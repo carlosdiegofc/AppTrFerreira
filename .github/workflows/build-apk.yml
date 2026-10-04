@@ -1,1 +1,41 @@
+name: Crear APK de Android
+on:
+  workflow_dispatch:
+  push:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Leer versión real del código
+        id: version
+        shell: bash
+        run: |
+          python3 - <<'PYCODE'
+          import os, re
+          from pathlib import Path
+          content = Path("app/build.gradle.kts").read_text()
+          match = re.search(r'versionName\s*=\s*"([0-9.]+)"', content)
+          if not match:
+              raise SystemExit("No se encontró la versión de app/build.gradle.kts")
+          version = match.group(1)
+          print("Compilando versión " + version)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write("name=" + version + "\n")
+          PYCODE
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - run: gradle --no-daemon :app:assembleDebug :app:testDebugUnitTest
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Transportes-Ferreira-GPS-v${{ steps.version.outputs.name }}
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
 
