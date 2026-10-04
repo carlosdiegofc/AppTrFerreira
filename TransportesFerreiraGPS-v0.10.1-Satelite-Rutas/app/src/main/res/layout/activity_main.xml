@@ -1,0 +1,474 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="@color/tr_white">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="22dp">
+
+        <!-- LOGIN -->
+        <LinearLayout
+            android:id="@+id/loginPanel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="105dp"
+                android:layout_marginTop="34dp"
+                android:layout_marginBottom="28dp"
+                android:adjustViewBounds="true"
+                android:contentDescription="TR Ferreira"
+                android:scaleType="fitCenter"
+                android:src="@drawable/tr_ferreira_logo" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="INICIAR SESIÓN"
+                android:textColor="@color/tr_black"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/email"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="18dp"
+                android:backgroundTint="@color/tr_blue"
+                android:hint="Correo"
+                android:inputType="textEmailAddress"
+                android:textColor="@color/tr_black"
+                android:textColorHint="@color/tr_gray_text" />
+
+            <EditText
+                android:id="@+id/password"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:backgroundTint="@color/tr_blue"
+                android:hint="Contraseña"
+                android:inputType="textPassword"
+                android:textColor="@color/tr_black"
+                android:textColorHint="@color/tr_gray_text" />
+
+            <CheckBox
+                android:id="@+id/remember"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Recordar mi sesión"
+                android:textColor="@color/tr_black" />
+
+            <Button
+                android:id="@+id/login"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
+                android:backgroundTint="@color/tr_blue"
+                android:text="INGRESAR"
+                android:textColor="@color/tr_white"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- MAIN MENU -->
+        <LinearLayout
+            android:id="@+id/menuPanel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="82dp"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="10dp"
+                android:adjustViewBounds="true"
+                android:contentDescription="TR Ferreira"
+                android:scaleType="fitCenter"
+                android:src="@drawable/tr_ferreira_logo" />
+
+            <TextView
+                android:id="@+id/menuDriverName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Chofer"
+                android:textColor="@color/tr_black"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="20dp"
+                android:text="Panel del chofer"
+                android:textColor="@color/tr_gray_text"
+                android:textSize="15sp" />
+
+            <Button
+                android:id="@+id/goStartTrip"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:backgroundTint="@color/tr_blue"
+                android:text="INICIAR VIAJE"
+                android:textColor="@color/tr_white"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/goTrips"
+                android:layout_width="match_parent"
+                android:layout_height="58dp"
+                android:layout_marginTop="12dp"
+                android:backgroundTint="@color/tr_black"
+                android:text="MIS VIAJES"
+                android:textColor="@color/tr_white" />
+
+            <Button
+                android:id="@+id/goFuel"
+                android:layout_width="match_parent"
+                android:layout_height="58dp"
+                android:layout_marginTop="12dp"
+                android:backgroundTint="@color/tr_black"
+                android:text="COMBUSTIBLES"
+                android:textColor="@color/tr_white" />
+
+            <Button
+                android:id="@+id/logout"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="30dp"
+                android:backgroundTint="@color/tr_gray"
+                android:text="CERRAR SESIÓN"
+                android:textColor="@color/tr_black" />
+        </LinearLayout>
+
+        <!-- PREPARE TRIP -->
+        <LinearLayout
+            android:id="@+id/preparePanel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/backPrepare"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:gravity="center_vertical"
+                android:text="‹  MENÚ"
+                android:textColor="@color/tr_blue"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="INICIAR VIAJE"
+                android:textColor="@color/tr_black"
+                android:textSize="24sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
+                android:text="Chofer"
+                android:textColor="@color/tr_gray_text" />
+
+            <TextView
+                android:id="@+id/driverName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="14dp"
+                android:textColor="@color/tr_black"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Camión"
+                android:textColor="@color/tr_gray_text" />
+
+            <Spinner
+                android:id="@+id/vehicle"
+                android:layout_width="match_parent"
+                android:layout_height="58dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="Tipo de viaje"
+                android:textColor="@color/tr_gray_text" />
+
+            <RadioGroup
+                android:id="@+id/tripType"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <RadioButton
+                    android:id="@+id/tripLoaded"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:checked="true"
+                    android:text="Con carga"
+                    android:textColor="@color/tr_black" />
+
+                <RadioButton
+                    android:id="@+id/tripEmpty"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:text="Sin carga / retorno vacío"
+                    android:textColor="@color/tr_black" />
+            </RadioGroup>
+
+            <Button
+                android:id="@+id/start"
+                android:layout_width="match_parent"
+                android:layout_height="60dp"
+                android:layout_marginTop="22dp"
+                android:backgroundTint="@color/tr_blue"
+                android:text="COMENZAR VIAJE"
+                android:textColor="@color/tr_white"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="16dp"
+                android:text="GPS listo para iniciar"
+                android:textColor="@color/tr_gray_text"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- ACTIVE TRIP -->
+        <LinearLayout
+            android:id="@+id/activePanel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="78dp"
+                android:layout_marginTop="10dp"
+                android:layout_marginBottom="6dp"
+                android:adjustViewBounds="true"
+                android:contentDescription="TR Ferreira"
+                android:scaleType="fitCenter"
+                android:src="@drawable/tr_ferreira_logo" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="VIAJE ACTIVO"
+                android:textColor="@color/tr_blue"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/gpsState"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:paddingBottom="22dp"
+                android:text="● GPS CONECTADO"
+                android:textColor="@color/tr_blue"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="VELOCIDAD ACTUAL"
+                android:textColor="@color/tr_gray_text" />
+
+            <TextView
+                android:id="@+id/speedValue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="0"
+                android:textColor="@color/tr_black"
+                android:textSize="56sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="km/h"
+                android:textColor="@color/tr_black"
+                android:textSize="20sp" />
+
+            <TextView
+                android:id="@+id/distanceValue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:layout_marginTop="18dp"
+                android:text="0,0 km recorridos"
+                android:textColor="@color/tr_black"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/activeVehicle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:paddingTop="8dp"
+                android:textColor="@color/tr_gray_text"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/activeTripType"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:paddingBottom="24dp"
+                android:textColor="@color/tr_gray_text"
+                android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/activeFuel"
+                android:layout_width="match_parent"
+                android:layout_height="58dp"
+                android:backgroundTint="@color/tr_blue"
+                android:text="CARGAR COMBUSTIBLE"
+                android:textColor="@color/tr_white"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/stop"
+                android:layout_width="match_parent"
+                android:layout_height="58dp"
+                android:layout_marginTop="14dp"
+                android:backgroundTint="@color/tr_red"
+                android:text="FINALIZAR VIAJE"
+                android:textColor="@color/tr_white"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- FUEL -->
+        <LinearLayout
+            android:id="@+id/fuelPanel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/backFuel"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:gravity="center_vertical"
+                android:text="‹  VOLVER"
+                android:textColor="@color/tr_blue"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="CARGAR COMBUSTIBLE"
+                android:textColor="@color/tr_black"
+                android:textSize="24sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="Fecha"
+                android:textColor="@color/tr_gray_text" />
+
+            <EditText
+                android:id="@+id/fuelDate"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:backgroundTint="@color/tr_blue"
+                android:inputType="date"
+                android:textColor="@color/tr_black" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Litros (opcional)"
+                android:textColor="@color/tr_gray_text" />
+
+            <EditText
+                android:id="@+id/fuelLiters"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:backgroundTint="@color/tr_blue"
+                android:hint="Ej. 50"
+                android:inputType="numberDecimal"
+                android:textColor="@color/tr_black"
+                android:textColorHint="@color/tr_gray_text" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Monto (opcional)"
+                android:textColor="@color/tr_gray_text" />
+
+            <EditText
+                android:id="@+id/fuelAmount"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:backgroundTint="@color/tr_blue"
+                android:hint="Ej. 2500"
+                android:inputType="numberDecimal"
+                android:textColor="@color/tr_black"
+                android:textColorHint="@color/tr_gray_text" />
+
+            <Button
+                android:id="@+id/takePhoto"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:layout_marginTop="18dp"
+                android:backgroundTint="@color/tr_blue"
+                android:text="SACAR FOTO DE LA BOLETA"
+                android:textColor="@color/tr_white" />
+
+            <Button
+                android:id="@+id/pickPhoto"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:layout_marginTop="10dp"
+                android:backgroundTint="@color/tr_black"
+                android:text="SUBIR FOTO DESDE GALERÍA"
+                android:textColor="@color/tr_white" />
+
+            <TextView
+                android:id="@+id/photoState"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="12dp"
+                android:text="Sin foto seleccionada"
+                android:textColor="@color/tr_gray_text" />
+
+            <Button
+                android:id="@+id/saveFuel"
+                android:layout_width="match_parent"
+                android:layout_height="58dp"
+                android:layout_marginTop="22dp"
+                android:backgroundTint="@color/tr_blue"
+                android:text="GUARDAR REGISTRO"
+                android:textColor="@color/tr_white"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>
