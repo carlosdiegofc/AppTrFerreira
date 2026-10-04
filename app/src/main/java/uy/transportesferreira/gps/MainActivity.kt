@@ -205,14 +205,19 @@ class MainActivity:AppCompatActivity(){
   pause=button(root,"Pausar viaje",false){try{service(if(store.current()?.optBoolean("paused")==true)GpsService.RESUME else GpsService.PAUSE)}catch(_:Exception){toast("Revisá el permiso de ubicación")}}
   actionTile(root,"Cargar combustible","Foto de boleta o ingreso manual"){openFuel(store.current())}
   actionTile(root,"Agregar remito","Salida o llegada · número y/o foto"){openDocument(store.current(),"trip","arrival")}
+  if(!(getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName))actionTile(root,"Evitar cortes del GPS","Permitir que la app siga en segundo plano"){batteryExemption()}
   count=label(root,"",12f,muted);sync=label(root,store.message(),12f,muted)
   back("Revisar ubicación GPS"){requestStart()}
   dock.visibility=View.VISIBLE;button(dock,"Finalizar viaje",false,Color.rgb(182,47,52)){AlertDialog.Builder(this).setTitle("¿Finalizar este viaje?").setMessage("Se guardarán el recorrido, las boletas y los remitos.").setNegativeButton("Seguir viaje",null).setPositiveButton("Finalizar"){_,_->try{service(GpsService.FINISH)}catch(_:Exception){toast("No se pudo finalizar. Reintentá.")}}.show()}
   refresh();try{service()}catch(_:Exception){gps?.text="Revisá el permiso de ubicación para continuar"}
  }
+ @android.annotation.SuppressLint("BatteryLife") private fun batteryExemption(){
+  try{startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,Uri.parse("package:$packageName")))}
+  catch(_:Exception){try{startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))}catch(_:Exception){toast("Abrí Ajustes › Batería y permití que la app funcione sin restricciones")}}
+ }
  private fun refresh(){if(!::store.isInitialized)return;sync?.text=store.message();if(screen!="trip")return;val t=store.current()?:return;if(!t.optBoolean("active")){home();toast("Viaje finalizado. Los datos pendientes se enviarán con conexión.");return}
   val paused=t.optBoolean("paused");status?.text=if(paused)"VIAJE PAUSADO" else "VIAJE EN CURSO";status?.setTextColor(if(paused)Color.rgb(159,101,15) else Color.rgb(12,119,90));distance?.text=String.format(Locale("es","UY"),"%.1f",t.optDouble("distance_meters",0.0)/1000);pause?.text=if(paused)"Reanudar viaje" else "Pausar viaje"
-  val recent=try{System.currentTimeMillis()-java.time.Instant.parse(t.optJSONObject("last_point")?.optString("recorded_at")).toEpochMilli()<30000}catch(_:Exception){false};speed?.text=if(paused)"0" else if(recent)String.format(Locale("es","UY"),"%.0f",t.optDouble("speed_kmh",0.0)) else "—";gps?.text=if(paused)"El GPS y los kilómetros están pausados" else if(recent)"GPS actualizado" else "Esperando señal GPS precisa…";val n=store.receiptCount(t.getString("id"));count?.text=if(n==0)"Sin boletas adjuntas" else "$n boleta(s) vinculada(s) a este viaje"
+  val recent=try{System.currentTimeMillis()-java.time.Instant.parse(t.optJSONObject("last_point")?.optString("recorded_at")).toEpochMilli()<30000}catch(_:Exception){false};speed?.text=if(paused)"0" else if(recent)String.format(Locale("es","UY"),"%.0f",t.optDouble("speed_kmh",0.0)) else "—";val warn=store.warning();gps?.text=if(paused)"El GPS y los kilómetros están pausados" else if(warn.isNotBlank())"⚠ "+warn else if(recent)"GPS actualizado" else "Esperando señal GPS precisa…";val n=store.receiptCount(t.getString("id"));count?.text=if(n==0)"Sin boletas adjuntas" else "$n boleta(s) vinculada(s) a este viaje"
   liveMap?.let{map->val (points,end)=store.track(t.getString("id"),trackOffset);trackOffset=end;map.push(points)}
  }
  private fun openFuel(t:JSONObject?){fuelStep=0;fuelTrip=t;fuelForm=JSONObject().put("receipt_date",java.time.LocalDate.now().toString());photo=null;photoMode="fuel";fuel()}

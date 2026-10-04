@@ -17,6 +17,7 @@ class TripStore(private val c:Context) {
     fun save(trip:JSONObject)=synchronized(lock){write(File(dir("trips"),"${trip.getString("id")}.json"),trip);Unit}
     fun start(user:JSONObject,name:String,vehicle:String,empty:Boolean,details:JSONObject=JSONObject()):JSONObject=synchronized(lock){
         check(current()?.optBoolean("active")!=true){"Ya hay un viaje activo"}
+        warning("")
         dir("track").listFiles()?.sortedByDescending{it.lastModified()}?.drop(5)?.forEach{it.delete()}
         val t=JSONObject().put("id",UUID.randomUUID().toString()).put("driver_id",user.getString("id")).put("driver_name",name).put("vehicle",vehicle)
             .put("started_at",Instant.now().toString()).put("ended_at",JSONObject.NULL).put("active",true).put("paused",false)
@@ -71,6 +72,8 @@ class TripStore(private val c:Context) {
     fun markTripSynced(id:String,revision:Int)=synchronized(lock){val f=File(dir("trips"),"$id.json");val t=read(f)?:return@synchronized;t.put("synced_revision",revision);write(f,t)}
     fun markReceiptSynced(file:File,r:JSONObject)=synchronized(lock){r.put("synced",true);write(file,r)}
     fun message(value:String){prefs.edit().putString("sync_message",value).apply()}
+    fun warning(value:String){prefs.edit().putString("gps_warning",value).apply()}
+    fun warning()=prefs.getString("gps_warning","") ?: ""
     fun message()=prefs.getString("sync_message","Esperando sincronización") ?: ""
     companion object{private val lock=Any()}
 }

@@ -1,3 +1,13 @@
+# Transportes Ferreira GPS — v0.11.1
+
+## Nuevo en v0.11.1 (GPS más robusto)
+- Aviso en pantalla y en una notificación si el GPS del teléfono está apagado, falta el permiso o pasan más de 2 minutos sin señal.
+- Si el GPS deja de entregar posiciones, la app lo reinicia sola (como máximo una vez por minuto).
+- Si Android detiene el servicio en segundo plano, la app lo informa en lugar de cerrarse.
+- Botón «Evitar cortes del GPS» en el viaje en curso para excluir la app de la optimización de batería (aparece solo si todavía no está excluida).
+- La app ya no espera una posición «perfecta» para empezar a registrar. Los filtros de precisión y de saltos imposibles se mantienen.
+- No cambia nada de lo que se envía al panel.
+
 # Transportes Ferreira GPS — v0.11.0
 
 ## Nuevo en v0.11.0
