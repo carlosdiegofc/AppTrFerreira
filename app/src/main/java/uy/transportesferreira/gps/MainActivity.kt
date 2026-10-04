@@ -45,7 +45,7 @@ class MainActivity:AppCompatActivity(){
  private var tripForm=JSONObject();private var fuelForm=JSONObject();private var docForm=JSONObject();private var draftDocs=JSONArray()
  private var fuelTrip:JSONObject?=null;private var historyTrip:JSONObject?=null;private var docTrip:JSONObject?=null
  private var photoMode="fuel";private var docReturn="prepare";private var historyLimit=50
- private var activeMap:android.webkit.WebView?=null
+ private var activeMap:android.webkit.WebView?=null;private var liveMap:TripMap.Live?=null;private var trackOffset=0L
  private val trucks=arrayOf("Seleccioná un camión","Ford Cargo 1722","Mercedes-Benz 1618","Leyland","Mercedes-Benz 1630")
  private val permissions=registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){
   if(ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED){try{service()}catch(_:Exception){};homeOrTrip()}
@@ -77,7 +77,7 @@ class MainActivity:AppCompatActivity(){
  }}
  private fun dp(n:Int)=(n*resources.displayMetrics.density).toInt()
  private fun bg(color:Int,r:Int=20)=GradientDrawable().apply{setColor(color);cornerRadius=dp(r).toFloat()}
- private fun page(key:String){activeMap?.destroy();activeMap=null;screen=key;distance=null;speed=null;status=null;sync=null;gps=null;pause=null;count=null
+ private fun page(key:String){activeMap?.destroy();activeMap=null;liveMap=null;screen=key;distance=null;speed=null;status=null;sync=null;gps=null;pause=null;count=null
   val shell=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(pale)}
   val scroll=ScrollView(this).apply{isFillViewport=true;isVerticalScrollBarEnabled=false}
   root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(20),dp(14),dp(20),dp(20))};scroll.addView(root)
@@ -199,6 +199,9 @@ class MainActivity:AppCompatActivity(){
   label(left,"RECORRIDO",11f,Color.rgb(155,190,245),true);distance=label(left,"0,0",32f,Color.WHITE,true);label(left,"kilómetros GPS",12f,Color.WHITE)
   label(right,"VELOCIDAD",11f,Color.rgb(155,190,245),true);speed=label(right,"—",32f,Color.WHITE,true);label(right,"km/h",12f,Color.WHITE)
   gps=label(c,"Esperando ubicación precisa…",13f,Color.rgb(212,225,245))
+  val dest=store.details().firstOrNull{it.second.optString("trip_id")==t.getString("id")}?.second?.optJSONObject("data")
+  trackOffset=0L;val live=TripMap.live(this,dest?.optDouble("destination_lat",Double.NaN)?:Double.NaN,dest?.optDouble("destination_lng",Double.NaN)?:Double.NaN)
+  liveMap=live;activeMap=live.web;root.addView(live.web,LinearLayout.LayoutParams(-1,dp(340)).apply{topMargin=dp(12);bottomMargin=dp(12)})
   pause=button(root,"Pausar viaje",false){try{service(if(store.current()?.optBoolean("paused")==true)GpsService.RESUME else GpsService.PAUSE)}catch(_:Exception){toast("Revisá el permiso de ubicación")}}
   actionTile(root,"Cargar combustible","Foto de boleta o ingreso manual"){openFuel(store.current())}
   actionTile(root,"Agregar remito","Salida o llegada · número y/o foto"){openDocument(store.current(),"trip","arrival")}
@@ -210,6 +213,7 @@ class MainActivity:AppCompatActivity(){
  private fun refresh(){if(!::store.isInitialized)return;sync?.text=store.message();if(screen!="trip")return;val t=store.current()?:return;if(!t.optBoolean("active")){home();toast("Viaje finalizado. Los datos pendientes se enviarán con conexión.");return}
   val paused=t.optBoolean("paused");status?.text=if(paused)"VIAJE PAUSADO" else "VIAJE EN CURSO";status?.setTextColor(if(paused)Color.rgb(159,101,15) else Color.rgb(12,119,90));distance?.text=String.format(Locale("es","UY"),"%.1f",t.optDouble("distance_meters",0.0)/1000);pause?.text=if(paused)"Reanudar viaje" else "Pausar viaje"
   val recent=try{System.currentTimeMillis()-java.time.Instant.parse(t.optJSONObject("last_point")?.optString("recorded_at")).toEpochMilli()<30000}catch(_:Exception){false};speed?.text=if(paused)"0" else if(recent)String.format(Locale("es","UY"),"%.0f",t.optDouble("speed_kmh",0.0)) else "—";gps?.text=if(paused)"El GPS y los kilómetros están pausados" else if(recent)"GPS actualizado" else "Esperando señal GPS precisa…";val n=store.receiptCount(t.getString("id"));count?.text=if(n==0)"Sin boletas adjuntas" else "$n boleta(s) vinculada(s) a este viaje"
+  liveMap?.let{map->val (points,end)=store.track(t.getString("id"),trackOffset);trackOffset=end;map.push(points)}
  }
  private fun openFuel(t:JSONObject?){fuelStep=0;fuelTrip=t;fuelForm=JSONObject().put("receipt_date",java.time.LocalDate.now().toString());photo=null;photoMode="fuel";fuel()}
  private fun fuel(){

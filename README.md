@@ -1,4 +1,10 @@
-# Transportes Ferreira GPS — v0.10.1
+# Transportes Ferreira GPS — v0.11.0
+
+## Nuevo en v0.11.0
+- Mapa en vivo en la pantalla del viaje en curso: muestra el recorrido, sigue al camión y permite cambiar entre Rutas y ciudades, Relieve y Satélite + rutas.
+- Si el viaje tiene destino elegido con la búsqueda, se dibuja la ruta por carretera hasta el destino con la distancia y el tiempo aproximados (requiere conexión; usa el servicio público OSRM).
+- Botones «Centrar» (vuelve a seguir al camión) y «Ver todo» (muestra el recorrido completo y el destino).
+- Kilómetros y km/h siguen visibles arriba del mapa. El recorrido del mapa se guarda además en el teléfono, por lo que se recupera al reabrir la app.
 
 ## Nuevo en v0.10.1
 - La vista Satélite + rutas superpone carreteras y nombres de lugares sobre las imágenes.

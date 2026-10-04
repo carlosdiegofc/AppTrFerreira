@@ -17,6 +17,7 @@ class TripStore(private val c:Context) {
     fun save(trip:JSONObject)=synchronized(lock){write(File(dir("trips"),"${trip.getString("id")}.json"),trip);Unit}
     fun start(user:JSONObject,name:String,vehicle:String,empty:Boolean,details:JSONObject=JSONObject()):JSONObject=synchronized(lock){
         check(current()?.optBoolean("active")!=true){"Ya hay un viaje activo"}
+        dir("track").listFiles()?.sortedByDescending{it.lastModified()}?.drop(5)?.forEach{it.delete()}
         val t=JSONObject().put("id",UUID.randomUUID().toString()).put("driver_id",user.getString("id")).put("driver_name",name).put("vehicle",vehicle)
             .put("started_at",Instant.now().toString()).put("ended_at",JSONObject.NULL).put("active",true).put("paused",false)
             .put("load_type",if(empty)"empty" else "loaded").put("distance_meters",0.0).put("segment",0).put("revision",1).put("synced_revision",0)
@@ -26,6 +27,19 @@ class TripStore(private val c:Context) {
     }
     fun update(change:(JSONObject)->Unit):JSONObject?=synchronized(lock){val t=current()?:return@synchronized null;change(t);t.put("revision",t.optInt("revision")+1);save(t);t}
     fun trips()=synchronized(lock){dir("trips").listFiles()?.filter{it.extension=="json"}?.mapNotNull{read(it)}?.sortedBy{it.optString("started_at")} ?: emptyList()}
+    /** Local copy of the route for the live map; GPS points are deleted from the phone once uploaded. */
+    fun appendTrack(tripId:String,lat:Double,lng:Double,segment:Int,time:Long)=synchronized(lock){File(dir("track"),"$tripId.csv").appendText("$lat,$lng,$segment,$time\n")}
+    fun track(tripId:String,offset:Long):Pair<List<DoubleArray>,Long>=synchronized(lock){
+        val f=File(dir("track"),"$tripId.csv")
+        if(!f.exists()||f.length()<=offset)Pair(emptyList(),offset) else {
+            val bytes=java.io.RandomAccessFile(f,"r").use{r->r.seek(offset);ByteArray((r.length()-offset).toInt()).also{r.readFully(it)}}
+            val end=bytes.lastIndexOf('\n'.code.toByte())
+            if(end<0)Pair(emptyList(),offset) else {
+                val points=String(bytes,0,end).lines().mapNotNull{l->val p=l.split(',');if(p.size!=4)null else try{doubleArrayOf(p[0].toDouble(),p[1].toDouble(),p[2].toDouble(),p[3].toDouble())}catch(_:Exception){null}}
+                Pair(points,offset+end+1)
+            }
+        }
+    }
     fun addPoint(point:JSONObject)=synchronized(lock){write(File(dir("points"),"${point.getString("event_id")}.json"),point);Unit}
     fun points()=synchronized(lock){dir("points").listFiles()?.filter{it.extension=="json"}?.mapNotNull{f->read(f)?.let{Pair(f,it)}}?.sortedBy{it.second.optString("recorded_at")} ?: emptyList()}
     fun receipts()=synchronized(lock){dir("receipts").listFiles()?.filter{it.extension=="json"}?.mapNotNull{f->read(f)?.let{Pair(f,it)}} ?: emptyList()}
