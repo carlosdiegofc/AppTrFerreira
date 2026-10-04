@@ -1,4 +1,12 @@
-# Transportes Ferreira GPS — v0.11.1
+# Transportes Ferreira GPS — v0.12.0
+
+## Nuevo en v0.12.0 (diseño)
+- Logo de TR Ferreira en el encabezado de todas las pantallas, con transición suave al cambiar de pantalla.
+- Tarjetas con sombra y bordes más redondeados; botones con degradado y efecto al tocar.
+- Accesos con íconos (combustible, historial, remitos, batería) y flecha.
+- Tarjetas principales de Inicio y Viaje con degradado azul; kilómetros y km/h con números más grandes.
+- Estado del viaje (en curso / pausado) en una etiqueta destacada.
+- Solo cambia el aspecto: no cambia nada de lo que se guarda ni de lo que se envía al panel.
 
 ## Nuevo en v0.11.1 (GPS más robusto)
 - Aviso en pantalla y en una notificación si el GPS del teléfono está apagado, falta el permiso o pasan más de 2 minutos sin señal.

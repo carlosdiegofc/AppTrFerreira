@@ -77,6 +77,8 @@ class MainActivity:AppCompatActivity(){
  }}
  private fun dp(n:Int)=(n*resources.displayMetrics.density).toInt()
  private fun bg(color:Int,r:Int=20)=GradientDrawable().apply{setColor(color);cornerRadius=dp(r).toFloat()}
+ private fun grad(a:Int,b:Int,r:Int=20)=GradientDrawable(GradientDrawable.Orientation.TL_BR,intArrayOf(a,b)).apply{cornerRadius=dp(r).toFloat()}
+ private fun ripple(content:android.graphics.drawable.Drawable,tint:Int=Color.argb(35,16,35,61)):android.graphics.drawable.Drawable=android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(tint),content,null)
  private fun page(key:String){activeMap?.destroy();activeMap=null;liveMap=null;screen=key;distance=null;speed=null;status=null;sync=null;gps=null;pause=null;count=null
   val shell=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(pale)}
   val scroll=ScrollView(this).apply{isFillViewport=true;isVerticalScrollBarEnabled=false}
@@ -85,7 +87,11 @@ class MainActivity:AppCompatActivity(){
   dock=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(20),0,dp(20),dp(12));setBackgroundColor(Color.WHITE);visibility=View.GONE}
   shell.addView(dock,LinearLayout.LayoutParams(-1,-2));setContentView(shell)
   ViewCompat.setOnApplyWindowInsetsListener(shell){v,i->val insets=i.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime());v.setPadding(insets.left,insets.top,insets.right,insets.bottom);i}
-  label(root,"TR FERREIRA   /   CHOFERES",11f,blue,true).apply{letterSpacing=.10f}
+  val brand=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
+  brand.addView(ImageView(this).apply{setImageResource(R.drawable.tr_ferreira_logo);adjustViewBounds=true;contentDescription="TR Ferreira"},LinearLayout.LayoutParams(-2,dp(26)))
+  brand.addView(TextView(this).apply{text="CHOFERES";textSize=11f;setTextColor(muted);setTypeface(null,Typeface.BOLD);letterSpacing=.12f;setPadding(dp(10),0,0,0)})
+  root.addView(brand,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(4);bottomMargin=dp(4)})
+  shell.alpha=0f;shell.animate().alpha(1f).setDuration(200).start()
  }
  private fun back(title:String="Inicio",action:()->Unit){
   val v=TextView(this).apply{text="‹  $title";textSize=16f;setTextColor(blue);gravity=Gravity.CENTER_VERTICAL;minHeight=dp(48);setOnClickListener{action()};isFocusable=true;contentDescription="Volver a $title"};root.addView(v)
@@ -95,9 +101,14 @@ class MainActivity:AppCompatActivity(){
   val row=LinearLayout(this);root.addView(row,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(10);bottomMargin=dp(8)})
   titles.forEachIndexed{i,title->val v=TextView(this).apply{text="${i+1}  $title";textSize=12f;gravity=Gravity.CENTER;setTextColor(if(i==current)Color.WHITE else muted);background=bg(if(i==current)navy else Color.WHITE,12);minHeight=dp(48);setPadding(dp(3),dp(8),dp(3),dp(8));isFocusable=true;setOnClickListener{change(i)}};row.addView(v,LinearLayout.LayoutParams(0,-2,1f).apply{if(i>0)leftMargin=dp(6)})}
  }
- private fun actionTile(parent:LinearLayout,title:String,subtitle:String,action:()->Unit){
-  val tile=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=bg(Color.WHITE,18);setPadding(dp(18),dp(12),dp(18),dp(12));isClickable=true;isFocusable=true;setOnClickListener{action()};contentDescription="$title. $subtitle"}
-  label(tile,"$title   ›",19f,navy,true);label(tile,subtitle,13f,muted);parent.addView(tile,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12)})
+ private fun actionTile(parent:LinearLayout,title:String,subtitle:String,icon:String="●",action:()->Unit){
+  val tile=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;background=ripple(bg(Color.WHITE,20));elevation=dp(2).toFloat();setPadding(dp(14),dp(12),dp(14),dp(12));isClickable=true;isFocusable=true;setOnClickListener{action()};contentDescription="$title. $subtitle"}
+  tile.addView(TextView(this).apply{text=icon;textSize=22f;gravity=Gravity.CENTER;background=bg(Color.rgb(228,238,254),16)},LinearLayout.LayoutParams(dp(52),dp(52)))
+  val texts=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),0,dp(8),0)}
+  label(texts,title,18f,navy,true).setPadding(0,0,0,dp(2));label(texts,subtitle,13f,muted).setPadding(0,0,0,0)
+  tile.addView(texts,LinearLayout.LayoutParams(0,-2,1f))
+  tile.addView(TextView(this).apply{text="›";textSize=28f;setTextColor(blue)})
+  parent.addView(tile,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12)})
  }
  private fun truckSelector(c:LinearLayout){
   val catalog=mobile.catalog().optJSONArray("equipos");val choices=mutableListOf("Sin seleccionar")
@@ -111,8 +122,8 @@ class MainActivity:AppCompatActivity(){
   button(c,(if(selected)"●  " else "○  ")+title,selected,navy,action)
  }
  private fun label(p:LinearLayout,s:String,size:Float=16f,color:Int=navy,bold:Boolean=false):TextView{val v=TextView(this).apply{text=s;textSize=size;setTextColor(color);if(bold)setTypeface(null,Typeface.BOLD);setPadding(0,dp(6),0,dp(8))};p.addView(v,LinearLayout.LayoutParams(-1,-2));return v}
- private fun card():LinearLayout{val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=bg(Color.WHITE);setPadding(dp(18),dp(12),dp(18),dp(12))};root.addView(v,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12);bottomMargin=dp(4)});return v}
- private fun button(p:LinearLayout,s:String,primary:Boolean=true,color:Int=blue,action:()->Unit):Button{val v=Button(this).apply{text=s;isAllCaps=false;textSize=16f;setTypeface(null,Typeface.BOLD);setTextColor(if(primary)Color.WHITE else color);backgroundTintList=null;background=bg(if(primary)color else Color.rgb(231,239,253),14);minHeight=dp(52);stateListAnimator=null;setPadding(dp(12),dp(10),dp(12),dp(10));setOnClickListener{action()}};p.addView(v,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12)});return v}
+ private fun card():LinearLayout{val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=bg(Color.WHITE,22);elevation=dp(3).toFloat();setPadding(dp(18),dp(14),dp(18),dp(14))};root.addView(v,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12);bottomMargin=dp(4)});return v}
+ private fun button(p:LinearLayout,s:String,primary:Boolean=true,color:Int=blue,action:()->Unit):Button{val v=Button(this).apply{text=s;isAllCaps=false;textSize=16f;setTypeface(null,Typeface.BOLD);setTextColor(if(primary)Color.WHITE else color);backgroundTintList=null;background=if(primary)ripple(grad(color,androidx.core.graphics.ColorUtils.blendARGB(color,Color.WHITE,.22f),16),Color.argb(70,255,255,255)) else ripple(bg(Color.rgb(231,239,253),16));if(primary)elevation=dp(2).toFloat();minHeight=dp(52);stateListAnimator=null;setPadding(dp(12),dp(10),dp(12),dp(10));setOnClickListener{action()}};p.addView(v,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12)});return v}
  private fun field(p:LinearLayout,s:String,type:Int):EditText{label(p,s,13f,muted,true);return EditText(this).apply{inputType=type;textSize=17f;setTextColor(navy);background=bg(pale,12);setPadding(dp(14),dp(14),dp(14),dp(14));isSingleLine=true;p.addView(this,LinearLayout.LayoutParams(-1,dp(56)))}}
  private fun login(){page("login");label(root,"Tu viaje empieza acá.",32f,navy,true);label(root,"Ingresá con tu cuenta de chofer.",16f,muted)
   val c=card();label(c,"Iniciar sesión",21f,navy,true);val email=field(c,"Correo electrónico",InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);email.setText(getSharedPreferences("gps",MODE_PRIVATE).getString("email",""));val pass=field(c,"Contraseña",InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD);val msg=label(c,"",14f,muted)
@@ -123,19 +134,19 @@ class MainActivity:AppCompatActivity(){
  private fun driverName():String{val u=api.session()?.optJSONObject("user")?:return "Chofer";val m=u.optJSONObject("user_metadata");val known=mapOf("immer@trferreira.com" to "Immer Sampayo","luis@trferreira.com" to "Luis Ferreira","hugo@trferreira.com" to "Hugo Silva");return m?.optString("full_name")?.takeIf{it.isNotBlank()}?:m?.optString("name")?.takeIf{it.isNotBlank()}?:known[u.optString("email")]?:u.optString("email").substringBefore("@").replaceFirstChar{it.uppercase()}}
  private fun homeOrTrip(){if(store.current()?.optBoolean("active")==true)trip() else home()}
  private fun home(){
-  page("home");label(root,"Hola, $name",28f,navy,true);label(root,"¿Qué vas a hacer hoy?",16f,muted)
+  page("home");label(root,"Hola, $name 👋",30f,navy,true);label(root,"¿Qué vas a hacer hoy?",16f,muted)
   val active=store.current()?.optBoolean("active")==true
-  val hero=card().apply{background=bg(navy,22)}
+  val hero=card().apply{background=grad(navy,Color.rgb(22,78,190),24)}
   label(hero,if(active)"TU VIAJE ESTÁ EN CURSO" else "LISTO PARA SALIR",11f,Color.rgb(155,190,245),true)
   label(hero,if(active)store.current()!!.optString("vehicle") else "Un nuevo viaje",25f,Color.WHITE,true)
   label(hero,if(active)"Volvé para ver kilómetros y registrar cargas." else "Podés salir ahora y completar los datos después.",14f,Color.rgb(212,225,245))
   button(hero,if(active)"Ver viaje  →" else "Nuevo viaje  →"){
    if(active)trip() else {tripForm=JSONObject();draftDocs=JSONArray();empty=false;tripStep=0;prepare()}
   }
-  actionTile(root,"Combustible",if(active)"Cargar en este viaje o fuera de él" else "Registrar una carga fuera de viaje"){
+  actionTile(root,"Combustible",if(active)"Cargar en este viaje o fuera de él" else "Registrar una carga fuera de viaje",icon="⛽"){
    if(active)AlertDialog.Builder(this).setTitle("¿Dónde registrar la carga?").setItems(arrayOf("En el viaje en curso","Fuera de viaje")){_,i->openFuel(if(i==0)store.current() else null)}.show() else openFuel(null)
   }
-  actionTile(root,"Mi historial","Mis viajes y cargas de combustible"){
+  actionTile(root,"Mi historial","Mis viajes y cargas de combustible",icon="🗂️"){
    AlertDialog.Builder(this).setTitle("Mi historial").setItems(arrayOf("Mis viajes","Mi combustible")){_,i->history(if(i==0)"trips" else "fuel",true)}.show()
   }
   sync=label(root,store.message(),12f,muted)
@@ -191,21 +202,21 @@ class MainActivity:AppCompatActivity(){
  }
  private fun trip(){
   val t=store.current()?:return home();page("trip");back{home()}
-  status=label(root,"VIAJE EN CURSO",12f,blue,true);label(root,t.optString("vehicle"),25f,navy,true);label(root,if(t.optString("load_type")=="empty")"Retorno vacío" else "Viaje con carga",14f,muted)
-  val c=card().apply{background=bg(navy,22)}
+  status=label(root,"VIAJE EN CURSO",12f,blue,true).apply{background=bg(Color.WHITE,14);setPadding(dp(14),dp(6),dp(14),dp(6));elevation=dp(1).toFloat();(layoutParams as LinearLayout.LayoutParams).apply{width=-2;topMargin=dp(6)}};label(root,t.optString("vehicle"),25f,navy,true);label(root,if(t.optString("load_type")=="empty")"Retorno vacío" else "Viaje con carga",14f,muted)
+  val c=card().apply{background=grad(navy,Color.rgb(22,78,190),24)}
   val row=LinearLayout(this);c.addView(row)
   val left=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};val right=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(12),0,0,0)}
   row.addView(left,LinearLayout.LayoutParams(0,-2,1f));row.addView(right,LinearLayout.LayoutParams(0,-2,1f))
-  label(left,"RECORRIDO",11f,Color.rgb(155,190,245),true);distance=label(left,"0,0",32f,Color.WHITE,true);label(left,"kilómetros GPS",12f,Color.WHITE)
-  label(right,"VELOCIDAD",11f,Color.rgb(155,190,245),true);speed=label(right,"—",32f,Color.WHITE,true);label(right,"km/h",12f,Color.WHITE)
+  label(left,"RECORRIDO",11f,Color.rgb(155,190,245),true);distance=label(left,"0,0",42f,Color.WHITE,true);label(left,"kilómetros GPS",12f,Color.WHITE)
+  label(right,"VELOCIDAD",11f,Color.rgb(155,190,245),true);speed=label(right,"—",42f,Color.WHITE,true);label(right,"km/h",12f,Color.WHITE)
   gps=label(c,"Esperando ubicación precisa…",13f,Color.rgb(212,225,245))
   val dest=store.details().firstOrNull{it.second.optString("trip_id")==t.getString("id")}?.second?.optJSONObject("data")
   trackOffset=0L;val live=TripMap.live(this,dest?.optDouble("destination_lat",Double.NaN)?:Double.NaN,dest?.optDouble("destination_lng",Double.NaN)?:Double.NaN)
   liveMap=live;activeMap=live.web;root.addView(live.web,LinearLayout.LayoutParams(-1,dp(340)).apply{topMargin=dp(12);bottomMargin=dp(12)})
   pause=button(root,"Pausar viaje",false){try{service(if(store.current()?.optBoolean("paused")==true)GpsService.RESUME else GpsService.PAUSE)}catch(_:Exception){toast("Revisá el permiso de ubicación")}}
-  actionTile(root,"Cargar combustible","Foto de boleta o ingreso manual"){openFuel(store.current())}
-  actionTile(root,"Agregar remito","Salida o llegada · número y/o foto"){openDocument(store.current(),"trip","arrival")}
-  if(!(getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName))actionTile(root,"Evitar cortes del GPS","Permitir que la app siga en segundo plano"){batteryExemption()}
+  actionTile(root,"Cargar combustible","Foto de boleta o ingreso manual",icon="⛽"){openFuel(store.current())}
+  actionTile(root,"Agregar remito","Salida o llegada · número y/o foto",icon="🧾"){openDocument(store.current(),"trip","arrival")}
+  if(!(getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName))actionTile(root,"Evitar cortes del GPS","Permitir que la app siga en segundo plano",icon="🔋"){batteryExemption()}
   count=label(root,"",12f,muted);sync=label(root,store.message(),12f,muted)
   back("Revisar ubicación GPS"){requestStart()}
   dock.visibility=View.VISIBLE;button(dock,"Finalizar viaje",false,Color.rgb(182,47,52)){AlertDialog.Builder(this).setTitle("¿Finalizar este viaje?").setMessage("Se guardarán el recorrido, las boletas y los remitos.").setNegativeButton("Seguir viaje",null).setPositiveButton("Finalizar"){_,_->try{service(GpsService.FINISH)}catch(_:Exception){toast("No se pudo finalizar. Reintentá.")}}.show()}
