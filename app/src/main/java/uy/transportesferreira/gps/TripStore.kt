@@ -29,7 +29,7 @@ class TripStore(private val c:Context) {
     fun trips()=synchronized(lock){dir("trips").listFiles()?.filter{it.extension=="json"}?.mapNotNull{read(it)}?.sortedBy{it.optString("started_at")} ?: emptyList()}
     /** Local copy of the route for the live map; GPS points are deleted from the phone once uploaded. */
     fun appendTrack(tripId:String,lat:Double,lng:Double,segment:Int,time:Long)=synchronized(lock){File(dir("track"),"$tripId.csv").appendText("$lat,$lng,$segment,$time\n")}
-    fun track(tripId:String,offset:Long):Pair<List<DoubleArray>,Long>=synchronized(lock){
+    fun track(tripId:String,offset:Long):Pair<List<DoubleArray>,Long> =synchronized(lock){
         val f=File(dir("track"),"$tripId.csv")
         if(!f.exists()||f.length()<=offset)Pair(emptyList(),offset) else {
             val bytes=java.io.RandomAccessFile(f,"r").use{r->r.seek(offset);ByteArray((r.length()-offset).toInt()).also{r.readFully(it)}}
