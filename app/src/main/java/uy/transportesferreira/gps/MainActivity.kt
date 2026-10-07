@@ -96,10 +96,10 @@ class MainActivity:AppCompatActivity(){
   dock=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(24),dp(8),dp(24),dp(16));setBackgroundColor(cardBg);visibility=View.GONE}
   shell.addView(dock,LinearLayout.LayoutParams(-1,-2));setContentView(shell)
   ViewCompat.setOnApplyWindowInsetsListener(shell){v,i->val insets=i.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime());v.setPadding(insets.left,insets.top,insets.right,insets.bottom);i}
-  val brand=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
-  brand.addView(ImageView(this).apply{setImageResource(R.drawable.tr_ferreira_logo);adjustViewBounds=true;contentDescription="TR Ferreira"},LinearLayout.LayoutParams(-2,dp(28)))
-  brand.addView(TextView(this).apply{text="CHOFERES";textSize=12f;setTextColor(muted);setTypeface(null,Typeface.BOLD);letterSpacing=.15f;setPadding(dp(12),0,0,0)})
-  root.addView(brand,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(6);bottomMargin=dp(8)})
+  val brand=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;background=bg(cardBg,12);elevation=dp(1).toFloat();setPadding(dp(12),dp(8),dp(12),dp(8))}
+  brand.addView(ImageView(this).apply{setImageResource(R.drawable.tr_ferreira_logo);adjustViewBounds=true;contentDescription="TR Ferreira"},LinearLayout.LayoutParams(-2,dp(30)))
+  brand.addView(TextView(this).apply{text="CHOFERES";textSize=13f;setTextColor(muted);setTypeface(null,Typeface.BOLD);letterSpacing=.12f;setPadding(dp(14),0,0,0)})
+  root.addView(brand,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(8);bottomMargin=dp(12)})
   shell.alpha=0f;shell.animate().alpha(1f).setDuration(300).setInterpolator(android.view.animation.DecelerateInterpolator()).start()
  }
  private fun back(title:String="Inicio",action:()->Unit){
