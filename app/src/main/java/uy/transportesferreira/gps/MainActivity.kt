@@ -29,7 +29,14 @@ import java.util.*
 import kotlin.concurrent.thread
 import kotlin.math.max
 class MainActivity:AppCompatActivity(){
- private val navy=Color.rgb(16,35,61);private val blue=Color.rgb(28,100,242);private val muted=Color.rgb(99,115,136);private val pale=Color.rgb(241,246,252)
+ private val isDarkMode by lazy { (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES }
+ private val primary by lazy { if(isDarkMode) Color.rgb(76,175,255) else Color.rgb(28,100,242) }
+ private val secondary by lazy { if(isDarkMode) Color.rgb(129,212,250) else Color.rgb(66,165,245) }
+ private val navy by lazy { if(isDarkMode) Color.rgb(230,235,242) else Color.rgb(16,35,61) }
+ private val blue by lazy { primary }
+ private val muted by lazy { if(isDarkMode) Color.rgb(176,190,197) else Color.rgb(99,115,136) }
+ private val pale by lazy { if(isDarkMode) Color.rgb(33,33,33) else Color.rgb(241,246,252) }
+ private val cardBg by lazy { if(isDarkMode) Color.rgb(48,48,48) else Color.WHITE }
  private lateinit var root:LinearLayout
  private lateinit var dock:LinearLayout
  private var tripStep=0;private var fuelStep=0;private var docStep=0
@@ -84,49 +91,50 @@ class MainActivity:AppCompatActivity(){
  private fun page(key:String){activeMap?.destroy();activeMap=null;liveMap=null;screen=key;distance=null;speed=null;status=null;sync=null;gps=null;pause=null;count=null
   val shell=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(pale)}
   val scroll=ScrollView(this).apply{isFillViewport=true;isVerticalScrollBarEnabled=false}
-  root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(20),dp(14),dp(20),dp(20))};scroll.addView(root)
+  root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(24),dp(16),dp(24),dp(24))};scroll.addView(root)
   shell.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
-  dock=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(20),0,dp(20),dp(12));setBackgroundColor(Color.WHITE);visibility=View.GONE}
+  dock=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(24),dp(8),dp(24),dp(16));setBackgroundColor(cardBg);visibility=View.GONE}
   shell.addView(dock,LinearLayout.LayoutParams(-1,-2));setContentView(shell)
   ViewCompat.setOnApplyWindowInsetsListener(shell){v,i->val insets=i.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime());v.setPadding(insets.left,insets.top,insets.right,insets.bottom);i}
   val brand=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
-  brand.addView(ImageView(this).apply{setImageResource(R.drawable.tr_ferreira_logo);adjustViewBounds=true;contentDescription="TR Ferreira"},LinearLayout.LayoutParams(-2,dp(26)))
-  brand.addView(TextView(this).apply{text="CHOFERES";textSize=11f;setTextColor(muted);setTypeface(null,Typeface.BOLD);letterSpacing=.12f;setPadding(dp(10),0,0,0)})
-  root.addView(brand,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(4);bottomMargin=dp(4)})
-  shell.alpha=0f;shell.animate().alpha(1f).setDuration(200).start()
+  brand.addView(ImageView(this).apply{setImageResource(R.drawable.tr_ferreira_logo);adjustViewBounds=true;contentDescription="TR Ferreira"},LinearLayout.LayoutParams(-2,dp(28)))
+  brand.addView(TextView(this).apply{text="CHOFERES";textSize=12f;setTextColor(muted);setTypeface(null,Typeface.BOLD);letterSpacing=.15f;setPadding(dp(12),0,0,0)})
+  root.addView(brand,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(6);bottomMargin=dp(8)})
+  shell.alpha=0f;shell.animate().alpha(1f).setDuration(300).setInterpolator(android.view.animation.DecelerateInterpolator()).start()
  }
  private fun back(title:String="Inicio",action:()->Unit){
-  val v=TextView(this).apply{text="‹  $title";textSize=16f;setTextColor(blue);gravity=Gravity.CENTER_VERTICAL;minHeight=dp(48);setOnClickListener{action()};isFocusable=true;contentDescription="Volver a $title"};root.addView(v)
+  val v=TextView(this).apply{text="‹  $title";textSize=16f;setTextColor(blue);gravity=Gravity.CENTER_VERTICAL;minHeight=dp(56);setPadding(dp(12),dp(8),dp(12),dp(8));background=ripple(bg(cardBg,12));elevation=dp(1).toFloat();setOnClickListener{action()};isFocusable=true;contentDescription="Volver a $title";letterSpacing=-.01f};root.addView(v,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(8)})
  }
  private fun sticky(title:String,action:()->Unit){dock.visibility=View.VISIBLE;button(dock,title,action=action)}
  private fun steps(current:Int,titles:List<String>,change:(Int)->Unit){
-  val row=LinearLayout(this);root.addView(row,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(10);bottomMargin=dp(8)})
-  titles.forEachIndexed{i,title->val v=TextView(this).apply{text="${i+1}  $title";textSize=12f;gravity=Gravity.CENTER;setTextColor(if(i==current)Color.WHITE else muted);background=bg(if(i==current)navy else Color.WHITE,12);minHeight=dp(48);setPadding(dp(3),dp(8),dp(3),dp(8));isFocusable=true;setOnClickListener{change(i)}};row.addView(v,LinearLayout.LayoutParams(0,-2,1f).apply{if(i>0)leftMargin=dp(6)})}
+  val row=LinearLayout(this);root.addView(row,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12);bottomMargin=dp(14)})
+  titles.forEachIndexed{i,title->val v=TextView(this).apply{text="${i+1}  $title";textSize=12f;gravity=Gravity.CENTER;setTextColor(if(i==current)Color.WHITE else navy);background=ripple(bg(if(i==current)navy else pale,14));elevation=if(i==current)dp(2).toFloat() else dp(1).toFloat();minHeight=dp(52);setPadding(dp(6),dp(10),dp(6),dp(10));setTypeface(null,if(i==current)Typeface.BOLD else Typeface.NORMAL);letterSpacing=if(i==current).01f else 0f;isFocusable=true;setOnClickListener{change(i)}};row.addView(v,LinearLayout.LayoutParams(0,-2,1f).apply{if(i>0)leftMargin=dp(8)})}
  }
  private fun actionTile(parent:LinearLayout,title:String,subtitle:String,icon:String="●",action:()->Unit){
-  val tile=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;background=ripple(bg(Color.WHITE,20));elevation=dp(2).toFloat();setPadding(dp(14),dp(12),dp(14),dp(12));isClickable=true;isFocusable=true;setOnClickListener{action()};contentDescription="$title. $subtitle"}
-  tile.addView(TextView(this).apply{text=icon;textSize=22f;gravity=Gravity.CENTER;background=bg(Color.rgb(228,238,254),16)},LinearLayout.LayoutParams(dp(52),dp(52)))
-  val texts=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),0,dp(8),0)}
-  label(texts,title,18f,navy,true).setPadding(0,0,0,dp(2));label(texts,subtitle,13f,muted).setPadding(0,0,0,0)
+  val tile=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;background=ripple(bg(cardBg,20));elevation=dp(3).toFloat();setPadding(dp(18),dp(16),dp(18),dp(16));isClickable=true;isFocusable=true;setOnClickListener{action()};contentDescription="$title. $subtitle"}
+  tile.addView(TextView(this).apply{text=icon;textSize=24f;gravity=Gravity.CENTER;background=bg(if(isDarkMode)Color.rgb(66,100,140) else Color.rgb(228,238,254),16);setPadding(dp(4),dp(4),dp(4),dp(4))},LinearLayout.LayoutParams(dp(56),dp(56)))
+  val texts=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(18),0,dp(12),0)}
+  label(texts,title,19f,navy,true).setPadding(0,0,0,dp(3));label(texts,subtitle,13f,muted).setPadding(0,0,0,0)
   tile.addView(texts,LinearLayout.LayoutParams(0,-2,1f))
-  tile.addView(TextView(this).apply{text="›";textSize=28f;setTextColor(blue)})
-  parent.addView(tile,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12)})
+  tile.addView(TextView(this).apply{text="›";textSize=28f;setTextColor(blue);setPadding(dp(8),0,0,0)})
+  parent.addView(tile,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(14);bottomMargin=dp(8)})
  }
  private fun truckSelector(c:LinearLayout){
+  label(c,"Seleccionar camión",13f,muted,true)
   val catalog=mobile.catalog().optJSONArray("equipos");val choices=mutableListOf("Sin seleccionar")
   if(catalog!=null)for(i in 0 until catalog.length()){val e=catalog.getJSONObject(i);choices.add(e.optString("tipo")+e.optString("matriculaCamion").let{if(it.isBlank())"" else " · $it"})}
   if(choices.size==1)choices.addAll(trucks.drop(1))
   if(truck.isNotBlank()&&!choices.contains(truck))choices.add(truck)
-  val spinner=Spinner(this).apply{adapter=ArrayAdapter(this@MainActivity,android.R.layout.simple_spinner_dropdown_item,choices);minimumHeight=dp(56)};c.addView(spinner)
+  val spinner=Spinner(this).apply{adapter=ArrayAdapter(this@MainActivity,android.R.layout.simple_spinner_dropdown_item,choices);minimumHeight=dp(56);background=bg(if(isDarkMode)Color.rgb(66,66,66) else pale,14)};c.addView(spinner,LinearLayout.LayoutParams(-1,dp(60)).apply{topMargin=dp(8);bottomMargin=dp(12)})
   spinner.setSelection(choices.indexOf(truck).coerceAtLeast(0));spinner.onItemSelectedListener=object:AdapterView.OnItemSelectedListener{override fun onNothingSelected(p:AdapterView<*>?){};override fun onItemSelected(p:AdapterView<*>?,v:View?,pos:Int,id:Long){truck=if(pos>0)choices[pos] else ""}}
  }
  private fun choice(c:LinearLayout,title:String,selected:Boolean,action:()->Unit){
   button(c,(if(selected)"●  " else "○  ")+title,selected,navy,action)
  }
- private fun label(p:LinearLayout,s:String,size:Float=16f,color:Int=navy,bold:Boolean=false):TextView{val v=TextView(this).apply{text=s;textSize=size;setTextColor(color);if(bold)setTypeface(null,Typeface.BOLD);setPadding(0,dp(6),0,dp(8))};p.addView(v,LinearLayout.LayoutParams(-1,-2));return v}
- private fun card():LinearLayout{val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=bg(Color.WHITE,22);elevation=dp(3).toFloat();setPadding(dp(18),dp(14),dp(18),dp(14))};root.addView(v,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12);bottomMargin=dp(4)});return v}
- private fun button(p:LinearLayout,s:String,primary:Boolean=true,color:Int=blue,action:()->Unit):Button{val v=Button(this).apply{text=s;isAllCaps=false;textSize=16f;setTypeface(null,Typeface.BOLD);setTextColor(if(primary)Color.WHITE else color);backgroundTintList=null;background=if(primary)ripple(grad(color,androidx.core.graphics.ColorUtils.blendARGB(color,Color.WHITE,.22f),16),Color.argb(70,255,255,255)) else ripple(bg(Color.rgb(231,239,253),16));if(primary)elevation=dp(2).toFloat();minHeight=dp(52);stateListAnimator=null;setPadding(dp(12),dp(10),dp(12),dp(10));setOnClickListener{action()}};p.addView(v,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12)});return v}
- private fun field(p:LinearLayout,s:String,type:Int):EditText{label(p,s,13f,muted,true);return EditText(this).apply{inputType=type;textSize=17f;setTextColor(navy);background=bg(pale,12);setPadding(dp(14),dp(14),dp(14),dp(14));isSingleLine=true;p.addView(this,LinearLayout.LayoutParams(-1,dp(56)))}}
+ private fun label(p:LinearLayout,s:String,size:Float=16f,color:Int=navy,bold:Boolean=false):TextView{val v=TextView(this).apply{text=s;textSize=size;setTextColor(color);if(bold){setTypeface(null,Typeface.BOLD);letterSpacing=.01f};setPadding(0,dp(8),0,dp(10));lineHeight=dp((size*1.4).toInt())};p.addView(v,LinearLayout.LayoutParams(-1,-2));return v}
+ private fun card():LinearLayout{val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=bg(cardBg,24);elevation=dp(4).toFloat();setPadding(dp(20),dp(18),dp(20),dp(18))};root.addView(v,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(14);bottomMargin=dp(6)});return v}
+ private fun button(p:LinearLayout,s:String,primary:Boolean=true,color:Int=blue,action:()->Unit):Button{val v=Button(this).apply{text=s;isAllCaps=false;textSize=16f;setTypeface(null,Typeface.BOLD);setTextColor(if(primary)Color.WHITE else color);backgroundTintList=null;background=if(primary)ripple(grad(color,androidx.core.graphics.ColorUtils.blendARGB(color,Color.BLACK,.12f),18),Color.argb(60,255,255,255)) else ripple(bg(if(isDarkMode)Color.rgb(66,66,66) else Color.rgb(231,239,253),18));if(primary)elevation=dp(3).toFloat();minHeight=dp(56);stateListAnimator=null;setPadding(dp(16),dp(12),dp(16),dp(12));letterSpacing=.02f;setOnClickListener{action()}};p.addView(v,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(14)});return v}
+ private fun field(p:LinearLayout,s:String,type:Int):EditText{label(p,s,13f,muted,true);return EditText(this).apply{inputType=type;textSize=17f;setTextColor(navy);background=bg(if(isDarkMode)Color.rgb(66,66,66) else pale,16);setPadding(dp(16),dp(16),dp(16),dp(16));isSingleLine=true;elevation=dp(1).toFloat();p.addView(this,LinearLayout.LayoutParams(-1,dp(60)))}}
  private fun login(){page("login");label(root,"Tu viaje empieza acá.",32f,navy,true);label(root,"Ingresá con tu cuenta de chofer.",16f,muted)
   val c=card();label(c,"Iniciar sesión",21f,navy,true);val email=field(c,"Correo electrónico",InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);email.setText(getSharedPreferences("gps",MODE_PRIVATE).getString("email",""));val pass=field(c,"Contraseña",InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD);val msg=label(c,"",14f,muted)
   lateinit var submit:Button;submit=button(c,"Ingresar"){val e=email.text.toString().trim().lowercase();val p=pass.text.toString();if(e.isBlank()||p.isBlank()){msg.text="Completá correo y contraseña";return@button};submit.isEnabled=false;msg.text="Ingresando…"
