@@ -1,3 +1,8 @@
+# Transportes Ferreira GPS — v0.12.1
+
+## Nuevo en v0.12.1
+- Más pruebas automáticas del cálculo de kilómetros y del recorrido local. Sin cambios visibles para el chofer.
+
 # Transportes Ferreira GPS — v0.12.0
 
 ## Nuevo en v0.12.0 (diseño)
