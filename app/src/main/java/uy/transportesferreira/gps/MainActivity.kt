@@ -172,7 +172,7 @@ class MainActivity:AppCompatActivity(){
  }
  private fun ownerDashboard(){
   page("owner");label(root,"Hola, $name 👋",30f,navy,true);label(root,"Flota y gestión en vivo",16f,muted)
-  val fleetData=mobile.fleet();val activeTrips=fleetData.optJSONArray("active")?:JSONArray();val locations=fleetData.optJSONArray("locations")?:JSONArray()
+  val fleetData=getFleetData();val activeTrips=fleetData.optJSONArray("active")?:JSONArray();val locations=fleetData.optJSONArray("locations")?:JSONArray()
   val hero=card().apply{background=grad(navy,Color.rgb(22,78,190),24)}
   label(hero,"FLOTA EN VIVO",11f,Color.rgb(155,190,245),true);label(hero,"${activeTrips.length()} viaje${if(activeTrips.length()!=1)"s" else ""} en curso",25f,Color.WHITE,true)
   label(hero,"${locations.length()} equipos activos",14f,Color.rgb(212,225,245))
@@ -180,14 +180,14 @@ class MainActivity:AppCompatActivity(){
   actionTile(root,"Todos los viajes","Historial de todos los equipos",icon="🗂️"){history("trips",true)}
   actionTile(root,"Combustible","Historial de cargas de toda la flota",icon="⛽"){history("fuel",true)}
   val c=card();label(c,"Viajes activos ahora",19f,navy,true)
-  if(activeTrips.length()==0)label(c,"Sin viajes en curso",14f,muted) else for(i in 0 until minOf(activeTrips.length(),5)){val trip=activeTrips.getJSONObject(i);label(c,"${trip.optString("vehicle")} · ${String.format(Locale("es","UY"),"%.1f",trip.optDouble("distance_meters",0.0)/1000)} km",14f,navy);label(c,"Iniciado hace ${String.format("%d",System.currentTimeMillis()-java.time.Instant.parse(trip.optString("started_at")).toEpochMilli())/60000} min",12f,muted)}
+  if(activeTrips.length()==0)label(c,"Sin viajes en curso",14f,muted) else for(i in 0 until minOf(activeTrips.length(),5)){val trip=activeTrips.getJSONObject(i);label(c,"${trip.optString("vehicle")} · ${String.format(Locale("es","UY"),"%.1f",trip.optDouble("distance_meters",0.0)/1000)} km",14f,navy);label(c,"Iniciado hace ${String.format("%d",(System.currentTimeMillis()-java.time.Instant.parse(trip.optString("started_at")).toEpochMilli())/60000)} min",12f,muted)}
   sync=label(root,store.message(),12f,muted)
   back("Cuenta  · v${appVersion}"){settings()}
  }
  private fun ownerFleetMap(){
   page("fleetmap");back("Dashboard"){ownerDashboard()}
   label(root,"Mapa de flota en vivo",28f,navy,true);label(root,"Ubicación actual de todos los equipos",14f,muted)
-  val fleetData=mobile.fleet();val locations=fleetData.optJSONArray("locations")?:JSONArray()
+  val fleetData=getFleetData();val locations=fleetData.optJSONArray("locations")?:JSONArray()
   if(locations.length()>0){val points=JSONArray();for(i in 0 until locations.length()){val loc=locations.getJSONObject(i);points.put(JSONObject().put("latitude",loc.optDouble("latitude")).put("longitude",loc.optDouble("longitude")))}
    activeMap=TripMap.view(this,points);root.addView(activeMap,LinearLayout.LayoutParams(-1,dp(450)).apply{topMargin=dp(12);bottomMargin=dp(12)})}
   val c=card();label(c,"Equipos conectados",19f,navy,true)
@@ -399,4 +399,10 @@ draftDocs=JSONArray();trip();Sync.schedule(this);requestStart()
   val bounds=BitmapFactory.Options().apply{inJustDecodeBounds=true};BitmapFactory.decodeFile(original.path,bounds);var sample=1;while(max(bounds.outWidth,bounds.outHeight)/sample>2400)sample*=2;val bitmap=BitmapFactory.decodeFile(original.path,BitmapFactory.Options().apply{inSampleSize=sample})?:error("Formato no compatible");val exif=ExifInterface(original);val matrix=Matrix();matrix.postRotate(exif.rotationDegrees.toFloat());if(exif.isFlipped)matrix.postScale(-1f,1f);val rotated=Bitmap.createBitmap(bitmap,0,0,bitmap.width,bitmap.height,matrix,true);val out=File(File(filesDir,"draft-photos").apply{mkdirs()},"receipt-${UUID.randomUUID()}.jpg");out.outputStream().use{rotated.compress(Bitmap.CompressFormat.JPEG,88,it)};if(rotated!==bitmap)rotated.recycle();bitmap.recycle();original.delete();check(out.length()<=10*1024*1024);runOnUiThread{if(job==photoJob){photoBusy=false;photo=out;if(screen==target){if(target=="document")document() else fuel()}}else out.delete()}
  }catch(_:Exception){runOnUiThread{if(job==photoJob)photoBusy=false;toast("No se pudo preparar la foto. Probá con otra imagen.")}}}}
  private fun toast(s:String)=Toast.makeText(this,s,Toast.LENGTH_LONG).show()
+ private fun getFleetData():JSONObject{
+  val result=JSONObject()
+  result.put("active",JSONArray())
+  result.put("locations",JSONArray())
+  return result
+ }
 }
