@@ -66,8 +66,8 @@ class MainActivity:AppCompatActivity(){
   fuelTrip=b?.getString("fuelTrip")?.let{JSONObject(it)};docTrip=b?.getString("docTrip")?.let{JSONObject(it)};historyTrip=b?.getString("historyTrip")?.let{JSONObject(it)};photoMode=b?.getString("photoMode")?:"fuel";docReturn=b?.getString("docReturn")?:"prepare"
  camera=b?.getString("camera")?.let{File(it)};photo=b?.getString("photo")?.let{File(it)}?.takeIf{it.exists()};truck=b?.getString("truck")?:"";empty=b?.getBoolean("empty")?:false
   tripStep=(b?.getInt("tripStep")?:0).coerceIn(0,2);fuelStep=(b?.getInt("fuelStep")?:0).coerceIn(0,1);docStep=(b?.getInt("docStep")?:0).coerceIn(0,1)
-  window.statusBarColor=pale;window.navigationBarColor=Color.WHITE
-  androidx.core.view.WindowCompat.getInsetsController(window,window.decorView).apply{isAppearanceLightStatusBars=true;isAppearanceLightNavigationBars=true}
+  window.statusBarColor=if(isDarkMode)Color.rgb(32,32,32) else pale;window.navigationBarColor=if(isDarkMode)Color.rgb(32,32,32) else Color.WHITE
+  androidx.core.view.WindowCompat.getInsetsController(window,window.decorView).apply{isAppearanceLightStatusBars=!isDarkMode;isAppearanceLightNavigationBars=!isDarkMode}
   if(api.session()==null)login() else {name=driverName();when(b?.getString("screen")){"fuel"->fuel();"document"->document();"prepare"->prepare();else->homeOrTrip()};Sync.schedule(this);thread{try{mobile.catalog(true);runOnUiThread{if(screen=="prepare")prepare()}}catch(_:Exception){}}}
 
  }
