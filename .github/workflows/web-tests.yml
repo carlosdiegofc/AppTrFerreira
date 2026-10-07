@@ -1,0 +1,68 @@
+name: Probar panel web
+on:
+  push:
+    paths: ['web/**', '.github/workflows/web-tests.yml']
+  pull_request:
+    paths: ['web/**', '.github/workflows/web-tests.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      AUTHENTICATOR_PASSWORD: test
+      POSTGREST_URL: http://127.0.0.1:3300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Pruebas de lógica
+        working-directory: web
+        run: npm test
+      - name: Instalador de la base y permisos
+        run: |
+          bash web/tests/e2e/reset-db.sh
+          psql -X -q -v ON_ERROR_STOP=1 -d trf -f web/tests/db/permissions.sql
+          bash web/tests/e2e/reset-db.sh
+          psql -X -q -v ON_ERROR_STOP=1 -d trf -f web/sql/001_panel_web.sql
+      - name: PostgREST (la misma API que usa Supabase)
+        run: |
+          curl -sSL -o postgrest.tar.xz https://github.com/PostgREST/postgrest/releases/download/v12.2.3/postgrest-v12.2.3-linux-static-x64.tar.xz
+          tar -xJf postgrest.tar.xz
+          printf '%s\n' 'db-uri = "postgres://authenticator:test@localhost:5432/trf"' 'db-schemas = "public"' 'db-anon-role = "anon"' \
+            'jwt-secret = "local-test-secret-for-trf-panel-0123456789"' 'server-host = "127.0.0.1"' 'server-port = 3300' > postgrest.conf
+          nohup ./postgrest postgrest.conf > postgrest.log 2>&1 &
+          for i in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:3300/ && break; sleep 1; done
+      - name: Navegador
+        working-directory: web
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Prueba de punta a punta
+        working-directory: web
+        run: node tests/e2e/run.mjs
+      - name: Capturas de pantalla
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas-panel-web
+          path: web/tests/e2e/shots
+          if-no-files-found: ignore
+      - name: Registro de PostgREST
+        if: failure()
+        run: cat postgrest.log

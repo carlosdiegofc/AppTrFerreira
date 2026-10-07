@@ -1,3 +1,6 @@
+# Panel web (nuevo)
+La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
+
 # Transportes Ferreira GPS — v0.12.2
 
 ## Nuevo en v0.12.2
