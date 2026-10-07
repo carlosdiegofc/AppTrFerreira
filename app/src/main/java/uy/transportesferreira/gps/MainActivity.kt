@@ -104,7 +104,7 @@ class MainActivity:AppCompatActivity(){
   shell.alpha=0f;shell.animate().alpha(1f).setDuration(250).setInterpolator(android.view.animation.DecelerateInterpolator()).start();root.animate().translationY(-dp(20).toFloat()).setDuration(0).start();root.animate().translationY(0f).setDuration(300).setInterpolator(android.view.animation.DecelerateInterpolator()).start()
  }
  private fun back(title:String="Inicio",action:()->Unit){
-  val v=TextView(this).apply{text="‹  $title";textSize=16f;setTextColor(blue);gravity=Gravity.CENTER_VERTICAL;minHeight=dp(56);setPadding(dp(12),dp(8),dp(12),dp(8));background=ripple(bg(cardBg,12));elevation=dp(1).toFloat();setOnClickListener{action()};isFocusable=true;contentDescription="Volver a $title";letterSpacing=-.01f};root.addView(v,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(8)})
+  val v=TextView(this).apply{text="‹  $title";textSize=16f;setTextColor(blue);gravity=Gravity.CENTER_VERTICAL;minHeight=dp(56);setPadding(dp(12),dp(8),dp(12),dp(8));background=ripple(bg(cardBg,12));elevation=dp(1).toFloat();setOnClickListener{root.animate().alpha(0.8f).setDuration(150).withEndAction{action()}.start()};isFocusable=true;contentDescription="Volver a $title";letterSpacing=-.01f};root.addView(v,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(8)})
  }
  private fun sticky(title:String,action:()->Unit){dock.visibility=View.VISIBLE;button(dock,title,action=action)}
  private fun steps(current:Int,titles:List<String>,change:(Int)->Unit){
