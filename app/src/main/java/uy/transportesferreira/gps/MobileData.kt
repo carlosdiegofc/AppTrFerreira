@@ -18,12 +18,12 @@ class MobileData(private val c:Context){
    while(offset<limit){val size=minOf(1000,limit-offset);val batch=array("/rest/v1/$table?driver_id=eq.${uid()}&order=$order.desc,id.desc&limit=$size&offset=$offset${if(kind=="trips")"" else "&archived=eq.false"}")
     for(i in 0 until batch.length())records.put(batch.getJSONObject(i));if(batch.length()<size)break;offset+=size
    }
-   store.cache(key,JSONObject().put("rows",records))
+   store.cache(key,JSONObject().put("rows",records).put("fetched_at",System.currentTimeMillis()))
   }
   val all=linkedMapOf<String,JSONObject>();val rows=store.cache(key).optJSONArray("rows")?:JSONArray()
   for(i in 0 until rows.length()){val r=rows.getJSONObject(i);all[r.getString("id")]=r}
   val local=if(kind=="trips")store.trips() else store.receipts().map{it.second}
-  for(r in local.filter{it.optString("driver_id")==uid()})if((!store.cache(key).has("rows")&&!all.containsKey(r.getString("id"))) || (kind=="trips"&&r.optInt("revision")>r.optInt("synced_revision")) || (kind!="trips"&&!r.optBoolean("synced")))all[r.getString("id")]=r
+  for(r in local.filter{it.optString("driver_id")==uid()})if((!all.containsKey(r.getString("id")) && (!store.cache(key).has("rows") || r.optLong("synced_at",0)>store.cache(key).optLong("fetched_at",0))) || (kind=="trips"&&r.optInt("revision")>r.optInt("synced_revision")) || (kind!="trips"&&!r.optBoolean("synced")))all[r.getString("id")]=r
   return JSONArray(all.values.sortedByDescending{it.optString(if(kind=="trips")"started_at" else "recorded_at")})
  }
  fun detail(trip:JSONObject,refresh:Boolean=false):JSONObject{

@@ -61,6 +61,7 @@ class GpsService:Service(){
  private fun stopGps(){callback?.let{fused.removeLocationUpdates(it)};callback=null}
  private fun record(l:Location){val t=store.current()?:return;if(!t.optBoolean("active")||t.optBoolean("paused")||!l.hasAccuracy()||l.accuracy>50||System.currentTimeMillis()-l.time !in -2000..30000)return
   val delta=distance.add(DistanceTracker.Fix(l.latitude,l.longitude,l.accuracy.toDouble(),l.time),System.currentTimeMillis())
+  if(!distance.accepted)return
   val p=JSONObject().put("event_id",UUID.randomUUID().toString()).put("trip_id",t.getString("id")).put("driver_id",t.getString("driver_id")).put("vehicle",t.getString("vehicle")).put("latitude",l.latitude).put("longitude",l.longitude).put("accuracy_m",l.accuracy.toDouble()).put("speed_kmh",if(l.hasSpeed())(l.speed*3.6).coerceAtLeast(0.0) else JSONObject.NULL).put("heading",if(l.hasBearing())l.bearing.toDouble() else JSONObject.NULL).put("recorded_at",Instant.ofEpochMilli(l.time).toString()).put("segment",t.optInt("segment"))
   store.addPoint(p);store.appendTrack(t.getString("id"),l.latitude,l.longitude,t.optInt("segment"),l.time);store.update{if(!it.has("origin_lat")){it.put("origin_lat",l.latitude).put("origin_lng",l.longitude)};it.put("distance_meters",it.optDouble("distance_meters",0.0)+delta).put("last_point",p).put("speed_kmh",p.optDouble("speed_kmh",0.0))};sync()
  }

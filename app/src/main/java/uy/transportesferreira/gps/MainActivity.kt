@@ -38,6 +38,7 @@ class MainActivity:AppCompatActivity(){
  private lateinit var store:TripStore
  private lateinit var api:Api
  private var screen="";private var name="";private var truck="";private var empty=false
+ private var photoJob=0;private var photoBusy=false
  private var photo:File?=null;private var camera:File?=null
  private var distance:TextView?=null;private var status:TextView?=null;private var sync:TextView?=null;private var gps:TextView?=null;private var pause:Button?=null;private var count:TextView?=null
  private val handler=Handler(Looper.getMainLooper());private val tick=object:Runnable{override fun run(){refresh();handler.postDelayed(this,1000)}}
@@ -60,11 +61,12 @@ class MainActivity:AppCompatActivity(){
   tripStep=(b?.getInt("tripStep")?:0).coerceIn(0,2);fuelStep=(b?.getInt("fuelStep")?:0).coerceIn(0,1);docStep=(b?.getInt("docStep")?:0).coerceIn(0,1)
   window.statusBarColor=pale;window.navigationBarColor=Color.WHITE
   androidx.core.view.WindowCompat.getInsetsController(window,window.decorView).apply{isAppearanceLightStatusBars=true;isAppearanceLightNavigationBars=true}
-  if(api.session()==null)login() else {name=driverName();when(b?.getString("screen")){"fuel"->fuel();"document"->document();"prepare"->prepare();else->homeOrTrip()};Sync.schedule(this);thread{try{mobile.catalog(true)}catch(_:Exception){}}}
+  if(api.session()==null)login() else {name=driverName();when(b?.getString("screen")){"fuel"->fuel();"document"->document();"prepare"->prepare();else->homeOrTrip()};Sync.schedule(this);thread{try{mobile.catalog(true);runOnUiThread{if(screen=="prepare")prepare()}}catch(_:Exception){}}}
 
  }
  override fun onSaveInstanceState(b:Bundle){super.onSaveInstanceState(b);b.putInt("tripStep",tripStep);b.putInt("fuelStep",fuelStep);b.putInt("docStep",docStep);b.putString("camera",camera?.path);b.putString("photo",photo?.path);b.putString("screen",screen);b.putString("truck",truck);b.putBoolean("empty",empty);b.putString("tripForm",tripForm.toString());b.putString("fuelForm",fuelForm.toString());b.putString("docForm",docForm.toString());b.putString("draftDocs",draftDocs.toString());b.putString("fuelTrip",fuelTrip?.toString());b.putString("docTrip",docTrip?.toString());b.putString("historyTrip",historyTrip?.toString());b.putString("photoMode",photoMode);b.putString("docReturn",docReturn)}
  override fun onStart(){super.onStart();handler.post(tick)}
+ override fun onDestroy(){photoJob++;activeMap?.destroy();activeMap=null;super.onDestroy()}
  override fun onStop(){handler.removeCallbacks(tick);super.onStop()}
  @Deprecated("Deprecated in Java") override fun onBackPressed(){when(screen){
   "fuel"->if(fuelStep>0){fuelStep--;fuel()}else homeOrTrip()
@@ -128,7 +130,7 @@ class MainActivity:AppCompatActivity(){
  private fun login(){page("login");label(root,"Tu viaje empieza acá.",32f,navy,true);label(root,"Ingresá con tu cuenta de chofer.",16f,muted)
   val c=card();label(c,"Iniciar sesión",21f,navy,true);val email=field(c,"Correo electrónico",InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);email.setText(getSharedPreferences("gps",MODE_PRIVATE).getString("email",""));val pass=field(c,"Contraseña",InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD);val msg=label(c,"",14f,muted)
   lateinit var submit:Button;submit=button(c,"Ingresar"){val e=email.text.toString().trim().lowercase();val p=pass.text.toString();if(e.isBlank()||p.isBlank()){msg.text="Completá correo y contraseña";return@button};submit.isEnabled=false;msg.text="Ingresando…"
-   thread{try{api.login(e,p);name=driverName();runOnUiThread{pass.text.clear();homeOrTrip();Sync.schedule(this);thread{try{mobile.catalog(true)}catch(_:Exception){}}}}catch(_:Exception){runOnUiThread{submit.isEnabled=true;msg.text="No se pudo ingresar. Revisá tus datos y la conexión."}}}}
+   thread{try{api.login(e,p);name=driverName();runOnUiThread{pass.text.clear();homeOrTrip();Sync.schedule(this);thread{try{mobile.catalog(true);runOnUiThread{if(screen=="prepare")prepare()}}catch(_:Exception){}}}}catch(_:Exception){runOnUiThread{submit.isEnabled=true;msg.text="No se pudo ingresar. Revisá tus datos y la conexión."}}}}
   label(root,"Tu sesión queda guardada de forma segura en este teléfono.",13f,muted)
  }
  private fun driverName():String{val u=api.session()?.optJSONObject("user")?:return "Chofer";val m=u.optJSONObject("user_metadata");val known=mapOf("immer@trferreira.com" to "Immer Sampayo","luis@trferreira.com" to "Luis Ferreira","hugo@trferreira.com" to "Hugo Silva");return m?.optString("full_name")?.takeIf{it.isNotBlank()}?:m?.optString("name")?.takeIf{it.isNotBlank()}?:known[u.optString("email")]?:u.optString("email").substringBefore("@").replaceFirstChar{it.uppercase()}}
@@ -190,8 +192,8 @@ class MainActivity:AppCompatActivity(){
  }
  private fun begin(){
   val u=api.session()?.optJSONObject("user")?:return login()
-  try{val t=store.start(u,name,InputRules.vehicle(truck),empty,JSONObject(tripForm.toString()).put("kg",InputRules.optionalNumber(tripForm.optString("kg"))?:"").apply{if(empty)put("tipoCarga","")})
-   for(i in 0 until draftDocs.length()){val d=draftDocs.getJSONObject(i);store.saveDocument(t,d,d.optString("draft_photo").takeIf{it.isNotBlank()}?.let{File(it)})};draftDocs=JSONArray();trip();Sync.schedule(this);requestStart()
+  try{store.start(u,name,InputRules.vehicle(truck),empty,JSONObject(tripForm.toString()).put("kg",InputRules.optionalNumber(tripForm.optString("kg"))?:"").apply{if(empty){put("tipoCarga","");put("kg","")}},draftDocs)
+draftDocs=JSONArray();trip();Sync.schedule(this);requestStart()
   }catch(_:Exception){toast("No se pudo guardar el viaje en el teléfono. Revisá el espacio disponible.");homeOrTrip()}
  }
  private fun service(action:String?=null){
@@ -231,7 +233,7 @@ class MainActivity:AppCompatActivity(){
   val recent=try{System.currentTimeMillis()-java.time.Instant.parse(t.optJSONObject("last_point")?.optString("recorded_at")).toEpochMilli()<30000}catch(_:Exception){false};speed?.text=if(paused)"0" else if(recent)String.format(Locale("es","UY"),"%.0f",t.optDouble("speed_kmh",0.0)) else "—";val warn=store.warning();gps?.text=if(paused)"El GPS y los kilómetros están pausados" else if(warn.isNotBlank())"⚠ "+warn else if(recent)"GPS actualizado" else "Esperando señal GPS precisa…";val n=store.receiptCount(t.getString("id"));count?.text=if(n==0)"Sin boletas adjuntas" else "$n boleta(s) vinculada(s) a este viaje"
   liveMap?.let{map->val (points,end)=store.track(t.getString("id"),trackOffset);trackOffset=end;map.push(points)}
  }
- private fun openFuel(t:JSONObject?){fuelStep=0;fuelTrip=t;fuelForm=JSONObject().put("receipt_date",java.time.LocalDate.now().toString());photo=null;photoMode="fuel";fuel()}
+ private fun openFuel(t:JSONObject?){photoJob++;photoBusy=false;fuelStep=0;fuelTrip=t;fuelForm=JSONObject().put("receipt_date",java.time.LocalDate.now().toString());photo=null;photoMode="fuel";fuel()}
  private fun fuel(){
   page("fuel");photoMode="fuel";back(if(fuelStep==0)"Volver" else "Foto"){if(fuelStep>0){fuelStep=0;fuel()}else homeOrTrip()}
   label(root,"Cargar combustible",28f,navy,true)
@@ -246,11 +248,12 @@ class MainActivity:AppCompatActivity(){
    val date=java.time.LocalDate.parse(fuelForm.optString("receipt_date",java.time.LocalDate.now().toString()));DatePickerDialog(this,{_,y,m,d->fuelForm.put("receipt_date",java.time.LocalDate.of(y,m+1,d).toString());fuel()},date.year,date.monthValue-1,date.dayOfMonth).show()
   }
   val stations=mobile.catalog().optJSONArray("estaciones")?:JSONArray();val names=(0 until stations.length()).map{stations.getJSONObject(it).optString("nombre")}
-  if(names.isEmpty())bound(c,"Estación de servicio · obligatoria",fuelForm,"station_name") else select(c,"Estación de servicio · obligatoria",fuelForm,"station_name",names)
+  if(names.isEmpty())bound(c,"Estación de servicio · obligatoria",fuelForm,"station_name") else {select(c,"Estación de servicio",fuelForm,"station_name",names){fuel()};bound(c,"Nombre de estación · podés escribir otra",fuelForm,"station_name")}
   bound(c,"Litros · opcional",fuelForm,"liters",true);bound(c,"Total en UYU · opcional",fuelForm,"total",true)
   label(c,if(photo==null)"Sin foto adjunta" else "✓ Boleta adjunta",13f,muted)
   dock.visibility=View.VISIBLE
   button(dock,"Guardar combustible"){
+   if(photoBusy){toast("Esperá a que termine de prepararse la foto");return@button}
    if(fuelForm.optString("station_name").isBlank()){toast("Indicá la estación de servicio para guardar el combustible");return@button}
    try{val fields=JSONObject(fuelForm.toString());for(key in listOf("liters","total")){val raw=fields.optString(key);val n=raw.replace(',','.').toDoubleOrNull();if(raw.isNotBlank()&&(n==null||!n.isFinite()||n<0)){toast("Revisá litros e importe");return@button};fields.put(key,n?:JSONObject.NULL)}
     for(i in 0 until stations.length()){val station=stations.getJSONObject(i);if(station.optString("nombre")==fields.optString("station_name"))fields.put("station_id",station.optString("id"))}
@@ -258,7 +261,7 @@ class MainActivity:AppCompatActivity(){
    }catch(_:Exception){toast("No se pudo guardar. Revisá el espacio del teléfono.")}
   };label(root,"Se enviará al panel cuando haya conexión.",13f,muted)
  }
- private fun openDocument(t:JSONObject?,target:String,kind:String){docTrip=t;docReturn=target;docForm=JSONObject().put("kind",kind);photo=null;docStep=0;document()}
+ private fun openDocument(t:JSONObject?,target:String,kind:String){photoJob++;photoBusy=false;docTrip=t;docReturn=target;docForm=JSONObject().put("kind",kind);photo=null;docStep=0;document()}
  private fun document(){
   page("document");photoMode="document";back(if(docStep==0)"Volver" else "Comprobante"){if(docStep>0){docStep=0;document()}else backFromDocument()}
   label(root,"Agregar remito",28f,navy,true);steps(docStep,listOf("Comprobante","Detalles")){docStep=it;document()}
@@ -275,6 +278,7 @@ class MainActivity:AppCompatActivity(){
   }
   dock.visibility=View.VISIBLE
   button(dock,"Guardar remito"){
+   if(photoBusy){toast("Esperá a que termine de prepararse la foto");return@button}
    try{val d=JSONObject(docForm.toString());val raw=d.optString("kg");val n=raw.replace(',','.').toDoubleOrNull();if(raw.isNotBlank()&&(n==null||!n.isFinite()||n<0)){toast("Revisá los kilogramos");return@button};d.put("kg",n?:JSONObject.NULL)
     if(docTrip==null){photo?.let{d.put("draft_photo",it.path)};draftDocs.put(d)}else{store.saveDocument(docTrip!!,d,photo);Sync.schedule(this)}
     photo=null;toast("Remito agregado. Podés agregar otro.");backFromDocument()
@@ -318,7 +322,7 @@ class MainActivity:AppCompatActivity(){
   val rows=mobile.history(kind,historyLimit);if(rows.length()==0)label(root,"Todavía no hay registros guardados.",16f,muted)
   for(i in 0 until rows.length()){val row=rows.getJSONObject(i);val c=card()
    if(kind=="trips"){label(c,row.optString("vehicle").ifBlank{"Sin camión asignado"},19f,navy,true);label(c,"${date(row.optString("started_at"))} · ${if(row.optBoolean("active"))if(row.optBoolean("paused"))"Pausado" else "En curso" else "Finalizado"}",14f,muted);label(c,"${String.format(Locale("es","UY"),"%.1f",row.optDouble("distance_meters",0.0)/1000)} km GPS · ${if(row.optString("load_type")=="empty")"Retorno vacío" else "Viaje común"}",14f,muted);button(c,"Ver datos, remitos y mapa",false){detail(row,true)}}
-   else{val d=row.optJSONObject("panel_data")?:JSONObject();label(c,d.optString("estacionNombre").ifBlank{row.optString("station_name").ifBlank{"Estación por completar"}},19f,navy,true);label(c,"${d.optString("fecha").ifBlank{row.optString("receipt_date")}} · ${d.optString("vehicle").ifBlank{row.optString("vehicle")}}",14f,muted);label(c,"${value(d,"litros",row,"liters")} L · UYU ${value(d,"monto",row,"total")}");label(c,if(row.isNull("trip_id"))"Fuera de viaje" else "Vinculado a un viaje",13f,muted);if(!row.isNull("object_path"))button(c,"Ver boleta",false){showPhoto(row,"trf-fuel-receipts")}}
+   else{val d=row.optJSONObject("panel_data")?:JSONObject();label(c,d.optString("estacionNombre").ifBlank{row.optString("station_name").ifBlank{"Estación por completar"}},19f,navy,true);label(c,"${d.optString("fecha").ifBlank{row.optString("receipt_date")}} · ${d.optString("vehicle").ifBlank{row.optString("vehicle")}}",14f,muted);label(c,"${value(d,"litros",row,"liters")} L · ${d.optString("moneda").ifBlank{"UYU"}} ${value(d,"monto",row,"total")}");label(c,if(row.isNull("trip_id"))"Fuera de viaje" else "Vinculado a un viaje",13f,muted);if(!row.isNull("object_path"))button(c,"Ver boleta",false){showPhoto(row,"trf-fuel-receipts")}}
   }
   button(root,"Actualizar historial",false){history(kind,true)};button(root,"Cargar más",false){historyLimit+=50;history(kind,true)}
   if(refresh)thread{try{mobile.history(kind,historyLimit,true);runOnUiThread{if(screen==key)history(kind)}}catch(_:Exception){runOnUiThread{toast("Sin conexión. Mostrando los registros guardados en este teléfono.")}}}
@@ -345,9 +349,9 @@ class MainActivity:AppCompatActivity(){
   toast("Abriendo foto…");thread{try{val local=r.optString("local_path").takeIf{it.isNotBlank()}?.let{File(it)};val bytes=if(local?.exists()==true)local.readBytes() else mobile.photo(r.getString("object_path"),bucket);val bitmap=BitmapFactory.decodeByteArray(bytes,0,bytes.size)?:error("Imagen no disponible");runOnUiThread{val image=ImageView(this).apply{setImageBitmap(bitmap);adjustViewBounds=true;contentDescription="Comprobante adjunto"};AlertDialog.Builder(this).setView(image).setPositiveButton("Cerrar",null).show()}}catch(_:Exception){runOnUiThread{toast("No se pudo abrir la foto. Revisá la conexión.")}}}
  }
  private fun date(s:String)=try{java.time.Instant.parse(s).atZone(java.time.ZoneId.systemDefault()).format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))}catch(_:Exception){s}
- private fun preparePhoto(uri:Uri){toast("Preparando foto…");thread{try{
+ private fun preparePhoto(uri:Uri){val job=++photoJob;val target=photoMode;photoBusy=true;toast("Preparando foto…");thread{try{
   val original=File(cacheDir,"receipt-original-${UUID.randomUUID()}");contentResolver.openInputStream(uri)?.use{input->original.outputStream().use{out->val buf=ByteArray(8192);var total=0L;while(true){val n=input.read(buf);if(n<0)break;total+=n;check(total<=40*1024*1024);out.write(buf,0,n)}}}?:error("Sin imagen")
-  val bounds=BitmapFactory.Options().apply{inJustDecodeBounds=true};BitmapFactory.decodeFile(original.path,bounds);var sample=1;while(max(bounds.outWidth,bounds.outHeight)/sample>2400)sample*=2;val bitmap=BitmapFactory.decodeFile(original.path,BitmapFactory.Options().apply{inSampleSize=sample})?:error("Formato no compatible");val exif=ExifInterface(original);val matrix=Matrix();matrix.postRotate(exif.rotationDegrees.toFloat());if(exif.isFlipped)matrix.postScale(-1f,1f);val rotated=Bitmap.createBitmap(bitmap,0,0,bitmap.width,bitmap.height,matrix,true);val out=File(cacheDir,"receipt-${UUID.randomUUID()}.jpg");out.outputStream().use{rotated.compress(Bitmap.CompressFormat.JPEG,88,it)};if(rotated!==bitmap)rotated.recycle();bitmap.recycle();original.delete();check(out.length()<=10*1024*1024);runOnUiThread{photo=out;if(photoMode=="document")document() else fuel()}
- }catch(_:Exception){runOnUiThread{toast("No se pudo preparar la foto. Probá con otra imagen.")}}}}
+  val bounds=BitmapFactory.Options().apply{inJustDecodeBounds=true};BitmapFactory.decodeFile(original.path,bounds);var sample=1;while(max(bounds.outWidth,bounds.outHeight)/sample>2400)sample*=2;val bitmap=BitmapFactory.decodeFile(original.path,BitmapFactory.Options().apply{inSampleSize=sample})?:error("Formato no compatible");val exif=ExifInterface(original);val matrix=Matrix();matrix.postRotate(exif.rotationDegrees.toFloat());if(exif.isFlipped)matrix.postScale(-1f,1f);val rotated=Bitmap.createBitmap(bitmap,0,0,bitmap.width,bitmap.height,matrix,true);val out=File(File(filesDir,"draft-photos").apply{mkdirs()},"receipt-${UUID.randomUUID()}.jpg");out.outputStream().use{rotated.compress(Bitmap.CompressFormat.JPEG,88,it)};if(rotated!==bitmap)rotated.recycle();bitmap.recycle();original.delete();check(out.length()<=10*1024*1024);runOnUiThread{if(job==photoJob){photoBusy=false;photo=out;if(screen==target){if(target=="document")document() else fuel()}}else out.delete()}
+ }catch(_:Exception){runOnUiThread{if(job==photoJob)photoBusy=false;toast("No se pudo preparar la foto. Probá con otra imagen.")}}}}
  private fun toast(s:String)=Toast.makeText(this,s,Toast.LENGTH_LONG).show()
 }
