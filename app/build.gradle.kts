@@ -9,8 +9,8 @@ android {
         applicationId = "uy.transportesferreira.gps"
         minSdk = 26
         targetSdk = 35
-        versionCode = 15
-        versionName = "0.12.1"
+        versionCode = 16
+        versionName = "0.12.2"
     }
     kotlinOptions { jvmTarget = "17" }
     testOptions { unitTests.isReturnDefaultValues = true }

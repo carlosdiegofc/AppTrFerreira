@@ -1,7 +1,17 @@
-# Transportes Ferreira GPS — v0.12.1
+# Transportes Ferreira GPS — v0.12.2
 
-## Nuevo en v0.12.1
-- Más pruebas automáticas del cálculo de kilómetros y del recorrido local. Sin cambios visibles para el chofer.
+## Nuevo en v0.12.2
+- Une la versión de compatibilidad con la web (0.12.1, rama de Codex) con las pruebas automáticas del cálculo de kilómetros y del recorrido local.
+- Más pruebas: acumulación de kilómetros, saltos de tiempo, límites de precisión, velocidad imposible, coordenadas inválidas y archivo de recorrido del mapa.
+- Sin cambios visibles para el chofer.
+
+## Nuevo en v0.12.1 (compatibilidad con la web)
+- Los adjuntos que fallan no bloquean el envío del recorrido: quedan pendientes y se reintentan.
+- Remitos previos al viaje recuperables con identificador estable; fotos asociadas al formulario original.
+- Moneda de combustible y estaciones fuera del catálogo.
+- Retorno vacío envía carga y kilos vacíos.
+- Las posiciones GPS imposibles se descartan también en el mapa y no se suben.
+- Detalle del acuerdo app/web en docs/APP-WEB-CONTRACT.md.
 
 # Transportes Ferreira GPS — v0.12.0
 
