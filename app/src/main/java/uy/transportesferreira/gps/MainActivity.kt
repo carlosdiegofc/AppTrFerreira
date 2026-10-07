@@ -45,6 +45,7 @@ class MainActivity:AppCompatActivity(){
  private lateinit var store:TripStore
  private lateinit var api:Api
  private var screen="";private var name="";private var truck="";private var empty=false
+ private val isOwner by lazy { api.session()?.optJSONObject("user")?.optString("email") == "luis@trferreira.com" }
  private var photoJob=0;private var photoBusy=false
  private var photo:File?=null;private var camera:File?=null
  private var distance:TextView?=null;private var status:TextView?=null;private var sync:TextView?=null;private var gps:TextView?=null;private var pause:Button?=null;private var count:TextView?=null
@@ -100,7 +101,7 @@ class MainActivity:AppCompatActivity(){
   brand.addView(ImageView(this).apply{setImageResource(R.drawable.tr_ferreira_logo);adjustViewBounds=true;contentDescription="TR Ferreira"},LinearLayout.LayoutParams(-2,dp(30)))
   brand.addView(TextView(this).apply{text="CHOFERES";textSize=13f;setTextColor(muted);setTypeface(null,Typeface.BOLD);letterSpacing=.12f;setPadding(dp(14),0,0,0)})
   root.addView(brand,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(8);bottomMargin=dp(12)})
-  shell.alpha=0f;shell.animate().alpha(1f).setDuration(300).setInterpolator(android.view.animation.DecelerateInterpolator()).start()
+  shell.alpha=0f;shell.animate().alpha(1f).setDuration(250).setInterpolator(android.view.animation.DecelerateInterpolator()).start();root.animate().translationY(-dp(20).toFloat()).setDuration(0).start();root.animate().translationY(0f).setDuration(300).setInterpolator(android.view.animation.DecelerateInterpolator()).start()
  }
  private fun back(title:String="Inicio",action:()->Unit){
   val v=TextView(this).apply{text="‹  $title";textSize=16f;setTextColor(blue);gravity=Gravity.CENTER_VERTICAL;minHeight=dp(56);setPadding(dp(12),dp(8),dp(12),dp(8));background=ripple(bg(cardBg,12));elevation=dp(1).toFloat();setOnClickListener{action()};isFocusable=true;contentDescription="Volver a $title";letterSpacing=-.01f};root.addView(v,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(8)})
@@ -142,7 +143,7 @@ class MainActivity:AppCompatActivity(){
   label(root,"Tu sesión queda guardada de forma segura en este teléfono.",13f,muted)
  }
  private fun driverName():String{val u=api.session()?.optJSONObject("user")?:return "Chofer";val m=u.optJSONObject("user_metadata");val known=mapOf("immer@trferreira.com" to "Immer Sampayo","luis@trferreira.com" to "Luis Ferreira","hugo@trferreira.com" to "Hugo Silva");return m?.optString("full_name")?.takeIf{it.isNotBlank()}?:m?.optString("name")?.takeIf{it.isNotBlank()}?:known[u.optString("email")]?:u.optString("email").substringBefore("@").replaceFirstChar{it.uppercase()}}
- private fun homeOrTrip(){if(store.current()?.optBoolean("active")==true)trip() else home()}
+ private fun homeOrTrip(){if(isOwner)ownerDashboard() else if(store.current()?.optBoolean("active")==true)trip() else home()}
  private fun home(){
   page("home");label(root,"Hola, $name 👋",30f,navy,true);label(root,"¿Qué vas a hacer hoy?",16f,muted)
   val active=store.current()?.optBoolean("active")==true
@@ -151,7 +152,7 @@ class MainActivity:AppCompatActivity(){
   label(hero,if(active)store.current()!!.optString("vehicle") else "Un nuevo viaje",25f,Color.WHITE,true)
   label(hero,if(active)"Volvé para ver kilómetros y registrar cargas." else "Podés salir ahora y completar los datos después.",14f,Color.rgb(212,225,245))
   button(hero,if(active)"Ver viaje  →" else "Nuevo viaje  →"){
-   if(active)trip() else {tripForm=JSONObject();draftDocs=JSONArray();empty=false;tripStep=0;prepare()}
+   if(active)trip() else startTripDashboard()
   }
   actionTile(root,"Combustible",if(active)"Cargar en este viaje o fuera de él" else "Registrar una carga fuera de viaje",icon="⛽"){
    if(active)AlertDialog.Builder(this).setTitle("¿Dónde registrar la carga?").setItems(arrayOf("En el viaje en curso","Fuera de viaje")){_,i->openFuel(if(i==0)store.current() else null)}.show() else openFuel(null)
@@ -168,6 +169,37 @@ class MainActivity:AppCompatActivity(){
   button(c,"Actualizar y enviar pendientes"){Sync.schedule(this);thread{try{mobile.catalog(true);runOnUiThread{toast("Catálogos actualizados")}}catch(_:Exception){runOnUiThread{toast("Sin conexión. Los datos siguen guardados.")}}}}
   button(root,"Renovar acceso",false){login()}
   button(root,"Cerrar sesión",false){if(store.current()?.optBoolean("active")==true||store.pendingCount()>0){toast("Finalizá el viaje y enviá los datos pendientes antes de cerrar sesión.");return@button};api.clear();login()}
+ }
+ private fun ownerDashboard(){
+  page("owner");label(root,"Hola, $name 👋",30f,navy,true);label(root,"Flota y gestión en vivo",16f,muted)
+  val fleetData=mobile.fleet();val activeTrips=fleetData.optJSONArray("active")?:JSONArray();val locations=fleetData.optJSONArray("locations")?:JSONArray()
+  val hero=card().apply{background=grad(navy,Color.rgb(22,78,190),24)}
+  label(hero,"FLOTA EN VIVO",11f,Color.rgb(155,190,245),true);label(hero,"${activeTrips.length()} viaje${if(activeTrips.length()!=1)"s" else ""} en curso",25f,Color.WHITE,true)
+  label(hero,"${locations.length()} equipos activos",14f,Color.rgb(212,225,245))
+  button(hero,"Ver mapa completo  →"){ownerFleetMap()}
+  actionTile(root,"Todos los viajes","Historial de todos los equipos",icon="🗂️"){history("trips",true)}
+  actionTile(root,"Combustible","Historial de cargas de toda la flota",icon="⛽"){history("fuel",true)}
+  val c=card();label(c,"Viajes activos ahora",19f,navy,true)
+  if(activeTrips.length()==0)label(c,"Sin viajes en curso",14f,muted) else for(i in 0 until minOf(activeTrips.length(),5)){val trip=activeTrips.getJSONObject(i);label(c,"${trip.optString("vehicle")} · ${String.format(Locale("es","UY"),"%.1f",trip.optDouble("distance_meters",0.0)/1000)} km",14f,navy);label(c,"Iniciado hace ${String.format("%d",System.currentTimeMillis()-java.time.Instant.parse(trip.optString("started_at")).toEpochMilli())/60000} min",12f,muted)}
+  sync=label(root,store.message(),12f,muted)
+  back("Cuenta  · v${appVersion}"){settings()}
+ }
+ private fun ownerFleetMap(){
+  page("fleetmap");back("Dashboard",action={ownerDashboard()})
+  label(root,"Mapa de flota en vivo",28f,navy,true);label(root,"Ubicación actual de todos los equipos",14f,muted)
+  val fleetData=mobile.fleet();val locations=fleetData.optJSONArray("locations")?:JSONArray()
+  if(locations.length()>0){activeMap=TripMap.view(this,locations.getJSONObject(0).optDouble("latitude"),locations.getJSONObject(0).optDouble("longitude"));root.addView(activeMap,LinearLayout.LayoutParams(-1,dp(450)).apply{topMargin=dp(12);bottomMargin=dp(12)})}
+  val c=card();label(c,"Equipos conectados",19f,navy,true)
+  for(i in 0 until locations.length()){val loc=locations.getJSONObject(i);label(c,"${loc.optString("vehicle")} · Actualizado hace ${String.format("%d",(System.currentTimeMillis()-java.time.Instant.parse(loc.optString("updated_at")).toEpochMilli())/60000)} min",14f,navy);label(c,"${String.format(Locale.US,"%.5f",loc.optDouble("latitude"))}, ${String.format(Locale.US,"%.5f",loc.optDouble("longitude"))}",11f,muted)}
+ }
+ private fun startTripDashboard(){
+  page("startdash");back("Inicio"){home()}
+  label(root,"Iniciar viaje",28f,navy,true);label(root,"¿Cómo quieres empezar?",16f,muted)
+  val quick=card().apply{background=grad(Color.rgb(56,142,60),Color.rgb(27,94,32),24);elevation=dp(4).toFloat();setPadding(dp(20),dp(24),dp(20),dp(24))}
+  label(quick,"RÁPIDO",11f,Color.rgb(165,214,167),true);label(quick,"Solo GPS y kilómetros",22f,Color.WHITE,true);label(quick,"Inicia ahora, datos automáticos. Perfecto si apuras.",14f,Color.rgb(198,239,206));button(quick,"Salir ahora  →",true,Color.rgb(76,175,80)){tripForm=JSONObject();draftDocs=JSONArray();empty=false;tripStep=0;beginTrip()};root.addView(quick,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(16);bottomMargin=dp(12)})
+  val detailed=card().apply{background=grad(navy,Color.rgb(22,78,190),24);elevation=dp(4).toFloat();setPadding(dp(20),dp(24),dp(20),dp(24))}
+  label(detailed,"COMPLETO",11f,Color.rgb(155,190,245),true);label(detailed,"Con cliente, carga y destino",22f,Color.WHITE,true);label(detailed,"Completá los datos. Toma 2 minutos, ayuda a la gestión.",14f,Color.rgb(212,225,245));button(detailed,"Completar datos  →",true,navy){tripForm=JSONObject();draftDocs=JSONArray();empty=false;tripStep=0;prepare()};root.addView(detailed,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12);bottomMargin=dp(12)})
+  label(root,"Podés cambiar de opinión durante el viaje.",13f,muted)
  }
  private fun prepare(){
   page("prepare");back(if(tripStep==0)"Inicio" else "Paso anterior"){if(tripStep>0){tripStep--;prepare()}else home()}
@@ -197,6 +229,10 @@ class MainActivity:AppCompatActivity(){
  private fun requestStart(){
   val req=mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION);if(Build.VERSION.SDK_INT>=33)req.add(Manifest.permission.POST_NOTIFICATIONS)
   if(req.any{ContextCompat.checkSelfPermission(this,it)!=PackageManager.PERMISSION_GRANTED})permissions.launch(req.toTypedArray()) else service()
+ }
+ private fun beginTrip(){
+  val u=api.session()?.optJSONObject("user")?:return login()
+  try{store.start(u,name,InputRules.vehicle(truck),empty,JSONObject().put("kg",""),draftDocs);draftDocs=JSONArray();trip();Sync.schedule(this);requestStart()}catch(_:Exception){toast("No se pudo guardar el viaje en el teléfono. Revisá el espacio disponible.");homeOrTrip()}
  }
  private fun begin(){
   val u=api.session()?.optJSONObject("user")?:return login()
