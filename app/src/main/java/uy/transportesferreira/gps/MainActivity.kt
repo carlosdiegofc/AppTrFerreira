@@ -295,7 +295,7 @@ draftDocs=JSONArray();trip();Sync.schedule(this);requestStart()
  }
  private fun backFromDocument(){when(docReturn){"prepare"->prepare();"tripdetail"->historyTrip?.let{detail(it,true)};else->trip()}}
  private fun photoControls(c:LinearLayout){
-  photo?.takeIf{it.exists()}?.let{f->c.addView(ImageView(this).apply{setImageURI(Uri.fromFile(f));adjustViewBounds=true;contentDescription="Vista previa del comprobante"},LinearLayout.LayoutParams(-1,dp(150)))}
+  photo?.takeIf{it.exists()}?.let{f->c.addView(ImageView(this).apply{setImageURI(Uri.fromFile(f));adjustViewBounds=true;contentDescription="Vista previa del comprobante";background=bg(pale,12)},LinearLayout.LayoutParams(-1,dp(160)).apply{topMargin=dp(8);bottomMargin=dp(12)})}
   button(c,if(photo==null)"Sacar foto" else "Cambiar foto",false){try{camera=File(File(filesDir,"camera").apply{mkdirs()},"${UUID.randomUUID()}.jpg");take.launch(FileProvider.getUriForFile(this,"$packageName.files",camera!!))}catch(_:Exception){toast("No hay cámara disponible. Elegí una imagen de la galería.")}}
   button(c,"Elegir foto de la galería",false){pick.launch("image/*")}
  }
@@ -304,7 +304,7 @@ draftDocs=JSONArray();trip();Sync.schedule(this);requestStart()
   v.setText(data.optString(key).takeUnless{it=="null"}?:"");v.addTextChangedListener(object:TextWatcher{override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){};override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){data.put(key,s.toString())};override fun afterTextChanged(e:Editable?){} });return v
  }
  private fun select(c:LinearLayout,title:String,data:JSONObject,key:String,values:List<String>,changed:(String)->Unit={}){
-  label(c,title,13f,muted,true);val options=listOf("Sin seleccionar")+(values+data.optString(key)).distinct().filter{it.isNotBlank()};val spinner=Spinner(this).apply{adapter=ArrayAdapter(this@MainActivity,android.R.layout.simple_spinner_dropdown_item,options);minimumHeight=dp(54)};c.addView(spinner)
+  label(c,title,13f,muted,true);val options=listOf("Sin seleccionar")+(values+data.optString(key)).distinct().filter{it.isNotBlank()};val spinner=Spinner(this).apply{adapter=ArrayAdapter(this@MainActivity,android.R.layout.simple_spinner_dropdown_item,options);minimumHeight=dp(60);background=bg(if(isDarkMode)Color.rgb(66,66,66) else pale,14);setPadding(dp(12),dp(8),dp(12),dp(8))};c.addView(spinner,LinearLayout.LayoutParams(-1,dp(60)).apply{topMargin=dp(8);bottomMargin=dp(10)})
   spinner.setSelection(options.indexOf(data.optString(key)).coerceAtLeast(0));spinner.onItemSelectedListener=object:AdapterView.OnItemSelectedListener{override fun onNothingSelected(p:AdapterView<*>?){};override fun onItemSelected(p:AdapterView<*>?,v:View?,pos:Int,id:Long){val next=if(pos==0)"" else options[pos];val previous=data.optString(key);data.put(key,next);if(previous!=next)changed(next)}}
  }
  private fun cargoNames(client:String):List<String>{
