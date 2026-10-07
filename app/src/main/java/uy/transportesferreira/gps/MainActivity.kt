@@ -185,10 +185,11 @@ class MainActivity:AppCompatActivity(){
   back("Cuenta  · v${appVersion}"){settings()}
  }
  private fun ownerFleetMap(){
-  page("fleetmap");back("Dashboard",action={ownerDashboard()})
+  page("fleetmap");back("Dashboard"){ownerDashboard()}
   label(root,"Mapa de flota en vivo",28f,navy,true);label(root,"Ubicación actual de todos los equipos",14f,muted)
   val fleetData=mobile.fleet();val locations=fleetData.optJSONArray("locations")?:JSONArray()
-  if(locations.length()>0){activeMap=TripMap.view(this,locations.getJSONObject(0).optDouble("latitude"),locations.getJSONObject(0).optDouble("longitude"));root.addView(activeMap,LinearLayout.LayoutParams(-1,dp(450)).apply{topMargin=dp(12);bottomMargin=dp(12)})}
+  if(locations.length()>0){val points=JSONArray();for(i in 0 until locations.length()){val loc=locations.getJSONObject(i);points.put(JSONObject().put("latitude",loc.optDouble("latitude")).put("longitude",loc.optDouble("longitude")))}
+   activeMap=TripMap.view(this,points);root.addView(activeMap,LinearLayout.LayoutParams(-1,dp(450)).apply{topMargin=dp(12);bottomMargin=dp(12)})}
   val c=card();label(c,"Equipos conectados",19f,navy,true)
   for(i in 0 until locations.length()){val loc=locations.getJSONObject(i);label(c,"${loc.optString("vehicle")} · Actualizado hace ${String.format("%d",(System.currentTimeMillis()-java.time.Instant.parse(loc.optString("updated_at")).toEpochMilli())/60000)} min",14f,navy);label(c,"${String.format(Locale.US,"%.5f",loc.optDouble("latitude"))}, ${String.format(Locale.US,"%.5f",loc.optDouble("longitude"))}",11f,muted)}
  }
