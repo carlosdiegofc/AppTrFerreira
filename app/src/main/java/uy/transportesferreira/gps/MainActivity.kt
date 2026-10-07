@@ -38,6 +38,7 @@ class MainActivity:AppCompatActivity(){
  private lateinit var store:TripStore
  private lateinit var api:Api
  private var screen="";private var name="";private var truck="";private var empty=false
+ private var photoJob=0;private var photoBusy=false
  private var photo:File?=null;private var camera:File?=null
  private var distance:TextView?=null;private var status:TextView?=null;private var sync:TextView?=null;private var gps:TextView?=null;private var pause:Button?=null;private var count:TextView?=null
  private val handler=Handler(Looper.getMainLooper());private val tick=object:Runnable{override fun run(){refresh();handler.postDelayed(this,1000)}}
@@ -45,7 +46,7 @@ class MainActivity:AppCompatActivity(){
  private var tripForm=JSONObject();private var fuelForm=JSONObject();private var docForm=JSONObject();private var draftDocs=JSONArray()
  private var fuelTrip:JSONObject?=null;private var historyTrip:JSONObject?=null;private var docTrip:JSONObject?=null
  private var photoMode="fuel";private var docReturn="prepare";private var historyLimit=50
- private var activeMap:android.webkit.WebView?=null
+ private var activeMap:android.webkit.WebView?=null;private var liveMap:TripMap.Live?=null;private var trackOffset=0L
  private val trucks=arrayOf("Seleccioná un camión","Ford Cargo 1722","Mercedes-Benz 1618","Leyland","Mercedes-Benz 1630")
  private val permissions=registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){
   if(ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED){try{service()}catch(_:Exception){};homeOrTrip()}
@@ -60,11 +61,12 @@ class MainActivity:AppCompatActivity(){
   tripStep=(b?.getInt("tripStep")?:0).coerceIn(0,2);fuelStep=(b?.getInt("fuelStep")?:0).coerceIn(0,1);docStep=(b?.getInt("docStep")?:0).coerceIn(0,1)
   window.statusBarColor=pale;window.navigationBarColor=Color.WHITE
   androidx.core.view.WindowCompat.getInsetsController(window,window.decorView).apply{isAppearanceLightStatusBars=true;isAppearanceLightNavigationBars=true}
-  if(api.session()==null)login() else {name=driverName();when(b?.getString("screen")){"fuel"->fuel();"document"->document();"prepare"->prepare();else->homeOrTrip()};Sync.schedule(this);thread{try{mobile.catalog(true)}catch(_:Exception){}}}
+  if(api.session()==null)login() else {name=driverName();when(b?.getString("screen")){"fuel"->fuel();"document"->document();"prepare"->prepare();else->homeOrTrip()};Sync.schedule(this);thread{try{mobile.catalog(true);runOnUiThread{if(screen=="prepare")prepare()}}catch(_:Exception){}}}
 
  }
  override fun onSaveInstanceState(b:Bundle){super.onSaveInstanceState(b);b.putInt("tripStep",tripStep);b.putInt("fuelStep",fuelStep);b.putInt("docStep",docStep);b.putString("camera",camera?.path);b.putString("photo",photo?.path);b.putString("screen",screen);b.putString("truck",truck);b.putBoolean("empty",empty);b.putString("tripForm",tripForm.toString());b.putString("fuelForm",fuelForm.toString());b.putString("docForm",docForm.toString());b.putString("draftDocs",draftDocs.toString());b.putString("fuelTrip",fuelTrip?.toString());b.putString("docTrip",docTrip?.toString());b.putString("historyTrip",historyTrip?.toString());b.putString("photoMode",photoMode);b.putString("docReturn",docReturn)}
  override fun onStart(){super.onStart();handler.post(tick)}
+ override fun onDestroy(){photoJob++;activeMap?.destroy();activeMap=null;super.onDestroy()}
  override fun onStop(){handler.removeCallbacks(tick);super.onStop()}
  @Deprecated("Deprecated in Java") override fun onBackPressed(){when(screen){
   "fuel"->if(fuelStep>0){fuelStep--;fuel()}else homeOrTrip()
@@ -77,7 +79,9 @@ class MainActivity:AppCompatActivity(){
  }}
  private fun dp(n:Int)=(n*resources.displayMetrics.density).toInt()
  private fun bg(color:Int,r:Int=20)=GradientDrawable().apply{setColor(color);cornerRadius=dp(r).toFloat()}
- private fun page(key:String){activeMap?.destroy();activeMap=null;screen=key;distance=null;speed=null;status=null;sync=null;gps=null;pause=null;count=null
+ private fun grad(a:Int,b:Int,r:Int=20)=GradientDrawable(GradientDrawable.Orientation.TL_BR,intArrayOf(a,b)).apply{cornerRadius=dp(r).toFloat()}
+ private fun ripple(content:android.graphics.drawable.Drawable,tint:Int=Color.argb(35,16,35,61)):android.graphics.drawable.Drawable=android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(tint),content,null)
+ private fun page(key:String){activeMap?.destroy();activeMap=null;liveMap=null;screen=key;distance=null;speed=null;status=null;sync=null;gps=null;pause=null;count=null
   val shell=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(pale)}
   val scroll=ScrollView(this).apply{isFillViewport=true;isVerticalScrollBarEnabled=false}
   root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(20),dp(14),dp(20),dp(20))};scroll.addView(root)
@@ -85,7 +89,11 @@ class MainActivity:AppCompatActivity(){
   dock=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(20),0,dp(20),dp(12));setBackgroundColor(Color.WHITE);visibility=View.GONE}
   shell.addView(dock,LinearLayout.LayoutParams(-1,-2));setContentView(shell)
   ViewCompat.setOnApplyWindowInsetsListener(shell){v,i->val insets=i.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime());v.setPadding(insets.left,insets.top,insets.right,insets.bottom);i}
-  label(root,"TR FERREIRA   /   CHOFERES",11f,blue,true).apply{letterSpacing=.10f}
+  val brand=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
+  brand.addView(ImageView(this).apply{setImageResource(R.drawable.tr_ferreira_logo);adjustViewBounds=true;contentDescription="TR Ferreira"},LinearLayout.LayoutParams(-2,dp(26)))
+  brand.addView(TextView(this).apply{text="CHOFERES";textSize=11f;setTextColor(muted);setTypeface(null,Typeface.BOLD);letterSpacing=.12f;setPadding(dp(10),0,0,0)})
+  root.addView(brand,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(4);bottomMargin=dp(4)})
+  shell.alpha=0f;shell.animate().alpha(1f).setDuration(200).start()
  }
  private fun back(title:String="Inicio",action:()->Unit){
   val v=TextView(this).apply{text="‹  $title";textSize=16f;setTextColor(blue);gravity=Gravity.CENTER_VERTICAL;minHeight=dp(48);setOnClickListener{action()};isFocusable=true;contentDescription="Volver a $title"};root.addView(v)
@@ -95,9 +103,14 @@ class MainActivity:AppCompatActivity(){
   val row=LinearLayout(this);root.addView(row,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(10);bottomMargin=dp(8)})
   titles.forEachIndexed{i,title->val v=TextView(this).apply{text="${i+1}  $title";textSize=12f;gravity=Gravity.CENTER;setTextColor(if(i==current)Color.WHITE else muted);background=bg(if(i==current)navy else Color.WHITE,12);minHeight=dp(48);setPadding(dp(3),dp(8),dp(3),dp(8));isFocusable=true;setOnClickListener{change(i)}};row.addView(v,LinearLayout.LayoutParams(0,-2,1f).apply{if(i>0)leftMargin=dp(6)})}
  }
- private fun actionTile(parent:LinearLayout,title:String,subtitle:String,action:()->Unit){
-  val tile=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=bg(Color.WHITE,18);setPadding(dp(18),dp(12),dp(18),dp(12));isClickable=true;isFocusable=true;setOnClickListener{action()};contentDescription="$title. $subtitle"}
-  label(tile,"$title   ›",19f,navy,true);label(tile,subtitle,13f,muted);parent.addView(tile,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12)})
+ private fun actionTile(parent:LinearLayout,title:String,subtitle:String,icon:String="●",action:()->Unit){
+  val tile=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;background=ripple(bg(Color.WHITE,20));elevation=dp(2).toFloat();setPadding(dp(14),dp(12),dp(14),dp(12));isClickable=true;isFocusable=true;setOnClickListener{action()};contentDescription="$title. $subtitle"}
+  tile.addView(TextView(this).apply{text=icon;textSize=22f;gravity=Gravity.CENTER;background=bg(Color.rgb(228,238,254),16)},LinearLayout.LayoutParams(dp(52),dp(52)))
+  val texts=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),0,dp(8),0)}
+  label(texts,title,18f,navy,true).setPadding(0,0,0,dp(2));label(texts,subtitle,13f,muted).setPadding(0,0,0,0)
+  tile.addView(texts,LinearLayout.LayoutParams(0,-2,1f))
+  tile.addView(TextView(this).apply{text="›";textSize=28f;setTextColor(blue)})
+  parent.addView(tile,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12)})
  }
  private fun truckSelector(c:LinearLayout){
   val catalog=mobile.catalog().optJSONArray("equipos");val choices=mutableListOf("Sin seleccionar")
@@ -111,31 +124,31 @@ class MainActivity:AppCompatActivity(){
   button(c,(if(selected)"●  " else "○  ")+title,selected,navy,action)
  }
  private fun label(p:LinearLayout,s:String,size:Float=16f,color:Int=navy,bold:Boolean=false):TextView{val v=TextView(this).apply{text=s;textSize=size;setTextColor(color);if(bold)setTypeface(null,Typeface.BOLD);setPadding(0,dp(6),0,dp(8))};p.addView(v,LinearLayout.LayoutParams(-1,-2));return v}
- private fun card():LinearLayout{val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=bg(Color.WHITE);setPadding(dp(18),dp(12),dp(18),dp(12))};root.addView(v,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12);bottomMargin=dp(4)});return v}
- private fun button(p:LinearLayout,s:String,primary:Boolean=true,color:Int=blue,action:()->Unit):Button{val v=Button(this).apply{text=s;isAllCaps=false;textSize=16f;setTypeface(null,Typeface.BOLD);setTextColor(if(primary)Color.WHITE else color);backgroundTintList=null;background=bg(if(primary)color else Color.rgb(231,239,253),14);minHeight=dp(52);stateListAnimator=null;setPadding(dp(12),dp(10),dp(12),dp(10));setOnClickListener{action()}};p.addView(v,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12)});return v}
+ private fun card():LinearLayout{val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=bg(Color.WHITE,22);elevation=dp(3).toFloat();setPadding(dp(18),dp(14),dp(18),dp(14))};root.addView(v,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12);bottomMargin=dp(4)});return v}
+ private fun button(p:LinearLayout,s:String,primary:Boolean=true,color:Int=blue,action:()->Unit):Button{val v=Button(this).apply{text=s;isAllCaps=false;textSize=16f;setTypeface(null,Typeface.BOLD);setTextColor(if(primary)Color.WHITE else color);backgroundTintList=null;background=if(primary)ripple(grad(color,androidx.core.graphics.ColorUtils.blendARGB(color,Color.WHITE,.22f),16),Color.argb(70,255,255,255)) else ripple(bg(Color.rgb(231,239,253),16));if(primary)elevation=dp(2).toFloat();minHeight=dp(52);stateListAnimator=null;setPadding(dp(12),dp(10),dp(12),dp(10));setOnClickListener{action()}};p.addView(v,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12)});return v}
  private fun field(p:LinearLayout,s:String,type:Int):EditText{label(p,s,13f,muted,true);return EditText(this).apply{inputType=type;textSize=17f;setTextColor(navy);background=bg(pale,12);setPadding(dp(14),dp(14),dp(14),dp(14));isSingleLine=true;p.addView(this,LinearLayout.LayoutParams(-1,dp(56)))}}
  private fun login(){page("login");label(root,"Tu viaje empieza acá.",32f,navy,true);label(root,"Ingresá con tu cuenta de chofer.",16f,muted)
   val c=card();label(c,"Iniciar sesión",21f,navy,true);val email=field(c,"Correo electrónico",InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);email.setText(getSharedPreferences("gps",MODE_PRIVATE).getString("email",""));val pass=field(c,"Contraseña",InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD);val msg=label(c,"",14f,muted)
   lateinit var submit:Button;submit=button(c,"Ingresar"){val e=email.text.toString().trim().lowercase();val p=pass.text.toString();if(e.isBlank()||p.isBlank()){msg.text="Completá correo y contraseña";return@button};submit.isEnabled=false;msg.text="Ingresando…"
-   thread{try{api.login(e,p);name=driverName();runOnUiThread{pass.text.clear();homeOrTrip();Sync.schedule(this);thread{try{mobile.catalog(true)}catch(_:Exception){}}}}catch(_:Exception){runOnUiThread{submit.isEnabled=true;msg.text="No se pudo ingresar. Revisá tus datos y la conexión."}}}}
+   thread{try{api.login(e,p);name=driverName();runOnUiThread{pass.text.clear();homeOrTrip();Sync.schedule(this);thread{try{mobile.catalog(true);runOnUiThread{if(screen=="prepare")prepare()}}catch(_:Exception){}}}}catch(_:Exception){runOnUiThread{submit.isEnabled=true;msg.text="No se pudo ingresar. Revisá tus datos y la conexión."}}}}
   label(root,"Tu sesión queda guardada de forma segura en este teléfono.",13f,muted)
  }
  private fun driverName():String{val u=api.session()?.optJSONObject("user")?:return "Chofer";val m=u.optJSONObject("user_metadata");val known=mapOf("immer@trferreira.com" to "Immer Sampayo","luis@trferreira.com" to "Luis Ferreira","hugo@trferreira.com" to "Hugo Silva");return m?.optString("full_name")?.takeIf{it.isNotBlank()}?:m?.optString("name")?.takeIf{it.isNotBlank()}?:known[u.optString("email")]?:u.optString("email").substringBefore("@").replaceFirstChar{it.uppercase()}}
  private fun homeOrTrip(){if(store.current()?.optBoolean("active")==true)trip() else home()}
  private fun home(){
-  page("home");label(root,"Hola, $name",28f,navy,true);label(root,"¿Qué vas a hacer hoy?",16f,muted)
+  page("home");label(root,"Hola, $name 👋",30f,navy,true);label(root,"¿Qué vas a hacer hoy?",16f,muted)
   val active=store.current()?.optBoolean("active")==true
-  val hero=card().apply{background=bg(navy,22)}
+  val hero=card().apply{background=grad(navy,Color.rgb(22,78,190),24)}
   label(hero,if(active)"TU VIAJE ESTÁ EN CURSO" else "LISTO PARA SALIR",11f,Color.rgb(155,190,245),true)
   label(hero,if(active)store.current()!!.optString("vehicle") else "Un nuevo viaje",25f,Color.WHITE,true)
   label(hero,if(active)"Volvé para ver kilómetros y registrar cargas." else "Podés salir ahora y completar los datos después.",14f,Color.rgb(212,225,245))
   button(hero,if(active)"Ver viaje  →" else "Nuevo viaje  →"){
    if(active)trip() else {tripForm=JSONObject();draftDocs=JSONArray();empty=false;tripStep=0;prepare()}
   }
-  actionTile(root,"Combustible",if(active)"Cargar en este viaje o fuera de él" else "Registrar una carga fuera de viaje"){
+  actionTile(root,"Combustible",if(active)"Cargar en este viaje o fuera de él" else "Registrar una carga fuera de viaje",icon="⛽"){
    if(active)AlertDialog.Builder(this).setTitle("¿Dónde registrar la carga?").setItems(arrayOf("En el viaje en curso","Fuera de viaje")){_,i->openFuel(if(i==0)store.current() else null)}.show() else openFuel(null)
   }
-  actionTile(root,"Mi historial","Mis viajes y cargas de combustible"){
+  actionTile(root,"Mi historial","Mis viajes y cargas de combustible",icon="🗂️"){
    AlertDialog.Builder(this).setTitle("Mi historial").setItems(arrayOf("Mis viajes","Mi combustible")){_,i->history(if(i==0)"trips" else "fuel",true)}.show()
   }
   sync=label(root,store.message(),12f,muted)
@@ -179,8 +192,8 @@ class MainActivity:AppCompatActivity(){
  }
  private fun begin(){
   val u=api.session()?.optJSONObject("user")?:return login()
-  try{val t=store.start(u,name,InputRules.vehicle(truck),empty,JSONObject(tripForm.toString()).put("kg",InputRules.optionalNumber(tripForm.optString("kg"))?:"").apply{if(empty)put("tipoCarga","")})
-   for(i in 0 until draftDocs.length()){val d=draftDocs.getJSONObject(i);store.saveDocument(t,d,d.optString("draft_photo").takeIf{it.isNotBlank()}?.let{File(it)})};draftDocs=JSONArray();trip();Sync.schedule(this);requestStart()
+  try{store.start(u,name,InputRules.vehicle(truck),empty,JSONObject(tripForm.toString()).put("kg",InputRules.optionalNumber(tripForm.optString("kg"))?:"").apply{if(empty){put("tipoCarga","");put("kg","")}},draftDocs)
+draftDocs=JSONArray();trip();Sync.schedule(this);requestStart()
   }catch(_:Exception){toast("No se pudo guardar el viaje en el teléfono. Revisá el espacio disponible.");homeOrTrip()}
  }
  private fun service(action:String?=null){
@@ -191,27 +204,36 @@ class MainActivity:AppCompatActivity(){
  }
  private fun trip(){
   val t=store.current()?:return home();page("trip");back{home()}
-  status=label(root,"VIAJE EN CURSO",12f,blue,true);label(root,t.optString("vehicle"),25f,navy,true);label(root,if(t.optString("load_type")=="empty")"Retorno vacío" else "Viaje con carga",14f,muted)
-  val c=card().apply{background=bg(navy,22)}
+  status=label(root,"VIAJE EN CURSO",12f,blue,true).apply{background=bg(Color.WHITE,14);setPadding(dp(14),dp(6),dp(14),dp(6));elevation=dp(1).toFloat();(layoutParams as LinearLayout.LayoutParams).apply{width=-2;topMargin=dp(6)}};label(root,t.optString("vehicle"),25f,navy,true);label(root,if(t.optString("load_type")=="empty")"Retorno vacío" else "Viaje con carga",14f,muted)
+  val c=card().apply{background=grad(navy,Color.rgb(22,78,190),24)}
   val row=LinearLayout(this);c.addView(row)
   val left=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};val right=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(12),0,0,0)}
   row.addView(left,LinearLayout.LayoutParams(0,-2,1f));row.addView(right,LinearLayout.LayoutParams(0,-2,1f))
-  label(left,"RECORRIDO",11f,Color.rgb(155,190,245),true);distance=label(left,"0,0",32f,Color.WHITE,true);label(left,"kilómetros GPS",12f,Color.WHITE)
-  label(right,"VELOCIDAD",11f,Color.rgb(155,190,245),true);speed=label(right,"—",32f,Color.WHITE,true);label(right,"km/h",12f,Color.WHITE)
+  label(left,"RECORRIDO",11f,Color.rgb(155,190,245),true);distance=label(left,"0,0",42f,Color.WHITE,true);label(left,"kilómetros GPS",12f,Color.WHITE)
+  label(right,"VELOCIDAD",11f,Color.rgb(155,190,245),true);speed=label(right,"—",42f,Color.WHITE,true);label(right,"km/h",12f,Color.WHITE)
   gps=label(c,"Esperando ubicación precisa…",13f,Color.rgb(212,225,245))
+  val dest=store.details().firstOrNull{it.second.optString("trip_id")==t.getString("id")}?.second?.optJSONObject("data")
+  trackOffset=0L;val live=TripMap.live(this,dest?.optDouble("destination_lat",Double.NaN)?:Double.NaN,dest?.optDouble("destination_lng",Double.NaN)?:Double.NaN)
+  liveMap=live;activeMap=live.web;root.addView(live.web,LinearLayout.LayoutParams(-1,dp(340)).apply{topMargin=dp(12);bottomMargin=dp(12)})
   pause=button(root,"Pausar viaje",false){try{service(if(store.current()?.optBoolean("paused")==true)GpsService.RESUME else GpsService.PAUSE)}catch(_:Exception){toast("Revisá el permiso de ubicación")}}
-  actionTile(root,"Cargar combustible","Foto de boleta o ingreso manual"){openFuel(store.current())}
-  actionTile(root,"Agregar remito","Salida o llegada · número y/o foto"){openDocument(store.current(),"trip","arrival")}
+  actionTile(root,"Cargar combustible","Foto de boleta o ingreso manual",icon="⛽"){openFuel(store.current())}
+  actionTile(root,"Agregar remito","Salida o llegada · número y/o foto",icon="🧾"){openDocument(store.current(),"trip","arrival")}
+  if(!(getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName))actionTile(root,"Evitar cortes del GPS","Permitir que la app siga en segundo plano",icon="🔋"){batteryExemption()}
   count=label(root,"",12f,muted);sync=label(root,store.message(),12f,muted)
   back("Revisar ubicación GPS"){requestStart()}
   dock.visibility=View.VISIBLE;button(dock,"Finalizar viaje",false,Color.rgb(182,47,52)){AlertDialog.Builder(this).setTitle("¿Finalizar este viaje?").setMessage("Se guardarán el recorrido, las boletas y los remitos.").setNegativeButton("Seguir viaje",null).setPositiveButton("Finalizar"){_,_->try{service(GpsService.FINISH)}catch(_:Exception){toast("No se pudo finalizar. Reintentá.")}}.show()}
   refresh();try{service()}catch(_:Exception){gps?.text="Revisá el permiso de ubicación para continuar"}
  }
+ @android.annotation.SuppressLint("BatteryLife") private fun batteryExemption(){
+  try{startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,Uri.parse("package:$packageName")))}
+  catch(_:Exception){try{startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))}catch(_:Exception){toast("Abrí Ajustes › Batería y permití que la app funcione sin restricciones")}}
+ }
  private fun refresh(){if(!::store.isInitialized)return;sync?.text=store.message();if(screen!="trip")return;val t=store.current()?:return;if(!t.optBoolean("active")){home();toast("Viaje finalizado. Los datos pendientes se enviarán con conexión.");return}
   val paused=t.optBoolean("paused");status?.text=if(paused)"VIAJE PAUSADO" else "VIAJE EN CURSO";status?.setTextColor(if(paused)Color.rgb(159,101,15) else Color.rgb(12,119,90));distance?.text=String.format(Locale("es","UY"),"%.1f",t.optDouble("distance_meters",0.0)/1000);pause?.text=if(paused)"Reanudar viaje" else "Pausar viaje"
-  val recent=try{System.currentTimeMillis()-java.time.Instant.parse(t.optJSONObject("last_point")?.optString("recorded_at")).toEpochMilli()<30000}catch(_:Exception){false};speed?.text=if(paused)"0" else if(recent)String.format(Locale("es","UY"),"%.0f",t.optDouble("speed_kmh",0.0)) else "—";gps?.text=if(paused)"El GPS y los kilómetros están pausados" else if(recent)"GPS actualizado" else "Esperando señal GPS precisa…";val n=store.receiptCount(t.getString("id"));count?.text=if(n==0)"Sin boletas adjuntas" else "$n boleta(s) vinculada(s) a este viaje"
+  val recent=try{System.currentTimeMillis()-java.time.Instant.parse(t.optJSONObject("last_point")?.optString("recorded_at")).toEpochMilli()<30000}catch(_:Exception){false};speed?.text=if(paused)"0" else if(recent)String.format(Locale("es","UY"),"%.0f",t.optDouble("speed_kmh",0.0)) else "—";val warn=store.warning();gps?.text=if(paused)"El GPS y los kilómetros están pausados" else if(warn.isNotBlank())"⚠ "+warn else if(recent)"GPS actualizado" else "Esperando señal GPS precisa…";val n=store.receiptCount(t.getString("id"));count?.text=if(n==0)"Sin boletas adjuntas" else "$n boleta(s) vinculada(s) a este viaje"
+  liveMap?.let{map->val (points,end)=store.track(t.getString("id"),trackOffset);trackOffset=end;map.push(points)}
  }
- private fun openFuel(t:JSONObject?){fuelStep=0;fuelTrip=t;fuelForm=JSONObject().put("receipt_date",java.time.LocalDate.now().toString());photo=null;photoMode="fuel";fuel()}
+ private fun openFuel(t:JSONObject?){photoJob++;photoBusy=false;fuelStep=0;fuelTrip=t;fuelForm=JSONObject().put("receipt_date",java.time.LocalDate.now().toString());photo=null;photoMode="fuel";fuel()}
  private fun fuel(){
   page("fuel");photoMode="fuel";back(if(fuelStep==0)"Volver" else "Foto"){if(fuelStep>0){fuelStep=0;fuel()}else homeOrTrip()}
   label(root,"Cargar combustible",28f,navy,true)
@@ -226,11 +248,12 @@ class MainActivity:AppCompatActivity(){
    val date=java.time.LocalDate.parse(fuelForm.optString("receipt_date",java.time.LocalDate.now().toString()));DatePickerDialog(this,{_,y,m,d->fuelForm.put("receipt_date",java.time.LocalDate.of(y,m+1,d).toString());fuel()},date.year,date.monthValue-1,date.dayOfMonth).show()
   }
   val stations=mobile.catalog().optJSONArray("estaciones")?:JSONArray();val names=(0 until stations.length()).map{stations.getJSONObject(it).optString("nombre")}
-  if(names.isEmpty())bound(c,"Estación de servicio · obligatoria",fuelForm,"station_name") else select(c,"Estación de servicio · obligatoria",fuelForm,"station_name",names)
+  if(names.isEmpty())bound(c,"Estación de servicio · obligatoria",fuelForm,"station_name") else {select(c,"Estación de servicio",fuelForm,"station_name",names){fuel()};bound(c,"Nombre de estación · podés escribir otra",fuelForm,"station_name")}
   bound(c,"Litros · opcional",fuelForm,"liters",true);bound(c,"Total en UYU · opcional",fuelForm,"total",true)
   label(c,if(photo==null)"Sin foto adjunta" else "✓ Boleta adjunta",13f,muted)
   dock.visibility=View.VISIBLE
   button(dock,"Guardar combustible"){
+   if(photoBusy){toast("Esperá a que termine de prepararse la foto");return@button}
    if(fuelForm.optString("station_name").isBlank()){toast("Indicá la estación de servicio para guardar el combustible");return@button}
    try{val fields=JSONObject(fuelForm.toString());for(key in listOf("liters","total")){val raw=fields.optString(key);val n=raw.replace(',','.').toDoubleOrNull();if(raw.isNotBlank()&&(n==null||!n.isFinite()||n<0)){toast("Revisá litros e importe");return@button};fields.put(key,n?:JSONObject.NULL)}
     for(i in 0 until stations.length()){val station=stations.getJSONObject(i);if(station.optString("nombre")==fields.optString("station_name"))fields.put("station_id",station.optString("id"))}
@@ -238,7 +261,7 @@ class MainActivity:AppCompatActivity(){
    }catch(_:Exception){toast("No se pudo guardar. Revisá el espacio del teléfono.")}
   };label(root,"Se enviará al panel cuando haya conexión.",13f,muted)
  }
- private fun openDocument(t:JSONObject?,target:String,kind:String){docTrip=t;docReturn=target;docForm=JSONObject().put("kind",kind);photo=null;docStep=0;document()}
+ private fun openDocument(t:JSONObject?,target:String,kind:String){photoJob++;photoBusy=false;docTrip=t;docReturn=target;docForm=JSONObject().put("kind",kind);photo=null;docStep=0;document()}
  private fun document(){
   page("document");photoMode="document";back(if(docStep==0)"Volver" else "Comprobante"){if(docStep>0){docStep=0;document()}else backFromDocument()}
   label(root,"Agregar remito",28f,navy,true);steps(docStep,listOf("Comprobante","Detalles")){docStep=it;document()}
@@ -255,6 +278,7 @@ class MainActivity:AppCompatActivity(){
   }
   dock.visibility=View.VISIBLE
   button(dock,"Guardar remito"){
+   if(photoBusy){toast("Esperá a que termine de prepararse la foto");return@button}
    try{val d=JSONObject(docForm.toString());val raw=d.optString("kg");val n=raw.replace(',','.').toDoubleOrNull();if(raw.isNotBlank()&&(n==null||!n.isFinite()||n<0)){toast("Revisá los kilogramos");return@button};d.put("kg",n?:JSONObject.NULL)
     if(docTrip==null){photo?.let{d.put("draft_photo",it.path)};draftDocs.put(d)}else{store.saveDocument(docTrip!!,d,photo);Sync.schedule(this)}
     photo=null;toast("Remito agregado. Podés agregar otro.");backFromDocument()
@@ -298,7 +322,7 @@ class MainActivity:AppCompatActivity(){
   val rows=mobile.history(kind,historyLimit);if(rows.length()==0)label(root,"Todavía no hay registros guardados.",16f,muted)
   for(i in 0 until rows.length()){val row=rows.getJSONObject(i);val c=card()
    if(kind=="trips"){label(c,row.optString("vehicle").ifBlank{"Sin camión asignado"},19f,navy,true);label(c,"${date(row.optString("started_at"))} · ${if(row.optBoolean("active"))if(row.optBoolean("paused"))"Pausado" else "En curso" else "Finalizado"}",14f,muted);label(c,"${String.format(Locale("es","UY"),"%.1f",row.optDouble("distance_meters",0.0)/1000)} km GPS · ${if(row.optString("load_type")=="empty")"Retorno vacío" else "Viaje común"}",14f,muted);button(c,"Ver datos, remitos y mapa",false){detail(row,true)}}
-   else{val d=row.optJSONObject("panel_data")?:JSONObject();label(c,d.optString("estacionNombre").ifBlank{row.optString("station_name").ifBlank{"Estación por completar"}},19f,navy,true);label(c,"${d.optString("fecha").ifBlank{row.optString("receipt_date")}} · ${d.optString("vehicle").ifBlank{row.optString("vehicle")}}",14f,muted);label(c,"${value(d,"litros",row,"liters")} L · UYU ${value(d,"monto",row,"total")}");label(c,if(row.isNull("trip_id"))"Fuera de viaje" else "Vinculado a un viaje",13f,muted);if(!row.isNull("object_path"))button(c,"Ver boleta",false){showPhoto(row,"trf-fuel-receipts")}}
+   else{val d=row.optJSONObject("panel_data")?:JSONObject();label(c,d.optString("estacionNombre").ifBlank{row.optString("station_name").ifBlank{"Estación por completar"}},19f,navy,true);label(c,"${d.optString("fecha").ifBlank{row.optString("receipt_date")}} · ${d.optString("vehicle").ifBlank{row.optString("vehicle")}}",14f,muted);label(c,"${value(d,"litros",row,"liters")} L · ${d.optString("moneda").ifBlank{"UYU"}} ${value(d,"monto",row,"total")}");label(c,if(row.isNull("trip_id"))"Fuera de viaje" else "Vinculado a un viaje",13f,muted);if(!row.isNull("object_path"))button(c,"Ver boleta",false){showPhoto(row,"trf-fuel-receipts")}}
   }
   button(root,"Actualizar historial",false){history(kind,true)};button(root,"Cargar más",false){historyLimit+=50;history(kind,true)}
   if(refresh)thread{try{mobile.history(kind,historyLimit,true);runOnUiThread{if(screen==key)history(kind)}}catch(_:Exception){runOnUiThread{toast("Sin conexión. Mostrando los registros guardados en este teléfono.")}}}
@@ -325,9 +349,9 @@ class MainActivity:AppCompatActivity(){
   toast("Abriendo foto…");thread{try{val local=r.optString("local_path").takeIf{it.isNotBlank()}?.let{File(it)};val bytes=if(local?.exists()==true)local.readBytes() else mobile.photo(r.getString("object_path"),bucket);val bitmap=BitmapFactory.decodeByteArray(bytes,0,bytes.size)?:error("Imagen no disponible");runOnUiThread{val image=ImageView(this).apply{setImageBitmap(bitmap);adjustViewBounds=true;contentDescription="Comprobante adjunto"};AlertDialog.Builder(this).setView(image).setPositiveButton("Cerrar",null).show()}}catch(_:Exception){runOnUiThread{toast("No se pudo abrir la foto. Revisá la conexión.")}}}
  }
  private fun date(s:String)=try{java.time.Instant.parse(s).atZone(java.time.ZoneId.systemDefault()).format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))}catch(_:Exception){s}
- private fun preparePhoto(uri:Uri){toast("Preparando foto…");thread{try{
+ private fun preparePhoto(uri:Uri){val job=++photoJob;val target=photoMode;photoBusy=true;toast("Preparando foto…");thread{try{
   val original=File(cacheDir,"receipt-original-${UUID.randomUUID()}");contentResolver.openInputStream(uri)?.use{input->original.outputStream().use{out->val buf=ByteArray(8192);var total=0L;while(true){val n=input.read(buf);if(n<0)break;total+=n;check(total<=40*1024*1024);out.write(buf,0,n)}}}?:error("Sin imagen")
-  val bounds=BitmapFactory.Options().apply{inJustDecodeBounds=true};BitmapFactory.decodeFile(original.path,bounds);var sample=1;while(max(bounds.outWidth,bounds.outHeight)/sample>2400)sample*=2;val bitmap=BitmapFactory.decodeFile(original.path,BitmapFactory.Options().apply{inSampleSize=sample})?:error("Formato no compatible");val exif=ExifInterface(original);val matrix=Matrix();matrix.postRotate(exif.rotationDegrees.toFloat());if(exif.isFlipped)matrix.postScale(-1f,1f);val rotated=Bitmap.createBitmap(bitmap,0,0,bitmap.width,bitmap.height,matrix,true);val out=File(cacheDir,"receipt-${UUID.randomUUID()}.jpg");out.outputStream().use{rotated.compress(Bitmap.CompressFormat.JPEG,88,it)};if(rotated!==bitmap)rotated.recycle();bitmap.recycle();original.delete();check(out.length()<=10*1024*1024);runOnUiThread{photo=out;if(photoMode=="document")document() else fuel()}
- }catch(_:Exception){runOnUiThread{toast("No se pudo preparar la foto. Probá con otra imagen.")}}}}
+  val bounds=BitmapFactory.Options().apply{inJustDecodeBounds=true};BitmapFactory.decodeFile(original.path,bounds);var sample=1;while(max(bounds.outWidth,bounds.outHeight)/sample>2400)sample*=2;val bitmap=BitmapFactory.decodeFile(original.path,BitmapFactory.Options().apply{inSampleSize=sample})?:error("Formato no compatible");val exif=ExifInterface(original);val matrix=Matrix();matrix.postRotate(exif.rotationDegrees.toFloat());if(exif.isFlipped)matrix.postScale(-1f,1f);val rotated=Bitmap.createBitmap(bitmap,0,0,bitmap.width,bitmap.height,matrix,true);val out=File(File(filesDir,"draft-photos").apply{mkdirs()},"receipt-${UUID.randomUUID()}.jpg");out.outputStream().use{rotated.compress(Bitmap.CompressFormat.JPEG,88,it)};if(rotated!==bitmap)rotated.recycle();bitmap.recycle();original.delete();check(out.length()<=10*1024*1024);runOnUiThread{if(job==photoJob){photoBusy=false;photo=out;if(screen==target){if(target=="document")document() else fuel()}}else out.delete()}
+ }catch(_:Exception){runOnUiThread{if(job==photoJob)photoBusy=false;toast("No se pudo preparar la foto. Probá con otra imagen.")}}}}
  private fun toast(s:String)=Toast.makeText(this,s,Toast.LENGTH_LONG).show()
 }

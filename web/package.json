@@ -1,0 +1,9 @@
+{
+  "name": "trf-panel-web",
+  "private": true,
+  "type": "module",
+  "description": "Panel web de TR Ferreira: viajes, seguimiento GPS y combustible sobre el Supabase de la app.",
+  "scripts": {
+    "test": "TZ=America/Montevideo node --test tests/unit/*.test.mjs"
+  }
+}
