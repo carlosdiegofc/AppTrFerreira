@@ -104,7 +104,31 @@ export async function saveTrip(trip, payload) {
   return rows[0];
 }
 
-export const setDeleted = (trip, deleted) => saveTrip(trip, { deleted_at: deleted ? new Date().toISOString() : null });
+export async function setDeleted(trip, deleted) {
+  if (!trip.panelId && trip.appTripId) {
+    try {
+      const body = {
+        source: 'app',
+        app_trip_id: trip.appTripId,
+        departure_at: trip.departureAt,
+        driver_id: trip.driverId,
+        deleted_at: deleted ? new Date().toISOString() : null,
+      };
+      const rows = await rest('trf_panel_trips', { method: 'POST', body, prefer: 'return=representation' });
+      return rows[0];
+    } catch (e) {
+      if (e.code === '23505') {
+        const rows = await rest(`trf_panel_trips?app_trip_id=eq.${enc(trip.appTripId)}`, {
+          method: 'PATCH', body: { deleted_at: deleted ? new Date().toISOString() : null }, prefer: 'return=representation',
+        });
+        if (!Array.isArray(rows) || rows.length === 0) throw new ConflictError();
+        return rows[0];
+      }
+      throw e;
+    }
+  }
+  return saveTrip(trip, { deleted_at: deleted ? new Date().toISOString() : null });
+}
 
 // ---- public map services (no account needed) -------------------------------------------------
 
