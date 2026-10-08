@@ -74,6 +74,24 @@ class MobileData(private val c:Context){
   }
   return store.cache(key)
  }
+ /** Truck services; row security limits them to drivers and administrators. */
+ fun maintenance(refresh:Boolean=false):JSONArray{
+  val key="maintenance-${uid()}"
+  if(refresh)store.cache(key,JSONObject().put("rows",array("/rest/v1/trf_vehicle_maintenance?select=*&order=created_at.desc&limit=500")).put("fetched_at",System.currentTimeMillis()))
+  return store.cache(key).optJSONArray("rows")?:JSONArray()
+ }
+ /** Own driver papers (every driver's for administrators) plus truck papers. */
+ fun documents(refresh:Boolean=false):JSONArray{
+  val key="documents-${uid()}"
+  if(refresh)store.cache(key,JSONObject().put("rows",array("/rest/v1/trf_documents?select=*&order=expires_on.asc.nullslast&limit=500")).put("fetched_at",System.currentTimeMillis()))
+  return store.cache(key).optJSONArray("rows")?:JSONArray()
+ }
+ /** Row security filters edits silently, so an update or delete that touches nothing means no permission. */
+ fun saveRecord(table:String,row:JSONObject,id:String?){
+  if(id==null)api.json("/rest/v1/$table",row,"return=minimal")
+  else check(JSONArray(api.json("/rest/v1/$table?id=eq.${enc(id)}",row,"return=representation","PATCH")).length()>0){"Sin permiso"}
+ }
+ fun deleteRecord(table:String,id:String){check(JSONArray(api.request("/rest/v1/$table?id=eq.${enc(id)}","DELETE",prefer="return=representation")).length()>0){"Sin permiso"}}
  fun photo(path:String,bucket:String):ByteArray{
   // Download with the current user's token. The Storage policy rechecks ownership.
   val result=api.json("/storage/v1/object/sign/$bucket/$path",JSONObject().put("expiresIn",120))

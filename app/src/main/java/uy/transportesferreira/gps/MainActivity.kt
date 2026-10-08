@@ -64,6 +64,7 @@ class MainActivity:AppCompatActivity(){
  private val amber by lazy{tone(0xFFB06A00,0xFFF2B25C)}
  private val amberBg by lazy{tone(0xFFFFEFD3,0xFF3A2A10)}
  private val red by lazy{tone(0xFFE0393E,0xFFF0575C)}
+ private val redBg by lazy{tone(0xFFFDE4E4,0xFF3D1A1C)}
  private val grey by lazy{tone(0xFF8F9BAD,0xFF6C7A90)}
  private val greyBg by lazy{tone(0xFFEDF0F5,0xFF222C3E)}
  private val press by lazy{tone(0x1F0F2142,0x33FFFFFF)}
@@ -95,6 +96,8 @@ class MainActivity:AppCompatActivity(){
  private var fuelTrip:JSONObject?=null;private var historyTrip:JSONObject?=null;private var docTrip:JSONObject?=null
  private var photoMode="fuel";private var docReturn="prepare";private var historyLimit=50;private var historyQuery="";private var fuelMonth=true
  private var fleetLoadedAt=0L;private var fleetLoading=false
+ private var editForm=JSONObject();private var editId:String?=null;private var maintFilter=0;private var maintTruck="";private var papersAt=0L
+ private val serviceKinds=listOf("Cambio de aceite","Cambio de filtros","Revisión de frenos","Alineación y balanceo","Cubiertas","Revisión general")
  private var activeMap:android.webkit.WebView?=null;private var liveMap:TripMap.Live?=null;private var trackOffset=0L
  private val trucks=listOf("Ford Cargo 1722","Mercedes-Benz 1618","Leyland","Mercedes-Benz 1630")
  // Accounts that open on the fleet panel instead of the driver home.
@@ -116,10 +119,11 @@ class MainActivity:AppCompatActivity(){
   tripForm=JSONObject(b?.getString("tripForm")?:"{}");fuelForm=JSONObject(b?.getString("fuelForm")?:"{}");docForm=JSONObject(b?.getString("docForm")?:"{}");draftDocs=JSONArray(b?.getString("draftDocs")?:"[]")
   fuelTrip=b?.getString("fuelTrip")?.let{JSONObject(it)};docTrip=b?.getString("docTrip")?.let{JSONObject(it)};historyTrip=b?.getString("historyTrip")?.let{JSONObject(it)};photoMode=b?.getString("photoMode")?:"fuel";docReturn=b?.getString("docReturn")?:"prepare"
   camera=b?.getString("camera")?.let{File(it)};photo=b?.getString("photo")?.let{File(it)}?.takeIf{it.exists()};truck=b?.getString("truck")?:prefs().getString("truck","")?:"";empty=b?.getBoolean("empty")?:false
-  if(api.session()==null)login() else {name=driverName();when(b?.getString("screen")){"fuel"->fuel();"document"->document();"prepare"->prepare();"newtrip"->newTrip();else->homeOrTrip()};Sync.schedule(this);refreshCatalog()}
+  editForm=JSONObject(b?.getString("editForm")?:"{}");editId=b?.getString("editId");maintTruck=b?.getString("maintTruck")?:"";maintFilter=b?.getInt("maintFilter")?:0
+  if(api.session()==null)login() else {name=driverName();when(b?.getString("screen")){"fuel"->fuel();"document"->document();"prepare"->prepare();"newtrip"->newTrip();"maintenance"->maintenance();"maintform"->maintForm();"documents"->documents();"docform"->paperForm();else->homeOrTrip()};Sync.schedule(this);refreshCatalog()}
  }
  @Suppress("DEPRECATION") private fun transparentBars(){window.statusBarColor=Color.TRANSPARENT;window.navigationBarColor=Color.TRANSPARENT}
- override fun onSaveInstanceState(b:Bundle){super.onSaveInstanceState(b);b.putString("camera",camera?.path);b.putString("photo",photo?.path);b.putString("screen",screen);b.putString("truck",truck);b.putBoolean("empty",empty);b.putString("tripForm",tripForm.toString());b.putString("fuelForm",fuelForm.toString());b.putString("docForm",docForm.toString());b.putString("draftDocs",draftDocs.toString());b.putString("fuelTrip",fuelTrip?.toString());b.putString("docTrip",docTrip?.toString());b.putString("historyTrip",historyTrip?.toString());b.putString("photoMode",photoMode);b.putString("docReturn",docReturn)}
+ override fun onSaveInstanceState(b:Bundle){super.onSaveInstanceState(b);b.putString("camera",camera?.path);b.putString("photo",photo?.path);b.putString("screen",screen);b.putString("truck",truck);b.putBoolean("empty",empty);b.putString("tripForm",tripForm.toString());b.putString("fuelForm",fuelForm.toString());b.putString("docForm",docForm.toString());b.putString("draftDocs",draftDocs.toString());b.putString("fuelTrip",fuelTrip?.toString());b.putString("docTrip",docTrip?.toString());b.putString("historyTrip",historyTrip?.toString());b.putString("photoMode",photoMode);b.putString("docReturn",docReturn);b.putString("editForm",editForm.toString());b.putString("editId",editId);b.putString("maintTruck",maintTruck);b.putInt("maintFilter",maintFilter)}
  override fun onStart(){super.onStart();handler.post(tick)}
  override fun onDestroy(){photoJob++;activeMap?.destroy();activeMap=null;super.onDestroy()}
  override fun onStop(){handler.removeCallbacks(tick);super.onStop()}
@@ -130,6 +134,9 @@ class MainActivity:AppCompatActivity(){
   "newtrip","trip"->home()
   "triphistory","fuelhistory","settings"->if(isOwner())ownerDashboard() else home()
   "tripdetail"->history("trips")
+  "maintenance","documents"->homeOrTrip()
+  "maintform"->maintenance()
+  "docform"->documents()
   else->super.onBackPressed()
  }}
  private fun refreshCatalog(){thread{try{mobile.catalog(true);runOnUiThread{if(screen=="prepare")prepare() else if(screen=="newtrip")newTrip()}}catch(_:Exception){}}}
@@ -186,7 +193,7 @@ class MainActivity:AppCompatActivity(){
   val label=tv(s,16f,fg,1).apply{maxLines=1;ellipsize=TextUtils.TruncateAt.END};v.addView(label)
   v.setOnClickListener{action()};p.addView(v,LinearLayout.LayoutParams(-1,dp(54)).apply{topMargin=dp(top)});return Btn(v,label)
  }
- private fun link(p:LinearLayout,s:String,top:Int=8,action:()->Unit)=tv(s,15f,blue,1).apply{gravity=Gravity.CENTER;minHeight=dp(48);background=ripple(null);isClickable=true;isFocusable=true;setOnClickListener{action()};p.addView(this,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(top)})}
+ private fun link(p:LinearLayout,s:String,top:Int=8,color:Int=blue,action:()->Unit)=tv(s,15f,color,1).apply{gravity=Gravity.CENTER;minHeight=dp(48);background=ripple(null);isClickable=true;isFocusable=true;setOnClickListener{action()};p.addView(this,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(top)})}
  private fun input(type:Int,hint:String="")=EditText(this).apply{inputType=type;textSize=16f;setTextColor(ink);setHintTextColor(faint);this.hint=hint;background=outline(cardBg,fieldLine,12);setPadding(dp(14),0,dp(14),0)}
  private fun field(p:LinearLayout,title:String,type:Int,hint:String=""):EditText{caption(p,title);val e=input(type,hint);p.addView(e,LinearLayout.LayoutParams(-1,dp(52)).apply{topMargin=dp(6)});return e}
  private fun bind(v:EditText,data:JSONObject,key:String){
@@ -352,6 +359,7 @@ class MainActivity:AppCompatActivity(){
   r.addView(ImageView(this).apply{setImageResource(R.drawable.truck_side);importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO},LinearLayout.LayoutParams(dp(126),dp(50)))
   tc.addView(r)
   if(running)button(root,"Volver al viaje en curso",Kind.PRIMARY,R.drawable.ic_navigation){trip()}
+  alerts()
   tileGrid(listOf(
    Tile(R.drawable.ic_route,"Nuevo viaje",null){if(active()){toast("Ya tenés un viaje en curso");trip()}else{tripForm=JSONObject();draftDocs=JSONArray();empty=false;newTrip()}},
    Tile(R.drawable.ic_navigation,"Viaje activo",if(running)"En curso" else "Sin viaje"){if(active())trip() else toast("No hay un viaje en curso. Tocá «Nuevo viaje» para empezar.")},
@@ -359,10 +367,11 @@ class MainActivity:AppCompatActivity(){
    Tile(R.drawable.ic_receipt,"Remitos",null){if(active())openDocument(store.current(),"trip","arrival") else {toast("Elegí el viaje al que querés agregar el remito");history("trips",true)}},
    Tile(R.drawable.ic_list,"Mis viajes",null){history("trips",true)},
    Tile(R.drawable.ic_history,"Mi combustible",null){history("fuel",true)},
-   Tile(R.drawable.ic_gps,"Revisar GPS",null){checkGps()},
-   Tile(R.drawable.ic_person,"Mi cuenta",null){settings()}))
+   Tile(R.drawable.ic_doc,"Documentos",null){documents(true)},
+   Tile(R.drawable.ic_wrench,"Mantenimiento",null){maintenance(true)}))
   sync=note(store.message(),top=18).apply{gravity=Gravity.CENTER}
   navBar("home")
+  refreshPapers()
  }
  private fun truckChoices():List<String>{
   val catalog=mobile.catalog().optJSONArray("equipos");val out=mutableListOf<String>()
@@ -770,6 +779,8 @@ class MainActivity:AppCompatActivity(){
   button(sc,"Enviar pendientes y actualizar",Kind.SOFT,R.drawable.ic_sync){syncNow()}
   section("GPS")
   row(card(),R.drawable.ic_gps,"Revisar GPS","Permisos de ubicación y batería"){checkGps()}
+  section("Camiones y papeles")
+  val pp=card();row(pp,R.drawable.ic_wrench,"Mantenimiento","Services hechos y pendientes"){maintenance(true)};row(pp,R.drawable.ic_doc,"Documentos","Licencia, carné de salud, SOA y más"){documents(true)}
   button(root,"Renovar acceso",Kind.LINE,R.drawable.ic_lock,top=24){login()}
   button(root,"Cerrar sesión",Kind.LINE_DANGER,R.drawable.ic_logout){if(active()||store.pendingCount()>0){toast("Finalizá el viaje y enviá los datos pendientes antes de cerrar sesión.");return@button};api.clear();login()}
   note("Transportes Ferreira GPS · versión $appVersion",top=18).gravity=Gravity.CENTER
@@ -782,16 +793,19 @@ class MainActivity:AppCompatActivity(){
   val f=mobile.fleet();val items=fleetItems(f);val fetched=f.optLong("fetched_at")
   val k=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL};root.addView(k,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(14)})
   stat(k,"${items.count{it.state=="moving"}}","En ruta",green,0);stat(k,"${items.count{it.state=="stopped"||it.state=="paused"||it.state=="nosignal"}}","Detenidos",amber,1);stat(k,"${items.count{it.state=="idle"}}","Sin viaje",grey,2)
+  alerts()
   val marks=JSONArray();items.filter{it.lat.isFinite()&&it.lng.isFinite()}.forEach{marks.put(JSONObject().put("lat",it.lat).put("lng",it.lng).put("label",it.plate.ifBlank{it.model}).put("color",hex(stateColor(it.state))))}
   val mc=card();val web=TripMap.fleet(this,marks);activeMap=web;mc.addView(web,LinearLayout.LayoutParams(-1,dp(260)))
   if(marks.length()==0)note(if(fetched==0L)"Buscando posiciones…" else "Todavía no hay posiciones GPS para mostrar.",mc,0).setPadding(dp(16),dp(10),dp(16),dp(12))
   section("Camiones")
   if(items.isEmpty())emptyCard(R.drawable.ic_truck,"Sin camiones cargados","Los equipos del catálogo aparecen acá.") else {val c=card();items.forEach{fleetRow(c,it)}}
   note(if(fetched==0L)"Buscando la flota…" else "Actualizado ${ago(fetched)}. Se actualiza sola cada 2 minutos.",top=10)
-  tileGrid(listOf(Tile(R.drawable.ic_list,"Viajes de la flota",null){history("trips",true)},Tile(R.drawable.ic_history,"Combustible de la flota",null){history("fuel",true)}))
+  tileGrid(listOf(Tile(R.drawable.ic_list,"Viajes de la flota",null){history("trips",true)},Tile(R.drawable.ic_history,"Combustible de la flota",null){history("fuel",true)},
+   Tile(R.drawable.ic_wrench,"Mantenimiento",null){maintenance(true)},Tile(R.drawable.ic_doc,"Documentos",null){documents(true)}))
   sync=note(store.message(),top=16).apply{gravity=Gravity.CENTER}
   navBar("owner")
   if(!fleetLoading&&System.currentTimeMillis()-fleetLoadedAt>120000)loadFleet()
+  refreshPapers()
  }
  private fun loadFleet(manual:Boolean=false){
   if(fleetLoading)return;fleetLoading=true;if(manual)toast("Actualizando la flota…")
@@ -833,6 +847,165 @@ class MainActivity:AppCompatActivity(){
   v.contentDescription="$title. $sub"
   u.session?.let{s->v.background=ripple(null);v.isClickable=true;v.isFocusable=true;v.setOnClickListener{detail(s,true)}}
   c.addView(v,LinearLayout.LayoutParams(-1,-2))
+ }
+
+ // ---------- Maintenance and documents ----------
+ private fun JSONArray.objects()=(0 until length()).map{getJSONObject(it)}
+ private fun day(r:JSONObject,key:String)=r.optString(key).takeIf{it.isNotBlank()&&it!="null"}?.let{try{LocalDate.parse(it.take(10))}catch(_:Exception){null}}
+ private fun dateValue(r:JSONObject,key:String):Any=day(r,key)?.toString()?:JSONObject.NULL
+ private fun fmt(d:LocalDate)=d.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+ private fun inDays(d:LocalDate):String{val n=java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(),d);return when{n==0L->"hoy";n==1L->"mañana";n>1L->"en $n días";n==-1L->"ayer";else->"hace ${-n} días"}}
+ private fun sameTruck(a:String,b:String):Boolean{val pa=truckParts(a).second;val pb=truckParts(b).second;return if(pa.isNotBlank()&&pb.isNotBlank())pa.equals(pb,true) else a.trim().equals(b.trim(),true)}
+ private fun truckLabel(v:String)=truckParts(v).let{if(it.second.isNotBlank())it.second else it.first}
+ private fun maintState(r:JSONObject):Pair<String,String>{val done=day(r,"done_on");val due=day(r,"due_on");val today=LocalDate.now()
+  return when{done!=null->Pair("done","Hecho el ${fmt(done)}");due==null->Pair("pending","Sin fecha prevista");due.isBefore(today)->Pair("late","Era para el ${fmt(due)}");!due.isAfter(today.plusDays(15))->Pair("soon","${fmt(due)} · ${inDays(due)}");else->Pair("planned","Para el ${fmt(due)}")}}
+ private fun docState(r:JSONObject):Pair<String,String>{val exp=day(r,"expires_on");val today=LocalDate.now()
+  return when{exp==null->Pair("nodate","Sin fecha de vencimiento");exp.isBefore(today)->Pair("late","Venció el ${fmt(exp)}");!exp.isAfter(today.plusDays(30))->Pair("soon","Vence el ${fmt(exp)} · ${inDays(exp)}");else->Pair("ok","Vence el ${fmt(exp)}")}}
+ private fun stateStyle(state:String,soon:String)=when(state){"done"->Triple("Realizado",green,greenBg);"ok"->Triple("Vigente",green,greenBg);"late"->Triple("Vencido",red,redBg);"soon"->Triple(soon,amber,amberBg);"planned"->Triple("Programado",blue,blueSoft);"nodate"->Triple("Sin fecha",grey,greyBg);else->Triple("Pendiente",grey,greyBg)}
+ private fun kindIcon(kind:String)=kind.lowercase(uy).let{when{"aceite" in it->R.drawable.ic_drop;"freno" in it||"cubierta" in it->R.drawable.ic_disc;"filtro" in it->R.drawable.ic_funnel;else->R.drawable.ic_wrench}}
+ private fun paperIcon(kind:String)=kind.lowercase(uy).let{when{"licencia" in it->R.drawable.ic_badge;"salud" in it->R.drawable.ic_health;"soa" in it||"seguro" in it->R.drawable.ic_shield;"patente" in it->R.drawable.ic_car;"mtop" in it||"habilitaci" in it->R.drawable.ic_doc;else->R.drawable.ic_folder}}
+ private fun dateField(c:LinearLayout,title:String,data:JSONObject,key:String,changed:()->Unit){
+  caption(c,title);val current=day(data,key)
+  val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
+  r.addView(tv(current?.let{fmt(it)}?:"Elegir fecha",16f,if(current==null)faint else ink).apply{gravity=Gravity.CENTER_VERTICAL;background=ripple(outline(cardBg,fieldLine,12));setPadding(dp(14),0,dp(14),0);setCompoundDrawablesRelative(null,null,tinted(R.drawable.ic_calendar,muted),null);isClickable=true;isFocusable=true;contentDescription="$title: ${current?.let{fmt(it)}?:"sin fecha"}";setOnClickListener{
+   val start=current?:LocalDate.now();DatePickerDialog(this@MainActivity,{_,y,m,d->data.put(key,LocalDate.of(y,m+1,d).toString());changed()},start.year,start.monthValue-1,start.dayOfMonth).show()}},LinearLayout.LayoutParams(0,dp(52),1f))
+  if(current!=null)r.addView(ImageView(this).apply{setImageResource(R.drawable.ic_close);imageTintList=ColorStateList.valueOf(muted);setPadding(dp(12),dp(12),dp(12),dp(12));background=RippleDrawable(ColorStateList.valueOf(press),null,null);contentDescription="Quitar fecha";isClickable=true;isFocusable=true;setOnClickListener{data.remove(key);changed()}},LinearLayout.LayoutParams(dp(48),dp(48)).apply{marginStart=dp(4)})
+  c.addView(r,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(6)})
+ }
+ private fun saveOnline(table:String,row:JSONObject,ok:String,then:()->Unit){
+  toast("Guardando…");val id=editId
+  thread{val error=try{mobile.saveRecord(table,row,id);null}catch(e:ApiError){if(e.status==401||e.status==403)"No tenés permiso para guardar esto." else "No se pudo guardar (error ${e.status}). Probá de nuevo."}catch(_:IllegalStateException){"Solo quien lo cargó o el dueño puede editarlo."}catch(_:Exception){"Sin conexión. Probá de nuevo cuando tengas señal."}
+   runOnUiThread{if(error==null){toast(ok);then()}else toast(error)}}
+ }
+ private fun confirmDelete(table:String,question:String,ok:String,then:()->Unit){
+  val id=editId?:return
+  AlertDialog.Builder(this).setTitle(question).setMessage("No se puede deshacer.").setNegativeButton("Cancelar",null).setPositiveButton("Eliminar"){_,_->
+   thread{val error=try{mobile.deleteRecord(table,id);null}catch(_:IllegalStateException){"Solo quien lo cargó o el dueño puede eliminarlo."}catch(_:Exception){"Sin conexión. Probá de nuevo cuando tengas señal."};runOnUiThread{if(error==null){toast(ok);then()}else toast(error)}}}.show()
+ }
+ /** Reloads both lists at most every 10 minutes and redraws the start screen only if something changed. */
+ private fun refreshPapers(force:Boolean=false){
+  if(!force&&System.currentTimeMillis()-papersAt<600000)return;papersAt=System.currentTimeMillis()
+  thread{val before=mobile.documents().toString()+mobile.maintenance().toString()
+   val ok=try{mobile.documents(true);mobile.maintenance(true);true}catch(_:Exception){false}
+   if(ok&&before!=mobile.documents().toString()+mobile.maintenance().toString())runOnUiThread{when(screen){"home"->home();"owner"->ownerDashboard()}}}
+ }
+ private fun alerts(){
+  val owner=isOwner()
+  fun myTruck(v:String)=owner||(truck.isNotBlank()&&sameTruck(v,truck))
+  val docs=mobile.documents().objects().filter{(it.optString("scope")=="vehicle"&&myTruck(it.optString("vehicle")))||(it.optString("scope")=="driver"&&(owner||it.optString("driver_id")==uid()))}.filter{docState(it).first in setOf("late","soon")}
+  val services=mobile.maintenance().objects().filter{myTruck(it.optString("vehicle"))}.filter{maintState(it).first in setOf("late","soon")}
+  if(docs.isEmpty()&&services.isEmpty())return
+  val c=card()
+  val top=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(16),dp(14),dp(16),dp(6))}
+  top.addView(iconView(R.drawable.ic_warning,amber,20));top.addView(tv("Para tener en cuenta",15.5f,ink,1).apply{setPadding(dp(10),0,0,0)});c.addView(top)
+  val items=docs.map{Triple(it,true,day(it,"expires_on"))}+services.map{Triple(it,false,day(it,"due_on"))}
+  items.sortedBy{it.third?:LocalDate.MAX}.take(4).forEach{(r,isDoc,_)->
+   val who=if(r.optString("scope")=="driver")(if(r.optString("driver_id")==uid())"" else r.optString("driver_name").substringBefore(" ")) else truckLabel(r.optString("vehicle"))
+   val (state,detail)=if(isDoc)docState(r) else maintState(r);val (label,fg,fill)=stateStyle(state,if(isDoc)"Por vencer" else "Próximo")
+   row(c,if(isDoc)paperIcon(r.optString("kind")) else kindIcon(r.optString("kind")),listOf(r.optString("kind"),who).filter{it.isNotBlank()}.joinToString(" · "),detail,trailing=pill(label,fg,fill),tint=fg){if(isDoc)documents(true) else maintenance(true)}}
+ }
+ private fun maintenance(refresh:Boolean=false){
+  page("maintenance");bar("Mantenimiento",back={homeOrTrip()},trailing=plusButton("Agregar service"){editMaintenance(null)})
+  val (model,plate)=truckParts(maintTruck)
+  row(card(),R.drawable.ic_truck,if(maintTruck.isBlank())"Todos los camiones" else model,if(maintTruck.isBlank())"Tocá para ver un solo camión" else if(plate.isNotBlank())"Matrícula $plate" else null,trailing=tv("Cambiar",14.5f,blue,1)){
+   val items=truckChoices();AlertDialog.Builder(this).setTitle("¿Qué camión?").setItems((listOf("Todos los camiones")+items).toTypedArray()){_,i->maintTruck=if(i==0)"" else items[i-1];maintenance()}.setNegativeButton("Cancelar",null).show()}
+  segmented(root,listOf("Todos","Pendientes","Hechos"),maintFilter){maintFilter=it;maintenance()}
+  val rows=mobile.maintenance().objects().filter{maintTruck.isBlank()||sameTruck(it.optString("vehicle"),maintTruck)}
+   .filter{when(maintFilter){1->day(it,"done_on")==null;2->day(it,"done_on")!=null;else->true}}
+   .sortedWith(compareBy<JSONObject>({day(it,"done_on")!=null},{day(it,"due_on")?:LocalDate.MAX}).thenByDescending{day(it,"done_on")?:LocalDate.MIN})
+  if(rows.isEmpty())emptyCard(R.drawable.ic_wrench,if(maintFilter==2)"Sin services hechos" else "Sin services cargados","Tocá + para cargar un service hecho o uno que hay que hacer.")
+  else{val c=card();rows.forEach{maintenanceRow(c,it)}}
+  note("Los pendientes se marcan como próximos 15 días antes de la fecha.",top=12)
+  if(refresh)thread{try{mobile.maintenance(true);runOnUiThread{if(screen=="maintenance")maintenance()}}catch(_:Exception){runOnUiThread{if(screen=="maintenance")toast("Sin conexión. Se muestran los datos guardados en el teléfono.")}}}
+ }
+ private fun maintenanceRow(c:LinearLayout,r:JSONObject){
+  if(c.childCount>0)divider(c,70)
+  val (state,detail)=maintState(r);val (label,fg,fill)=stateStyle(state,"Próximo")
+  val km=r.optString("odometer_km").takeIf{it.isNotBlank()&&it!="null"}?.toLongOrNull()?.let{"${NumberFormat.getIntegerInstance(uy).format(it)} km"}
+  val sub=listOfNotNull(detail,if(maintTruck.isBlank())truckLabel(r.optString("vehicle")).ifBlank{null} else null,km).joinToString(" · ")
+  val v=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(14),dp(12),dp(14),dp(12));background=ripple(null);isClickable=true;isFocusable=true;contentDescription="${r.optString("kind")}. $sub. $label";setOnClickListener{openMaintenance(r)}}
+  v.addView(square(kindIcon(r.optString("kind")),tone(0xFF56647B,0xFFB4C0D3),greyBg))
+  val col=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),0,dp(8),0)}
+  col.addView(tv(r.optString("kind"),15.5f,ink,1).apply{maxLines=1;ellipsize=TextUtils.TruncateAt.END});col.addView(tv(sub,13f,muted).apply{maxLines=2;setPadding(0,dp(3),0,0)})
+  v.addView(col,LinearLayout.LayoutParams(0,-2,1f));v.addView(pill(label,fg,fill))
+  c.addView(v,LinearLayout.LayoutParams(-1,-2))
+ }
+ private fun openMaintenance(r:JSONObject){
+  if(isOwner()||r.optString("created_by")==uid()){editMaintenance(r);return}
+  val lines=listOfNotNull(r.optString("vehicle").ifBlank{null},maintState(r).second,r.optString("odometer_km").takeIf{it.isNotBlank()&&it!="null"}?.let{"Kilometraje: $it km"},r.optString("notes").ifBlank{null},r.optString("created_by_name").ifBlank{null}?.let{"Cargado por $it"})
+  AlertDialog.Builder(this).setTitle(r.optString("kind")).setMessage(lines.joinToString("\n")).setPositiveButton("Cerrar",null).show()
+ }
+ private fun editMaintenance(r:JSONObject?){editId=r?.optString("id");editForm=if(r==null)JSONObject().put("vehicle",maintTruck.ifBlank{truck}).put("done",false) else JSONObject(r.toString()).put("done",day(r,"done_on")!=null);maintForm()}
+ private fun maintForm(){
+  page("maintform");bar(if(editId==null)"Nuevo service" else "Editar service",back={maintenance()})
+  val done=editForm.optBoolean("done")
+  val c=card(pad=16)
+  select(c,"Camión",editForm,"vehicle",truckChoices())
+  select(c,"Tipo de service",editForm,"kind",serviceKinds){maintForm()};bound(c,"Otro tipo · si no está en la lista",editForm,"kind")
+  val s=card(pad=16);text(s,"¿Ya se hizo?",16.5f,ink,1)
+  radio(s,"Todavía no",!done){editForm.put("done",false);maintForm()}
+  radio(s,"Sí, ya se hizo",done){editForm.put("done",true);if(day(editForm,"done_on")==null)editForm.put("done_on",LocalDate.now().toString());maintForm()}
+  if(done)dateField(s,"Fecha en que se hizo",editForm,"done_on"){maintForm()} else dateField(s,"Fecha prevista · opcional",editForm,"due_on"){maintForm()}
+  val d=card(pad=16);bound(d,"Kilometraje del camión · opcional",editForm,"odometer_km",true,"Ej. 412380");bound(d,"Notas · opcional",editForm,"notes",hint="Taller, repuestos, costo…")
+  dock.visibility=View.VISIBLE
+  button(dock,"Guardar service",top=0){
+   val vehicle=editForm.optString("vehicle").trim();val kind=editForm.optString("kind").trim()
+   if(vehicle.isBlank()){toast("Elegí el camión");return@button};if(kind.isBlank()){toast("Indicá el tipo de service");return@button}
+   val rawKm=editForm.optString("odometer_km").takeUnless{it=="null"}.orEmpty().replace(".","").replace(",","").trim()
+   val km=if(rawKm.isBlank())null else rawKm.toIntOrNull()?.takeIf{it>=0}
+   if(rawKm.isNotBlank()&&km==null){toast("Revisá el kilometraje");return@button}
+   val row=JSONObject().put("vehicle",vehicle).put("kind",kind).put("due_on",dateValue(editForm,"due_on")).put("done_on",if(editForm.optBoolean("done"))(day(editForm,"done_on")?:LocalDate.now()).toString() else JSONObject.NULL).put("odometer_km",km?:JSONObject.NULL).put("notes",editForm.optString("notes").takeUnless{it=="null"}.orEmpty().trim())
+   if(editId==null)row.put("created_by_name",name)
+   saveOnline("trf_vehicle_maintenance",row,"Service guardado"){maintenance(true)}
+  }
+  if(editId!=null)link(dock,"Eliminar service",top=2,color=red){confirmDelete("trf_vehicle_maintenance","¿Eliminar este service?","Service eliminado"){maintenance(true)}}
+ }
+ private fun documents(refresh:Boolean=false){
+  page("documents");bar("Documentos",back={homeOrTrip()},trailing=plusButton("Agregar documento"){editDocument(null)})
+  val all=mobile.documents().objects().sortedWith(compareBy<JSONObject>{day(it,"expires_on")?:LocalDate.MAX})
+  val mine=all.filter{it.optString("scope")=="driver"&&it.optString("driver_id")==uid()}
+  val drivers=all.filter{it.optString("scope")=="driver"&&it.optString("driver_id")!=uid()}
+  val papers=all.filter{it.optString("scope")=="vehicle"}
+  if(!isOwner()||mine.isNotEmpty()){section("Mis documentos");if(mine.isEmpty())emptyCard(R.drawable.ic_badge,"Sin documentos cargados","Tocá + para agregar tu licencia de conducir o tu carné de salud.") else {val c=card();mine.forEach{documentRow(c,it,false)}}}
+  if(drivers.isNotEmpty()){section("Choferes");val c=card();drivers.forEach{documentRow(c,it,true)}}
+  section("Camiones")
+  if(papers.isEmpty())note(if(isOwner())"Todavía no hay documentos de camiones. Tocá + para agregar SOA, patente o habilitación MTOP." else "Todavía no hay documentos de camiones cargados.",top=8) else {val c=card();papers.forEach{documentRow(c,it,false)}}
+  note("Se marcan en ámbar 30 días antes de vencer.",top=14)
+  if(refresh)thread{try{mobile.documents(true);runOnUiThread{if(screen=="documents")documents()}}catch(_:Exception){runOnUiThread{if(screen=="documents")toast("Sin conexión. Se muestran los datos guardados en el teléfono.")}}}
+ }
+ private fun documentRow(c:LinearLayout,r:JSONObject,showDriver:Boolean){
+  if(c.childCount>0)divider(c,70)
+  val (state,detail)=docState(r);val (label,fg,fill)=stateStyle(state,"Por vencer")
+  val owner=if(r.optString("scope")=="vehicle")truckParts(r.optString("vehicle")).let{listOf(it.first,it.second).filter{s->s.isNotBlank()}.joinToString(" · ")} else if(showDriver)r.optString("driver_name").ifBlank{"Chofer"} else ""
+  val editable=isOwner()||(r.optString("scope")=="driver"&&r.optString("driver_id")==uid())
+  val sub=listOf(owner,detail).filter{it.isNotBlank()}.joinToString(" · ")
+  val v=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(14),dp(12),dp(14),dp(12));contentDescription="${r.optString("kind")}. $sub. $label";if(editable){background=ripple(null);isClickable=true;isFocusable=true;setOnClickListener{editDocument(r)}}}
+  v.addView(square(paperIcon(r.optString("kind")),blue,blueSoft))
+  val col=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),0,dp(8),0)}
+  col.addView(tv(r.optString("kind"),15.5f,ink,1).apply{maxLines=1;ellipsize=TextUtils.TruncateAt.END});col.addView(tv(sub,13f,muted).apply{maxLines=2;setPadding(0,dp(3),0,0)})
+  v.addView(col,LinearLayout.LayoutParams(0,-2,1f));v.addView(pill(label,fg,fill))
+  c.addView(v,LinearLayout.LayoutParams(-1,-2))
+ }
+ private fun editDocument(r:JSONObject?){editId=r?.optString("id");editForm=if(r==null)JSONObject().put("scope","driver") else JSONObject(r.toString());paperForm()}
+ private fun paperForm(){
+  page("docform");bar(if(editId==null)"Nuevo documento" else "Editar documento",back={documents()})
+  val vehicle=editForm.optString("scope")=="vehicle";val c=card(pad=16)
+  if(isOwner()&&editId==null){text(c,"¿De quién es?",16.5f,ink,1);radio(c,"Mío",!vehicle){editForm.put("scope","driver");paperForm()};radio(c,"De un camión",vehicle){editForm.put("scope","vehicle");paperForm()}}
+  if(vehicle)select(c,"Camión",editForm,"vehicle",truckChoices())
+  select(c,"Tipo de documento",editForm,"kind",if(vehicle)listOf("SOA / Seguro","Patente","Habilitación MTOP") else listOf("Licencia de conducir","Carné de salud")){paperForm()}
+  bound(c,"Otro tipo · si no está en la lista",editForm,"kind")
+  dateField(c,"Fecha de vencimiento",editForm,"expires_on"){paperForm()}
+  bound(c,"Notas · opcional",editForm,"notes",hint="Número, categoría, aseguradora…")
+  dock.visibility=View.VISIBLE
+  button(dock,"Guardar documento",top=0){
+   val kind=editForm.optString("kind").trim();val truckName=editForm.optString("vehicle").trim()
+   if(kind.isBlank()){toast("Indicá el tipo de documento");return@button};if(vehicle&&truckName.isBlank()){toast("Elegí el camión");return@button}
+   val row=JSONObject().put("kind",kind).put("expires_on",dateValue(editForm,"expires_on")).put("notes",editForm.optString("notes").takeUnless{it=="null"}.orEmpty().trim())
+   if(vehicle)row.put("vehicle",truckName)
+   if(editId==null){row.put("scope",if(vehicle)"vehicle" else "driver");if(!vehicle)row.put("driver_name",name)}
+   saveOnline("trf_documents",row,"Documento guardado"){documents(true)}
+  }
+  if(editId!=null)link(dock,"Eliminar documento",top=2,color=red){confirmDelete("trf_documents","¿Eliminar este documento?","Documento eliminado"){documents(true)}}
  }
 
  // ---------- Formatting ----------
