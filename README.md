@@ -1,6 +1,22 @@
 # Panel web (nuevo)
 La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
 
+# Transportes Ferreira GPS — v0.15.0
+
+## Nuevo en v0.15.0 (Google Play)
+- Lista para Google Play: apunta a Android 16 (API 36) y usa el gesto «atrás» predictivo.
+- Ícono propio con el logo TR, también en los íconos temáticos de Android 13 o posterior.
+- Antes de pedir la ubicación, la app explica para qué la usa. Ya no declara ubicación en segundo plano: el GPS del viaje sigue funcionando con la pantalla apagada gracias al servicio en primer plano y su notificación fija.
+- «Evitar cortes del GPS» abre los ajustes de batería de la app en lugar de pedir la excepción directa, que Google Play restringe.
+- Política de privacidad dentro de la app (pantalla de ingreso y Mi cuenta › Privacidad), con el mismo texto publicado en [docs/legal/privacidad.md](docs/legal/privacidad.md).
+- GitHub Actions arma también el paquete para Google Play (.aab), firmado con la llave de subida guardada en los secretos del repositorio. Pasos para publicar: [docs/google-play/GUIA.md](docs/google-play/GUIA.md).
+
+## Nuevo en v0.14.0
+- Mantenimiento de los camiones (services hechos y pendientes) y vencimientos de documentos de choferes y camiones.
+
+## Nuevo en v0.13.0
+- Nuevo diseño: encabezado azul marino, tarjetas, barra inferior y modo oscuro. Panel de flota en vivo para las cuentas de los dueños.
+
 # Transportes Ferreira GPS — v0.12.2
 
 ## Nuevo en v0.12.2
@@ -91,7 +107,7 @@ La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la
 - Los kilómetros son una estimación GPS, no una lectura del odómetro del camión. Se filtran posiciones imprecisas, antiguas y saltos imposibles. Los tramos sin lecturas no se inventan.
 
 ## Instalar / actualizar
-Abrí esta carpeta en Android Studio, sincronizá Gradle y compilá con Java 17 y Android SDK 35. El proyecto incluye Gradle Wrapper 8.9. En Windows: `gradlew.bat assembleDebug`; en Linux/macOS: `./gradlew assembleDebug`.
+Abrí esta carpeta en Android Studio, sincronizá Gradle y compilá con Java 17 y Android SDK 36. El proyecto incluye Gradle Wrapper 8.11.1. En Windows: `gradlew.bat assembleDebug`; en Linux/macOS: `./gradlew assembleDebug`.
 
 Para actualizar la app que ya está instalada, compilá con la MISMA firma/keystore que utilizaste para instalarla. El APK de prueba adjunto usa una firma de desarrollo de este entorno; Android puede rechazarlo como actualización si la firma anterior es distinta. No desinstales la app anterior para resolver esto si tiene boletas pendientes: usá la firma anterior.
 

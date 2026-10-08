@@ -22,6 +22,7 @@ import android.text.TextWatcher
 import android.view.*
 import android.view.inputmethod.EditorInfo
 import android.widget.*
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -120,25 +121,28 @@ class MainActivity:AppCompatActivity(){
   fuelTrip=b?.getString("fuelTrip")?.let{JSONObject(it)};docTrip=b?.getString("docTrip")?.let{JSONObject(it)};historyTrip=b?.getString("historyTrip")?.let{JSONObject(it)};photoMode=b?.getString("photoMode")?:"fuel";docReturn=b?.getString("docReturn")?:"prepare"
   camera=b?.getString("camera")?.let{File(it)};photo=b?.getString("photo")?.let{File(it)}?.takeIf{it.exists()};truck=b?.getString("truck")?:prefs().getString("truck","")?:"";empty=b?.getBoolean("empty")?:false
   editForm=JSONObject(b?.getString("editForm")?:"{}");editId=b?.getString("editId");maintTruck=b?.getString("maintTruck")?:"";maintFilter=b?.getInt("maintFilter")?:0
-  if(api.session()==null)login() else {name=driverName();when(b?.getString("screen")){"fuel"->fuel();"document"->document();"prepare"->prepare();"newtrip"->newTrip();"maintenance"->maintenance();"maintform"->maintForm();"documents"->documents();"docform"->paperForm();else->homeOrTrip()};Sync.schedule(this);refreshCatalog()}
+  onBackPressedDispatcher.addCallback(this,back)
+  if(api.session()==null)login() else {name=driverName();when(b?.getString("screen")){"fuel"->fuel();"document"->document();"prepare"->prepare();"newtrip"->newTrip();"maintenance"->maintenance();"maintform"->maintForm();"documents"->documents();"docform"->paperForm();"privacy"->privacy();else->homeOrTrip()};Sync.schedule(this);refreshCatalog()}
  }
  @Suppress("DEPRECATION") private fun transparentBars(){window.statusBarColor=Color.TRANSPARENT;window.navigationBarColor=Color.TRANSPARENT}
  override fun onSaveInstanceState(b:Bundle){super.onSaveInstanceState(b);b.putString("camera",camera?.path);b.putString("photo",photo?.path);b.putString("screen",screen);b.putString("truck",truck);b.putBoolean("empty",empty);b.putString("tripForm",tripForm.toString());b.putString("fuelForm",fuelForm.toString());b.putString("docForm",docForm.toString());b.putString("draftDocs",draftDocs.toString());b.putString("fuelTrip",fuelTrip?.toString());b.putString("docTrip",docTrip?.toString());b.putString("historyTrip",historyTrip?.toString());b.putString("photoMode",photoMode);b.putString("docReturn",docReturn);b.putString("editForm",editForm.toString());b.putString("editId",editId);b.putString("maintTruck",maintTruck);b.putInt("maintFilter",maintFilter)}
  override fun onStart(){super.onStart();handler.post(tick)}
  override fun onDestroy(){photoJob++;activeMap?.destroy();activeMap=null;super.onDestroy()}
  override fun onStop(){handler.removeCallbacks(tick);super.onStop()}
- @Deprecated("Deprecated in Java") override fun onBackPressed(){when(screen){
+ // Screens where back stays inside the app; on the rest the system back gesture leaves it.
+ private val innerScreens=setOf("fuel","document","prepare","newtrip","trip","triphistory","fuelhistory","settings","privacy","tripdetail","maintenance","documents","maintform","docform")
+ private val back=object:OnBackPressedCallback(false){override fun handleOnBackPressed(){when(screen){
   "fuel"->homeOrTrip()
   "document"->backFromDocument()
   "prepare"->newTrip()
   "newtrip","trip"->home()
   "triphistory","fuelhistory","settings"->if(isOwner())ownerDashboard() else home()
+  "privacy"->if(api.session()==null)login() else settings()
   "tripdetail"->history("trips")
   "maintenance","documents"->homeOrTrip()
   "maintform"->maintenance()
   "docform"->documents()
-  else->super.onBackPressed()
- }}
+ }}}
  private fun refreshCatalog(){thread{try{mobile.catalog(true);runOnUiThread{if(screen=="prepare")prepare() else if(screen=="newtrip")newTrip()}}catch(_:Exception){}}}
 
  // ---------- Building blocks ----------
@@ -266,7 +270,7 @@ class MainActivity:AppCompatActivity(){
 
  // ---------- Page frame: navy header, scrolling content, optional bottom dock and navigation ----------
  private fun page(key:String,header:Boolean=true){
-  activeMap?.destroy();activeMap=null;liveMap=null;screen=key
+  activeMap?.destroy();activeMap=null;liveMap=null;screen=key;back.isEnabled=key in innerScreens
   distance=null;speed=null;limit=null;status=null;statusBox=null;elapsed=null;sync=null;gps=null;count=null;pauseLabel=null;pauseIcon=null
   shell=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(appBg)}
   head=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(barBg);visibility=if(header)View.VISIBLE else View.GONE}
@@ -334,6 +338,7 @@ class MainActivity:AppCompatActivity(){
   submit=button(form,"Ingresar",top=6){val e=email.text.toString().trim().lowercase();val p=pass.text.toString();if(e.isBlank()||p.isBlank()){msg.text="Completá correo y contraseña";return@button};submit.enable(false);msg.setTextColor(0xFFA9B6CC.toInt());msg.text="Ingresando…"
    thread{try{api.login(e,p);name=driverName();runOnUiThread{pass.text.clear();homeOrTrip();Sync.schedule(this);refreshCatalog()}}catch(_:Exception){runOnUiThread{submit.enable(true);msg.setTextColor(0xFFFFB4B4.toInt());msg.text="No se pudo ingresar. Revisá tus datos y la conexión."}}}}
   text(form,"Tu sesión queda guardada de forma segura en este teléfono.",13f,0xFF8E9CB4.toInt(),0,18).gravity=Gravity.CENTER
+  link(form,"Política de privacidad",top=2,color=0xFFA9B6CC.toInt()){privacy()}
  }
  private fun darkField(p:LinearLayout,icon:Int,hint:String,type:Int,top:Int):EditText{
   val box=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;background=outline(0xB30F1A2E.toInt(),0x47FFFFFF,12);setPadding(dp(16),0,dp(8),0)}
@@ -390,9 +395,17 @@ class MainActivity:AppCompatActivity(){
  private fun syncNow(){Sync.schedule(this);toast("Enviando pendientes y actualizando…");thread{try{mobile.catalog(true);runOnUiThread{toast("Datos actualizados")}}catch(_:Exception){runOnUiThread{toast("Sin conexión. Los datos siguen guardados en el teléfono.")}}}}
  private fun locationPermissions()=mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION).apply{if(Build.VERSION.SDK_INT>=33)add(Manifest.permission.POST_NOTIFICATIONS)}
  private fun checkGps(){
-  val req=locationPermissions();if(req.any{ContextCompat.checkSelfPermission(this,it)!=PackageManager.PERMISSION_GRANTED}){permissions.launch(req.toTypedArray());return}
-  if(!(getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName))AlertDialog.Builder(this).setTitle("Evitar cortes del GPS").setMessage("La ubicación está permitida. Para que el GPS no se corte durante el viaje, permití que la app funcione sin restricciones de batería.").setPositiveButton("Permitir"){_,_->batteryExemption()}.setNegativeButton("Ahora no",null).show()
+  val req=locationPermissions();if(req.any{ContextCompat.checkSelfPermission(this,it)!=PackageManager.PERMISSION_GRANTED}){askLocation(req);return}
+  if(!(getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName))batteryExemption()
   else toast("GPS listo: ubicación precisa y batería sin restricciones.")
+ }
+ /** Google Play requires telling drivers how location is used right before the system prompt. */
+ private fun askLocation(req:List<String>){
+  if(ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED){permissions.launch(req.toTypedArray());return}
+  AlertDialog.Builder(this).setTitle("Uso de tu ubicación")
+   .setMessage("Transportes Ferreira GPS usa tu ubicación precisa mientras hay un viaje en curso, incluso con la app cerrada o la pantalla apagada, para registrar el recorrido y los kilómetros y mostrarle a la administración dónde está el camión.\n\nMientras se registra vas a ver una notificación fija. Al pausar o finalizar el viaje, la app deja de usar la ubicación. Los datos quedan en el sistema de Transportes Ferreira y no se usan para publicidad.")
+   .setPositiveButton("Aceptar"){_,_->permissions.launch(req.toTypedArray())}
+   .setNegativeButton("Ahora no"){_,_->toast("Sin permiso de ubicación no se registra el recorrido del viaje.")}.show()
  }
 
  // ---------- New trip ----------
@@ -457,7 +470,7 @@ class MainActivity:AppCompatActivity(){
  }
  private fun requestStart(){
   val req=locationPermissions()
-  if(req.any{ContextCompat.checkSelfPermission(this,it)!=PackageManager.PERMISSION_GRANTED})permissions.launch(req.toTypedArray()) else service()
+  if(req.any{ContextCompat.checkSelfPermission(this,it)!=PackageManager.PERMISSION_GRANTED})askLocation(req) else service()
  }
  private fun beginTrip(){
   val u=api.session()?.optJSONObject("user")?:return login()
@@ -520,9 +533,13 @@ class MainActivity:AppCompatActivity(){
   val image=iconView(icon,blue,24);val caption=tv(label,13.5f,blue,1).apply{setPadding(0,dp(6),0,0)};v.addView(image);v.addView(caption)
   p.addView(v,LinearLayout.LayoutParams(0,dp(76),1f).apply{if(index>0)marginStart=dp(10)});return Pair(image,caption)
  }
- @android.annotation.SuppressLint("BatteryLife") private fun batteryExemption(){
-  try{startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,Uri.parse("package:$packageName")))}
-  catch(_:Exception){try{startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))}catch(_:Exception){toast("Abrí Ajustes › Batería y permití que la app funcione sin restricciones")}}
+ // Opens the system page where the driver lifts battery limits; asking for the exemption directly is restricted on Google Play.
+ private fun batteryExemption(){
+  val appPage=Build.VERSION.SDK_INT>=31
+  AlertDialog.Builder(this).setTitle("Evitar cortes del GPS")
+   .setMessage(if(appPage)"Para que el GPS no se corte durante el viaje, en la pantalla que se abre tocá «Batería» (o «Uso de batería de la app») y elegí «Sin restricciones»." else "Para que el GPS no se corte durante el viaje, en la lista que se abre elegí «Todas las apps», buscá «Transportes Ferreira GPS» y marcá «No optimizar».")
+   .setPositiveButton("Abrir ajustes"){_,_->try{startActivity(if(appPage)Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:$packageName")) else Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))}catch(_:Exception){toast("Abrí Ajustes › Apps › Transportes Ferreira GPS › Batería y elegí «Sin restricciones»")}}
+   .setNegativeButton("Ahora no",null).show()
  }
  private fun refresh(){if(!::store.isInitialized)return;sync?.text=store.message()
   if(screen=="owner"&&!fleetLoading&&System.currentTimeMillis()-fleetLoadedAt>120000)loadFleet()
@@ -777,14 +794,31 @@ class MainActivity:AppCompatActivity(){
   section("Sincronización")
   val sc=card(pad=16);sync=text(sc,store.message(),15f,ink);note("Los viajes, boletas y remitos se guardan en el teléfono y se envían solos cuando hay conexión.",sc,6)
   button(sc,"Enviar pendientes y actualizar",Kind.SOFT,R.drawable.ic_sync){syncNow()}
-  section("GPS")
-  row(card(),R.drawable.ic_gps,"Revisar GPS","Permisos de ubicación y batería"){checkGps()}
+  section("GPS y privacidad")
+  val gc=card();row(gc,R.drawable.ic_gps,"Revisar GPS","Permisos de ubicación y batería"){checkGps()};row(gc,R.drawable.ic_shield,"Privacidad","Qué datos usa la app y para qué"){privacy()}
   section("Camiones y papeles")
   val pp=card();row(pp,R.drawable.ic_wrench,"Mantenimiento","Services hechos y pendientes"){maintenance(true)};row(pp,R.drawable.ic_doc,"Documentos","Licencia, carné de salud, SOA y más"){documents(true)}
   button(root,"Renovar acceso",Kind.LINE,R.drawable.ic_lock,top=24){login()}
   button(root,"Cerrar sesión",Kind.LINE_DANGER,R.drawable.ic_logout){if(active()||store.pendingCount()>0){toast("Finalizá el viaje y enviá los datos pendientes antes de cerrar sesión.");return@button};api.clear();login()}
   note("Transportes Ferreira GPS · versión $appVersion",top=18).gravity=Gravity.CENTER
   navBar("more")
+ }
+
+ // ---------- Privacy policy: the same text published in docs/legal/privacidad.md ----------
+ private fun privacy(){
+  page("privacy");bar("Privacidad",back={if(api.session()==null)login() else settings()})
+  val c=card(pad=18)
+  val lines=try{assets.open("privacidad.md").bufferedReader().use{it.readLines()}}catch(_:Exception){listOf("No se pudo abrir la política de privacidad.")}
+  var paragraph=""
+  fun flush(){if(paragraph.isNotBlank())text(c,paragraph.trim(),14.5f,ink,0,10).setLineSpacing(0f,1.2f);paragraph=""}
+  for(l in lines)when{
+   l.startsWith("# ")->{flush();text(c,l.removePrefix("# "),20f,ink,2)}
+   l.startsWith("## ")->{flush();text(c,l.removePrefix("## "),16.5f,ink,1,22)}
+   l.startsWith("- ")->{flush();text(c,"•  "+l.removePrefix("- "),14.5f,ink,0,8).setLineSpacing(0f,1.2f)}
+   l.isBlank()->flush()
+   else->paragraph+=" "+l
+  }
+  flush()
  }
 
  // ---------- Owner fleet panel ----------
