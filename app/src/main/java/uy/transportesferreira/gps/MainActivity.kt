@@ -70,7 +70,7 @@ class MainActivity:AppCompatActivity(){
  private val greyBg by lazy{tone(0xFFEDF0F5,0xFF222C3E)}
  private val press by lazy{tone(0x1F0F2142,0x33FFFFFF)}
  private val medium by lazy{Typeface.create("sans-serif-medium",Typeface.NORMAL)}
- private val uy=Locale("es","UY")
+ private val uy=Locale.forLanguageTag("es-UY")
  private val loginBg=0xFF0A1220.toInt()
  private enum class Kind{PRIMARY,DANGER,LINE,SOFT,LINE_DANGER}
  private class Btn(val view:LinearLayout,val label:TextView){fun enable(v:Boolean){view.isEnabled=v;view.alpha=if(v)1f else .5f}}
