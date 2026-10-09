@@ -1,0 +1,39 @@
+name: Paquete de Google Play para firmar
+# Temporal: arma el .aab sin firmar y lo deja 20 minutos en la rama tmp/aab-sin-firmar para firmarlo fuera de GitHub.
+on:
+  push:
+    branches: [claude/apptrferreira-g1agmt]
+    paths: ['.github/workflows/aab-para-firmar.yml']
+permissions:
+  contents: write
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    env:
+      REMOTE: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - run: gradle --no-daemon :app:bundleRelease
+      - name: Dejar el paquete sin firmar en tmp/aab-sin-firmar
+        shell: bash
+        run: |
+          out="$RUNNER_TEMP/aab"; mkdir -p "$out"
+          cp app/build/outputs/bundle/release/app-release.aab "$out/"
+          cd "$out"
+          sha256sum app-release.aab
+          git init -q -b tmp
+          git add app-release.aab
+          git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com commit -q -m "Paquete sin firmar $GITHUB_SHA"
+          git push -q --force "$REMOTE" tmp:refs/heads/tmp/aab-sin-firmar
+      - name: Esperar 20 minutos
+        run: sleep 1200
+      - name: Borrar la rama temporal
+        if: always()
+        run: git push -q "$REMOTE" --delete tmp/aab-sin-firmar || true
