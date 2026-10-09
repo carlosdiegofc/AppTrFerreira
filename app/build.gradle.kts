@@ -6,11 +6,11 @@ android {
     namespace = "uy.transportesferreira.gps"
     compileSdk = 36
     defaultConfig {
-        applicationId = "uy.transportesferreira.gps"
+        applicationId = "com.transportesferreira.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 19
-        versionName = "0.15.0"
+        versionCode = 20
+        versionName = "0.15.1"
     }
     // The Google Play upload key only exists in the CI secrets; without it the release bundle stays unsigned.
     signingConfigs {

@@ -203,7 +203,7 @@ Otros datos:
 ## 5. Prueba interna e invitación a los choferes
 
 1. *Prueba y lanzamiento › Prueba › Prueba interna › Testers*: creá la lista `Choferes` con el correo de Google de cada chofer (el mismo que usan en el Play Store de su teléfono).
-2. *Versiones › Crear versión*: subí `app-release.aab`. Nombre de la versión: `0.15.0`. Notas de la versión:
+2. *Versiones › Crear versión*: subí el archivo `.aab`. Nombre de la versión: `0.15.1`. Notas de la versión:
 
 ```text
 <es-419>
@@ -216,11 +216,11 @@ Primera versión en Google Play.
 
 ## 6. Pasar de la app vieja a la de Google Play (una vez por teléfono)
 
-La app de Google Play tiene otra firma, así que Android no la instala encima de la anterior:
+La app de Google Play es una app nueva para Android (nombre de paquete `com.transportesferreira.app`): se instala aparte de la anterior, con el mismo ícono y el mismo nombre.
 
 1. En la app vieja: terminá el viaje si hay uno en curso y tocá **Enviar pendientes y actualizar** hasta ver «Todo guardado en el panel».
-2. Desinstalá la app vieja. Lo que no se haya enviado se pierde.
-3. Instalá la app desde el enlace de Google Play e ingresá con la misma cuenta.
+2. Instalá la app desde el enlace de Google Play e ingresá con la misma cuenta.
+3. Desinstalá la app vieja, para no tener dos íconos iguales ni registrar viajes en las dos. Lo que no se haya enviado desde la vieja se pierde.
 4. Al empezar el primer viaje, aceptá el aviso de ubicación. En **Mi cuenta › Revisar GPS**, dejá la batería de la app en **Sin restricciones**.
 
 ## 7. Actualizaciones

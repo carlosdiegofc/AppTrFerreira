@@ -1,7 +1,10 @@
 # Panel web (nuevo)
 La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
 
-# Transportes Ferreira GPS — v0.15.0
+# Transportes Ferreira GPS — v0.15.1
+
+## Nuevo en v0.15.1
+- Nombre de paquete para Google Play: `com.transportesferreira.app` (antes `uy.transportesferreira.gps`). Es una app nueva para Android: se instala aparte de la anterior y pide iniciar sesión otra vez. El código sigue en el paquete `uy.transportesferreira.gps`.
 
 ## Nuevo en v0.15.0 (Google Play)
 - Lista para Google Play: apunta a Android 16 (API 36) y usa el gesto «atrás» predictivo.
