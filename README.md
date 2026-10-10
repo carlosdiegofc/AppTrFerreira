@@ -1,7 +1,15 @@
 # Panel web (nuevo)
 La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
 
-# Transportes Ferreira GPS — v0.15.1
+# Transportes Ferreira GPS — v0.16.0
+
+## Nuevo en v0.16.0 (modo sencillo y modo normal)
+- Después de ingresar, cada chofer elige cómo usar la app: **modo sencillo** o **modo normal**. La elección queda guardada en el teléfono para esa cuenta; a quien ya tenía la sesión abierta se le pregunta una vez al abrir la app. Las cuentas de los dueños siguen entrando directo al panel de flota.
+- **Modo sencillo:** dos pantallas con botones grandes. En Inicio, el camión asignado y el botón **INICIAR VIAJE**; en Viaje en curso, el tiempo, el mapa, la velocidad, la distancia y el botón **FINALIZAR VIAJE**, que pide confirmar en la misma pantalla.
+- En modo sencillo el chofer no completa nada: el camión es el último que usó (si el teléfono no tiene ninguno guardado, el de su último viaje; solo si no hay ninguno se pregunta una vez), y la hora, el recorrido, los kilómetros y el lugar de salida y de llegada los registra el GPS. El viaje llega al panel como un inicio rápido «con carga», para completar ahí cliente, carga, kilos y remitos.
+- **Modo normal:** el Inicio pasa a ser una lista con íconos de color (Iniciar viaje, Mis viajes, Combustible, Remitos y fotos, Documentos, Mantenimiento, Mi cuenta). «Mi combustible» sigue en la barra de abajo. Mis viajes suma el filtro Todos / Activos / Finalizados y el botón «Iniciar viaje» de Datos del viaje es verde.
+- El modo se cambia desde **Mi cuenta › Modo de uso** (normal) o con **Cambiar de modo** (sencillo).
+- No cambia nada de lo que se guarda ni de lo que se envía al panel.
 
 ## Nuevo en v0.15.1
 - Nombre de paquete para Google Play: `com.transportesferreira.app` (antes `uy.transportesferreira.gps`). Es una app nueva para Android: se instala aparte de la anterior y pide iniciar sesión otra vez. El código sigue en el paquete `uy.transportesferreira.gps`.

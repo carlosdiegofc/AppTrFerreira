@@ -10,8 +10,8 @@ android {
         minSdk = 26
         targetSdk = 36
         // Google Play accepts each versionCode only once: every bundle uploaded there needs a higher one, even a rebuild of the same versionName.
-        versionCode = 21
-        versionName = "0.15.1"
+        versionCode = 22
+        versionName = "0.16.0"
     }
     // The Google Play upload key only exists in the CI secrets; without it the release bundle stays unsigned.
     signingConfigs {

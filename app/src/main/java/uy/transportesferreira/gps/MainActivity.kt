@@ -58,6 +58,7 @@ class MainActivity:AppCompatActivity(){
  private val ink by lazy{tone(0xFF111C2E,0xFFE8EEF7)}
  private val muted by lazy{tone(0xFF67758B,0xFF9AA8BE)}
  private val faint by lazy{tone(0xFF9AA5B6,0xFF6C7A90)}
+ private val inkSoft by lazy{tone(0xFF4F5D73,0xFFB4C0D3)}
  private val line by lazy{tone(0xFFE5EAF1,0xFF253047)}
  private val fieldLine by lazy{tone(0xFFD5DDE8,0xFF33415A)}
  private val green by lazy{tone(0xFF178A4C,0xFF4CC58A)}
@@ -72,9 +73,10 @@ class MainActivity:AppCompatActivity(){
  private val medium by lazy{Typeface.create("sans-serif-medium",Typeface.NORMAL)}
  private val uy=Locale.forLanguageTag("es-UY")
  private val loginBg=0xFF0A1220.toInt()
- private enum class Kind{PRIMARY,DANGER,LINE,SOFT,LINE_DANGER}
+ private enum class Kind{PRIMARY,DANGER,LINE,SOFT,LINE_DANGER,GO}
  private class Btn(val view:LinearLayout,val label:TextView){fun enable(v:Boolean){view.isEnabled=v;view.alpha=if(v)1f else .5f}}
  private class Tile(val icon:Int,val title:String,val sub:String?,val action:()->Unit)
+ private class Shortcut(val icon:Int,val fill:Int,val title:String,val sub:String?,val action:()->Unit)
  private class Fact(val icon:Int,val label:String,val value:String)
  private class FleetItem(val model:String,val plate:String,val driver:String,val state:String,val speed:Double,val meters:Double,val lat:Double,val lng:Double,val at:Long?,val session:JSONObject?)
 
@@ -98,6 +100,7 @@ class MainActivity:AppCompatActivity(){
  private var photoMode="fuel";private var docReturn="prepare";private var historyLimit=50;private var historyQuery="";private var fuelMonth=true
  private var fleetLoadedAt=0L;private var fleetLoading=false
  private var editForm=JSONObject();private var editId:String?=null;private var maintFilter=0;private var maintTruck="";private var papersAt=0L
+ private var modePick=UiMode.SIMPLE;private var finishAsk=false;private var tripFilter=0
  private val serviceKinds=listOf("Cambio de aceite","Cambio de filtros","Revisión de frenos","Alineación y balanceo","Cubiertas","Revisión general")
  private var activeMap:android.webkit.WebView?=null;private var liveMap:TripMap.Live?=null;private var trackOffset=0L
  private val trucks=listOf("Ford Cargo 1722","Mercedes-Benz 1618","Leyland","Mercedes-Benz 1630")
@@ -107,6 +110,10 @@ class MainActivity:AppCompatActivity(){
  private fun uid()=api.session()?.optJSONObject("user")?.optString("id")?:""
  private fun prefs()=getSharedPreferences("gps",MODE_PRIVATE)
  private fun active()=store.current()?.optBoolean("active")==true
+ // The mode of use is kept on the phone, one per driver account.
+ private fun mode()=UiMode.parse(prefs().getString("mode-${uid()}",null))
+ private fun simple()=!isOwner()&&mode()==UiMode.SIMPLE
+ private fun setMode(v:String){prefs().edit().putString("mode-${uid()}",v).apply()}
 
  private val permissions=registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){
   if(ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED){if(active())try{service()}catch(_:Exception){};homeOrTrip()}
@@ -122,7 +129,7 @@ class MainActivity:AppCompatActivity(){
   camera=b?.getString("camera")?.let{File(it)};photo=b?.getString("photo")?.let{File(it)}?.takeIf{it.exists()};truck=b?.getString("truck")?:prefs().getString("truck","")?:"";empty=b?.getBoolean("empty")?:false
   editForm=JSONObject(b?.getString("editForm")?:"{}");editId=b?.getString("editId");maintTruck=b?.getString("maintTruck")?:"";maintFilter=b?.getInt("maintFilter")?:0
   onBackPressedDispatcher.addCallback(this,back)
-  if(api.session()==null)login() else {name=driverName();when(b?.getString("screen")){"fuel"->fuel();"document"->document();"prepare"->prepare();"newtrip"->newTrip();"maintenance"->maintenance();"maintform"->maintForm();"documents"->documents();"docform"->paperForm();"privacy"->privacy();else->homeOrTrip()};Sync.schedule(this);refreshCatalog()}
+  if(api.session()==null)login() else {name=driverName();when(b?.getString("screen")){"fuel"->fuel();"document"->document();"prepare"->prepare();"newtrip"->newTrip();"maintenance"->maintenance();"maintform"->maintForm();"documents"->documents();"docform"->paperForm();"privacy"->privacy();"mode"->askMode();else->homeOrTrip()};Sync.schedule(this);refreshCatalog()}
  }
  @Suppress("DEPRECATION") private fun transparentBars(){window.statusBarColor=Color.TRANSPARENT;window.navigationBarColor=Color.TRANSPARENT}
  override fun onSaveInstanceState(b:Bundle){super.onSaveInstanceState(b);b.putString("camera",camera?.path);b.putString("photo",photo?.path);b.putString("screen",screen);b.putString("truck",truck);b.putBoolean("empty",empty);b.putString("tripForm",tripForm.toString());b.putString("fuelForm",fuelForm.toString());b.putString("docForm",docForm.toString());b.putString("draftDocs",draftDocs.toString());b.putString("fuelTrip",fuelTrip?.toString());b.putString("docTrip",docTrip?.toString());b.putString("historyTrip",historyTrip?.toString());b.putString("photoMode",photoMode);b.putString("docReturn",docReturn);b.putString("editForm",editForm.toString());b.putString("editId",editId);b.putString("maintTruck",maintTruck);b.putInt("maintFilter",maintFilter)}
@@ -142,6 +149,7 @@ class MainActivity:AppCompatActivity(){
   "maintenance","documents"->homeOrTrip()
   "maintform"->maintenance()
   "docform"->documents()
+  "mode"->homeOrTrip()
  }}}
  private fun refreshCatalog(){thread{try{mobile.catalog(true);runOnUiThread{if(screen=="prepare")prepare() else if(screen=="newtrip")newTrip()}}catch(_:Exception){}}}
 
@@ -188,9 +196,9 @@ class MainActivity:AppCompatActivity(){
   p.addView(r,LinearLayout.LayoutParams(-1,-2))
  }
  private fun button(p:LinearLayout,s:String,kind:Kind=Kind.PRIMARY,icon:Int?=null,top:Int=12,action:()->Unit):Btn{
-  val solid=kind==Kind.PRIMARY||kind==Kind.DANGER
-  val fill=when(kind){Kind.PRIMARY->blue;Kind.DANGER->red;Kind.SOFT->blueSoft;else->cardBg}
-  val fg=when(kind){Kind.PRIMARY,Kind.DANGER->Color.WHITE;Kind.LINE_DANGER->red;else->blue}
+  val solid=kind==Kind.PRIMARY||kind==Kind.DANGER||kind==Kind.GO
+  val fill=when(kind){Kind.PRIMARY->blue;Kind.DANGER->red;Kind.GO->0xFF178A4C.toInt();Kind.SOFT->blueSoft;else->cardBg}
+  val fg=when(kind){Kind.PRIMARY,Kind.DANGER,Kind.GO->Color.WHITE;Kind.LINE_DANGER->red;else->blue}
   val shape=when(kind){Kind.LINE->outline(fill,tone(0xFFC9D8F6,0xFF35507E),14);Kind.LINE_DANGER->outline(fill,tone(0xFFF3C5C7,0xFF6A2C30),14);else->bg(fill,14)}
   val v=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;background=ripple(shape,if(solid)0x40FFFFFF else press);isClickable=true;isFocusable=true;contentDescription=s;setPadding(dp(16),0,dp(16),0);if(solid)elevation=dpf(2f)}
   if(icon!=null)v.addView(iconView(icon,fg,20).apply{(layoutParams as LinearLayout.LayoutParams).marginEnd=dp(10)})
@@ -237,6 +245,16 @@ class MainActivity:AppCompatActivity(){
     val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=ripple(bg(cardBg,16));elevation=dpf(1.5f);setPadding(dp(16),dp(16),dp(12),dp(14));isClickable=true;isFocusable=true;contentDescription=t.title+(t.sub?.let{". $it"}?:"");setOnClickListener{t.action()}}
     v.addView(iconView(t.icon,blue,28));v.addView(tv(t.title,15.5f,ink,1).apply{setPadding(0,dp(12),0,0)});if(t.sub!=null)v.addView(tv(t.sub,13f,muted).apply{setPadding(0,dp(2),0,0)})
     r.addView(v,LinearLayout.LayoutParams(0,-1,1f).apply{if(j%2==1)marginStart=dp(12)})}}
+ }
+ private fun menuList(items:List<Shortcut>){
+  val c=card()
+  for(e in items){if(c.childCount>0)divider(c,72)
+   val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;minimumHeight=dp(62);setPadding(dp(14),dp(8),dp(12),dp(8));background=ripple(null);isClickable=true;isFocusable=true;contentDescription=e.title+(e.sub?.let{". $it"}?:"");setOnClickListener{e.action()}}
+   r.addView(square(e.icon,Color.WHITE,e.fill,42,24))
+   val col=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(16),0,dp(8),0)}
+   col.addView(tv(e.title,16.5f,ink,1));if(e.sub!=null)col.addView(tv(e.sub,13.5f,muted).apply{setPadding(0,dp(2),0,0)})
+   r.addView(col,LinearLayout.LayoutParams(0,-2,1f));r.addView(iconView(R.drawable.ic_chevron,faint,20))
+   c.addView(r,LinearLayout.LayoutParams(-1,-2))}
  }
  private fun factsGrid(c:LinearLayout,items:List<Fact>):List<TextView>{
   val values=mutableListOf<TextView>()
@@ -336,7 +354,7 @@ class MainActivity:AppCompatActivity(){
   val msg=text(form,"",14f,0xFFFFB4B4.toInt(),0,10)
   lateinit var submit:Btn
   submit=button(form,"Ingresar",top=6){val e=email.text.toString().trim().lowercase();val p=pass.text.toString();if(e.isBlank()||p.isBlank()){msg.text="Completá correo y contraseña";return@button};submit.enable(false);msg.setTextColor(0xFFA9B6CC.toInt());msg.text="Ingresando…"
-   thread{try{api.login(e,p);name=driverName();runOnUiThread{pass.text.clear();homeOrTrip();Sync.schedule(this);refreshCatalog()}}catch(_:Exception){runOnUiThread{submit.enable(true);msg.setTextColor(0xFFFFB4B4.toInt());msg.text="No se pudo ingresar. Revisá tus datos y la conexión."}}}}
+   thread{try{api.login(e,p);name=driverName();runOnUiThread{pass.text.clear();if(isOwner())ownerDashboard() else askMode();Sync.schedule(this);refreshCatalog()}}catch(_:Exception){runOnUiThread{submit.enable(true);msg.setTextColor(0xFFFFB4B4.toInt());msg.text="No se pudo ingresar. Revisá tus datos y la conexión."}}}}
   text(form,"Tu sesión queda guardada de forma segura en este teléfono.",13f,0xFF8E9CB4.toInt(),0,18).gravity=Gravity.CENTER
   link(form,"Política de privacidad",top=2,color=0xFFA9B6CC.toInt()){privacy()}
  }
@@ -347,11 +365,145 @@ class MainActivity:AppCompatActivity(){
   box.addView(e,LinearLayout.LayoutParams(0,-1,1f));p.addView(box,LinearLayout.LayoutParams(-1,dp(56)).apply{topMargin=dp(top)});return e
  }
  private fun driverName():String{val u=api.session()?.optJSONObject("user")?:return "Chofer";val m=u.optJSONObject("user_metadata");val known=mapOf("immer@trferreira.com" to "Immer Sampayo","luis@trferreira.com" to "Luis Ferreira","hugo@trferreira.com" to "Hugo Silva","transportesferreirauy@gmail.com" to "Transportes Ferreira");return m?.optString("full_name")?.takeIf{it.isNotBlank()}?:m?.optString("name")?.takeIf{it.isNotBlank()}?:known[u.optString("email").lowercase()]?:u.optString("email").substringBefore("@").replaceFirstChar{it.uppercase()}}
- private fun homeOrTrip(){if(isOwner())ownerDashboard() else if(active())trip() else home()}
+ private fun homeOrTrip(){when(UiMode.start(isOwner(),mode(),active())){"owner"->ownerDashboard();"mode"->askMode();"simpletrip"->simpleTrip();"simplehome"->simpleHome();"trip"->trip();else->home()}}
+
+ // ---------- Mode of use: asked after signing in, kept per driver ----------
+ private fun askMode(){modePick=mode()?:UiMode.SIMPLE;modeChoice()}
+ private fun modeChoice(){
+  page("mode",header=false);back.isEnabled=mode()!=null
+  shell.setBackgroundColor(loginBg);(root.parent as View).setBackgroundColor(loginBg);dock.setBackgroundColor(loginBg);root.setPadding(dp(20),0,dp(20),dp(16))
+  WindowCompat.getInsetsController(window,window.decorView).isAppearanceLightNavigationBars=false
+  val top=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER_HORIZONTAL};root.addView(top,LinearLayout.LayoutParams(-1,-2));topTarget=top
+  top.addView(ImageView(this).apply{setImageResource(R.drawable.tr_ferreira_logo);adjustViewBounds=true;contentDescription="TR Ferreira"},LinearLayout.LayoutParams(dp(170),-2).apply{topMargin=dp(28)})
+  text(root,"Hola, ${name.substringBefore(" ")}",30f,Color.WHITE,2,30).gravity=Gravity.CENTER
+  text(root,"¿Qué modo querés usar?",17f,0xFFA9B6CC.toInt(),0,6).gravity=Gravity.CENTER
+  modeCard(R.drawable.ic_truck,0xFF178A4C.toInt(),"Modo sencillo","Solo lo necesario: iniciar y finalizar el viaje. Botones grandes y datos automáticos.",modePick==UiMode.SIMPLE,26){modePick=UiMode.SIMPLE;modeChoice()}
+  modeCard(R.drawable.ic_list,0xFF1663E8.toInt(),"Modo normal","Todas las opciones: combustible, remitos, historial, documentos y mantenimiento.",modePick==UiMode.NORMAL,14){modePick=UiMode.NORMAL;modeChoice()}
+  text(root,"Podés cambiar el modo cuando quieras.",13.5f,0xFF8E9CB4.toInt(),0,18).gravity=Gravity.CENTER
+  dock.visibility=View.VISIBLE
+  button(dock,"Continuar",top=0){setMode(modePick);homeOrTrip()}
+  if(mode()!=null)link(dock,"Cerrar sesión",top=2,color=0xFFA9B6CC.toInt()){logout()}
+ }
+ private fun modeCard(icon:Int,fill:Int,title:String,sub:String,selected:Boolean,top:Int,action:()->Unit){
+  val f=FrameLayout(this).apply{background=ripple(if(selected)outline(greenBg,green,16).apply{setStroke(dp(2),green)} else bg(cardBg,16));isClickable=true;isFocusable=true;contentDescription="$title. $sub"+if(selected)". Elegido" else "";setOnClickListener{action()}}
+  val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(16),dp(18),dp(16),dp(18))}
+  r.addView(square(icon,Color.WHITE,fill,56,30))
+  val col=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(16),0,dp(if(selected)24 else 0),0)}
+  col.addView(tv(title,20f,ink,2));col.addView(tv(sub,14.5f,inkSoft).apply{setPadding(0,dp(4),0,0);setLineSpacing(0f,1.12f)})
+  r.addView(col,LinearLayout.LayoutParams(0,-2,1f));f.addView(r,FrameLayout.LayoutParams(-1,-2))
+  if(selected)f.addView(iconView(R.drawable.ic_check_circle,green,26),FrameLayout.LayoutParams(dp(26),dp(26),Gravity.TOP or Gravity.END).apply{setMargins(dp(10),dp(10),dp(10),dp(10))})
+  root.addView(f,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(top)})
+ }
+
+ // ---------- Simple mode: two screens, big buttons, nothing to fill in ----------
+ private fun brandBar(){
+  val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(18),0,dp(14),0)}
+  r.addView(ImageView(this).apply{setImageResource(R.drawable.tr_ferreira_logo);adjustViewBounds=true;contentDescription="TR Ferreira"},LinearLayout.LayoutParams(dp(170),-2))
+  r.addView(View(this),LinearLayout.LayoutParams(0,1,1f))
+  r.addView(chip(name.substringBefore(" ")).apply{(layoutParams as LinearLayout.LayoutParams).marginEnd=0})
+  head.addView(r,LinearLayout.LayoutParams(-1,dp(60)))
+ }
+ private fun bigButton(p:LinearLayout,s:String,fill:Int,icon:Int,stacked:Boolean,lp:LinearLayout.LayoutParams,action:()->Unit):LinearLayout{
+  val v=LinearLayout(this).apply{orientation=if(stacked)LinearLayout.VERTICAL else LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;background=ripple(bg(fill,18),0x40FFFFFF);elevation=dpf(3f);isClickable=true;isFocusable=true;contentDescription=s;setPadding(dp(16),dp(14),dp(16),dp(14));setOnClickListener{action()}}
+  v.addView(iconView(icon,Color.WHITE,if(stacked)76 else 34))
+  val label=tv(s,if(stacked)28f else 20f,Color.WHITE,2).apply{gravity=Gravity.CENTER;letterSpacing=.03f;maxLines=1;ellipsize=TextUtils.TruncateAt.END}
+  if(stacked){label.setAutoSizeTextTypeUniformWithConfiguration(16,28,1,android.util.TypedValue.COMPLEX_UNIT_SP);v.addView(label,LinearLayout.LayoutParams(-1,dp(44)).apply{topMargin=dp(6)})}
+  else v.addView(label,LinearLayout.LayoutParams(-2,-2).apply{marginStart=dp(12)})
+  p.addView(v,lp);return v
+ }
+ private fun bigStat(p:LinearLayout,label:String,value:String,unit:String?,index:Int):TextView{
+  val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=bg(cardBg,16);elevation=dpf(1.5f);setPadding(dp(16),dp(12),dp(12),dp(12))}
+  v.addView(tv(label,14f,muted))
+  val figures=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.BOTTOM}
+  val big=tv(value,28f,ink,2).apply{maxLines=1};figures.addView(big)
+  if(unit!=null)figures.addView(tv(unit,14.5f,muted,1).apply{setPadding(dp(6),0,0,dp(5))})
+  v.addView(figures);p.addView(v,LinearLayout.LayoutParams(0,-2,1f).apply{if(index>0)marginStart=dp(12)});return big
+ }
+ private fun simpleHome(){
+  page("simplehome");brandBar();finishAsk=false
+  val (model,plate)=truckParts(truck)
+  val tc=card(top=10)
+  val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(18),dp(16),dp(10),dp(16));background=ripple(null);isClickable=true;isFocusable=true;contentDescription="Camión asignado: ${model.ifBlank{"sin elegir"}}. Tocá para cambiarlo";setOnClickListener{pickTruck{simpleHome()}}}
+  val col=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
+  col.addView(tv("Camión asignado",13.5f,muted));col.addView(tv(model.ifBlank{"Sin camión elegido"},21f,ink,2).apply{setPadding(0,dp(2),0,0)})
+  col.addView(tv(if(plate.isNotBlank())"Matrícula $plate" else if(model.isBlank())"Tocá para elegirlo" else "Tocá para cambiarlo",14.5f,muted).apply{setPadding(0,dp(2),0,0)})
+  r.addView(col,LinearLayout.LayoutParams(0,-2,1f))
+  r.addView(ImageView(this).apply{setImageResource(R.drawable.truck_side);importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO},LinearLayout.LayoutParams(dp(126),dp(50)))
+  tc.addView(r)
+  val ready=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;background=bg(greenBg,16);setPadding(dp(16),dp(14),dp(16),dp(14))}
+  ready.addView(iconView(R.drawable.ic_check_circle,green,30))
+  val rc=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),0,0,0)}
+  rc.addView(tv("Listo para viajar",17f,ink,1));rc.addView(tv("El recorrido, los kilómetros y la hora se registran solos.",14f,inkSoft).apply{setPadding(0,dp(2),0,0)})
+  ready.addView(rc,LinearLayout.LayoutParams(0,-2,1f));root.addView(ready,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12)})
+  bigButton(root,"INICIAR VIAJE",0xFF178A4C.toInt(),R.drawable.ic_play,true,LinearLayout.LayoutParams(-1,0,1f).apply{topMargin=dp(12)}){simpleStart()}.minimumHeight=dp(190)
+  // The last finished trip confirms that it was saved without the driver doing anything else.
+  store.current()?.takeIf{!it.optBoolean("active")&&it.optString("driver_id")==uid()}?.let{t->
+   row(card(),R.drawable.ic_check_circle,"Último viaje guardado",listOfNotNull(date(t.optString("started_at")),km(t.optDouble("distance_meters",0.0)),durationText(t.optString("started_at"),t.optString("ended_at"))).joinToString(" · "),tint=green)}
+  button(root,"Cambiar de modo",Kind.LINE,R.drawable.ic_list){askMode()}
+  sync=note(store.message(),top=12).apply{gravity=Gravity.CENTER}
+  if(truck.isBlank())guessTruck()
+ }
+ /** Truck of the driver's latest trip, for a phone that has none saved yet. */
+ private fun knownTruck():String?{
+  val rows=try{mobile.history("trips",50)}catch(_:Exception){return null}
+  for(i in 0 until rows.length()){val v=rows.getJSONObject(i).optString("vehicle").trim();if(v.isNotBlank()&&v!=InputRules.vehicle(""))return v}
+  return null
+ }
+ private fun guessTruck(){
+  knownTruck()?.let{saveTruck(it);simpleHome();return}
+  thread{try{mobile.history("trips",50,true);val v=knownTruck();runOnUiThread{if(v!=null&&truck.isBlank()&&screen=="simplehome"){saveTruck(v);simpleHome()}}}catch(_:Exception){}}
+ }
+ /** One tap starts the trip: remembered truck, loaded trip, no form. Without a known truck it asks once. */
+ private fun simpleStart(asked:Boolean=false){
+  if(active()){simpleTrip();return}
+  if(truck.isBlank()&&!asked){val v=knownTruck();if(v!=null)saveTruck(v) else {pickTruck{simpleStart(true)};return}}
+  tripForm=JSONObject();draftDocs=JSONArray();empty=false;beginTrip()
+ }
+ private fun simpleTrip(){
+  val t=store.current()?.takeIf{it.optBoolean("active")}?:return simpleHome()
+  page("simpletrip");brandBar();finishAsk=false
+  val (model,plate)=truckParts(t.optString("vehicle"))
+  val sb=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(16),dp(12),dp(16),dp(12));background=bg(0xFF178A4C.toInt(),14)}
+  sb.addView(iconView(R.drawable.ic_clock,Color.WHITE,30))
+  val bc=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),0,0,0)}
+  val state=tv("Viaje en curso",18f,Color.WHITE,2);bc.addView(state);status=state
+  bc.addView(tv(listOf(model,plate).filter{it.isNotBlank()}.joinToString(" · ").ifBlank{"Sin camión asignado"},14f,0xFFE3F5EA.toInt()).apply{maxLines=1;ellipsize=TextUtils.TruncateAt.END})
+  sb.addView(bc,LinearLayout.LayoutParams(0,-2,1f));statusBox=sb;root.addView(sb,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(10)})
+  val clock=tv(elapsedText(t.optString("started_at")),54f,ink,2).apply{gravity=Gravity.CENTER;fontFeatureSettings="tnum";includeFontPadding=false;maxLines=1;setAutoSizeTextTypeUniformWithConfiguration(28,54,1,android.util.TypedValue.COMPLEX_UNIT_SP)}
+  root.addView(clock,LinearLayout.LayoutParams(-1,dp(66)).apply{topMargin=dp(14)});elapsed=clock
+  text(root,"Tiempo de viaje",14.5f,muted,0,4).gravity=Gravity.CENTER
+  val mc=card(top=14);trackOffset=0L
+  val live=TripMap.live(this,Double.NaN,Double.NaN);liveMap=live;activeMap=live.web;mc.addView(live.web,LinearLayout.LayoutParams(-1,dp(230)))
+  val st=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL};root.addView(st,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12)})
+  speed=bigStat(st,"Velocidad","—","km/h",0);distance=bigStat(st,"Distancia",km(t.optDouble("distance_meters",0.0)),null,1)
+  gps=note("",top=10).apply{gravity=Gravity.CENTER}
+  if(!(getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName))row(card(),R.drawable.ic_battery,"Evitar cortes del GPS","Permitir que la app siga en segundo plano",tint=amber){batteryExemption()}
+  sync=note(store.message(),top=6).apply{gravity=Gravity.CENTER}
+  simpleDock()
+  refresh();try{service()}catch(_:Exception){gps?.text="Revisá el permiso de ubicación para continuar"}
+ }
+ /** Bottom of the trip screen: the finish button, or the confirmation after tapping it, without leaving the screen. */
+ private fun simpleDock(){
+  dock.removeAllViews();dock.visibility=View.VISIBLE
+  if(finishAsk){
+   val t=store.current()
+   text(dock,"¿Finalizar el viaje?",20f,ink,2).gravity=Gravity.CENTER
+   text(dock,"${elapsedText(t?.optString("started_at")?:"")} · ${km(t?.optDouble("distance_meters",0.0)?:0.0)}. Todo queda guardado.",14.5f,muted,0,4).gravity=Gravity.CENTER
+   bigButton(dock,"SÍ, FINALIZAR",0xFFD32F2F.toInt(),R.drawable.ic_stop,false,LinearLayout.LayoutParams(-1,dp(76)).apply{topMargin=dp(12)}){
+    finishAsk=false;dock.removeAllViews();text(dock,"Guardando el viaje…",17f,ink,1,18).apply{gravity=Gravity.CENTER;setPadding(0,0,0,dp(18))}
+    try{service(GpsService.FINISH)}catch(_:Exception){toast("No se pudo finalizar. Reintentá.");simpleDock()}}
+   button(dock,"Seguir viaje",Kind.LINE,top=10){finishAsk=false;simpleDock()}
+  }else{
+   // A trip paused from normal mode would otherwise have no way to continue here.
+   if(store.current()?.optBoolean("paused")==true)button(dock,"Reanudar viaje",Kind.PRIMARY,R.drawable.ic_play,top=0){try{service(GpsService.RESUME)}catch(_:Exception){toast("Revisá el permiso de ubicación")};handler.postDelayed({if(screen=="simpletrip")simpleDock()},700)}
+   bigButton(dock,"FINALIZAR VIAJE",0xFFD32F2F.toInt(),R.drawable.ic_stop,false,LinearLayout.LayoutParams(-1,dp(92)).apply{topMargin=dp(if(dock.childCount>0)10 else 0)}){finishAsk=true;simpleDock()}
+  }
+ }
 
  // ---------- Driver home ----------
  private fun home(){
-  page("home");hello("Bienvenido",name,barButton(R.drawable.ic_sync,"Enviar pendientes y actualizar"){syncNow()})
+  if(simple()){simpleHome();return}
+  page("home");hello("Hola",name,barButton(R.drawable.ic_sync,"Enviar pendientes y actualizar"){syncNow()})
   val t=store.current();val running=t?.optBoolean("active")==true
   val (model,plate)=truckParts(if(running)t!!.optString("vehicle") else truck)
   val tc=card()
@@ -365,15 +517,14 @@ class MainActivity:AppCompatActivity(){
   tc.addView(r)
   if(running)button(root,"Volver al viaje en curso",Kind.PRIMARY,R.drawable.ic_navigation){trip()}
   alerts()
-  tileGrid(listOf(
-   Tile(R.drawable.ic_route,"Nuevo viaje",null){if(active()){toast("Ya tenés un viaje en curso");trip()}else{tripForm=JSONObject();draftDocs=JSONArray();empty=false;newTrip()}},
-   Tile(R.drawable.ic_navigation,"Viaje activo",if(running)"En curso" else "Sin viaje"){if(active())trip() else toast("No hay un viaje en curso. Tocá «Nuevo viaje» para empezar.")},
-   Tile(R.drawable.ic_fuel,"Cargar combustible",null){fuelChoice()},
-   Tile(R.drawable.ic_receipt,"Remitos",null){if(active())openDocument(store.current(),"trip","arrival") else {toast("Elegí el viaje al que querés agregar el remito");history("trips",true)}},
-   Tile(R.drawable.ic_list,"Mis viajes",null){history("trips",true)},
-   Tile(R.drawable.ic_history,"Mi combustible",null){history("fuel",true)},
-   Tile(R.drawable.ic_doc,"Documentos",null){documents(true)},
-   Tile(R.drawable.ic_wrench,"Mantenimiento",null){maintenance(true)}))
+  menuList(listOf(
+   Shortcut(R.drawable.ic_play,0xFF178A4C.toInt(),"Iniciar viaje",if(running)"Ya hay un viaje en curso" else null){if(active()){toast("Ya tenés un viaje en curso");trip()}else{tripForm=JSONObject();draftDocs=JSONArray();empty=false;newTrip()}},
+   Shortcut(R.drawable.ic_list,0xFF1663E8.toInt(),"Mis viajes",null){history("trips",true)},
+   Shortcut(R.drawable.ic_fuel,0xFFC96A12.toInt(),"Combustible","Cargar una boleta"){fuelChoice()},
+   Shortcut(R.drawable.ic_receipt,0xFF7A4FD0.toInt(),"Remitos y fotos",null){if(active())openDocument(store.current(),"trip","arrival") else {toast("Elegí el viaje al que querés agregar el remito");history("trips",true)}},
+   Shortcut(R.drawable.ic_doc,0xFF0E8A8A.toInt(),"Documentos",null){documents(true)},
+   Shortcut(R.drawable.ic_wrench,0xFF56647B.toInt(),"Mantenimiento",null){maintenance(true)},
+   Shortcut(R.drawable.ic_person,0xFF8590A2.toInt(),"Mi cuenta","Modo de uso, GPS y sesión"){settings()}))
   sync=note(store.message(),top=18).apply{gravity=Gravity.CENTER}
   navBar("home")
   refreshPapers()
@@ -446,7 +597,7 @@ class MainActivity:AppCompatActivity(){
   if(n>0){val dc=card();for(i in 0 until n){val d=draftDocs.getJSONObject(i);val title="${if(d.optString("kind")=="arrival")"Llegada" else "Salida"} · ${d.optString("number").ifBlank{"Sin número"}}"
    row(dc,R.drawable.ic_receipt,title,if(d.optString("draft_photo").isNotBlank())"Con foto" else "Sin foto",trailing=iconView(R.drawable.ic_close,muted,20)){AlertDialog.Builder(this).setTitle("¿Quitar este remito?").setMessage(title).setNegativeButton("Conservar",null).setPositiveButton("Quitar"){_,_->draftDocs.remove(i);prepare()}.show()}}}
   note("Todos los datos son opcionales. Podés completarlos durante el viaje o al llegar.",top=14)
-  dock.visibility=View.VISIBLE;button(dock,"Iniciar viaje",top=0){begin()}
+  dock.visibility=View.VISIBLE;button(dock,"Iniciar viaje",Kind.GO,R.drawable.ic_play,top=0){begin()}
  }
  private fun choose(title:String,values:List<String>,data:JSONObject,key:String,changed:()->Unit={}){
   val current=data.optString(key);val items=values.filter{it.isNotBlank()}.distinct().toMutableList()
@@ -491,6 +642,7 @@ class MainActivity:AppCompatActivity(){
 
  // ---------- Trip in progress ----------
  private fun trip(){
+  if(simple()){simpleTrip();return}
   val t=store.current()?:return home();page("trip")
   val (model,plate)=truckParts(t.optString("vehicle"))
   bar("Viaje activo",back={home()},trailing=if(plate.isNotBlank())chip(plate) else null)
@@ -543,7 +695,7 @@ class MainActivity:AppCompatActivity(){
  }
  private fun refresh(){if(!::store.isInitialized)return;sync?.text=store.message()
   if(screen=="owner"&&!fleetLoading&&System.currentTimeMillis()-fleetLoadedAt>120000)loadFleet()
-  if(screen!="trip")return;val t=store.current()?:return
+  if(screen!="trip"&&screen!="simpletrip")return;val t=store.current()?:return
   if(!t.optBoolean("active")){home();toast("Viaje finalizado. Los datos pendientes se enviarán con conexión.");return}
   val paused=t.optBoolean("paused")
   status?.text=if(paused)"Viaje pausado" else "Viaje en curso";statusBox?.background=bg(if(paused)0xFFB7740B.toInt() else 0xFF178A4C.toInt(),14)
@@ -651,14 +803,16 @@ class MainActivity:AppCompatActivity(){
  }
  private fun tripList(rows:JSONArray,fleet:Boolean){
   val info=mobile.tripInfo(fleet)
+  segmented(root,listOf("Todos","Activos","Finalizados"),tripFilter){tripFilter=it;history("trips")}
   val search=searchBox(root,"Buscar por camión, destino o carga",historyQuery)
   val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};root.addView(box,LinearLayout.LayoutParams(-1,-2))
   fun render(){box.removeAllViews();val q=historyQuery.trim().lowercase(uy);var c:LinearLayout?=null
    for(i in 0 until rows.length()){val r=rows.getJSONObject(i);val d=info.optJSONObject(r.optString("id"))?:JSONObject()
     val haystack=listOf(r.optString("vehicle"),r.optString("driver_name"),d.optString("destino"),d.optString("cliente"),d.optString("tipoCarga"),date(r.optString("started_at"))).joinToString(" ").lowercase(uy)
     if(q.isNotEmpty()&&!haystack.contains(q))continue
+    if((tripFilter==1&&!r.optBoolean("active"))||(tripFilter==2&&r.optBoolean("active")))continue
     if(c==null)c=card(box);tripRow(c,r,d,fleet)}
-   if(c==null){val prev=root;root=box;emptyCard(R.drawable.ic_route,if(q.isEmpty())"Todavía no hay viajes" else "Sin resultados",if(q.isEmpty())"Los viajes aparecen acá cuando se inician." else "No hay viajes que coincidan con «${historyQuery.trim()}».");root=prev}
+   if(c==null){val prev=root;root=box;emptyCard(R.drawable.ic_route,if(q.isNotEmpty())"Sin resultados" else if(tripFilter==1)"No hay viajes en curso" else if(tripFilter==2)"Todavía no hay viajes finalizados" else "Todavía no hay viajes",if(q.isNotEmpty())"No hay viajes que coincidan con «${historyQuery.trim()}»." else if(tripFilter==1)"Los viajes iniciados aparecen acá hasta que se finalizan." else "Los viajes aparecen acá cuando se inician.");root=prev}
   }
   render()
   search.addTextChangedListener(object:TextWatcher{override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){};override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){};override fun afterTextChanged(e:Editable?){historyQuery=e?.toString()?:"";render()}})
@@ -791,6 +945,9 @@ class MainActivity:AppCompatActivity(){
   col.addView(tv(name,18f,ink,1));col.addView(tv(email,14f,muted).apply{setPadding(0,dp(2),0,0)})
   col.addView(pill(if(isOwner())"Dueño · panel de flota" else "Chofer",blue,blueSoft).apply{(layoutParams as LinearLayout.LayoutParams).topMargin=dp(8)})
   pr.addView(col,LinearLayout.LayoutParams(0,-2,1f));pc.addView(pr)
+  if(!isOwner()){section("Modo de uso");val mc=card(pad=16)
+   segmented(mc,listOf("Sencillo","Normal"),1,top=0){if(it==0){setMode(UiMode.SIMPLE);toast("Modo sencillo activado");homeOrTrip()}}
+   note("Sencillo: solo iniciar y finalizar el viaje, con botones grandes. Normal: todas las opciones.",mc,10)}
   section("Sincronización")
   val sc=card(pad=16);sync=text(sc,store.message(),15f,ink);note("Los viajes, boletas y remitos se guardan en el teléfono y se envían solos cuando hay conexión.",sc,6)
   button(sc,"Enviar pendientes y actualizar",Kind.SOFT,R.drawable.ic_sync){syncNow()}
@@ -799,10 +956,11 @@ class MainActivity:AppCompatActivity(){
   section("Camiones y papeles")
   val pp=card();row(pp,R.drawable.ic_wrench,"Mantenimiento","Services hechos y pendientes"){maintenance(true)};row(pp,R.drawable.ic_doc,"Documentos","Licencia, carné de salud, SOA y más"){documents(true)}
   button(root,"Renovar acceso",Kind.LINE,R.drawable.ic_lock,top=24){login()}
-  button(root,"Cerrar sesión",Kind.LINE_DANGER,R.drawable.ic_logout){if(active()||store.pendingCount()>0){toast("Finalizá el viaje y enviá los datos pendientes antes de cerrar sesión.");return@button};api.clear();login()}
+  button(root,"Cerrar sesión",Kind.LINE_DANGER,R.drawable.ic_logout){logout()}
   note("Transportes Ferreira GPS · versión $appVersion",top=18).gravity=Gravity.CENTER
   navBar("more")
  }
+ private fun logout(){if(active()||store.pendingCount()>0){toast("Finalizá el viaje y enviá los datos pendientes antes de cerrar sesión.");return};api.clear();login()}
 
  // ---------- Privacy policy: the same text published in docs/legal/privacidad.md ----------
  private fun privacy(){
