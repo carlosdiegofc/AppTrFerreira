@@ -3,12 +3,15 @@ La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la
 
 # Transportes Ferreira GPS — v0.16.0
 
-## Nuevo en v0.16.0 (modo sencillo y modo normal)
-- Después de ingresar, cada chofer elige cómo usar la app: **modo sencillo** o **modo normal**. La elección queda guardada en el teléfono para esa cuenta; a quien ya tenía la sesión abierta se le pregunta una vez al abrir la app. Las cuentas de los dueños siguen entrando directo al panel de flota.
+## Nuevo en v0.16.0 (modo sencillo, modo normal y menú del dueño)
+- Después de ingresar, cada chofer elige cómo usar la app: **modo sencillo** o **modo normal**. La elección queda guardada en el teléfono para esa cuenta; a quien ya tenía la sesión abierta se le pregunta una vez al abrir la app. La cuenta de la empresa sigue entrando directo al panel de flota.
 - **Modo sencillo:** dos pantallas con botones grandes. En Inicio, el camión asignado y el botón **INICIAR VIAJE**; en Viaje en curso, el tiempo, el mapa, la velocidad, la distancia y el botón **FINALIZAR VIAJE**, que pide confirmar en la misma pantalla.
 - En modo sencillo el chofer no completa nada: el camión es el último que usó (si el teléfono no tiene ninguno guardado, el de su último viaje; solo si no hay ninguno se pregunta una vez), y la hora, el recorrido, los kilómetros y el lugar de salida y de llegada los registra el GPS. El viaje llega al panel como un inicio rápido «con carga», para completar ahí cliente, carga, kilos y remitos.
 - **Modo normal:** el Inicio pasa a ser una lista con íconos de color (Iniciar viaje, Mis viajes, Combustible, Remitos y fotos, Documentos, Mantenimiento, Mi cuenta). «Mi combustible» sigue en la barra de abajo. Mis viajes suma el filtro Todos / Activos / Finalizados y el botón «Iniciar viaje» de Datos del viaje es verde.
 - El modo se cambia desde **Mi cuenta › Modo de uso** (normal) o con **Cambiar de modo** (sencillo).
+- **Dueño que también maneja (cuenta de Luis):** entra igual que un chofer —elige el modo e inicia y finaliza sus viajes— y suma el **Menú del dueño**: el botón **Menú** arriba a la derecha en sus pantallas de inicio y de viaje, y un botón o renglón con ese nombre en el Inicio. Se abre desde abajo con Flota en vivo, Viajes de la flota, Rendimiento, Combustible de la flota, Mantenimiento y Documentos (en modo sencillo, también Cambiar de modo). Cada pantalla vuelve al Inicio con la flecha; «Viajes» y «Combustible» de la barra de abajo siguen siendo los suyos.
+- **Rendimiento** (nuevo; también está en el panel de flota de la cuenta de la empresa): por mes, para toda la flota y **por camión** o **por chofer**: viajes, kilómetros del GPS, kilómetros con carga y sin carga, litros y gasto de combustible, consumo (L/100 km y km por litro, si hubo 300 km o más en el mes) y, cuando están cargados en el panel web, kilómetros facturables, kilos e importes en pesos y en dólares por separado. Suma con las reglas del resumen del panel web: lo que se completó en el panel manda y los viajes eliminados no cuentan. Los viajes guardados con un nombre viejo del camión («Ford Cargo», «Mercedes-Benz 1618») se suman al camión del catálogo, y los camiones sin viajes ni cargas figuran como «Sin movimientos en el mes».
+- Al abrir un viaje desde Flota en vivo, la flecha vuelve al mapa de la flota.
 - No cambia nada de lo que se guarda ni de lo que se envía al panel.
 
 ## Nuevo en v0.15.1

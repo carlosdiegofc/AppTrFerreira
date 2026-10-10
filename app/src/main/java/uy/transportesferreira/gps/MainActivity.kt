@@ -101,18 +101,22 @@ class MainActivity:AppCompatActivity(){
  private var fleetLoadedAt=0L;private var fleetLoading=false
  private var editForm=JSONObject();private var editId:String?=null;private var maintFilter=0;private var maintTruck="";private var papersAt=0L
  private var modePick=UiMode.SIMPLE;private var finishAsk=false;private var tripFilter=0
+ private var fleetView=false;private var detailFrom="list";private var sheet:android.app.Dialog?=null
+ private var perfMonth:YearMonth=YearMonth.now();private var perfDrivers=false;private var perfFailed=false;private var perfLoading:YearMonth?=null
  private val serviceKinds=listOf("Cambio de aceite","Cambio de filtros","Revisión de frenos","Alineación y balanceo","Cubiertas","Revisión general")
  private var activeMap:android.webkit.WebView?=null;private var liveMap:TripMap.Live?=null;private var trackOffset=0L
  private val trucks=listOf("Ford Cargo 1722","Mercedes-Benz 1618","Leyland","Mercedes-Benz 1630")
- // Accounts that open on the fleet panel instead of the driver home.
- private val ownerEmails=setOf("luis@trferreira.com","transportesferreirauy@gmail.com")
- private fun isOwner()=(api.session()?.optJSONObject("user")?.optString("email")?.lowercase()?:"") in ownerEmails
+ private fun account()=api.session()?.optJSONObject("user")?.optString("email")?:""
+ // Owners see the whole fleet. The company account opens on the fleet panel; an owner who also drives starts like any driver and opens the owner menu from there.
+ private fun isOwner()=UiMode.owner(account())
+ private fun panelFirst()=UiMode.panelFirst(account())
+ private fun ownerDriver()=UiMode.drivingOwner(account())
  private fun uid()=api.session()?.optJSONObject("user")?.optString("id")?:""
  private fun prefs()=getSharedPreferences("gps",MODE_PRIVATE)
  private fun active()=store.current()?.optBoolean("active")==true
  // The mode of use is kept on the phone, one per driver account.
  private fun mode()=UiMode.parse(prefs().getString("mode-${uid()}",null))
- private fun simple()=!isOwner()&&mode()==UiMode.SIMPLE
+ private fun simple()=!panelFirst()&&mode()==UiMode.SIMPLE
  private fun setMode(v:String){prefs().edit().putString("mode-${uid()}",v).apply()}
 
  private val permissions=registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){
@@ -134,19 +138,20 @@ class MainActivity:AppCompatActivity(){
  @Suppress("DEPRECATION") private fun transparentBars(){window.statusBarColor=Color.TRANSPARENT;window.navigationBarColor=Color.TRANSPARENT}
  override fun onSaveInstanceState(b:Bundle){super.onSaveInstanceState(b);b.putString("camera",camera?.path);b.putString("photo",photo?.path);b.putString("screen",screen);b.putString("truck",truck);b.putBoolean("empty",empty);b.putString("tripForm",tripForm.toString());b.putString("fuelForm",fuelForm.toString());b.putString("docForm",docForm.toString());b.putString("draftDocs",draftDocs.toString());b.putString("fuelTrip",fuelTrip?.toString());b.putString("docTrip",docTrip?.toString());b.putString("historyTrip",historyTrip?.toString());b.putString("photoMode",photoMode);b.putString("docReturn",docReturn);b.putString("editForm",editForm.toString());b.putString("editId",editId);b.putString("maintTruck",maintTruck);b.putInt("maintFilter",maintFilter)}
  override fun onStart(){super.onStart();handler.post(tick)}
- override fun onDestroy(){photoJob++;activeMap?.destroy();activeMap=null;super.onDestroy()}
+ override fun onDestroy(){photoJob++;sheet?.dismiss();sheet=null;activeMap?.destroy();activeMap=null;super.onDestroy()}
  override fun onStop(){handler.removeCallbacks(tick);super.onStop()}
  // Screens where back stays inside the app; on the rest the system back gesture leaves it.
- private val innerScreens=setOf("fuel","document","prepare","newtrip","trip","triphistory","fuelhistory","settings","privacy","tripdetail","maintenance","documents","maintform","docform")
+ private val innerScreens=setOf("fuel","document","prepare","newtrip","trip","triphistory","fuelhistory","settings","privacy","tripdetail","maintenance","documents","maintform","docform","performance")
  private val back=object:OnBackPressedCallback(false){override fun handleOnBackPressed(){when(screen){
   "fuel"->homeOrTrip()
   "document"->backFromDocument()
   "prepare"->newTrip()
   "newtrip","trip"->home()
-  "triphistory","fuelhistory","settings"->if(isOwner())ownerDashboard() else home()
+  "triphistory","fuelhistory"->if(fleetView||panelFirst())homeOrTrip() else home()
+  "settings"->if(panelFirst())ownerDashboard() else home()
   "privacy"->if(api.session()==null)login() else settings()
-  "tripdetail"->history("trips")
-  "maintenance","documents"->homeOrTrip()
+  "tripdetail"->leaveDetail()
+  "maintenance","documents","owner","performance"->homeOrTrip()
   "maintform"->maintenance()
   "docform"->documents()
   "mode"->homeOrTrip()
@@ -246,10 +251,11 @@ class MainActivity:AppCompatActivity(){
     v.addView(iconView(t.icon,blue,28));v.addView(tv(t.title,15.5f,ink,1).apply{setPadding(0,dp(12),0,0)});if(t.sub!=null)v.addView(tv(t.sub,13f,muted).apply{setPadding(0,dp(2),0,0)})
     r.addView(v,LinearLayout.LayoutParams(0,-1,1f).apply{if(j%2==1)marginStart=dp(12)})}}
  }
- private fun menuList(items:List<Shortcut>){
-  val c=card()
+ private fun menuList(items:List<Shortcut>)=menuRows(card(),items)
+ /** Rows with a coloured icon. before runs ahead of each action, for a menu that has to close first. */
+ private fun menuRows(c:LinearLayout,items:List<Shortcut>,before:()->Unit={}){
   for(e in items){if(c.childCount>0)divider(c,72)
-   val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;minimumHeight=dp(62);setPadding(dp(14),dp(8),dp(12),dp(8));background=ripple(null);isClickable=true;isFocusable=true;contentDescription=e.title+(e.sub?.let{". $it"}?:"");setOnClickListener{e.action()}}
+   val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;minimumHeight=dp(62);setPadding(dp(14),dp(8),dp(12),dp(8));background=ripple(null);isClickable=true;isFocusable=true;contentDescription=e.title+(e.sub?.let{". $it"}?:"");setOnClickListener{before();e.action()}}
    r.addView(square(e.icon,Color.WHITE,e.fill,42,24))
    val col=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(16),0,dp(8),0)}
    col.addView(tv(e.title,16.5f,ink,1));if(e.sub!=null)col.addView(tv(e.sub,13.5f,muted).apply{setPadding(0,dp(2),0,0)})
@@ -325,7 +331,7 @@ class MainActivity:AppCompatActivity(){
   head.addView(r,LinearLayout.LayoutParams(-1,-2))
  }
  private fun navBar(active:String){
-  val items=listOf(if(isOwner())Triple("owner",R.drawable.ic_map,"Flota") else Triple("home",R.drawable.ic_home,"Inicio"),Triple("trips",R.drawable.ic_route,"Viajes"),Triple("fuel",R.drawable.ic_fuel,"Combustible"),Triple("more",R.drawable.ic_more,"Más"))
+  val items=listOf(if(panelFirst())Triple("owner",R.drawable.ic_map,"Flota") else Triple("home",R.drawable.ic_home,"Inicio"),Triple("trips",R.drawable.ic_route,"Viajes"),Triple("fuel",R.drawable.ic_fuel,"Combustible"),Triple("more",R.drawable.ic_more,"Más"))
   shell.addView(View(this).apply{setBackgroundColor(line)},LinearLayout.LayoutParams(-1,1))
   val nav=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;setBackgroundColor(cardBg)}
   for((key,res,label) in items){val on=key==active;val color=if(on)blue else muted
@@ -334,11 +340,13 @@ class MainActivity:AppCompatActivity(){
    nav.addView(item,LinearLayout.LayoutParams(0,dp(64),1f))}
   shell.addView(nav,LinearLayout.LayoutParams(-1,-2));shell.setBackgroundColor(cardBg)
  }
- private fun go(key:String){when(key){"home"->home();"owner"->ownerDashboard();"trips"->history("trips",true);"fuel"->history("fuel",true);else->settings()}}
+ private fun go(key:String){when(key){"home"->home();"owner"->ownerDashboard();"trips"->openHistory("trips",panelFirst());"fuel"->openHistory("fuel",panelFirst());else->settings()}}
 
  // ---------- Login ----------
  private fun login(){
   page("login",header=false);shell.setBackgroundColor(loginBg);(root.parent as View).setBackgroundColor(loginBg);root.setPadding(0,0,0,dp(28))
+  // Whoever signs in next starts on their own lists.
+  fleetView=false;detailFrom="list"
   WindowCompat.getInsetsController(window,window.decorView).isAppearanceLightNavigationBars=false
   val hero=FrameLayout(this)
   hero.addView(ImageView(this).apply{setImageResource(R.drawable.login_scene);scaleType=ImageView.ScaleType.CENTER_CROP;importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO},FrameLayout.LayoutParams(-1,-1))
@@ -354,7 +362,7 @@ class MainActivity:AppCompatActivity(){
   val msg=text(form,"",14f,0xFFFFB4B4.toInt(),0,10)
   lateinit var submit:Btn
   submit=button(form,"Ingresar",top=6){val e=email.text.toString().trim().lowercase();val p=pass.text.toString();if(e.isBlank()||p.isBlank()){msg.text="Completá correo y contraseña";return@button};submit.enable(false);msg.setTextColor(0xFFA9B6CC.toInt());msg.text="Ingresando…"
-   thread{try{api.login(e,p);name=driverName();runOnUiThread{pass.text.clear();if(isOwner())ownerDashboard() else askMode();Sync.schedule(this);refreshCatalog()}}catch(_:Exception){runOnUiThread{submit.enable(true);msg.setTextColor(0xFFFFB4B4.toInt());msg.text="No se pudo ingresar. Revisá tus datos y la conexión."}}}}
+   thread{try{api.login(e,p);name=driverName();runOnUiThread{pass.text.clear();if(panelFirst())ownerDashboard() else askMode();Sync.schedule(this);refreshCatalog()}}catch(_:Exception){runOnUiThread{submit.enable(true);msg.setTextColor(0xFFFFB4B4.toInt());msg.text="No se pudo ingresar. Revisá tus datos y la conexión."}}}}
   text(form,"Tu sesión queda guardada de forma segura en este teléfono.",13f,0xFF8E9CB4.toInt(),0,18).gravity=Gravity.CENTER
   link(form,"Política de privacidad",top=2,color=0xFFA9B6CC.toInt()){privacy()}
  }
@@ -365,7 +373,7 @@ class MainActivity:AppCompatActivity(){
   box.addView(e,LinearLayout.LayoutParams(0,-1,1f));p.addView(box,LinearLayout.LayoutParams(-1,dp(56)).apply{topMargin=dp(top)});return e
  }
  private fun driverName():String{val u=api.session()?.optJSONObject("user")?:return "Chofer";val m=u.optJSONObject("user_metadata");val known=mapOf("immer@trferreira.com" to "Immer Sampayo","luis@trferreira.com" to "Luis Ferreira","hugo@trferreira.com" to "Hugo Silva","transportesferreirauy@gmail.com" to "Transportes Ferreira");return m?.optString("full_name")?.takeIf{it.isNotBlank()}?:m?.optString("name")?.takeIf{it.isNotBlank()}?:known[u.optString("email").lowercase()]?:u.optString("email").substringBefore("@").replaceFirstChar{it.uppercase()}}
- private fun homeOrTrip(){when(UiMode.start(isOwner(),mode(),active())){"owner"->ownerDashboard();"mode"->askMode();"simpletrip"->simpleTrip();"simplehome"->simpleHome();"trip"->trip();else->home()}}
+ private fun homeOrTrip(){when(UiMode.start(panelFirst(),mode(),active())){"owner"->ownerDashboard();"mode"->askMode();"simpletrip"->simpleTrip();"simplehome"->simpleHome();"trip"->trip();else->home()}}
 
  // ---------- Mode of use: asked after signing in, kept per driver ----------
  private fun askMode(){modePick=mode()?:UiMode.SIMPLE;modeChoice()}
@@ -379,7 +387,7 @@ class MainActivity:AppCompatActivity(){
   text(root,"¿Qué modo querés usar?",17f,0xFFA9B6CC.toInt(),0,6).gravity=Gravity.CENTER
   modeCard(R.drawable.ic_truck,0xFF178A4C.toInt(),"Modo sencillo","Solo lo necesario: iniciar y finalizar el viaje. Botones grandes y datos automáticos.",modePick==UiMode.SIMPLE,26){modePick=UiMode.SIMPLE;modeChoice()}
   modeCard(R.drawable.ic_list,0xFF1663E8.toInt(),"Modo normal","Todas las opciones: combustible, remitos, historial, documentos y mantenimiento.",modePick==UiMode.NORMAL,14){modePick=UiMode.NORMAL;modeChoice()}
-  text(root,"Podés cambiar el modo cuando quieras.",13.5f,0xFF8E9CB4.toInt(),0,18).gravity=Gravity.CENTER
+  text(root,if(ownerDriver())"Podés cambiar el modo cuando quieras. El menú del dueño está en los dos." else "Podés cambiar el modo cuando quieras.",13.5f,0xFF8E9CB4.toInt(),0,18).gravity=Gravity.CENTER
   dock.visibility=View.VISIBLE
   button(dock,"Continuar",top=0){setMode(modePick);homeOrTrip()}
   if(mode()!=null)link(dock,"Cerrar sesión",top=2,color=0xFFA9B6CC.toInt()){logout()}
@@ -400,7 +408,7 @@ class MainActivity:AppCompatActivity(){
   val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(18),0,dp(14),0)}
   r.addView(ImageView(this).apply{setImageResource(R.drawable.tr_ferreira_logo);adjustViewBounds=true;contentDescription="TR Ferreira"},LinearLayout.LayoutParams(dp(170),-2))
   r.addView(View(this),LinearLayout.LayoutParams(0,1,1f))
-  r.addView(chip(name.substringBefore(" ")).apply{(layoutParams as LinearLayout.LayoutParams).marginEnd=0})
+  r.addView(if(ownerDriver())menuButton() else chip(name.substringBefore(" ")).apply{(layoutParams as LinearLayout.LayoutParams).marginEnd=0})
   head.addView(r,LinearLayout.LayoutParams(-1,dp(60)))
  }
  private fun bigButton(p:LinearLayout,s:String,fill:Int,icon:Int,stacked:Boolean,lp:LinearLayout.LayoutParams,action:()->Unit):LinearLayout{
@@ -439,7 +447,8 @@ class MainActivity:AppCompatActivity(){
   // The last finished trip confirms that it was saved without the driver doing anything else.
   store.current()?.takeIf{!it.optBoolean("active")&&it.optString("driver_id")==uid()}?.let{t->
    row(card(),R.drawable.ic_check_circle,"Último viaje guardado",listOfNotNull(date(t.optString("started_at")),km(t.optDouble("distance_meters",0.0)),durationText(t.optString("started_at"),t.optString("ended_at"))).joinToString(" · "),tint=green)}
-  button(root,"Cambiar de modo",Kind.LINE,R.drawable.ic_list){askMode()}
+  // The owner who drives gets the owner menu here; changing the mode is inside that menu.
+  if(ownerDriver())button(root,"Menú del dueño",Kind.PRIMARY,R.drawable.ic_menu){ownerMenu()} else button(root,"Cambiar de modo",Kind.LINE,R.drawable.ic_list){askMode()}
   sync=note(store.message(),top=12).apply{gravity=Gravity.CENTER}
   if(truck.isBlank())guessTruck()
  }
@@ -502,8 +511,8 @@ class MainActivity:AppCompatActivity(){
 
  // ---------- Driver home ----------
  private fun home(){
-  if(simple()){simpleHome();return}
-  page("home");hello("Hola",name,barButton(R.drawable.ic_sync,"Enviar pendientes y actualizar"){syncNow()})
+  if(simple()){homeOrTrip();return}
+  page("home");hello("Hola",name,if(ownerDriver())menuButton().apply{(layoutParams as LinearLayout.LayoutParams).marginEnd=dp(8)} else barButton(R.drawable.ic_sync,"Enviar pendientes y actualizar"){syncNow()})
   val t=store.current();val running=t?.optBoolean("active")==true
   val (model,plate)=truckParts(if(running)t!!.optString("vehicle") else truck)
   val tc=card()
@@ -517,11 +526,12 @@ class MainActivity:AppCompatActivity(){
   tc.addView(r)
   if(running)button(root,"Volver al viaje en curso",Kind.PRIMARY,R.drawable.ic_navigation){trip()}
   alerts()
-  menuList(listOf(
+  menuList(listOfNotNull(
+   if(ownerDriver())Shortcut(R.drawable.ic_menu,0xFF2F4A7D.toInt(),"Menú del dueño","Flota, viajes y rendimiento"){ownerMenu()} else null,
    Shortcut(R.drawable.ic_play,0xFF178A4C.toInt(),"Iniciar viaje",if(running)"Ya hay un viaje en curso" else null){if(active()){toast("Ya tenés un viaje en curso");trip()}else{tripForm=JSONObject();draftDocs=JSONArray();empty=false;newTrip()}},
-   Shortcut(R.drawable.ic_list,0xFF1663E8.toInt(),"Mis viajes",null){history("trips",true)},
+   Shortcut(R.drawable.ic_list,0xFF1663E8.toInt(),"Mis viajes",null){openHistory("trips",false)},
    Shortcut(R.drawable.ic_fuel,0xFFC96A12.toInt(),"Combustible","Cargar una boleta"){fuelChoice()},
-   Shortcut(R.drawable.ic_receipt,0xFF7A4FD0.toInt(),"Remitos y fotos",null){if(active())openDocument(store.current(),"trip","arrival") else {toast("Elegí el viaje al que querés agregar el remito");history("trips",true)}},
+   Shortcut(R.drawable.ic_receipt,0xFF7A4FD0.toInt(),"Remitos y fotos",null){if(active())openDocument(store.current(),"trip","arrival") else {toast("Elegí el viaje al que querés agregar el remito");openHistory("trips",false)}},
    Shortcut(R.drawable.ic_doc,0xFF0E8A8A.toInt(),"Documentos",null){documents(true)},
    Shortcut(R.drawable.ic_wrench,0xFF56647B.toInt(),"Mantenimiento",null){maintenance(true)},
    Shortcut(R.drawable.ic_person,0xFF8590A2.toInt(),"Mi cuenta","Modo de uso, GPS y sesión"){settings()}))
@@ -791,14 +801,18 @@ class MainActivity:AppCompatActivity(){
  }
 
  // ---------- History ----------
+ /** Opens a list of one driver or of the whole fleet; search and filters start clean when that changes. */
+ private fun openHistory(kind:String,fleet:Boolean){if(fleetView!=fleet){historyQuery="";tripFilter=0;historyLimit=50};fleetView=fleet;history(kind,true)}
  private fun history(kind:String,refresh:Boolean=false){
-  val fleet=isOwner();val key=if(kind=="trips")"triphistory" else "fuelhistory";page(key)
+  val fleet=fleetView||panelFirst();val key=if(kind=="trips")"triphistory" else "fuelhistory";page(key)
+  // An owner who also drives opens the fleet lists from the owner menu: a back arrow replaces the driver tabs.
+  val hub=fleet&&!panelFirst()
   val title=if(kind=="trips")(if(fleet)"Viajes de la flota" else "Mis viajes") else (if(fleet)"Combustible de la flota" else "Mi combustible")
-  bar(title,trailing=if(kind=="fuel"&&!fleet)plusButton("Cargar combustible"){fuelChoice()} else barButton(R.drawable.ic_sync,"Actualizar"){history(kind,true)})
+  bar(title,back=if(hub){{homeOrTrip()}} else null,trailing=if(kind=="fuel"&&!fleet)plusButton("Cargar combustible"){fuelChoice()} else barButton(R.drawable.ic_sync,"Actualizar"){history(kind,true)})
   val rows=mobile.history(kind,historyLimit,false,fleet)
   if(kind=="trips")tripList(rows,fleet) else fuelList(rows,fleet)
   if(rows.length()>=historyLimit)button(root,"Cargar más",Kind.LINE){historyLimit+=50;history(kind,true)}
-  navBar(kind)
+  if(!hub)navBar(kind)
   if(refresh)thread{try{mobile.history(kind,historyLimit,true,fleet);runOnUiThread{if(screen==key)history(kind)}}catch(_:Exception){runOnUiThread{if(screen==key)toast("Sin conexión. Mostrando los registros guardados en este teléfono.")}}}
  }
  private fun tripList(rows:JSONArray,fleet:Boolean){
@@ -820,7 +834,7 @@ class MainActivity:AppCompatActivity(){
  private fun tripRow(c:LinearLayout,r:JSONObject,d:JSONObject,fleet:Boolean){
   if(c.childCount>0)divider(c,16)
   val z=zoned(r.optString("started_at"))
-  val v=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(12),dp(12),dp(12),dp(12));background=ripple(null);isClickable=true;isFocusable=true;setOnClickListener{detail(r,true)}}
+  val v=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(12),dp(12),dp(12),dp(12));background=ripple(null);isClickable=true;isFocusable=true;setOnClickListener{detailFrom="list";detail(r,true)}}
   val badge=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=bg(appBg,10)}
   badge.addView(tv(z?.format(DateTimeFormatter.ofPattern("dd"))?:"--",19f,ink,2).apply{gravity=Gravity.CENTER})
   badge.addView(tv(z?.format(DateTimeFormatter.ofPattern("MMM",uy))?.replace(".","")?.uppercase(uy)?:"",11f,muted,1).apply{gravity=Gravity.CENTER})
@@ -878,7 +892,7 @@ class MainActivity:AppCompatActivity(){
 
  // ---------- Trip detail ----------
  private fun detail(t:JSONObject,refresh:Boolean=false){
-  historyTrip=t;page("tripdetail");bar("Detalle del viaje",back={history("trips")})
+  historyTrip=t;page("tripdetail");bar("Detalle del viaje",back={leaveDetail()})
   val bundle=mobile.detail(t);val d=bundle.optJSONObject("data")?:JSONObject();val docs=bundle.optJSONArray("documents")?:JSONArray()
   val running=t.optBoolean("active");val (model,plate)=truckParts(t.optString("vehicle"))
   val (label,fg,fill)=when{running&&t.optBoolean("paused")->Triple("Viaje pausado",amber,amberBg);running->Triple("Viaje en curso",blue,blueSoft);else->Triple("Viaje finalizado",green,greenBg)}
@@ -914,6 +928,8 @@ class MainActivity:AppCompatActivity(){
   link(root,"Actualizar desde el panel",top=10){detail(t,true)}
   if(refresh)thread{try{mobile.detail(t,true);mobile.route(t,true);runOnUiThread{if(screen=="tripdetail"&&historyTrip?.optString("id")==t.optString("id"))detail(t)}}catch(_:Exception){runOnUiThread{if(screen=="tripdetail")toast("No se pudo actualizar. Se mantienen los datos guardados.")}}}
  }
+ /** A trip opened from the live fleet goes back to it; any other goes back to its list. */
+ private fun leaveDetail(){if(detailFrom=="fleet")ownerDashboard() else history("trips")}
  private fun stop(p:LinearLayout,label:String,place:String,time:String,first:Boolean){
   val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
   val rail=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER_HORIZONTAL}
@@ -943,10 +959,10 @@ class MainActivity:AppCompatActivity(){
   pr.addView(tv(initials(name),17f,Color.WHITE,1).apply{gravity=Gravity.CENTER;background=oval(barBg)},LinearLayout.LayoutParams(dp(52),dp(52)))
   val col=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),0,0,0)}
   col.addView(tv(name,18f,ink,1));col.addView(tv(email,14f,muted).apply{setPadding(0,dp(2),0,0)})
-  col.addView(pill(if(isOwner())"Dueño · panel de flota" else "Chofer",blue,blueSoft).apply{(layoutParams as LinearLayout.LayoutParams).topMargin=dp(8)})
+  col.addView(pill(when{panelFirst()->"Dueño · panel de flota";isOwner()->"Dueño y chofer";else->"Chofer"},blue,blueSoft).apply{(layoutParams as LinearLayout.LayoutParams).topMargin=dp(8)})
   pr.addView(col,LinearLayout.LayoutParams(0,-2,1f));pc.addView(pr)
-  if(!isOwner()){section("Modo de uso");val mc=card(pad=16)
-   segmented(mc,listOf("Sencillo","Normal"),1,top=0){if(it==0){setMode(UiMode.SIMPLE);toast("Modo sencillo activado");homeOrTrip()}}
+  if(!panelFirst()){section("Modo de uso");val mc=card(pad=16)
+   segmented(mc,listOf("Sencillo","Normal"),if(mode()==UiMode.SIMPLE)0 else 1,top=0){setMode(if(it==0)UiMode.SIMPLE else UiMode.NORMAL);toast(if(it==0)"Modo sencillo activado" else "Modo normal activado");homeOrTrip()}
    note("Sencillo: solo iniciar y finalizar el viaje, con botones grandes. Normal: todas las opciones.",mc,10)}
   section("Sincronización")
   val sc=card(pad=16);sync=text(sc,store.message(),15f,ink);note("Los viajes, boletas y remitos se guardan en el teléfono y se envían solos cuando hay conexión.",sc,6)
@@ -981,7 +997,10 @@ class MainActivity:AppCompatActivity(){
 
  // ---------- Owner fleet panel ----------
  private fun ownerDashboard(){
-  page("owner");hello(name,"Flota en vivo",barButton(R.drawable.ic_sync,"Actualizar flota"){loadFleet(true)})
+  // The company account lives on this screen. An owner who also drives opens it from the owner menu and goes back to the start screen.
+  val hub=!panelFirst();page("owner");back.isEnabled=hub
+  val reload=barButton(R.drawable.ic_sync,"Actualizar flota"){loadFleet(true)}
+  if(hub)bar("Flota en vivo",back={homeOrTrip()},trailing=reload) else hello(name,"Flota en vivo",reload)
   val f=mobile.fleet();val items=fleetItems(f);val fetched=f.optLong("fetched_at")
   val k=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL};root.addView(k,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(14)})
   stat(k,"${items.count{it.state=="moving"}}","En ruta",green,0);stat(k,"${items.count{it.state=="stopped"||it.state=="paused"||it.state=="nosignal"}}","Detenidos",amber,1);stat(k,"${items.count{it.state=="idle"}}","Sin viaje",grey,2)
@@ -992,10 +1011,10 @@ class MainActivity:AppCompatActivity(){
   section("Camiones")
   if(items.isEmpty())emptyCard(R.drawable.ic_truck,"Sin camiones cargados","Los equipos del catálogo aparecen acá.") else {val c=card();items.forEach{fleetRow(c,it)}}
   note(if(fetched==0L)"Buscando la flota…" else "Actualizado ${ago(fetched)}. Se actualiza sola cada 2 minutos.",top=10)
-  tileGrid(listOf(Tile(R.drawable.ic_list,"Viajes de la flota",null){history("trips",true)},Tile(R.drawable.ic_history,"Combustible de la flota",null){history("fuel",true)},
-   Tile(R.drawable.ic_wrench,"Mantenimiento",null){maintenance(true)},Tile(R.drawable.ic_doc,"Documentos",null){documents(true)}))
+  if(!hub)tileGrid(listOf(Tile(R.drawable.ic_list,"Viajes de la flota",null){openHistory("trips",true)},Tile(R.drawable.ic_history,"Combustible de la flota",null){openHistory("fuel",true)},
+   Tile(R.drawable.ic_speed,"Rendimiento",null){openPerformance()},Tile(R.drawable.ic_wrench,"Mantenimiento",null){maintenance(true)},Tile(R.drawable.ic_doc,"Documentos",null){documents(true)}))
   sync=note(store.message(),top=16).apply{gravity=Gravity.CENTER}
-  navBar("owner")
+  if(!hub)navBar("owner")
   if(!fleetLoading&&System.currentTimeMillis()-fleetLoadedAt>120000)loadFleet()
   refreshPapers()
  }
@@ -1037,8 +1056,145 @@ class MainActivity:AppCompatActivity(){
    right.addView(tv(if(u.speed.isFinite())String.format(uy,"%.0f km/h",u.speed) else "— km/h",14.5f,ink,1).apply{gravity=Gravity.END})
    right.addView(tv(km(u.meters),13f,muted).apply{gravity=Gravity.END;setPadding(0,dp(3),0,0)});v.addView(right)}
   v.contentDescription="$title. $sub"
-  u.session?.let{s->v.background=ripple(null);v.isClickable=true;v.isFocusable=true;v.setOnClickListener{detail(s,true)}}
+  u.session?.let{s->v.background=ripple(null);v.isClickable=true;v.isFocusable=true;v.setOnClickListener{detailFrom="fleet";detail(s,true)}}
   c.addView(v,LinearLayout.LayoutParams(-1,-2))
+ }
+
+ // ---------- Owner menu: every fleet function, one tap away from the start screen of an owner who also drives ----------
+ private fun menuButton()=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;background=ripple(bg(0x26FFFFFF,12),0x40FFFFFF);setPadding(dp(12),0,dp(14),0);isClickable=true;isFocusable=true;contentDescription="Menú del dueño";setOnClickListener{ownerMenu()}
+  addView(iconView(R.drawable.ic_menu,Color.WHITE,22));addView(tv("Menú",15.5f,Color.WHITE,1).apply{setPadding(dp(8),0,0,0)})
+  layoutParams=LinearLayout.LayoutParams(-2,dp(44))}
+ /** A panel that slides up from the bottom. It closes before opening the chosen screen, with the back gesture or by tapping outside. */
+ private fun ownerMenu(){
+  sheet?.dismiss()
+  val d=android.app.Dialog(this);sheet=d
+  d.requestWindowFeature(Window.FEATURE_NO_TITLE)
+  val frame=FrameLayout(this).apply{setPadding(dp(10),dp(10),dp(10),dp(10));setOnClickListener{d.dismiss()}}
+  val panel=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=bg(appBg,22);clipToOutline=true;isClickable=true}
+  val top=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(18),dp(12),dp(6),dp(8))}
+  val col=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
+  col.addView(tv("Menú del dueño",20f,ink,2));col.addView(tv("Toda la flota, desde tu cuenta",13.5f,muted).apply{setPadding(0,dp(2),0,0)})
+  top.addView(col,LinearLayout.LayoutParams(0,-2,1f))
+  top.addView(ImageView(this).apply{setImageResource(R.drawable.ic_close);imageTintList=ColorStateList.valueOf(muted);setPadding(dp(12),dp(12),dp(12),dp(12));background=RippleDrawable(ColorStateList.valueOf(press),null,null);contentDescription="Cerrar el menú";isClickable=true;isFocusable=true;setOnClickListener{d.dismiss()}},LinearLayout.LayoutParams(dp(48),dp(48)))
+  panel.addView(top,LinearLayout.LayoutParams(-1,-2))
+  val items=mutableListOf(
+   Shortcut(R.drawable.ic_map,0xFF178A4C.toInt(),"Flota en vivo","Mapa y estado de cada camión"){ownerDashboard()},
+   Shortcut(R.drawable.ic_route,0xFF1663E8.toInt(),"Viajes de la flota","De todos los choferes"){openHistory("trips",true)},
+   Shortcut(R.drawable.ic_speed,0xFF7A4FD0.toInt(),"Rendimiento","De cada camión y cada chofer"){openPerformance()},
+   Shortcut(R.drawable.ic_fuel,0xFFC96A12.toInt(),"Combustible de la flota","Cargas y gasto de cada camión"){openHistory("fuel",true)},
+   Shortcut(R.drawable.ic_wrench,0xFF56647B.toInt(),"Mantenimiento","Services hechos y pendientes"){maintenance(true)},
+   Shortcut(R.drawable.ic_doc,0xFF0E8A8A.toInt(),"Documentos","Vencimientos de la flota"){documents(true)})
+  // In simple mode this menu takes the place of the "Cambiar de modo" button of the start screen.
+  if(simple())items.add(Shortcut(R.drawable.ic_list,0xFF8590A2.toInt(),"Cambiar de modo","Sencillo o normal"){askMode()})
+  val list=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(10),dp(2),dp(10),dp(12))}
+  menuRows(card(list,top=0),items){d.dismiss()}
+  panel.addView(ScrollView(this).apply{isVerticalScrollBarEnabled=false;overScrollMode=View.OVER_SCROLL_NEVER;addView(list)},LinearLayout.LayoutParams(-1,-2,1f))
+  frame.addView(panel,FrameLayout.LayoutParams(if(resources.displayMetrics.widthPixels>dp(560))dp(520) else -1,-2,Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM))
+  ViewCompat.setOnApplyWindowInsetsListener(frame){v,i->val bars=i.getInsets(WindowInsetsCompat.Type.systemBars());v.setPadding(bars.left+dp(10),bars.top+dp(10),bars.right+dp(10),bars.bottom+dp(10));i}
+  d.setContentView(frame);d.setTitle("Menú del dueño");d.setCanceledOnTouchOutside(true)
+  d.setOnDismissListener{if(sheet===d)sheet=null}
+  d.window?.apply{setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT));setGravity(Gravity.BOTTOM);setLayout(-1,-2);setWindowAnimations(android.R.style.Animation_InputMethod)}
+  d.show();d.window?.setLayout(-1,-2)
+ }
+
+ // ---------- Owner: month totals per truck or per driver ----------
+ private fun openPerformance(){perfMonth=YearMonth.now();perfDrivers=false;perfFailed=false;performance(true)}
+ private fun monthName(m:YearMonth)=m.atDay(1).format(DateTimeFormatter.ofPattern("MMMM yyyy",uy)).replaceFirstChar{it.uppercase(uy)}
+ private fun whole(v:Double)=money(v)
+ private fun cash(uyu:Double,usd:Double)=listOfNotNull(if(uyu>0)"$ ${whole(uyu)}" else null,if(usd>0)"US$ ${whole(usd)}" else null).joinToString(" + ")
+ /** Same truck when the plates match; a label without plate is matched by model. */
+ private fun sameUnit(a:String,b:String):Boolean{val (ma,pa)=truckParts(a);val (mb,pb)=truckParts(b);return if(pa.isNotBlank()&&pb.isNotBlank())pa.replace(" ","").equals(pb.replace(" ",""),true) else ma.equals(mb,true)}
+ private fun performance(refresh:Boolean=false){
+  page("performance");bar("Rendimiento",back={homeOrTrip()},trailing=barButton(R.drawable.ic_sync,"Actualizar"){perfFailed=false;performance(true)})
+  val month=perfMonth;val now=YearMonth.now()
+  val mr=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(4),dp(4),dp(4),dp(4))}
+  fun step(label:String,delta:Long,enabled:Boolean)=ImageView(this).apply{setImageResource(R.drawable.ic_chevron);if(delta<0)rotation=180f;imageTintList=ColorStateList.valueOf(if(enabled)blue else faint);setPadding(dp(12),dp(12),dp(12),dp(12));contentDescription=label;isEnabled=enabled
+   if(enabled){background=RippleDrawable(ColorStateList.valueOf(press),null,null);isClickable=true;isFocusable=true;setOnClickListener{perfMonth=month.plusMonths(delta);perfFailed=false;performance(true)}}}
+  mr.addView(step("Mes anterior",-1,month.isAfter(now.minusMonths(12))),LinearLayout.LayoutParams(dp(48),dp(48)))
+  mr.addView(tv(monthName(month),17f,ink,1).apply{gravity=Gravity.CENTER},LinearLayout.LayoutParams(0,-2,1f))
+  mr.addView(step("Mes siguiente",1,month.isBefore(now)),LinearLayout.LayoutParams(dp(48),dp(48)))
+  card().addView(mr)
+  segmented(root,listOf("Por camión","Por chofer"),if(perfDrivers)1 else 0){perfDrivers=it==1;performance()}
+  val data=mobile.performance(month)
+  if(data==null){
+   if(perfFailed){emptyCard(R.drawable.ic_warning,"No se pudo calcular","Revisá la conexión del teléfono y probá de nuevo.");button(root,"Reintentar",Kind.LINE,R.drawable.ic_sync){perfFailed=false;performance(true)}}
+   else emptyCard(R.drawable.ic_speed,"Calculando…","Sumando los viajes y el combustible del mes.")
+  }else{
+   val s=if(perfDrivers)data.drivers else data.trucks
+   if(s.rows.isEmpty())emptyCard(R.drawable.ic_route,"Sin viajes ni combustible","No hay registros de la flota en este mes.")
+   else{
+    section("Toda la flota");perfCard(s.total,null)
+    val moving=s.rows.filter{it.gpsKm>0}
+    if(moving.size>1){section(if(perfDrivers)"Kilómetros por chofer" else "Kilómetros por camión");kmBars(moving)}
+    section(if(perfDrivers)"Por chofer" else "Por camión");s.rows.forEach{perfCard(it,if(perfDrivers)R.drawable.ic_person else R.drawable.ic_truck)}
+   }
+   if(!perfDrivers){
+    // Trucks of the catalog that neither travelled nor loaded fuel still belong in the picture.
+    val idle=mobile.trucks().map{it.label}.filter{label->s.rows.none{sameUnit(it.name,label)}}
+    if(idle.isNotEmpty()){section("Sin movimientos en el mes");val ic=card();idle.forEach{label->val (m,p)=truckParts(label);row(ic,R.drawable.ic_truck_outline,m.ifBlank{p},if(m.isNotBlank()&&p.isNotBlank())"Matrícula $p" else null,tint=grey)}}
+   }
+   note("Kilómetros del GPS de la app. El consumo usa los litros cargados en el mes y se calcula con ${whole(FleetStats.MIN_KM_FOR_RATIO)} km o más. Kilos, kilómetros facturables e importes son los que se completan en el panel web.",top=14)
+   note("Actualizado ${ago(data.fetchedAt)}.",top=6)
+  }
+  if((refresh||data==null)&&!perfFailed)loadPerformance(month)
+ }
+ private fun loadPerformance(month:YearMonth){
+  if(perfLoading==month)return;perfLoading=month
+  thread{val ok=try{mobile.performance(month,true);true}catch(_:Exception){false}
+   runOnUiThread{if(perfLoading==month)perfLoading=null
+    if(screen!="performance"||perfMonth!=month)return@runOnUiThread
+    if(!ok){perfFailed=mobile.performance(month)==null;toast(if(perfFailed)"No se pudo calcular. Revisá la conexión." else "Sin conexión. Se muestran los últimos datos guardados.")}
+    if(ok||perfFailed){val y=(root.parent as? ScrollView)?.scrollY?:0;performance();(root.parent as? ScrollView)?.let{s->s.post{s.scrollTo(0,y)}}}}}
+ }
+ /** One truck, one driver, or the whole fleet when icon is null: kilometres, share with cargo, fuel and what the office billed. */
+ private fun perfCard(r:FleetStats.Row,icon:Int?){
+  val c=card()
+  if(icon!=null){
+   val unnamed=r.name==FleetStats.NO_TRUCK||r.name==FleetStats.NO_DRIVER;val isTruck=icon==R.drawable.ic_truck
+   val (model,plate)=if(isTruck&&!unnamed)truckParts(r.name) else Pair(r.name,"")
+   row(c,if(unnamed&&isTruck)R.drawable.ic_truck_outline else icon,model.ifBlank{r.name},when{unnamed->if(isTruck)"Viajes y cargas sin camión elegido" else "Viajes y cargas sin nombre de chofer";plate.isNotBlank()->"Matrícula $plate";else->null},tint=if(unnamed)grey else blue)
+   divider(c)
+  }
+  factsGrid(c,listOf(Fact(R.drawable.ic_route,"Kilómetros","${whole(r.gpsKm)} km"),Fact(R.drawable.ic_list,"Viajes","${r.trips}"),Fact(R.drawable.ic_truck,"Con carga","${whole(r.loadedKm)} km"),Fact(R.drawable.ic_truck_outline,"Sin carga","${whole(r.emptyKm)} km")))
+  loadBar(c,r)
+  val spent=cash(r.fuelUyu,r.fuelUsd)
+  fact(c,R.drawable.ic_fuel,"Combustible",if(r.liters<=0&&spent.isEmpty())"Sin cargas en el mes" else listOf("${whole(r.liters)} L",spent).filter{it.isNotEmpty()}.joinToString(" · "))
+  fact(c,R.drawable.ic_speed,"Consumo",r.litersPer100?.let{String.format(uy,"%.1f L/100 km · %.1f km por litro",it,100/it)}?:if(r.liters<=0)"Sin litros cargados en el mes" else "Se calcula con ${whole(FleetStats.MIN_KM_FOR_RATIO)} km o más")
+  if(r.billableKm>0)fact(c,R.drawable.ic_navigation,"Kilómetros facturables","${whole(r.billableKm)} km")
+  if(r.kg>0)fact(c,R.drawable.ic_weight,"Kilos transportados","${whole(r.kg)} kg")
+  val billed=cash(r.billedUyu,r.billedUsd)
+  if(billed.isNotEmpty()){fact(c,R.drawable.ic_receipt,"Facturado",billed);if(r.unbilled>0)note("Falta el importe de ${r.unbilled} viaje${if(r.unbilled==1)"" else "s"} con carga.",c,0).setPadding(dp(56),0,dp(16),dp(12))}
+ }
+ /** Share of the GPS kilometres driven with and without cargo. */
+ private fun loadBar(c:LinearLayout,r:FleetStats.Row){
+  val share=r.loadedShare?:return
+  divider(c)
+  // The second figure is what is left of the first, so the two always add up to 100.
+  val full=0xFF178A4C.toInt();val empty=0xFFE69A1E.toInt();val part=Math.round(share*1000)/10.0
+  val loaded=String.format(uy,"%.1f%%",part);val unloaded=String.format(uy,"%.1f%%",100-part)
+  val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(16),dp(12),dp(16),dp(12));contentDescription="Con carga $loaded, sin carga $unloaded"}
+  val track=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;background=bg(greyBg,5);clipToOutline=true}
+  track.addView(View(this).apply{setBackgroundColor(full)},LinearLayout.LayoutParams(0,-1,share.toFloat()))
+  track.addView(View(this).apply{setBackgroundColor(empty)},LinearLayout.LayoutParams(0,-1,(1-share).toFloat()))
+  box.addView(track,LinearLayout.LayoutParams(-1,dp(10)))
+  val legend=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(0,dp(8),0,0)}
+  for((color,label) in listOf(Pair(full,"Con carga $loaded"),Pair(empty,"Sin carga $unloaded"))){
+   legend.addView(View(this).apply{background=oval(color)},LinearLayout.LayoutParams(dp(8),dp(8)))
+   legend.addView(tv(label,13f,muted).apply{setPadding(dp(6),0,dp(8),0);maxLines=1},LinearLayout.LayoutParams(0,-2,1f))}
+  box.addView(legend);c.addView(box,LinearLayout.LayoutParams(-1,-2))
+ }
+ /** Kilometres of the month side by side, longest first. */
+ private fun kmBars(rows:List<FleetStats.Row>){
+  val c=card(pad=16);val longest=rows.maxOf{it.gpsKm}
+  rows.sortedByDescending{it.gpsKm}.forEachIndexed{i,r->
+   val head=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;contentDescription="${r.name}: ${whole(r.gpsKm)} kilómetros"}
+   head.addView(tv(r.name,14f,ink,1).apply{maxLines=1;ellipsize=TextUtils.TruncateAt.END;setPadding(0,0,dp(10),0)},LinearLayout.LayoutParams(0,-2,1f))
+   head.addView(tv("${whole(r.gpsKm)} km",14f,ink,1))
+   c.addView(head,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(if(i==0)0 else 14)})
+   val part=(r.gpsKm/longest).toFloat().coerceIn(0f,1f)
+   val track=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;background=bg(greyBg,5);clipToOutline=true}
+   track.addView(View(this).apply{background=bg(blue,5)},LinearLayout.LayoutParams(0,-1,part));track.addView(View(this),LinearLayout.LayoutParams(0,-1,1f-part))
+   c.addView(track,LinearLayout.LayoutParams(-1,dp(10)).apply{topMargin=dp(6)})}
  }
 
  // ---------- Maintenance and documents ----------
@@ -1158,7 +1314,7 @@ class MainActivity:AppCompatActivity(){
   val mine=all.filter{it.optString("scope")=="driver"&&it.optString("driver_id")==uid()}
   val drivers=all.filter{it.optString("scope")=="driver"&&it.optString("driver_id")!=uid()}
   val papers=all.filter{it.optString("scope")=="vehicle"}
-  if(!isOwner()||mine.isNotEmpty()){section("Mis documentos");if(mine.isEmpty())emptyCard(R.drawable.ic_badge,"Sin documentos cargados","Tocá + para agregar tu licencia de conducir o tu carné de salud.") else {val c=card();mine.forEach{documentRow(c,it,false)}}}
+  if(!panelFirst()||mine.isNotEmpty()){section("Mis documentos");if(mine.isEmpty())emptyCard(R.drawable.ic_badge,"Sin documentos cargados","Tocá + para agregar tu licencia de conducir o tu carné de salud.") else {val c=card();mine.forEach{documentRow(c,it,false)}}}
   if(drivers.isNotEmpty()){section("Choferes");val c=card();drivers.forEach{documentRow(c,it,true)}}
   section("Camiones")
   if(papers.isEmpty())note(if(isOwner())"Todavía no hay documentos de camiones. Tocá + para agregar SOA, patente o habilitación MTOP." else "Todavía no hay documentos de camiones cargados.",top=8) else {val c=card();papers.forEach{documentRow(c,it,false)}}

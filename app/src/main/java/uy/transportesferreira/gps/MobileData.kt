@@ -74,6 +74,56 @@ class MobileData(private val c:Context){
   }
   return store.cache(key)
  }
+ class Performance(val trucks:FleetStats.Summary,val drivers:FleetStats.Summary,val fetchedAt:Long)
+ /**
+  * Month totals per truck and per driver for the owner, from the same rows as the web panel summary:
+  * app trips that started in the month with what the office completed in the panel, trips typed by hand, and fuel receipts.
+  * Returns null until the month has been fetched once.
+  */
+ fun performance(month:java.time.YearMonth,refresh:Boolean=false):Performance?{
+  val key="performance-${uid()}-$month"
+  if(refresh){
+   val zone=java.time.ZoneId.systemDefault()
+   val from=enc(month.atDay(1).atStartOfDay(zone).toInstant().toString());val to=enc(month.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant().toString())
+   val sessions=linkedMapOf<String,JSONObject>()
+   for(s in all("/rest/v1/trf_driver_tracking_sessions?select=id,driver_name,vehicle,distance_meters,load_type&started_at=gte.$from&started_at=lt.$to&order=started_at.desc,id.desc"))sessions[s.getString("id")]=s
+   // Old labels without plate are added to the catalog truck they name. The catalog is refreshed after the first answer, so being offline fails once.
+   try{catalog(true)}catch(_:Exception){}
+   val fleet=trucks()
+   val panel=HashMap<String,JSONObject>();val details=HashMap<String,JSONObject>()
+   sessions.keys.chunked(40).forEach{chunk->val ids=chunk.joinToString(","){enc(it)}
+    val p=array("/rest/v1/trf_panel_trips?select=app_trip_id,driver_name,vehicle,billable_km,kg,amount,currency,deleted_at&app_trip_id=in.($ids)");for(i in 0 until p.length())panel[p.getJSONObject(i).optString("app_trip_id")]=p.getJSONObject(i)
+    val d=array("/rest/v1/trf_trip_details?select=trip_id,data&trip_id=in.($ids)");for(i in 0 until d.length())details[d.getJSONObject(i).optString("trip_id")]=json(d.getJSONObject(i),"data")}
+   val trips=mutableListOf<FleetStats.Trip>()
+   for((id,s) in sessions){val p=panel[id]
+    trips.add(FleetStats.Trip(FleetStats.canonical(text(p,"vehicle")?:text(s,"vehicle"),fleet),text(p,"driver_name")?:text(s,"driver_name"),(num(s,"distance_meters")?:0.0)/1000,s.optString("load_type")!="empty",num(p,"billable_km")?:0.0,num(p,"kg")?:num(details[id],"kg")?:0.0,num(p,"amount")?:0.0,text(p,"currency")=="USD",text(p,"deleted_at")!=null))}
+   for(p in all("/rest/v1/trf_panel_trips?select=id,driver_name,vehicle,billable_km,kg,amount,currency,deleted_at&source=eq.manual&departure_at=gte.$from&departure_at=lt.$to&order=departure_at.desc,id.desc"))
+    trips.add(FleetStats.Trip(FleetStats.canonical(text(p,"vehicle"),fleet),text(p,"driver_name"),0.0,null,num(p,"billable_km")?:0.0,num(p,"kg")?:0.0,num(p,"amount")?:0.0,text(p,"currency")=="USD",text(p,"deleted_at")!=null))
+   val fuel=all("/rest/v1/trf_driver_fuel_receipts?select=id,driver_name,vehicle,liters,total,panel_data&or=(archived.is.null,archived.is.false)&recorded_at=gte.$from&recorded_at=lt.$to&order=recorded_at.desc,id.desc").map{r->val d=json(r,"panel_data")
+    FleetStats.Fuel(FleetStats.canonical(text(d,"vehicle")?:text(r,"vehicle"),fleet),text(r,"driver_name"),num(d,"litros")?:num(r,"liters")?:0.0,num(d,"monto")?:num(r,"total")?:0.0,text(d,"moneda")=="USD")}
+   store.cache(key,JSONObject().put("trucks",pack(FleetStats.summarize(trips,fuel))).put("drivers",pack(FleetStats.summarize(trips,fuel,true))).put("fetched_at",System.currentTimeMillis()))
+  }
+  val saved=store.cache(key);if(!saved.has("fetched_at"))return null
+  return Performance(unpack(saved.optJSONObject("trucks")),unpack(saved.optJSONObject("drivers")),saved.optLong("fetched_at"))
+ }
+ /** Trucks of the catalog, as model and plate. */
+ fun trucks():List<FleetStats.CatalogTruck>{val a=catalog().optJSONArray("equipos")?:JSONArray();return (0 until a.length()).map{a.getJSONObject(it)}.map{FleetStats.CatalogTruck(text(it,"tipo")?:"",text(it,"matriculaCamion")?:"")}.filter{it.label.isNotEmpty()}}
+ /** Every row of a query, 1000 at a time. The path must carry a stable order. */
+ private fun all(path:String):List<JSONObject>{
+  val out=mutableListOf<JSONObject>();var offset=0
+  while(true){val page=array("$path&limit=1000&offset=$offset");for(i in 0 until page.length())out.add(page.getJSONObject(i));if(page.length()<1000)break;offset+=1000}
+  return out
+ }
+ private fun text(o:JSONObject?,key:String):String?=if(o==null||o.isNull(key))null else FleetStats.text(o.optString(key))
+ private fun num(o:JSONObject?,key:String):Double?=if(o==null||o.isNull(key))null else FleetStats.number(o.opt(key))
+ /** JSON columns may arrive as objects (jsonb) or as text (json saved as a string): both are accepted. */
+ private fun json(o:JSONObject,key:String):JSONObject=o.optJSONObject(key)?:try{JSONObject(o.optString(key))}catch(_:Exception){JSONObject()}
+ private fun pack(s:FleetStats.Summary):JSONObject=JSONObject().put("rows",JSONArray(s.rows.map{pack(it)})).put("total",pack(s.total))
+ private fun pack(r:FleetStats.Row):JSONObject=JSONObject().put("name",r.name).put("trips",r.trips).put("gps_km",r.gpsKm).put("loaded_km",r.loadedKm).put("empty_km",r.emptyKm).put("billable_km",r.billableKm).put("kg",r.kg)
+  .put("billed_uyu",r.billedUyu).put("billed_usd",r.billedUsd).put("unbilled",r.unbilled).put("liters",r.liters).put("fuel_uyu",r.fuelUyu).put("fuel_usd",r.fuelUsd)
+ private fun unpack(o:JSONObject?):FleetStats.Summary{val a=o?.optJSONArray("rows")?:JSONArray();return FleetStats.Summary((0 until a.length()).map{row(a.getJSONObject(it))},row(o?.optJSONObject("total")?:JSONObject()))}
+ private fun row(o:JSONObject):FleetStats.Row=FleetStats.Row(o.optString("name")).apply{trips=o.optInt("trips");gpsKm=o.optDouble("gps_km",0.0);loadedKm=o.optDouble("loaded_km",0.0);emptyKm=o.optDouble("empty_km",0.0);billableKm=o.optDouble("billable_km",0.0);kg=o.optDouble("kg",0.0)
+  billedUyu=o.optDouble("billed_uyu",0.0);billedUsd=o.optDouble("billed_usd",0.0);unbilled=o.optInt("unbilled");liters=o.optDouble("liters",0.0);fuelUyu=o.optDouble("fuel_uyu",0.0);fuelUsd=o.optDouble("fuel_usd",0.0)}
  /** Truck services; row security limits them to drivers and administrators. */
  fun maintenance(refresh:Boolean=false):JSONArray{
   val key="maintenance-${uid()}"
