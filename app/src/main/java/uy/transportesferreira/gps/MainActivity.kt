@@ -305,12 +305,17 @@ class MainActivity:AppCompatActivity(){
   dock=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),dp(10),dp(14),dp(12));setBackgroundColor(appBg);visibility=View.GONE}
   shell.addView(dock,LinearLayout.LayoutParams(-1,-2))
   setContentView(shell)
-  ViewCompat.setOnApplyWindowInsetsListener(shell){v,i->val bars=i.getInsets(WindowInsetsCompat.Type.systemBars());val ime=i.getInsets(WindowInsetsCompat.Type.ime())
-   topTarget?.let{it.setPadding(it.paddingLeft,bars.top,it.paddingRight,it.paddingBottom)}
-   v.setPadding(bars.left,0,bars.right,max(bars.bottom,ime.bottom));i}
+  ViewCompat.setOnApplyWindowInsetsListener(shell){v,i->fitBars(v,i);i}
+  // AppCompat swaps the content view without asking for a new insets pass, so only the first screen would hear about the
+  // system bars and every later one would sit under them. Each screen takes the sizes the window already has and asks for its own pass.
+  ViewCompat.getRootWindowInsets(shell)?.let{fitBars(shell,it)};shell.requestApplyInsets()
   WindowCompat.getInsetsController(window,window.decorView).apply{isAppearanceLightStatusBars=false;isAppearanceLightNavigationBars=!dark}
   shell.alpha=0f;shell.animate().alpha(1f).setDuration(160).start()
  }
+ /** Keeps a screen clear of the status bar, the navigation bar and the keyboard. */
+ private fun fitBars(v:View,i:WindowInsetsCompat){val bars=i.getInsets(WindowInsetsCompat.Type.systemBars());val ime=i.getInsets(WindowInsetsCompat.Type.ime())
+  topTarget?.let{it.setPadding(it.paddingLeft,bars.top,it.paddingRight,it.paddingBottom)}
+  v.setPadding(bars.left,0,bars.right,max(bars.bottom,ime.bottom))}
  private fun barButton(res:Int,desc:String,action:()->Unit)=ImageView(this).apply{setImageResource(res);imageTintList=ColorStateList.valueOf(Color.WHITE);setPadding(dp(12),dp(12),dp(12),dp(12));background=RippleDrawable(ColorStateList.valueOf(0x33FFFFFF),null,null);contentDescription=desc;isClickable=true;isFocusable=true;setOnClickListener{action()};layoutParams=LinearLayout.LayoutParams(dp(48),dp(48))}
  private fun plusButton(desc:String,action:()->Unit)=ImageView(this).apply{setImageResource(R.drawable.ic_plus);imageTintList=ColorStateList.valueOf(Color.WHITE);setPadding(dp(7),dp(7),dp(7),dp(7));background=ripple(bg(0xFF1663E8.toInt(),10),0x40FFFFFF);contentDescription=desc;isClickable=true;isFocusable=true;setOnClickListener{action()};layoutParams=LinearLayout.LayoutParams(dp(38),dp(38)).apply{marginEnd=dp(8)}}
  private fun chip(s:String)=tv(s,13f,0xFFDCE6F8.toInt(),1).apply{background=bg(0x26FFFFFF,8);setPadding(dp(10),dp(5),dp(10),dp(6));layoutParams=LinearLayout.LayoutParams(-2,-2).apply{marginEnd=dp(10)}}
@@ -336,7 +341,7 @@ class MainActivity:AppCompatActivity(){
   val nav=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;setBackgroundColor(cardBg)}
   for((key,res,label) in items){val on=key==active;val color=if(on)blue else muted
    val item=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=RippleDrawable(ColorStateList.valueOf(press),null,null);isClickable=true;isFocusable=true;isSelected=on;contentDescription=label;setOnClickListener{if(!on)go(key)}}
-   item.addView(iconView(res,color,24));item.addView(tv(label,12f,color,if(on)1 else 0).apply{setPadding(0,dp(3),0,0)})
+   item.addView(iconView(res,color,24));item.addView(tv(label,12f,color,if(on)1 else 0).apply{gravity=Gravity.CENTER;setPadding(0,dp(3),0,0)})
    nav.addView(item,LinearLayout.LayoutParams(0,dp(64),1f))}
   shell.addView(nav,LinearLayout.LayoutParams(-1,-2));shell.setBackgroundColor(cardBg)
  }
@@ -692,7 +697,7 @@ class MainActivity:AppCompatActivity(){
  }
  private fun actionBox(p:LinearLayout,icon:Int,label:String,index:Int,action:()->Unit):Pair<ImageView,TextView>{
   val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=ripple(bg(cardBg,14));elevation=dpf(1.5f);isClickable=true;isFocusable=true;contentDescription=label;setOnClickListener{action()}}
-  val image=iconView(icon,blue,24);val caption=tv(label,13.5f,blue,1).apply{setPadding(0,dp(6),0,0)};v.addView(image);v.addView(caption)
+  val image=iconView(icon,blue,24);val caption=tv(label,13.5f,blue,1).apply{gravity=Gravity.CENTER;setPadding(0,dp(6),0,0)};v.addView(image);v.addView(caption)
   p.addView(v,LinearLayout.LayoutParams(0,dp(76),1f).apply{if(index>0)marginStart=dp(10)});return Pair(image,caption)
  }
  // Opens the system page where the driver lifts battery limits; asking for the exemption directly is restricted on Google Play.
@@ -786,7 +791,7 @@ class MainActivity:AppCompatActivity(){
   }
  }
  private fun photoButton(icon:Int,label:String,action:()->Unit)=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=ripple(outline(cardBg,fieldLine,12));isClickable=true;isFocusable=true;contentDescription=label;setOnClickListener{action()}
-  addView(iconView(icon,blue,24));addView(tv(label,13.5f,ink,1).apply{setPadding(0,dp(5),0,0)})}
+  addView(iconView(icon,blue,24));addView(tv(label,13.5f,ink,1).apply{gravity=Gravity.CENTER;setPadding(0,dp(5),0,0)})}
  private fun takePhoto(){try{camera=File(File(filesDir,"camera").apply{mkdirs()},"${UUID.randomUUID()}.jpg");take.launch(FileProvider.getUriForFile(this,"$packageName.files",camera!!))}catch(_:Exception){toast("No hay cámara disponible. Elegí una imagen de la galería.")}}
  private fun removePhoto(){photoJob++;photoBusy=false;photo?.delete();photo=null;if(screen=="document")document() else fuel()}
  private fun cargoNames(client:String):List<String>{

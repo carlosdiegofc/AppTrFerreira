@@ -1,7 +1,11 @@
 # Panel web (nuevo)
 La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
 
-# Transportes Ferreira GPS — v0.16.0
+# Transportes Ferreira GPS — v0.16.1
+
+## Nuevo en v0.16.1 (corrección)
+- Las pantallas ya no quedan tapadas por la barra de estado ni por los botones de navegación del teléfono. Pasaba en toda pantalla que se abría después de la primera (por ejemplo el Inicio después de elegir el modo, o un viaje recién iniciado): el encabezado quedaba debajo de la hora y la barra de abajo o el botón de finalizar, debajo de los botones del teléfono.
+- Los nombres de la barra de abajo (Inicio, Viajes, Combustible, Más) quedan centrados debajo de su ícono; antes salían corridos a la izquierda. Lo mismo en los botones Combustible, Remito y Pausar del viaje en curso y en Sacar foto y Galería.
 
 ## Nuevo en v0.16.0 (modo sencillo, modo normal y menú del dueño)
 - Después de ingresar, cada chofer elige cómo usar la app: **modo sencillo** o **modo normal**. La elección queda guardada en el teléfono para esa cuenta; a quien ya tenía la sesión abierta se le pregunta una vez al abrir la app. La cuenta de la empresa sigue entrando directo al panel de flota.
