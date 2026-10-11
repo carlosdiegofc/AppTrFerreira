@@ -101,6 +101,8 @@ class MainActivity:AppCompatActivity(){
  private var fleetLoadedAt=0L;private var fleetLoading=false
  private var editForm=JSONObject();private var editId:String?=null;private var maintFilter=0;private var maintTruck="";private var papersAt=0L
  private var modePick=UiMode.SIMPLE;private var finishAsk=false;private var tripFilter=0
+ // Simple mode asks before starting a trip; startAskAt is when the question came up.
+ private var startAsk=false;private var startAskAt=0L
  private var fleetView=false;private var detailFrom="list";private var sheet:android.app.Dialog?=null
  private var perfMonth:YearMonth=YearMonth.now();private var perfDrivers=false;private var perfFailed=false;private var perfLoading:YearMonth?=null
  private val serviceKinds=listOf("Cambio de aceite","Cambio de filtros","Revisión de frenos","Alineación y balanceo","Cubiertas","Revisión general")
@@ -155,6 +157,8 @@ class MainActivity:AppCompatActivity(){
   "maintform"->maintenance()
   "docform"->documents()
   "mode"->homeOrTrip()
+  // Only enabled while the question before starting a trip is up: back answers "no".
+  "simplehome"->simpleHome()
  }}}
  private fun refreshCatalog(){thread{try{mobile.catalog(true);runOnUiThread{if(screen=="prepare")prepare() else if(screen=="newtrip")newTrip()}}catch(_:Exception){}}}
 
@@ -432,11 +436,12 @@ class MainActivity:AppCompatActivity(){
   if(unit!=null)figures.addView(tv(unit,14.5f,muted,1).apply{setPadding(dp(6),0,0,dp(5))})
   v.addView(figures);p.addView(v,LinearLayout.LayoutParams(0,-2,1f).apply{if(index>0)marginStart=dp(12)});return big
  }
- private fun simpleHome(){
-  page("simplehome");brandBar();finishAsk=false
+ /** Start screen of simple mode. With ask, the question before starting a trip takes the place of the start button. */
+ private fun simpleHome(ask:Boolean=false){
+  page("simplehome");brandBar();finishAsk=false;startAsk=ask;back.isEnabled=ask
   val (model,plate)=truckParts(truck)
   val tc=card(top=10)
-  val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(18),dp(16),dp(10),dp(16));background=ripple(null);isClickable=true;isFocusable=true;contentDescription="Camión asignado: ${model.ifBlank{"sin elegir"}}. Tocá para cambiarlo";setOnClickListener{pickTruck{simpleHome()}}}
+  val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(18),dp(16),dp(10),dp(16));background=ripple(null);isClickable=true;isFocusable=true;contentDescription="Camión asignado: ${model.ifBlank{"sin elegir"}}. Tocá para cambiarlo";setOnClickListener{pickTruck{simpleHome(startAsk)}}}
   val col=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
   col.addView(tv("Camión asignado",13.5f,muted));col.addView(tv(model.ifBlank{"Sin camión elegido"},21f,ink,2).apply{setPadding(0,dp(2),0,0)})
   col.addView(tv(if(plate.isNotBlank())"Matrícula $plate" else if(model.isBlank())"Tocá para elegirlo" else "Tocá para cambiarlo",14.5f,muted).apply{setPadding(0,dp(2),0,0)})
@@ -448,7 +453,8 @@ class MainActivity:AppCompatActivity(){
   val rc=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),0,0,0)}
   rc.addView(tv("Listo para viajar",17f,ink,1));rc.addView(tv("El recorrido, los kilómetros y la hora se registran solos.",14f,inkSoft).apply{setPadding(0,dp(2),0,0)})
   ready.addView(rc,LinearLayout.LayoutParams(0,-2,1f));root.addView(ready,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12)})
-  bigButton(root,"INICIAR VIAJE",0xFF178A4C.toInt(),R.drawable.ic_play,true,LinearLayout.LayoutParams(-1,0,1f).apply{topMargin=dp(12)}){simpleStart()}.minimumHeight=dp(190)
+  if(ask)startQuestion(model,plate)
+  else bigButton(root,"INICIAR VIAJE",0xFF178A4C.toInt(),R.drawable.ic_play,true,LinearLayout.LayoutParams(-1,0,1f).apply{topMargin=dp(12)}){startAskAt=SystemClock.elapsedRealtime();simpleHome(true)}.minimumHeight=dp(190)
   // The last finished trip confirms that it was saved without the driver doing anything else.
   store.current()?.takeIf{!it.optBoolean("active")&&it.optString("driver_id")==uid()}?.let{t->
    row(card(),R.drawable.ic_check_circle,"Último viaje guardado",listOfNotNull(date(t.optString("started_at")),km(t.optDouble("distance_meters",0.0)),durationText(t.optString("started_at"),t.optString("ended_at"))).joinToString(" · "),tint=green)}
@@ -464,10 +470,21 @@ class MainActivity:AppCompatActivity(){
   return null
  }
  private fun guessTruck(){
-  knownTruck()?.let{saveTruck(it);simpleHome();return}
-  thread{try{mobile.history("trips",50,true);val v=knownTruck();runOnUiThread{if(v!=null&&truck.isBlank()&&screen=="simplehome"){saveTruck(v);simpleHome()}}}catch(_:Exception){}}
+  knownTruck()?.let{saveTruck(it);simpleHome(startAsk);return}
+  thread{try{mobile.history("trips",50,true);val v=knownTruck();runOnUiThread{if(v!=null&&truck.isBlank()&&screen=="simplehome"){saveTruck(v);simpleHome(startAsk)}}}catch(_:Exception){}}
  }
- /** One tap starts the trip: remembered truck, loaded trip, no form. Without a known truck it asks once. */
+ /** Takes the place of the start button once it is tapped, so that a trip never starts with a single touch. */
+ private fun startQuestion(model:String,plate:String){
+  val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER_VERTICAL;background=outline(cardBg,green,18).apply{setStroke(dp(2),green)};elevation=dpf(3f);setPadding(dp(16),dp(18),dp(16),dp(16));minimumHeight=dp(190)}
+  text(box,"¿Iniciar el viaje?",24f,ink,2).gravity=Gravity.CENTER
+  text(box,listOf(model,plate).filter{it.isNotBlank()}.joinToString(" · ").ifBlank{"Sin camión elegido"},15.5f,inkSoft,0,4).gravity=Gravity.CENTER
+  // The question comes up right under the finger that tapped the start button: a double tap must not answer it.
+  val settled={SystemClock.elapsedRealtime()-startAskAt>=700}
+  bigButton(box,"SÍ, INICIAR",0xFF178A4C.toInt(),R.drawable.ic_play,false,LinearLayout.LayoutParams(-1,dp(76)).apply{topMargin=dp(14)}){if(settled())simpleStart()}
+  button(box,"Cancelar",Kind.LINE,top=10){if(settled())simpleHome()}
+  root.addView(box,LinearLayout.LayoutParams(-1,0,1f).apply{topMargin=dp(12)})
+ }
+ /** Starts the trip once the driver has confirmed: remembered truck, loaded trip, no form. Without a known truck it asks once. */
  private fun simpleStart(asked:Boolean=false){
   if(active()){simpleTrip();return}
   if(truck.isBlank()&&!asked){val v=knownTruck();if(v!=null)saveTruck(v) else {pickTruck{simpleStart(true)};return}}

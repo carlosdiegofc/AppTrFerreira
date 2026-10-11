@@ -1,7 +1,10 @@
 # Panel web (nuevo)
 La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
 
-# Transportes Ferreira GPS — v0.16.1
+# Transportes Ferreira GPS — v0.16.2
+
+## Nuevo en v0.16.2 (confirmación al iniciar en modo sencillo)
+- **Modo sencillo:** al tocar **INICIAR VIAJE** el viaje ya no empieza solo. En el lugar del botón aparece la pregunta **¿Iniciar el viaje?** con el camión y dos botones: **SÍ, INICIAR** y **Cancelar**. El viaje recién empieza al confirmar, para que no arranque por un toque sin querer. El gesto «atrás» también cancela, y un toque doble sobre el botón no cuenta como confirmación.
 
 ## Nuevo en v0.16.1 (corrección)
 - Las pantallas ya no quedan tapadas por la barra de estado ni por los botones de navegación del teléfono. Pasaba en toda pantalla que se abría después de la primera (por ejemplo el Inicio después de elegir el modo, o un viaje recién iniciado): el encabezado quedaba debajo de la hora y la barra de abajo o el botón de finalizar, debajo de los botones del teléfono.
