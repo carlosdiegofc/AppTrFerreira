@@ -47,10 +47,12 @@ En la etapa 1, Transportes Ferreira pasa a ser la empresa 1: sus datos se copian
 - [ ] Entorno de pruebas con la misma estructura y datos de ejemplo.
 - [ ] CI que aplica las migraciones a una base local y corre las pruebas de permisos, sobre lo que ya existe en `web/tests/e2e`.
 
+## Decisiones tomadas
+- 16/10/2026: Supabase sigue en el plan gratis, sin Pro. Como ese plan no tiene respaldos descargables, antes de cada migración se hace un respaldo manual completo (estructura y datos) y se le entrega al dueño, nunca en el repositorio. La base entra en reposo si pasa unos días sin uso y vuelve con el uso (la app, el panel) o desde el proyecto en supabase.com. Las ramas de prueba de Supabase quedan descartadas porque requieren Pro.
+
 ## Decisiones abiertas
 Antes de tocar datos reales:
-- Supabase Pro (US$ 25 por mes: respaldos diarios y la base no entra en reposo) o seguir en el plan gratis con respaldos manuales.
-- Entorno de pruebas: un segundo proyecto gratis o las ramas de Supabase (requieren Pro).
+- Entorno de pruebas: un segundo proyecto gratis de Supabase.
 - Pasar la v0.16.2 a `main`.
 - Rol de cada cuenta actual: dueños, choferes y la cuenta de revisión de Google, que iría a una empresa de demostración.
 

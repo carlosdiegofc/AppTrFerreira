@@ -72,8 +72,10 @@ No borres la rama `claude/apptrferreira-g1agmt` en GitHub: si se borra, este enl
 Elegí **Todas las funciones o algunas de ellas están restringidas** y agregá una credencial con el usuario y la contraseña de `cuenta-de-prueba-para-google.txt`. En las instrucciones pegá:
 
 ```text
-Log in with the test account. Tap "Nuevo viaje" (New trip) and then "¿Apurado? Salir ahora y completar después" (Start now). Accept the location notice and the system location permission. While the trip runs, the app shows a persistent "Viaje en curso" notification and the live route on the map. Tap "Finalizar viaje" to end the trip. Fuel receipts ("Cargar combustible") and delivery notes ("Remitos") can be added during the trip. The app is for drivers of Transportes Ferreira (Uruguay); the company creates the accounts.
+Log in with the test account. Keep "Modo sencillo" and tap "Continuar". Tap "INICIAR VIAJE", then "SÍ, INICIAR" (pick any truck if asked). Accept the location notice and permission. During the trip the app shows a "Viaje en curso" notification and the route on the map. End it with "FINALIZAR VIAJE" > "SÍ, FINALIZAR". Fuel receipts and delivery notes: "Cambiar de modo" > "Modo normal" > "Continuar". The company creates the drivers' accounts.
 ```
+
+Desde la versión 0.16 la app pregunta el modo de uso después de ingresar; si en Play Console quedó el texto de la 0.15, reemplazalo por este.
 
 La cuenta de prueba es un chofer llamado «Revisión Google Play». Los viajes que haga Google aparecen en el panel con ese nombre; se pueden borrar después de la revisión.
 
@@ -142,7 +144,7 @@ Impacto si el sistema demora o corta el servicio:
 If the service is deferred or interrupted, the route and the kilometers of the trip are lost or incomplete, and the company cannot see where the truck is. The distance is used to control fuel and trip costs.
 ```
 
-Video: grabá la pantalla del teléfono (30 a 60 segundos) mostrando: abrir la app › **Nuevo viaje** › **Salir ahora** › aceptar el aviso de ubicación › bajar la barra de notificaciones y mostrar **Viaje en curso** › volver al mapa › **Finalizar viaje**. Subilo a YouTube como **No listado** y pegá el enlace.
+Video: grabá la pantalla del teléfono (30 a 60 segundos) mostrando: abrir la app › **Modo sencillo** › **Continuar** › **INICIAR VIAJE** › **SÍ, INICIAR** › aceptar el aviso de ubicación › bajar la barra de notificaciones y mostrar **Viaje en curso** › volver al mapa › **FINALIZAR VIAJE** › **SÍ, FINALIZAR**. Subilo a YouTube como **No listado** y pegá el enlace.
 
 ### Ubicación precisa (solo si Play Console la pide)
 
@@ -226,6 +228,17 @@ La app de Google Play es una app nueva para Android (nombre de paquete `com.tran
 ## 7. Actualizaciones
 
 Cada versión nueva lleva un número de versión más alto, y GitHub Actions arma su `.aab` solo. En Play Console: *Prueba interna › Crear versión* › subí el `.aab` nuevo › **Lanzar**. Los teléfonos se actualizan desde Google Play sin hacer nada más.
+
+Versión `0.16.2` (código de versión 24). No cambia permisos, datos recopilados ni la política de privacidad; solo hay que actualizar las instrucciones de [Acceso a la app](#acceso-a-la-app). Notas de la versión:
+
+```text
+<es-419>
+• Al entrar, cada chofer elige el modo: sencillo (solo iniciar y finalizar el viaje, con botones grandes) o normal (todas las opciones).
+• En modo sencillo, la app pregunta antes de iniciar el viaje, para que no arranque por un toque sin querer.
+• Nuevo: Rendimiento del mes por camión y por chofer, para los dueños.
+• Las pantallas ya no quedan tapadas por las barras del teléfono.
+</es-419>
+```
 
 ## Si más adelante querés publicarla para todo el público
 
