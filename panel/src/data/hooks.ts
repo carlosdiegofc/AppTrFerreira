@@ -1,8 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { FLEET_REFRESH_MS, ROUTE_REFRESH_MS } from '../config';
 import { type ActiveTrip, fleetUnits } from '../lib/fleet';
-import { fetchCatalog, fetchFleet, fetchPapers, fetchRoute, fetchTrips } from './api';
+import { appendReadings } from '../lib/route';
+import { fetchCatalog, fetchFleet, fetchPapers, fetchRoute, fetchTrips, type RoutePoint } from './api';
 
 /** The current time, refreshed every few seconds so "hace 2 min" keeps moving. */
 export function useNow(everyMs = 10_000): number {
@@ -41,10 +42,18 @@ export const useTrips = (fromIso: string, toIso: string, refreshMs?: number) =>
 
 export const usePapers = () => useQuery({ queryKey: ['papers'], queryFn: fetchPapers, staleTime: 10 * 60_000 });
 
-export const useRoute = (trip: ActiveTrip | null) =>
-  useQuery({
+/** The route of a trip in progress. After the first load each refresh brings only the readings since the last one. */
+export function useRoute(trip: ActiveTrip | null) {
+  const client = useQueryClient();
+  return useQuery({
     queryKey: ['route', trip?.id ?? null],
-    queryFn: () => (trip ? fetchRoute(trip) : Promise.resolve([])),
+    queryFn: async (): Promise<RoutePoint[]> => {
+      if (!trip) return [];
+      const shown = client.getQueryData<RoutePoint[]>(['route', trip.id]);
+      const last = shown?.at(-1);
+      return shown && last ? appendReadings(shown, await fetchRoute(trip, last.recorded_at)) : fetchRoute(trip);
+    },
     enabled: trip !== null,
     refetchInterval: ROUTE_REFRESH_MS,
   });
+}

@@ -97,15 +97,17 @@ export async function fetchTrips(fromIso: string, toIso: string): Promise<TripRo
   return trips.filter((t) => !deleted.has(t.id));
 }
 
+/** Every paper with an expiry date and every service still to do with a date: a cap could hide an old one that is late. */
 export async function fetchPapers(): Promise<{ papers: PaperRow[]; services: ServiceRow[] }> {
   const [papers, services] = await Promise.all([
-    supabase.from('trf_documents').select('id,scope,driver_name,vehicle,kind,expires_on').order('expires_on', { ascending: true, nullsFirst: false }).limit(500),
-    supabase.from('trf_vehicle_maintenance').select('id,vehicle,kind,due_on,done_on').order('created_at', { ascending: false }).limit(500),
+    all((from, to) => supabase.from('trf_documents').select('id,scope,driver_name,vehicle,kind,expires_on').not('expires_on', 'is', null).order('expires_on', { ascending: true }).order('id', { ascending: true }).range(from, to)),
+    all((from, to) => supabase.from('trf_vehicle_maintenance').select('id,vehicle,kind,due_on,done_on').is('done_on', null).not('due_on', 'is', null).order('due_on', { ascending: true }).order('id', { ascending: true }).range(from, to)),
   ]);
-  return { papers: rows(papers), services: rows(services) };
+  return { papers, services };
 }
 
 export interface RoutePoint {
+  id: number;
   latitude: number;
   longitude: number;
   recorded_at: string;
@@ -116,9 +118,9 @@ export interface RoutePoint {
  * GPS readings of a trip, oldest first. Same rule as the phone and the current panel: the readings of this trip, or
  * readings without trip saved by older app versions inside its time window.
  */
-export async function fetchRoute(trip: Pick<ActiveTrip, 'id' | 'driver_id' | 'started_at'> & { ended_at?: string | null }): Promise<RoutePoint[]> {
+export async function fetchRoute(trip: Pick<ActiveTrip, 'id' | 'driver_id' | 'started_at'> & { ended_at?: string | null }, since?: string): Promise<RoutePoint[]> {
   return all((from, to) => {
-    let q = supabase.from('trf_driver_location_history').select('latitude,longitude,recorded_at,segment').eq('driver_id', trip.driver_id).or(`trip_id.eq.${trip.id},trip_id.is.null`).gte('recorded_at', trip.started_at);
+    let q = supabase.from('trf_driver_location_history').select('id,latitude,longitude,recorded_at,segment').eq('driver_id', trip.driver_id).or(`trip_id.eq.${trip.id},trip_id.is.null`).gte('recorded_at', since ?? trip.started_at);
     if (trip.ended_at) q = q.lte('recorded_at', trip.ended_at);
     return q.order('recorded_at', { ascending: true }).order('id', { ascending: true }).range(from, to);
   }, 40_000);

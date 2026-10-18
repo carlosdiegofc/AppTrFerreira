@@ -35,7 +35,7 @@ class MobileData(private val c:Context){
  private fun fetchTripInfo(rows:JSONArray,fleet:Boolean){
   val out=JSONObject();val ids=(0 until rows.length()).map{rows.getJSONObject(it).getString("id")}
   ids.chunked(40).forEach{chunk->val a=array("/rest/v1/trf_trip_details?trip_id=in.(${chunk.joinToString(","){enc(it)}})&select=trip_id,data${if(fleet)"" else "&driver_id=eq.${uid()}"}")
-   for(i in 0 until a.length()){val d=a.getJSONObject(i);out.put(d.getString("trip_id"),d.optJSONObject("data")?:JSONObject())}}
+   for(i in 0 until a.length()){val d=a.getJSONObject(i);out.put(d.getString("trip_id"),json(d,"data"))}}
   store.cache("tripinfo-${if(fleet)"fleet-" else ""}${uid()}",JSONObject().put("data",out))
  }
  fun tripInfo(fleet:Boolean=false):JSONObject{
@@ -47,7 +47,7 @@ class MobileData(private val c:Context){
   val id=trip.getString("id");val owner=trip.optString("driver_id").ifBlank{uid()};val key="detail-${uid()}-$id"
   if(refresh){val data=array("/rest/v1/trf_trip_details?trip_id=eq.$id&driver_id=eq.${enc(owner)}");val docs=JSONArray();var offset=0
    while(true){val page=array("/rest/v1/trf_trip_documents?trip_id=eq.$id&driver_id=eq.${enc(owner)}&order=created_at.asc,id.asc&limit=1000&offset=$offset");for(i in 0 until page.length())docs.put(page.getJSONObject(i));if(page.length()<1000)break;offset+=1000}
-   store.cache(key,JSONObject().put("data",if(data.length()>0)data.getJSONObject(0).getJSONObject("data") else JSONObject()).put("documents",docs))
+   store.cache(key,JSONObject().put("data",if(data.length()>0)json(data.getJSONObject(0),"data") else JSONObject()).put("documents",docs))
   }
   val result=store.cache(key);if(!result.has("data")){result.put("data",store.details().firstOrNull{it.second.optString("trip_id")==id}?.second?.optJSONObject("data")?:JSONObject())}
   val docs=result.optJSONArray("documents")?:JSONArray();val ids=(0 until docs.length()).map{docs.getJSONObject(it).optString("id")}.toSet()

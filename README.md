@@ -10,7 +10,10 @@ La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la
 ## Nuevo en v0.16.3 (correcciones del menú del dueño)
 - **Flota en vivo:** un camión que está en viaje ya no aparece dos veces (una en ruta y otra «sin viaje») cuando el viaje se guardó con un nombre viejo del camión, como «Ford Cargo». El camión se reconoce igual que en Rendimiento: por la matrícula o, si no tiene, por el modelo, cuando ese modelo es de un solo camión del catálogo. Lo mismo para mostrar el último chofer y el lugar de llegada de un camión sin viaje.
 - **Combustible › Este mes:** los totales de litros y de gasto suman todas las cargas del mes. Antes contaban solo las 50 más recientes, así que en una flota con más cargas el total quedaba corto hasta tocar «Cargar más».
-- **Combustible:** el total gastado muestra los pesos y, en otro renglón, los dólares; antes las cargas en dólares no se sumaban. Las correcciones hechas en el panel (litros, monto, moneda, fecha) se toman también en cargas viejas que las guardaron como texto.
+- **Combustible:** el total gastado muestra los pesos y, en otro renglón, los dólares; antes las cargas en dólares no se sumaban. Las correcciones hechas en el panel (litros, monto, moneda, fecha) se toman también en cargas viejas que las guardaron como texto, y los números escritos a la uruguaya («30.000», «1.234,5») se leen igual que en Rendimiento.
+- **Mapas:** una lectura sin posición (0,0) ya no se dibuja ni lleva el mapa de la flota o del viaje al medio del océano.
+- **Viajes:** el destino, el cliente y la carga se ven también en viajes viejos que guardaron esos datos como texto.
+- Al girar el teléfono, o si Android cierra la app en segundo plano, se vuelve a la misma pantalla (Mis viajes, combustible, detalle de un viaje, Mi cuenta, Rendimiento, Flota en vivo) con los mismos filtros, en lugar del Inicio.
 - **Documentos (dueño):** al agregar un documento, además de «Mío» y «De un camión», está **De un chofer**: se elige el chofer de la lista (los que tienen viajes o documentos) y el documento queda a su nombre.
 - Lo que se envía al panel no cambia, salvo que un documento cargado por el dueño ahora puede quedar a nombre de otro chofer.
 

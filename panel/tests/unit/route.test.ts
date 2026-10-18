@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type ActiveTrip, fleetUnits } from '../../src/lib/fleet';
-import { drawable, type Reading, routeLines, validPosition } from '../../src/lib/route';
+import { appendReadings, drawable, type Reading, routeLines, validPosition } from '../../src/lib/route';
 
 const T0 = Date.parse('2026-10-18T15:00:00Z');
 const at = (seconds: number) => new Date(T0 + seconds * 1000).toISOString();
@@ -47,6 +47,15 @@ describe('route lines (same rule as routeSegments in the current panel and the a
   it('no readings, no lines', () => {
     expect(routeLines([])).toEqual([]);
     expect(routeLines([reading(0, 0, 0)])).toEqual([]);
+  });
+});
+
+describe('route refresh', () => {
+  it('adds only the readings it did not have; the last one shown comes again', () => {
+    const shown = [{ id: 1, ...reading(0, -34.9, -56.1) }, { id: 2, ...reading(30, -34.8, -56.2) }];
+    const newer = [{ id: 2, ...reading(30, -34.8, -56.2) }, { id: 3, ...reading(60, -34.7, -56.3) }];
+    expect(appendReadings(shown, newer).map((p) => p.id)).toEqual([1, 2, 3]);
+    expect(appendReadings(shown, [shown[1]!]).map((p) => p.id)).toEqual([1, 2]);
   });
 });
 

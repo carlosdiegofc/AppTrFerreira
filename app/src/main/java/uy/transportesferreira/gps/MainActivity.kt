@@ -134,11 +134,14 @@ class MainActivity:AppCompatActivity(){
   fuelTrip=b?.getString("fuelTrip")?.let{JSONObject(it)};docTrip=b?.getString("docTrip")?.let{JSONObject(it)};historyTrip=b?.getString("historyTrip")?.let{JSONObject(it)};photoMode=b?.getString("photoMode")?:"fuel";docReturn=b?.getString("docReturn")?:"prepare"
   camera=b?.getString("camera")?.let{File(it)};photo=b?.getString("photo")?.let{File(it)}?.takeIf{it.exists()};truck=b?.getString("truck")?:prefs().getString("truck","")?:"";empty=b?.getBoolean("empty")?:false
   editForm=JSONObject(b?.getString("editForm")?:"{}");editId=b?.getString("editId");maintTruck=b?.getString("maintTruck")?:"";maintFilter=b?.getInt("maintFilter")?:0
+  if(b!=null){fleetView=b.getBoolean("fleetView");tripFilter=b.getInt("tripFilter");historyQuery=b.getString("historyQuery")?:"";historyLimit=b.getInt("historyLimit",50);fuelMonth=b.getBoolean("fuelMonth",true);detailFrom=b.getString("detailFrom")?:"list";perfMonth=b.getString("perfMonth")?.let{try{YearMonth.parse(it)}catch(_:Exception){null}}?:YearMonth.now();perfDrivers=b.getBoolean("perfDrivers")}
   onBackPressedDispatcher.addCallback(this,back)
-  if(api.session()==null)login() else {name=driverName();when(b?.getString("screen")){"fuel"->fuel();"document"->document();"prepare"->prepare();"newtrip"->newTrip();"maintenance"->maintenance();"maintform"->maintForm();"documents"->documents();"docform"->paperForm();"privacy"->privacy();"mode"->askMode();else->homeOrTrip()};Sync.schedule(this);refreshCatalog()}
+  if(api.session()==null)login() else {name=driverName();when(b?.getString("screen")){"fuel"->fuel();"document"->document();"prepare"->prepare();"newtrip"->newTrip();"maintenance"->maintenance();"maintform"->maintForm();"documents"->documents();"docform"->paperForm();"privacy"->privacy();"mode"->askMode()
+   "triphistory"->history("trips",true);"fuelhistory"->history("fuel",true);"tripdetail"->historyTrip?.let{detail(it,true)}?:homeOrTrip();"settings"->settings();"performance"->performance(true);"owner"->ownerDashboard();else->homeOrTrip()};Sync.schedule(this);refreshCatalog()}
  }
  @Suppress("DEPRECATION") private fun transparentBars(){window.statusBarColor=Color.TRANSPARENT;window.navigationBarColor=Color.TRANSPARENT}
- override fun onSaveInstanceState(b:Bundle){super.onSaveInstanceState(b);b.putString("camera",camera?.path);b.putString("photo",photo?.path);b.putString("screen",screen);b.putString("truck",truck);b.putBoolean("empty",empty);b.putString("tripForm",tripForm.toString());b.putString("fuelForm",fuelForm.toString());b.putString("docForm",docForm.toString());b.putString("draftDocs",draftDocs.toString());b.putString("fuelTrip",fuelTrip?.toString());b.putString("docTrip",docTrip?.toString());b.putString("historyTrip",historyTrip?.toString());b.putString("photoMode",photoMode);b.putString("docReturn",docReturn);b.putString("editForm",editForm.toString());b.putString("editId",editId);b.putString("maintTruck",maintTruck);b.putInt("maintFilter",maintFilter)}
+ override fun onSaveInstanceState(b:Bundle){super.onSaveInstanceState(b);b.putString("camera",camera?.path);b.putString("photo",photo?.path);b.putString("screen",screen);b.putString("truck",truck);b.putBoolean("empty",empty);b.putString("tripForm",tripForm.toString());b.putString("fuelForm",fuelForm.toString());b.putString("docForm",docForm.toString());b.putString("draftDocs",draftDocs.toString());b.putString("fuelTrip",fuelTrip?.toString());b.putString("docTrip",docTrip?.toString());b.putString("historyTrip",historyTrip?.toString());b.putString("photoMode",photoMode);b.putString("docReturn",docReturn);b.putString("editForm",editForm.toString());b.putString("editId",editId);b.putString("maintTruck",maintTruck);b.putInt("maintFilter",maintFilter)
+  b.putBoolean("fleetView",fleetView);b.putInt("tripFilter",tripFilter);b.putString("historyQuery",historyQuery);b.putInt("historyLimit",historyLimit);b.putBoolean("fuelMonth",fuelMonth);b.putString("detailFrom",detailFrom);b.putString("perfMonth",perfMonth.toString());b.putBoolean("perfDrivers",perfDrivers)}
  override fun onStart(){super.onStart();handler.post(tick)}
  override fun onDestroy(){photoJob++;sheet?.dismiss();sheet=null;activeMap?.destroy();activeMap=null;super.onDestroy()}
  override fun onStop(){handler.removeCallbacks(tick);super.onStop()}
@@ -914,7 +917,8 @@ class MainActivity:AppCompatActivity(){
  private fun cash(cur:String,v:Double)=(when(cur){"UYU"->"$ ";"USD"->"US$ ";else->"$cur "})+money(v)
  /** The office's corrections on a fuel receipt; older rows keep them as JSON text, like the month summary reads them. */
  private fun panelData(r:JSONObject):JSONObject=r.optJSONObject("panel_data")?:try{JSONObject(r.optString("panel_data"))}catch(_:Exception){JSONObject()}
- private fun amount(a:JSONObject,k:String,b:JSONObject,l:String):Double?{val raw=a.optString(k).takeUnless{it.isBlank()||it=="null"}?:b.optString(l).takeUnless{it.isBlank()||it=="null"}?:return null;return raw.replace(',','.').toDoubleOrNull()?.takeIf{it.isFinite()}}
+ /** The office's value when it has one, else the phone's; numbers typed the Uruguayan way ("30.000", "1.234,5") count, as in Rendimiento. */
+ private fun amount(a:JSONObject,k:String,b:JSONObject,l:String):Double?=(if(a.isNull(k))null else FleetStats.number(a.opt(k)))?:(if(b.isNull(l))null else FleetStats.number(b.opt(l)))
  private fun fuelDay(r:JSONObject):LocalDate?{
   val s=panelData(r).optString("fecha").takeIf{it.isNotBlank()&&it!="null"}?:r.optString("receipt_date")
   return try{LocalDate.parse(s.take(10))}catch(_:Exception){try{LocalDate.parse(s,DateTimeFormatter.ofPattern("dd/MM/yyyy"))}catch(_:Exception){zoned(r.optString("recorded_at"))?.toLocalDate()}}
@@ -1035,7 +1039,7 @@ class MainActivity:AppCompatActivity(){
   val k=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL};root.addView(k,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(14)})
   stat(k,"${items.count{it.state=="moving"}}","En ruta",green,0);stat(k,"${items.count{it.state=="stopped"||it.state=="paused"||it.state=="nosignal"}}","Detenidos",amber,1);stat(k,"${items.count{it.state=="idle"}}","Sin viaje",grey,2)
   alerts()
-  val marks=JSONArray();items.filter{it.lat.isFinite()&&it.lng.isFinite()}.forEach{marks.put(JSONObject().put("lat",it.lat).put("lng",it.lng).put("label",it.plate.ifBlank{it.model}).put("color",hex(stateColor(it.state))))}
+  val marks=JSONArray();items.filter{FleetStats.validPosition(it.lat,it.lng)}.forEach{marks.put(JSONObject().put("lat",it.lat).put("lng",it.lng).put("label",it.plate.ifBlank{it.model}).put("color",hex(stateColor(it.state))))}
   val mc=card();val web=TripMap.fleet(this,marks);activeMap=web;mc.addView(web,LinearLayout.LayoutParams(-1,dp(260)))
   if(marks.length()==0)note(if(fetched==0L)"Buscando posiciones…" else "Todavía no hay posiciones GPS para mostrar.",mc,0).setPadding(dp(16),dp(10),dp(16),dp(12))
   section("Camiones")

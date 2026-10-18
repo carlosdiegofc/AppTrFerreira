@@ -15,6 +15,10 @@ class FleetStatsTest {
         assertEquals(500.0,a.billedUyu,.001);assertEquals(100.0,a.billedUsd,.001);assertEquals(150.0,a.gpsKm,.001);assertEquals(110.0,a.billableKm,.001);assertEquals(1000.0,a.kg,.001)
         assertEquals(2,s.total.trips);assertEquals(300.0,s.total.fuelUyu,.001);assertEquals(10.0,s.total.fuelUsd,.001);assertEquals(40.0,s.total.liters,.001)
     }
+    @Test fun positionsWithoutAFixAreNotShown(){
+        assertFalse(FleetStats.validPosition(0.0,0.0));assertFalse(FleetStats.validPosition(91.0,10.0));assertFalse(FleetStats.validPosition(10.0,-181.0));assertFalse(FleetStats.validPosition(Double.NaN,10.0))
+        assertTrue(FleetStats.validPosition(-34.9,-56.16));assertTrue(FleetStats.validPosition(0.0,-56.16))
+    }
     @Test fun deletedTripsAreLeftOut(){
         val s=FleetStats.summarize(listOf(trip("B",999.0,amount=1.0,deleted=true)),emptyList())
         assertTrue(s.rows.isEmpty());assertEquals(0,s.total.trips);assertEquals(0.0,s.total.gpsKm,.001)

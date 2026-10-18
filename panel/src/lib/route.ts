@@ -21,6 +21,13 @@ export function drawable<T extends Reading>(points: readonly T[]): T[] {
   return points.filter((p) => validPosition(p.latitude, p.longitude));
 }
 
+/** The readings already shown plus the ones read since the last of them, which comes again and is not repeated. */
+export function appendReadings<T extends { id: number }>(shown: readonly T[], newer: readonly T[]): T[] {
+  const seen = new Set(shown.map((p) => p.id));
+  const added = newer.filter((p) => !seen.has(p.id));
+  return added.length === 0 ? [...shown] : [...shown, ...added];
+}
+
 /** Lines to draw: a new one starts when the segment changes (the trip was paused) or after a gap without signal. */
 export function routeLines(points: readonly Reading[], gapMs = ROUTE_GAP_MS): [number, number][][] {
   const lines: [number, number][][] = [];
