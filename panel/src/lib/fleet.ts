@@ -196,6 +196,19 @@ export function fleetUnits(active: readonly ActiveTrip[], finished: readonly Fin
   return [...travelling, ...idle];
 }
 
+/**
+ * The latest finished trip of each catalog truck in `trips` (newest first), added to `found` by truck label; trips of
+ * trucks already found or outside the catalog are skipped.
+ */
+export function lastTripByTruck(trips: readonly FinishedTrip[], catalog: readonly CatalogTruck[], found = new Map<string, FinishedTrip>()): Map<string, FinishedTrip> {
+  const labels = new Set(catalog.map(truckLabel));
+  for (const t of trips) {
+    const label = canonical(t.vehicle, catalog);
+    if (label !== null && labels.has(label) && !found.has(label)) found.set(label, t);
+  }
+  return found;
+}
+
 export interface FleetCounts {
   moving: number;
   /** Stopped, paused and without signal: on a trip but not on the road. */

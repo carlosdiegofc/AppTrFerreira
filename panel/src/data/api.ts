@@ -1,6 +1,6 @@
 // Every read the panel makes. Screens never build queries themselves; row security in the database decides what
 // each account gets back.
-import { type ActiveTrip, type CatalogTruck, catalogTrucks, type FinishedTrip, type LastPoint } from '../lib/fleet';
+import { type ActiveTrip, type CatalogTruck, catalogTrucks, type FinishedTrip, lastTripByTruck, type LastPoint, truckLabel } from '../lib/fleet';
 import type { PaperRow, ServiceRow } from '../lib/papers';
 import { supabase } from '../lib/supabase';
 
@@ -64,6 +64,21 @@ export async function fetchFleet(): Promise<FleetData> {
     }),
   );
   return { active: trips.map((t, i) => ({ ...t, last: last[i] ?? null })), finished: rows(finished), fetchedAt: Date.now() };
+}
+
+/**
+ * The latest finished trip of every catalog truck, looking further back than the live refresh (its last 100 trips) so a
+ * truck used rarely keeps its last driver and place. Stops as soon as every truck is found, at most 3000 trips back.
+ */
+export async function fetchLastTrips(catalog: readonly CatalogTruck[]): Promise<FinishedTrip[]> {
+  const wanted = new Set(catalog.map(truckLabel).filter((l) => l !== '')).size;
+  const found = new Map<string, FinishedTrip>();
+  for (let from = 0; from < 3000 && found.size < wanted; from += PAGE) {
+    const part = rows(await supabase.from('trf_driver_tracking_sessions').select('driver_name,vehicle,ended_at,arrival_lat,arrival_lng').eq('active', false).order('ended_at', { ascending: false, nullsFirst: false }).order('id', { ascending: false }).range(from, from + PAGE - 1));
+    lastTripByTruck(part, catalog, found);
+    if (part.length < PAGE) break;
+  }
+  return [...found.values()];
 }
 
 export interface TripRow {

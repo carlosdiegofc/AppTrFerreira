@@ -1,9 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { FLEET_REFRESH_MS, ROUTE_REFRESH_MS } from '../config';
-import { type ActiveTrip, fleetUnits } from '../lib/fleet';
+import { type ActiveTrip, type CatalogTruck, fleetUnits, truckLabel } from '../lib/fleet';
 import { appendReadings } from '../lib/route';
-import { fetchCatalog, fetchFleet, fetchPapers, fetchRoute, fetchTrips, type RoutePoint } from './api';
+import { fetchCatalog, fetchFleet, fetchLastTrips, fetchPapers, fetchRoute, fetchTrips, type RoutePoint } from './api';
 
 /** The current time, refreshed every few seconds so "hace 2 min" keeps moving. */
 export function useNow(everyMs = 10_000): number {
@@ -19,20 +19,32 @@ export const useCatalog = () => useQuery({ queryKey: ['catalog'], queryFn: fetch
 
 export const useFleetData = () => useQuery({ queryKey: ['fleet'], queryFn: fetchFleet, refetchInterval: FLEET_REFRESH_MS, refetchIntervalInBackground: false });
 
+/** The last trip of every truck, further back than the live refresh; trucks rarely change it, so every 30 minutes. */
+const useLastTrips = (catalog: readonly CatalogTruck[] | undefined) =>
+  useQuery({
+    queryKey: ['lastTrips', catalog?.map(truckLabel).join('|') ?? ''],
+    queryFn: () => fetchLastTrips(catalog ?? []),
+    enabled: catalog !== undefined,
+    staleTime: 30 * 60_000,
+    refetchInterval: 30 * 60_000,
+  });
+
 /** Every truck with its live state, recomputed as time passes (a truck goes "sin señal" without new data). */
 export function useFleet(now: number) {
   const catalog = useCatalog();
   const fleet = useFleetData();
+  const last = useLastTrips(catalog.data);
+  // The live list first: a truck that appears there has its newest trip there.
   const units = useMemo(
-    () => (fleet.data ? fleetUnits(fleet.data.active, fleet.data.finished, catalog.data ?? [], now) : []),
-    [fleet.data, catalog.data, now],
+    () => (fleet.data ? fleetUnits(fleet.data.active, [...fleet.data.finished, ...(last.data ?? [])], catalog.data ?? [], now) : []),
+    [fleet.data, last.data, catalog.data, now],
   );
   return {
     units,
     fetchedAt: fleet.data?.fetchedAt ?? null,
     isLoading: fleet.isLoading || catalog.isLoading,
     error: fleet.error ?? catalog.error,
-    refetch: () => Promise.all([fleet.refetch(), catalog.refetch()]),
+    refetch: () => Promise.all([fleet.refetch(), catalog.refetch(), last.refetch()]),
     isFetching: fleet.isFetching || catalog.isFetching,
   };
 }

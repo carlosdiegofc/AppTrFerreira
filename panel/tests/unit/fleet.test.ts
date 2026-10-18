@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type ActiveTrip, canonical, catalogTrucks, fleetCounts, fleetUnits, tripState, truck, truckParts } from '../../src/lib/fleet';
+import { type ActiveTrip, canonical, catalogTrucks, type FinishedTrip, fleetCounts, fleetUnits, lastTripByTruck, tripState, truck, truckParts } from '../../src/lib/fleet';
 
 const fleet = [
   { model: 'Ford Cargo 1722', plate: 'GTP4265' },
@@ -93,5 +93,20 @@ describe('the whole fleet', () => {
   it('counts like the app: stopped, paused and without signal are "detenidos"', () => {
     const more = fleetUnits([...active, trip({ id: 'c', vehicle: 'Sin camión asignado', paused: true }), trip({ id: 'd', vehicle: 'X · Y', last: null })], finished, fleet, NOW);
     expect(fleetCounts(more)).toEqual({ moving: 1, halted: 3, noSignal: 1, idle: 2 });
+  });
+});
+
+describe('last trip of each truck (to place the ones without a trip)', () => {
+  const ended = (driver: string, vehicle: string, day: number): FinishedTrip => ({ driver_name: driver, vehicle, ended_at: `2026-10-${day}T12:00:00Z`, arrival_lat: -34.9, arrival_lng: -56.1 });
+  it('keeps the newest trip of each catalog truck, older labels included', () => {
+    const found = lastTripByTruck([ended('Uno', 'Ford Cargo', 18), ended('Dos', 'Ford Cargo 1722 · GTP4265', 17), ended('Tres', 'Camión prestado', 16), ended('Cuatro', 'Leyland · HTP1545', 15)], fleet);
+    expect([...found.keys()]).toEqual(['Ford Cargo 1722 · GTP4265', 'Leyland · HTP1545']);
+    expect(found.get('Ford Cargo 1722 · GTP4265')?.driver_name).toBe('Uno');
+  });
+  it('a later page only adds the trucks still missing', () => {
+    const found = lastTripByTruck([ended('Uno', 'Leyland · HTP1545', 18)], fleet);
+    lastTripByTruck([ended('Dos', 'Leyland · HTP1545', 10), ended('Tres', 'Mercedes Benz 1618 · ATM2661', 9)], fleet, found);
+    expect(found.get('Leyland · HTP1545')?.driver_name).toBe('Uno');
+    expect(found.get('Mercedes Benz 1618 · ATM2661')?.driver_name).toBe('Tres');
   });
 });

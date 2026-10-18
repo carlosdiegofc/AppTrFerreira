@@ -127,7 +127,8 @@ class MobileData(private val c:Context){
  /** Truck services; row security limits them to drivers and administrators. */
  fun maintenance(refresh:Boolean=false):JSONArray{
   val key="maintenance-${uid()}"
-  if(refresh)store.cache(key,JSONObject().put("rows",array("/rest/v1/trf_vehicle_maintenance?select=*&order=created_at.desc&limit=500")).put("fetched_at",System.currentTimeMillis()))
+  // Every row, a page at a time: with a cap an old service still pending would drop out of the list and the warnings.
+  if(refresh)store.cache(key,JSONObject().put("rows",JSONArray(all("/rest/v1/trf_vehicle_maintenance?select=*&order=created_at.desc,id.desc"))).put("fetched_at",System.currentTimeMillis()))
   return store.cache(key).optJSONArray("rows")?:JSONArray()
  }
  /** Drivers who have trips, by id with their latest name, for the owner's forms; row security shows everyone's trips only to administrators. */
@@ -139,7 +140,7 @@ class MobileData(private val c:Context){
  /** Own driver papers (every driver's for administrators) plus truck papers. */
  fun documents(refresh:Boolean=false):JSONArray{
   val key="documents-${uid()}"
-  if(refresh)store.cache(key,JSONObject().put("rows",array("/rest/v1/trf_documents?select=*&order=expires_on.asc.nullslast&limit=500")).put("fetched_at",System.currentTimeMillis()))
+  if(refresh)store.cache(key,JSONObject().put("rows",JSONArray(all("/rest/v1/trf_documents?select=*&order=expires_on.asc.nullslast,id.asc"))).put("fetched_at",System.currentTimeMillis()))
   return store.cache(key).optJSONArray("rows")?:JSONArray()
  }
  /** Row security filters edits silently, so an update or delete that touches nothing means no permission. */

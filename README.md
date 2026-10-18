@@ -12,6 +12,7 @@ La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la
 - **Combustible › Este mes:** los totales de litros y de gasto suman todas las cargas del mes. Antes contaban solo las 50 más recientes, así que en una flota con más cargas el total quedaba corto hasta tocar «Cargar más».
 - **Combustible:** el total gastado muestra los pesos y, en otro renglón, los dólares; antes las cargas en dólares no se sumaban. Las correcciones hechas en el panel (litros, monto, moneda, fecha) se toman también en cargas viejas que las guardaron como texto, y los números escritos a la uruguaya («30.000», «1.234,5») se leen igual que en Rendimiento.
 - **Mapas:** una lectura sin posición (0,0) ya no se dibuja ni lleva el mapa de la flota o del viaje al medio del océano.
+- **Mantenimiento y Documentos:** se cargan todos los registros, de a páginas. Antes se leían los últimos 500, y un service viejo todavía pendiente podía quedar afuera de la lista y de los avisos.
 - **Viajes:** el destino, el cliente y la carga se ven también en viajes viejos que guardaron esos datos como texto.
 - Al girar el teléfono, o si Android cierra la app en segundo plano, se vuelve a la misma pantalla (Mis viajes, combustible, detalle de un viaje, Mi cuenta, Rendimiento, Flota en vivo) con los mismos filtros, en lugar del Inicio.
 - **Documentos (dueño):** al agregar un documento, además de «Mío» y «De un camión», está **De un chofer**: se elige el chofer de la lista (los que tienen viajes o documentos) y el documento queda a su nombre.
