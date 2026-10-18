@@ -1,7 +1,7 @@
 // Every read and write the panel makes. Screens never build queries themselves; row security in the database decides
 // what each account gets back and what it may change.
 import type { Tables, TablesInsert } from '../lib/database.types';
-import { type ActiveTrip, type CatalogTruck, catalogTrucks, type FinishedTrip, lastTripByTruck, type LastPoint, text, truckLabel } from '../lib/fleet';
+import { type ActiveTrip, type CatalogTruck, catalogTrucks, type FinishedTrip, lastTripByTruck, type LivePosition, text, truckLabel } from '../lib/fleet';
 import type { PaperRow, ServiceRow } from '../lib/papers';
 import { supabase } from '../lib/supabase';
 import type { TripPayload } from '../lib/tripForm';
@@ -63,21 +63,21 @@ export interface FleetData {
   fetchedAt: number;
 }
 
-/** Trips in progress with their latest GPS reading, and the latest finished trips to place idle trucks. */
+/** Trips in progress, and the latest finished trips to place idle trucks. Positions come from fetchLivePositions. */
 export async function fetchFleet(): Promise<FleetData> {
   const [running, finished] = await Promise.all([
     supabase.from('trf_driver_tracking_sessions').select('id,driver_id,driver_name,vehicle,started_at,paused,load_type,distance_meters').eq('active', true).order('started_at', { ascending: false }).limit(50),
     supabase.from('trf_driver_tracking_sessions').select('driver_name,vehicle,ended_at,arrival_lat,arrival_lng').eq('active', false).order('ended_at', { ascending: false, nullsFirst: false }).limit(100),
   ]);
-  const trips = rows(running);
-  const last = await Promise.all(
-    trips.map(async (t) => {
-      // Same rule as the route: older app versions save readings without trip, inside the trip's time window.
-      const point = await supabase.from('trf_driver_location_history').select('latitude,longitude,speed_kmh,recorded_at').eq('driver_id', t.driver_id).or(`trip_id.eq.${t.id},trip_id.is.null`).gte('recorded_at', t.started_at).order('recorded_at', { ascending: false }).limit(1);
-      return (rows(point)[0] ?? null) as LastPoint | null;
-    }),
-  );
-  return { active: trips.map((t, i) => ({ ...t, last: last[i] ?? null })), finished: rows(finished), fetchedAt: Date.now() };
+  return { active: rows(running).map((t) => ({ ...t, last: null })), finished: rows(finished), fetchedAt: Date.now() };
+}
+
+/**
+ * The latest position of every driver: the phone updates its row of trf_driver_locations with each reading (every app
+ * version does), so one small query brings the whole fleet. Only what the map needs, since it is read every few seconds.
+ */
+export async function fetchLivePositions(): Promise<LivePosition[]> {
+  return rows(await supabase.from('trf_driver_locations').select('driver_id,latitude,longitude,speed_kmh,recorded_at').limit(500));
 }
 
 /**

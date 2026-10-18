@@ -6,6 +6,7 @@ import { type Photo, PhotoDialog } from '../components/PhotoDialog';
 import { TripFormDialog } from '../components/TripFormDialog';
 import { TripMap } from '../components/TripMap';
 import { CatalogNote, Card, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote } from '../components/ui';
+import { ROUTE_REFRESH_MS } from '../config';
 import { ConflictError, describeWriteError } from '../data/api';
 import { useRoute, useSetTripDeleted, useTripDetail } from '../data/hooks';
 import { calendarDay, formatDay, formatDayTime, formatDuration } from '../lib/dates';
@@ -200,7 +201,7 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
           )}
         </Card>
 
-        <Card title="Recorrido" padded={false} action={live ? <Pill tone="blue">En vivo · se actualiza cada 30 s</Pill> : undefined}>
+        <Card title="Recorrido" padded={false} action={live ? <Pill tone="blue">En vivo · se actualiza cada {ROUTE_REFRESH_MS / 1000} s</Pill> : undefined}>
           {trip.source === 'manual' && !trip.origin && !trip.destination ? (
             <div className="card-body">
               <Empty icon="route" title="Sin recorrido">Este viaje se cargó a mano: no tiene recorrido del GPS.</Empty>

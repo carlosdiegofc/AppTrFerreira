@@ -69,6 +69,15 @@ test('el GPS en vivo filtra la flota y sigue a un camión con su recorrido', asy
   await expect(page).toHaveURL(/camion=trip%3A10000000-0000-4000-8000-00000000000a/);
   await shot(page, 'gps');
 
+  // The phone sends a new reading: within a few seconds the panel shows it, without touching anything.
+  await page.route('**/rest/v1/trf_driver_locations*', async (route) => {
+    const response = await route.fetch();
+    const live = (await response.json()) as { driver_id: string; speed_kmh: number }[];
+    await route.fulfill({ response, json: live.map((r) => (r.driver_id === '00000000-0000-4000-8000-000000000011' ? { ...r, speed_kmh: 91 } : r)) });
+  });
+  await expect(detail).toContainText('91 km/h');
+  await page.unroute('**/rest/v1/trf_driver_locations*');
+
   await chip('Sin viaje').click();
   await expect(page.locator('.units > li')).toHaveCount(2);
 });

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { FLEET_REFRESH_MS, ROUTE_REFRESH_MS } from '../config';
-import { type ActiveTrip, type CatalogTruck, fleetUnits, truckLabel } from '../lib/fleet';
+import { FLEET_REFRESH_MS, LIVE_REFRESH_MS, ROUTE_REFRESH_MS } from '../config';
+import { type ActiveTrip, type CatalogTruck, fleetUnits, truckLabel, withLivePositions } from '../lib/fleet';
 import { appendReadings } from '../lib/route';
 import type { TripPayload } from '../lib/tripForm';
 import { mergeTrips, type Trip, tripFromPanel, tripFromSession } from '../lib/trips';
@@ -11,6 +11,7 @@ import {
   fetchDriverNames,
   fetchFleet,
   fetchLastTrips,
+  fetchLivePositions,
   fetchPapers,
   fetchRoute,
   fetchTripDetail,
@@ -35,6 +36,9 @@ export const useCatalog = () => useQuery({ queryKey: ['catalog'], queryFn: fetch
 
 export const useFleetData = () => useQuery({ queryKey: ['fleet'], queryFn: fetchFleet, refetchInterval: FLEET_REFRESH_MS, refetchIntervalInBackground: false });
 
+/** The position of every truck, every few seconds while the screen is visible (a hidden tab does not read). */
+export const useLivePositions = () => useQuery({ queryKey: ['livePositions'], queryFn: fetchLivePositions, refetchInterval: LIVE_REFRESH_MS, refetchIntervalInBackground: false, staleTime: 0 });
+
 /** The last trip of every truck, further back than the live refresh; trucks rarely change it, so every 30 minutes. */
 const useLastTrips = (catalog: readonly CatalogTruck[] | undefined) =>
   useQuery({
@@ -45,22 +49,28 @@ const useLastTrips = (catalog: readonly CatalogTruck[] | undefined) =>
     refetchInterval: 30 * 60_000,
   });
 
-/** Every truck with its live state, recomputed as time passes (a truck goes "sin señal" without new data). */
+/**
+ * Every truck with its live state, recomputed as time passes (a truck goes "sin señal" without new data). Who is on a
+ * trip is read every 15 seconds; where each truck is, every 3.
+ */
 export function useFleet(now: number) {
   const catalog = useCatalog();
   const fleet = useFleetData();
+  const live = useLivePositions();
   const last = useLastTrips(catalog.data);
   // The live list first: a truck that appears there has its newest trip there.
   const units = useMemo(
-    () => (fleet.data ? fleetUnits(fleet.data.active, [...fleet.data.finished, ...(last.data ?? [])], catalog.data ?? [], now) : []),
-    [fleet.data, last.data, catalog.data, now],
+    () => (fleet.data ? fleetUnits(withLivePositions(fleet.data.active, live.data ?? []), [...fleet.data.finished, ...(last.data ?? [])], catalog.data ?? [], now) : []),
+    [fleet.data, live.data, last.data, catalog.data, now],
   );
   return {
     units,
-    fetchedAt: fleet.data?.fetchedAt ?? null,
-    isLoading: fleet.isLoading || catalog.isLoading,
-    error: fleet.error ?? catalog.error,
-    refetch: () => Promise.all([fleet.refetch(), catalog.refetch(), last.refetch()]),
+    /** When the positions were last read. */
+    fetchedAt: live.dataUpdatedAt || fleet.data?.fetchedAt || null,
+    isLoading: fleet.isLoading || catalog.isLoading || live.isLoading,
+    error: fleet.error ?? catalog.error ?? live.error,
+    refetch: () => Promise.all([fleet.refetch(), live.refetch(), catalog.refetch(), last.refetch()]),
+    // The position refresh every few seconds does not turn the refresh button.
     isFetching: fleet.isFetching || catalog.isFetching,
   };
 }

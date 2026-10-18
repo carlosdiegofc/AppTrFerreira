@@ -12,6 +12,7 @@ declare
 begin
   if (select count(*) from public.trf_driver_tracking_sessions) <> 2 then raise exception 'chofer: tendría que ver solo sus 2 viajes'; end if;
   if (select count(*) from public.trf_driver_location_history) <> 13 then raise exception 'chofer: tendría que ver solo sus 13 lecturas GPS'; end if;
+  if (select count(*) from public.trf_driver_locations) <> 1 then raise exception 'chofer: tendría que ver solo su posición en vivo'; end if;
   if (select count(*) from public.trf_panel_trips) <> 0 then raise exception 'chofer: no tendría que ver los datos del panel'; end if;
   if (select count(*) from public.trf_documents) <> 3 then raise exception 'chofer: tendría que ver sus papeles y los de los camiones'; end if;
   if (select count(*) from public.trf_vehicle_maintenance) <> 3 then raise exception 'chofer: tendría que ver los services'; end if;
@@ -46,6 +47,7 @@ begin
   if public.trf_is_admin() then raise exception 'lectura: no es administrador completo'; end if;
   if (select count(*) from public.trf_driver_tracking_sessions) <> 6 then raise exception 'lectura: tendría que ver los 6 viajes'; end if;
   if (select count(*) from public.trf_driver_location_history) <> 15 then raise exception 'lectura: tendría que ver las 15 lecturas GPS'; end if;
+  if (select count(*) from public.trf_driver_locations) <> 4 then raise exception 'lectura: tendría que ver la posición en vivo de los 4 choferes'; end if;
   if (select count(*) from public.trf_panel_trips) <> 3 then raise exception 'lectura: tendría que ver los 3 viajes del panel'; end if;
   if (select count(*) from public.trf_trip_documents) <> 2 or (select count(*) from public.trf_driver_fuel_receipts) <> 1 then raise exception 'lectura: tendría que ver los remitos y el combustible'; end if;
   if (select count(*) from public.trf_documents) <> 3 then raise exception 'lectura: tendría que ver todos los papeles'; end if;
@@ -135,7 +137,7 @@ set local role anon;
 do $$
 begin
   if (select count(*) from public.trf_driver_tracking_sessions) <> 0 then raise exception 'anónimo: no tendría que ver viajes'; end if;
-  if (select count(*) from public.trf_driver_location_history) <> 0 then raise exception 'anónimo: no tendría que ver el GPS'; end if;
+  if (select count(*) from public.trf_driver_location_history) <> 0 or (select count(*) from public.trf_driver_locations) <> 0 then raise exception 'anónimo: no tendría que ver el GPS'; end if;
   if (select count(*) from public.trf_mobile_catalog) <> 0 then raise exception 'anónimo: no tendría que leer el catálogo'; end if;
   begin
     insert into public.trf_panel_trips (source, departure_at, vehicle) values ('manual', now(), 'Volvo FH 460 · ABC1234');
