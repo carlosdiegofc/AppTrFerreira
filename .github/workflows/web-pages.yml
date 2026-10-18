@@ -18,10 +18,22 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: panel/package-lock.json
+      - name: Panel nuevo
+        working-directory: panel
+        run: |
+          npm ci
+          npm run build
       - name: Archivos de la web (sin pruebas ni SQL)
         run: |
           mkdir _site
           cp -r web/index.html web/css web/js web/vendor web/logo.png _site/
+          # El panel nuevo se publica en /nuevo/ hasta que reemplace al actual.
+          cp -r panel/dist _site/nuevo
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -4,14 +4,31 @@ plugins {
 }
 android {
     namespace = "uy.transportesferreira.gps"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
-        applicationId = "uy.transportesferreira.gps"
+        applicationId = "com.transportesferreira.app"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 16
-        versionName = "0.12.2"
+        targetSdk = 36
+        // Google Play accepts each versionCode only once: every bundle uploaded there needs a higher one, even a rebuild of the same versionName.
+        versionCode = 25
+        versionName = "0.16.3"
     }
+    // The Google Play upload key only exists in the CI secrets; without it the release bundle stays unsigned.
+    signingConfigs {
+        System.getenv("TRF_UPLOAD_KEYSTORE")?.takeIf { it.isNotBlank() }?.let { path ->
+            create("upload") {
+                storeFile = file(path)
+                storePassword = System.getenv("TRF_UPLOAD_PASSWORD")
+                keyAlias = "upload"
+                keyPassword = System.getenv("TRF_UPLOAD_PASSWORD")
+            }
+        }
+    }
+    buildTypes {
+        getByName("release") { signingConfig = signingConfigs.findByName("upload") }
+    }
+    // The privacy policy shown in the app is the same file published in docs/legal.
+    sourceSets { getByName("main") { assets.srcDir("../docs/legal") } }
     kotlinOptions { jvmTarget = "17" }
     testOptions { unitTests.isReturnDefaultValues = true }
     compileOptions {
@@ -27,4 +44,5 @@ dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.gms:play-services-location:21.3.0")
+    implementation("com.google.android.material:material:1.12.0")
 }

@@ -1,0 +1,21 @@
+// Numbers the Uruguayan way: "1.234,5".
+
+const whole = new Intl.NumberFormat('es-UY', { maximumFractionDigits: 0 });
+const oneDecimal = new Intl.NumberFormat('es-UY', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+export function km(meters: number): string {
+  const value = Math.max(0, meters) / 1000;
+  return `${value < 100 ? oneDecimal.format(value) : whole.format(value)} km`;
+}
+
+export function kmh(speed: number | null): string {
+  return speed === null ? '— km/h' : `${whole.format(Math.max(0, speed))} km/h`;
+}
+
+export function count(n: number): string {
+  return whole.format(n);
+}
+
+export function percent(share: number): string {
+  return `${whole.format(Math.round(share * 100))} %`;
+}

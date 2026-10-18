@@ -7,6 +7,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      HAS_UPLOAD_KEY: ${{ secrets.ANDROID_UPLOAD_KEYSTORE != '' }}
     steps:
       - uses: actions/checkout@v4
       - name: Leer versión real del código
@@ -31,11 +33,36 @@ jobs:
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.9'
-      - run: gradle --no-daemon :app:assembleDebug :app:testDebugUnitTest
+          gradle-version: '8.11.1'
+      - name: Preparar la llave de subida a Google Play
+        env:
+          UPLOAD_KEYSTORE: ${{ secrets.ANDROID_UPLOAD_KEYSTORE }}
+          UPLOAD_PASSWORD: ${{ secrets.ANDROID_UPLOAD_PASSWORD }}
+        shell: bash
+        run: |
+          key="$RUNNER_TEMP/upload.p12"
+          if [ -n "$UPLOAD_KEYSTORE" ]; then
+            printf '%s' "$UPLOAD_KEYSTORE" | base64 --decode --ignore-garbage > "$key"
+            password="$UPLOAD_PASSWORD"
+          else
+            # Sin los secretos se firma con una llave descartable, solo para comprobar que el paquete de Google Play compila.
+            password="prueba-$GITHUB_RUN_ID"
+            keytool -genkeypair -keystore "$key" -storetype PKCS12 -alias upload -keyalg RSA -keysize 2048 -validity 1 -dname "CN=Prueba" -storepass "$password" -keypass "$password"
+          fi
+          echo "TRF_UPLOAD_KEYSTORE=$key" >> "$GITHUB_ENV"
+          echo "TRF_UPLOAD_PASSWORD=$password" >> "$GITHUB_ENV"
+      - run: gradle --no-daemon :app:assembleDebug :app:testDebugUnitTest :app:bundleRelease
+      - name: Borrar la llave del equipo de compilación
+        if: always()
+        run: rm -f "$RUNNER_TEMP/upload.p12"
       - uses: actions/upload-artifact@v4
         with:
           name: Transportes-Ferreira-GPS-v${{ steps.version.outputs.name }}
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-
+      - uses: actions/upload-artifact@v4
+        if: env.HAS_UPLOAD_KEY == 'true'
+        with:
+          name: Google-Play-Transportes-Ferreira-GPS-v${{ steps.version.outputs.name }}
+          path: app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error

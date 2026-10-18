@@ -1,5 +1,58 @@
+Plan de trabajo de la plataforma (etapas, reglas y decisiones): [docs/PLAN-PLATAFORMA.md](docs/PLAN-PLATAFORMA.md).
+
+Panel web nuevo (React + TypeScript), en construcción al lado del actual: [panel/README.md](panel/README.md).
+
 # Panel web (nuevo)
 La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
+
+# Transportes Ferreira GPS — v0.16.3
+
+## Nuevo en v0.16.3 (correcciones del menú del dueño)
+- **Flota en vivo:** la posición de un camión en viaje se toma también de las lecturas de choferes con versiones viejas de la app, que no las guardan con el viaje; antes ese camión figuraba «sin señal». Un camión que se usa poco sigue mostrando su último chofer y dónde terminó, aunque la flota haya hecho más de 100 viajes desde entonces.
+- **Flota en vivo:** un camión que está en viaje ya no aparece dos veces (una en ruta y otra «sin viaje») cuando el viaje se guardó con un nombre viejo del camión, como «Ford Cargo». El camión se reconoce igual que en Rendimiento: por la matrícula o, si no tiene, por el modelo, cuando ese modelo es de un solo camión del catálogo. Lo mismo para mostrar el último chofer y el lugar de llegada de un camión sin viaje.
+- **Combustible › Este mes:** los totales de litros y de gasto suman todas las cargas del mes. Antes contaban solo las 50 más recientes, así que en una flota con más cargas el total quedaba corto hasta tocar «Cargar más».
+- **Combustible:** el total gastado muestra los pesos y, en otro renglón, los dólares; antes las cargas en dólares no se sumaban. Las correcciones hechas en el panel (litros, monto, moneda, fecha) se toman también en cargas viejas que las guardaron como texto, y los números escritos a la uruguaya («30.000», «1.234,5») se leen igual que en Rendimiento.
+- **Mapas:** una lectura sin posición (0,0) ya no se dibuja ni lleva el mapa de la flota o del viaje al medio del océano.
+- **Mantenimiento y Documentos:** se cargan todos los registros, de a páginas. Antes se leían los últimos 500, y un service viejo todavía pendiente podía quedar afuera de la lista y de los avisos.
+- **Viajes:** el destino, el cliente y la carga se ven también en viajes viejos que guardaron esos datos como texto.
+- Al girar el teléfono, o si Android cierra la app en segundo plano, se vuelve a la misma pantalla (Mis viajes, combustible, detalle de un viaje, Mi cuenta, Rendimiento, Flota en vivo) con los mismos filtros, en lugar del Inicio.
+- **Documentos (dueño):** al agregar un documento, además de «Mío» y «De un camión», está **De un chofer**: se elige el chofer de la lista (los que tienen viajes o documentos) y el documento queda a su nombre.
+- Lo que se envía al panel no cambia, salvo que un documento cargado por el dueño ahora puede quedar a nombre de otro chofer.
+
+## Nuevo en v0.16.2 (confirmación al iniciar en modo sencillo)
+- **Modo sencillo:** al tocar **INICIAR VIAJE** el viaje ya no empieza solo. En el lugar del botón aparece la pregunta **¿Iniciar el viaje?** con el camión y dos botones: **SÍ, INICIAR** y **Cancelar**. El viaje recién empieza al confirmar, para que no arranque por un toque sin querer. El gesto «atrás» también cancela, y un toque doble sobre el botón no cuenta como confirmación.
+
+## Nuevo en v0.16.1 (corrección)
+- Las pantallas ya no quedan tapadas por la barra de estado ni por los botones de navegación del teléfono. Pasaba en toda pantalla que se abría después de la primera (por ejemplo el Inicio después de elegir el modo, o un viaje recién iniciado): el encabezado quedaba debajo de la hora y la barra de abajo o el botón de finalizar, debajo de los botones del teléfono.
+- Los nombres de la barra de abajo (Inicio, Viajes, Combustible, Más) quedan centrados debajo de su ícono; antes salían corridos a la izquierda. Lo mismo en los botones Combustible, Remito y Pausar del viaje en curso y en Sacar foto y Galería.
+
+## Nuevo en v0.16.0 (modo sencillo, modo normal y menú del dueño)
+- Después de ingresar, cada chofer elige cómo usar la app: **modo sencillo** o **modo normal**. La elección queda guardada en el teléfono para esa cuenta; a quien ya tenía la sesión abierta se le pregunta una vez al abrir la app. La cuenta de la empresa sigue entrando directo al panel de flota.
+- **Modo sencillo:** dos pantallas con botones grandes. En Inicio, el camión asignado y el botón **INICIAR VIAJE**; en Viaje en curso, el tiempo, el mapa, la velocidad, la distancia y el botón **FINALIZAR VIAJE**, que pide confirmar en la misma pantalla.
+- En modo sencillo el chofer no completa nada: el camión es el último que usó (si el teléfono no tiene ninguno guardado, el de su último viaje; solo si no hay ninguno se pregunta una vez), y la hora, el recorrido, los kilómetros y el lugar de salida y de llegada los registra el GPS. El viaje llega al panel como un inicio rápido «con carga», para completar ahí cliente, carga, kilos y remitos.
+- **Modo normal:** el Inicio pasa a ser una lista con íconos de color (Iniciar viaje, Mis viajes, Combustible, Remitos y fotos, Documentos, Mantenimiento, Mi cuenta). «Mi combustible» sigue en la barra de abajo. Mis viajes suma el filtro Todos / Activos / Finalizados y el botón «Iniciar viaje» de Datos del viaje es verde.
+- El modo se cambia desde **Mi cuenta › Modo de uso** (normal) o con **Cambiar de modo** (sencillo).
+- **Dueño que también maneja (cuenta de Luis):** entra igual que un chofer —elige el modo e inicia y finaliza sus viajes— y suma el **Menú del dueño**: el botón **Menú** arriba a la derecha en sus pantallas de inicio y de viaje, y un botón o renglón con ese nombre en el Inicio. Se abre desde abajo con Flota en vivo, Viajes de la flota, Rendimiento, Combustible de la flota, Mantenimiento y Documentos (en modo sencillo, también Cambiar de modo). Cada pantalla vuelve al Inicio con la flecha; «Viajes» y «Combustible» de la barra de abajo siguen siendo los suyos.
+- **Rendimiento** (nuevo; también está en el panel de flota de la cuenta de la empresa): por mes, para toda la flota y **por camión** o **por chofer**: viajes, kilómetros del GPS, kilómetros con carga y sin carga, litros y gasto de combustible, consumo (L/100 km y km por litro, si hubo 300 km o más en el mes) y, cuando están cargados en el panel web, kilómetros facturables, kilos e importes en pesos y en dólares por separado. Suma con las reglas del resumen del panel web: lo que se completó en el panel manda y los viajes eliminados no cuentan. Los viajes guardados con un nombre viejo del camión («Ford Cargo», «Mercedes-Benz 1618») se suman al camión del catálogo, y los camiones sin viajes ni cargas figuran como «Sin movimientos en el mes».
+- Al abrir un viaje desde Flota en vivo, la flecha vuelve al mapa de la flota.
+- No cambia nada de lo que se guarda ni de lo que se envía al panel.
+
+## Nuevo en v0.15.1
+- Nombre de paquete para Google Play: `com.transportesferreira.app` (antes `uy.transportesferreira.gps`). Es una app nueva para Android: se instala aparte de la anterior y pide iniciar sesión otra vez. El código sigue en el paquete `uy.transportesferreira.gps`.
+
+## Nuevo en v0.15.0 (Google Play)
+- Lista para Google Play: apunta a Android 16 (API 36) y usa el gesto «atrás» predictivo.
+- Ícono propio con el logo TR, también en los íconos temáticos de Android 13 o posterior.
+- Antes de pedir la ubicación, la app explica para qué la usa. Ya no declara ubicación en segundo plano: el GPS del viaje sigue funcionando con la pantalla apagada gracias al servicio en primer plano y su notificación fija.
+- «Evitar cortes del GPS» abre los ajustes de batería de la app en lugar de pedir la excepción directa, que Google Play restringe.
+- Política de privacidad dentro de la app (pantalla de ingreso y Mi cuenta › Privacidad), con el mismo texto publicado en [docs/legal/privacidad.md](docs/legal/privacidad.md).
+- GitHub Actions arma también el paquete para Google Play (.aab), firmado con la llave de subida guardada en los secretos del repositorio. Pasos para publicar: [docs/google-play/GUIA.md](docs/google-play/GUIA.md).
+
+## Nuevo en v0.14.0
+- Mantenimiento de los camiones (services hechos y pendientes) y vencimientos de documentos de choferes y camiones.
+
+## Nuevo en v0.13.0
+- Nuevo diseño: encabezado azul marino, tarjetas, barra inferior y modo oscuro. Panel de flota en vivo para las cuentas de los dueños.
 
 # Transportes Ferreira GPS — v0.12.2
 
@@ -91,7 +144,7 @@ La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la
 - Los kilómetros son una estimación GPS, no una lectura del odómetro del camión. Se filtran posiciones imprecisas, antiguas y saltos imposibles. Los tramos sin lecturas no se inventan.
 
 ## Instalar / actualizar
-Abrí esta carpeta en Android Studio, sincronizá Gradle y compilá con Java 17 y Android SDK 35. El proyecto incluye Gradle Wrapper 8.9. En Windows: `gradlew.bat assembleDebug`; en Linux/macOS: `./gradlew assembleDebug`.
+Abrí esta carpeta en Android Studio, sincronizá Gradle y compilá con Java 17 y Android SDK 36. El proyecto incluye Gradle Wrapper 8.11.1. En Windows: `gradlew.bat assembleDebug`; en Linux/macOS: `./gradlew assembleDebug`.
 
 Para actualizar la app que ya está instalada, compilá con la MISMA firma/keystore que utilizaste para instalarla. El APK de prueba adjunto usa una firma de desarrollo de este entorno; Android puede rechazarlo como actualización si la firma anterior es distinta. No desinstales la app anterior para resolver esto si tiene boletas pendientes: usá la firma anterior.
 
