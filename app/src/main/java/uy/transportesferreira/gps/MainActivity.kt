@@ -104,7 +104,7 @@ class MainActivity:AppCompatActivity(){
  private var photoMode="fuel";private var docReturn="prepare";private var historyLimit=50;private var historyQuery="";private var fuelMonth=true
  private var fleetLoadedAt=0L;private var fleetLoading=false
  // Flota en vivo: who is on a trip every minute, the positions every few seconds; these views change in place.
- private var liveLoadedAt=0L;private var liveLoading=false;private var fleetStats:LinearLayout?=null;private var fleetCard:LinearLayout?=null;private var fleetNote:TextView?=null
+ private var liveLoadedAt=0L;private var liveLoading=false;private var fleetStats:LinearLayout?=null;private var fleetCard:LinearLayout?=null;private var fleetNote:TextView?=null;private var fleetShape=""
  private var editForm=JSONObject();private var editId:String?=null;private var maintFilter=0;private var maintTruck="";private var papersAt=0L
  private var modePick=UiMode.SIMPLE;private var finishAsk=false;private var tripFilter=0
  // Simple mode asks before starting a trip; startAskAt is when the question came up.
@@ -1045,7 +1045,7 @@ class MainActivity:AppCompatActivity(){
   val k=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL};root.addView(k,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(14)})
   fleetStats=k;fleetStatsInto(k,items)
   alerts()
-  val marks=fleetMarks(items)
+  val marks=fleetMarks(items);fleetShape=shapeOf(f,items,marks)
   val mc=card();val web=TripMap.fleet(this,marks);activeMap=web;mc.addView(web,LinearLayout.LayoutParams(-1,dp(260)))
   if(marks.length()==0)note(if(fetched==0L)"Buscando posiciones…" else "Todavía no hay posiciones GPS para mostrar.",mc,0).setPadding(dp(16),dp(10),dp(16),dp(12))
   section("Camiones")
@@ -1075,12 +1075,14 @@ class MainActivity:AppCompatActivity(){
   thread{val ok=try{mobile.live();true}catch(_:Exception){false}
    runOnUiThread{liveLoading=false;liveLoadedAt=System.currentTimeMillis();if(ok&&screen=="owner"&&!fleetLive())rebuildOwner()}}
  }
- /** False when the screen has to be built again (no trucks before, or none now). */
+ /** What decides how the fleet screen is built: trucks or none, positions or none, data or still looking. */
+ private fun shapeOf(f:JSONObject,items:List<FleetItem>,marks:JSONArray)="${items.isEmpty()}|${marks.length()==0}|${f.optLong("fetched_at")==0L}"
+ /** False when the screen has to be built again: what it shows changed shape. An empty fleet stays as it is. */
  private fun fleetLive():Boolean{
-  val f=mobile.fleet();val items=fleetItems(f);val k=fleetStats;val c=fleetCard
-  if(k==null||c==null||items.isEmpty())return false
-  fleetStatsInto(k,items);c.removeAllViews();items.forEach{fleetRow(c,it)}
-  activeMap?.evaluateJavascript("window.setMarks&&setMarks(${fleetMarks(items).toString().replace("<","\\u003c")})",null)
+  val f=mobile.fleet();val items=fleetItems(f);val marks=fleetMarks(items);val k=fleetStats
+  if(k==null||fleetShape!=shapeOf(f,items,marks))return false
+  fleetStatsInto(k,items);fleetCard?.let{c->c.removeAllViews();items.forEach{fleetRow(c,it)}}
+  activeMap?.evaluateJavascript("window.setMarks&&setMarks(${marks.toString().replace("<","\\u003c")})",null)
   fleetNote?.text=fleetNoteText(f)
   return true
  }

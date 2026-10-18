@@ -72,14 +72,19 @@ class MobileData(private val c:Context){
    val recent=array("/rest/v1/trf_driver_tracking_sessions?active=eq.false&select=driver_name,vehicle,ended_at,arrival_lat,arrival_lng&order=ended_at.desc.nullslast&limit=100")
    // After the latest 100, the last trip of the trucks used rarely; the live data still shows if that lookup fails.
    try{val older=lastTrips(trucks());for(i in 0 until older.length())recent.put(older.getJSONObject(i))}catch(_:Exception){}
-   store.cache(key,JSONObject().put("active",active).put("recent",recent).put("fetched_at",System.currentTimeMillis()))
+   synchronized(fleetLock){store.cache(key,JSONObject().put("active",active).put("recent",recent).put("fetched_at",System.currentTimeMillis()))}
   }
   return store.cache(key)
  }
- /** Only the positions, every few seconds while Flota en vivo is open; who is on a trip comes from fleet(true). */
+ /**
+  * Only the positions, every few seconds while Flota en vivo is open; who is on a trip comes from fleet(true). The saved
+  * fleet is read once the positions arrive, so a fleet(true) that finished meanwhile keeps the trips it found.
+  */
  fun live():JSONObject{
-  val key="fleet-${uid()}";val f=store.cache(key);val active=f.optJSONArray("active")?:return f
-  withPositions(active,positions());f.put("active",active).put("live_at",System.currentTimeMillis());store.cache(key,f);return f
+  val key="fleet-${uid()}";val saved=store.cache(key);if(!saved.has("active"))return saved
+  val now=positions()
+  synchronized(fleetLock){val f=store.cache(key);val active=f.optJSONArray("active")?:return f
+   withPositions(active,now);f.put("active",active).put("live_at",System.currentTimeMillis());store.cache(key,f);return f}
  }
  /** Every driver's latest position: the phone updates its row of trf_driver_locations with each reading (every version). */
  private fun positions()=array("/rest/v1/trf_driver_locations?select=driver_id,latitude,longitude,speed_kmh,recorded_at&limit=500")
@@ -186,5 +191,9 @@ class MobileData(private val c:Context){
   val url=if(signed.startsWith("http"))signed else Config.SUPABASE_URL+"/storage/v1"+signed
   return java.net.URL(url).openConnection().apply{connectTimeout=10000;readTimeout=20000}.getInputStream().use{it.readBytes()}
  }
- companion object{fun enc(s:String)=URLEncoder.encode(s,"UTF-8")}
+ companion object{
+  fun enc(s:String)=URLEncoder.encode(s,"UTF-8")
+  /** fleet(true) and live() both save the fleet; one at a time, so neither puts back what the other replaced. */
+  private val fleetLock=Any()
+ }
 }

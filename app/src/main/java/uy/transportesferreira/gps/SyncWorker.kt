@@ -12,6 +12,8 @@ class SyncWorker(c:Context,p:WorkerParameters):Worker(c,p){
 }
 object Sync {
     private val lock=Any()
+    /** live() and flush() both write the live row: one at a time, so a slower write never puts an older reading back. */
+    private val liveLock=Any()
     fun schedule(c:Context){
         val request=OneTimeWorkRequestBuilder<SyncWorker>().setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL,15,TimeUnit.SECONDS).build()
@@ -23,15 +25,16 @@ object Sync {
         loc.put("driver_name",latest.getString("driver_name")).put("is_tracking",latest.optBoolean("active")&&!latest.optBoolean("paused"))
             .put("updated_at",java.time.Instant.now().toString())
     }
+    /** Writes the live row of the trip latest() returns, read only once the previous write has finished. */
+    private fun putLive(api:Api,latest:()->JSONObject?){synchronized(liveLock){liveRow(latest())?.let{api.json("/rest/v1/trf_driver_locations?on_conflict=driver_id",it,"resolution=merge-duplicates")}}}
     /**
      * Only the latest position, right after each reading and without waiting for the rest of the sync (trip, route,
      * photos), so the live maps follow the truck within seconds. Failures wait for the next reading or for flush().
      */
     fun live(c:Context):Boolean=try{
         // The trip in progress only (reading every saved trip each time would cost battery); flush() covers the rest.
-        val api=Api(c);val uid=api.session()?.getJSONObject("user")?.getString("id")
-        val trip=TripStore(c).current()?.takeIf{uid!=null&&it.optString("driver_id")==uid}
-        liveRow(trip)?.let{api.json("/rest/v1/trf_driver_locations?on_conflict=driver_id",it,"resolution=merge-duplicates")}
+        val api=Api(c);val uid=api.session()?.getJSONObject("user")?.getString("id");val store=TripStore(c)
+        putLive(api){store.current()?.takeIf{uid!=null&&it.optString("driver_id")==uid}}
         true
     }catch(_:Exception){false}
     fun flush(c:Context):Boolean=synchronized(lock){
@@ -49,8 +52,9 @@ object Sync {
                 store.markTripSynced(t.getString("id"),t.optInt("revision"))
               }catch(_:Exception){failures++}
             }
-            // The latest location belongs to the newest local trip only; never replay old locations over it.
-            try{liveRow(trips.lastOrNull())?.let{api.json("/rest/v1/trf_driver_locations?on_conflict=driver_id",it,"resolution=merge-duplicates")}}catch(_:Exception){failures++}
+            // The latest location belongs to the newest local trip only; never replay old locations over it. The trip is
+            // read again here, not taken from the list above, which may be older than what live() sent meanwhile.
+            try{putLive(api){store.trips().filter{it.optString("driver_id")==uid}.lastOrNull()}}catch(_:Exception){failures++}
             for((file,r) in store.details().filter{it.second.optString("driver_id")==uid&&!it.second.optBoolean("synced")}){
                 try{val body=JSONObject(r.toString());body.remove("synced");body.remove("synced_at")
                 api.json("/rest/v1/trf_trip_details?on_conflict=trip_id",body,"resolution=ignore-duplicates");store.markSynced(file,r)}catch(_:Exception){failures++}

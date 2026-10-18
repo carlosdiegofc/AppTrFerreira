@@ -31,9 +31,9 @@ class GpsService:Service(){
   watchSince=System.currentTimeMillis()
   if(tripId!=t.getString("id")){distance.reset();route.reset();tripId=t.getString("id")}
   when(i?.action){
-   PAUSE->{store.update{it.put("paused",true).put("speed_kmh",0.0)};stopGps();distance.reset();sendLive();sync()}
+   PAUSE->{keepLast();store.update{it.put("paused",true).put("speed_kmh",0.0)};stopGps();distance.reset();sendLive();sync()}
    RESUME->{store.update{it.put("paused",false).put("segment",it.optInt("segment")+1)};distance.reset();sync()}
-   FINISH->{store.update{it.optJSONObject("last_point")?.let{p->it.put("arrival_lat",p.optDouble("latitude")).put("arrival_lng",p.optDouble("longitude"))};it.put("active",false).put("paused",false).put("ended_at",Instant.now().toString()).put("speed_kmh",0.0)};stopGps();Sync.schedule(this);sync();stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();return START_NOT_STICKY}
+   FINISH->{keepLast();store.update{it.optJSONObject("last_point")?.let{p->it.put("arrival_lat",p.optDouble("latitude")).put("arrival_lng",p.optDouble("longitude"))};it.put("active",false).put("paused",false).put("ended_at",Instant.now().toString()).put("speed_kmh",0.0)};stopGps();Sync.schedule(this);sync();stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();return START_NOT_STICKY}
   }
   val paused=store.current()?.optBoolean("paused")?:false;try{notifyTrip(paused)}catch(_:Exception){};if(paused)stopGps() else startGps();handler.removeCallbacks(timer);handler.post(timer);return START_STICKY
  }
@@ -68,11 +68,16 @@ class GpsService:Service(){
   // The phone's own map draws every reading; the route sent to the panel keeps one every few seconds (RouteSampler).
   store.appendTrack(t.getString("id"),l.latitude,l.longitude,t.optInt("segment"),l.time)
   if(route.keep(l.latitude,l.longitude,l.time,t.optInt("segment")))store.addPoint(p)
-  // The trip (distance, last reading) goes up at most every 15 s; a pause, a resume or the end go at once.
+  // The trip (distance, last reading) goes up every 15 s, without waiting for the timer; a pause, a resume or the end go at once.
   val now=System.currentTimeMillis();val send=now-tripSentAt>=15000;if(send)tripSentAt=now
   store.update(send){if(!it.has("origin_lat")){it.put("origin_lat",l.latitude).put("origin_lng",l.longitude)};it.put("distance_meters",it.optDouble("distance_meters",0.0)+delta).put("last_point",p).put("speed_kmh",p.optDouble("speed_kmh",0.0))}
-  sendLive()
+  sendLive();if(send)sync()
  }
+ /**
+  * The route keeps a reading every few seconds, so the last one may not be in it: a pause or the end adds it, and the
+  * route reaches where the truck stopped. It keeps its event_id, so a reading already queued or sent is not repeated.
+  */
+ private fun keepLast(){store.current()?.optJSONObject("last_point")?.let{store.addPoint(it)}}
  private fun sync(){if(syncing.compareAndSet(false,true))executor.execute{try{Sync.flush(this)}finally{syncing.set(false)}}}
  /** The latest reading to the live map; a reading that arrives while one is on its way goes with the next one. */
  private fun sendLive(){if(sendingLive.compareAndSet(false,true))try{liveExecutor.execute{try{Sync.live(this)}finally{sendingLive.set(false)}}}
