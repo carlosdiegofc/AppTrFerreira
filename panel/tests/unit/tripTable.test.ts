@@ -44,8 +44,16 @@ describe('the trip as the screen and the files show it', () => {
   it('totals never add pesos and dollars together', () => {
     const usd = tripFromPanel(panel({ id: 'm1', source: 'manual', app_trip_id: null, departure_at: '2026-10-14T12:00:00Z', amount: 1250.5, currency: 'USD', billable_km: 40, kg: 0 }));
     const totals = tripTotals([trip, usd]);
-    expect(totals).toEqual({ trips: 2, billableKm: 200, gpsKm: 152.34, kg: 30000, amount: { UYU: 41000, USD: 1250.5 } });
+    expect(totals).toEqual({ trips: 2, deleted: 0, billableKm: 200, gpsKm: 152.34, kg: 30000, amount: { UYU: 41000, USD: 1250.5 } });
     expect(totalsText(totals)).toBe('2 viajes · 200 km facturables · 152,3 km GPS · 30.000 kg · $ 41.000 · US$ 1.250,50');
+  });
+
+  it('deleted trips are listed but never added up', () => {
+    const binned = tripFromPanel(panel({ id: 'm2', source: 'manual', app_trip_id: null, departure_at: '2026-10-14T12:00:00Z', amount: 900, billable_km: 40, deleted_at: '2026-10-15T00:00:00Z' }));
+    expect(tripTotals([binned])).toEqual({ trips: 0, deleted: 1, billableKm: 0, gpsKm: 0, kg: 0, amount: { UYU: 0, USD: 0 } });
+    expect(totalsText(tripTotals([binned]))).toBe('1 viaje eliminado, que no se suma');
+    expect(totalsText(tripTotals([binned, binned]))).toBe('2 viajes eliminados, que no se suman');
+    expect(totalsText(tripTotals([trip, binned]))).toBe('1 viaje · 160 km facturables · 152,3 km GPS · 30.000 kg · $ 41.000 · además, 1 viaje eliminado, que no se suma');
   });
 
   it('the load order lists every fact, with a dash for what is not known', () => {

@@ -87,6 +87,8 @@ export function printRow(t: Trip): string[] {
 
 export interface TripTotals {
   trips: number;
+  /** Deleted trips can be listed (the trash) but never count. */
+  deleted: number;
   billableKm: number;
   gpsKm: number;
   kg: number;
@@ -95,8 +97,12 @@ export interface TripTotals {
 }
 
 export function tripTotals(list: readonly Trip[]): TripTotals {
-  const totals: TripTotals = { trips: 0, billableKm: 0, gpsKm: 0, kg: 0, amount: { UYU: 0, USD: 0 } };
+  const totals: TripTotals = { trips: 0, deleted: 0, billableKm: 0, gpsKm: 0, kg: 0, amount: { UYU: 0, USD: 0 } };
   for (const t of list) {
+    if (t.deleted) {
+      totals.deleted++;
+      continue;
+    }
     totals.trips++;
     totals.billableKm += t.billableKm ?? 0;
     totals.gpsKm += t.gpsKm ?? 0;
@@ -108,6 +114,8 @@ export function tripTotals(list: readonly Trip[]): TripTotals {
 
 /** "12 viajes · 3.450 km facturables · 1.234,5 km GPS · 280.000 kg · $ 1.200.000 · US$ 3.500". */
 export function totalsText(t: TripTotals): string {
+  const deleted = t.deleted === 1 ? '1 viaje eliminado, que no se suma' : `${number(t.deleted)} viajes eliminados, que no se suman`;
+  if (t.trips === 0 && t.deleted > 0) return deleted;
   return [
     t.trips === 1 ? '1 viaje' : `${number(t.trips)} viajes`,
     t.billableKm > 0 ? `${number(t.billableKm, 0)} km facturables` : null,
@@ -115,6 +123,7 @@ export function totalsText(t: TripTotals): string {
     t.kg > 0 ? `${number(t.kg, 0)} kg` : null,
     t.amount.UYU > 0 ? money(t.amount.UYU, 'UYU') : null,
     t.amount.USD > 0 ? money(t.amount.USD, 'USD') : null,
+    t.deleted > 0 ? `además, ${deleted}` : null,
   ]
     .filter(Boolean)
     .join(' · ');

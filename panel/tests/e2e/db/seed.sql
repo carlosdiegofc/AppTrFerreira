@@ -76,8 +76,8 @@ insert into public.trf_vehicle_maintenance (vehicle, kind, due_on, done_on, odom
 -- Viajes: the office completed the trip that ended today and typed one by hand three days ago, in dollars. The trip on
 -- the road has what Ana typed on the phone, its two delivery notes (the departure one with photo) and a fuel receipt
 -- the office corrected.
-insert into public.trf_panel_trips (source, app_trip_id, departure_at, driver_id, driver_name, order_number, client, product, origin_name, destination_name, billable_km, kg, amount, currency)
-values ('app', '10000000-0000-4000-8000-00000000000d', (select now from t0) - interval '6 hours', '00000000-0000-4000-8000-000000000014', 'Diego Silva', '24129', 'Molino San José', 'Trigo', 'Paysandú', 'Salto', 120, 28000, 38500, 'UYU');
+insert into public.trf_panel_trips (source, app_trip_id, departure_at, driver_id, driver_name, order_number, client, product, origin_name, destination_name, destination_lat, destination_lng, billable_km, kg, amount, currency)
+values ('app', '10000000-0000-4000-8000-00000000000d', (select now from t0) - interval '6 hours', '00000000-0000-4000-8000-000000000014', 'Diego Silva', '24129', 'Molino San José', 'Trigo', 'Paysandú', 'Salto', -31.388, -57.96, 120, 28000, 38500, 'UYU');
 insert into public.trf_panel_trips (id, source, departure_at, arrival_at, driver_name, vehicle, order_number, client, product, origin_name, destination_name, billable_km, kg, amount, currency, notes)
 values ('20000000-0000-4000-8000-000000000001', 'manual', (select now from t0) - interval '3 days', (select now from t0) - interval '3 days' + interval '5 hours', 'Ana Pereira', 'Iveco Stralis · MNO7890', '24101', 'Cooperativa Agraria', 'Soja', 'Young', 'Nueva Palmira', 180, 30000, 1250.5, 'USD', 'Pagado por transferencia.');
 insert into public.trf_trip_details (trip_id, driver_id, data) values

@@ -1563,6 +1563,53 @@ a.trip-line:hover {
   fill-opacity: 1;
 }
 
+/* Declared, not measured: a dashed ring in another color, never like the GPS markers. */
+.leaflet-interactive.fm-declared {
+  stroke: var(--amber);
+  fill: var(--amber-bg);
+  fill-opacity: 0.85;
+}
+
+.map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  padding: 12px 18px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.map-legend i {
+  display: inline-block;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.lg-gps {
+  background: var(--blue);
+}
+
+.lg-declared {
+  border: 2px dashed var(--amber);
+  background: var(--amber-bg);
+}
+
+.map-legend + .route-facts {
+  padding-top: 2px;
+}
+
+.route-error {
+  padding-bottom: 0;
+}
+
 .item-list {
   list-style: none;
   margin: 0;

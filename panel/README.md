@@ -6,7 +6,7 @@ Panel web de la plataforma (etapas en [docs/PLAN-PLATAFORMA.md](../docs/PLAN-PLA
 |---|---|
 | **Inicio** | Camiones en ruta, detenidos y sin viaje; mapa de la flota; viajes de hoy; papeles y services vencidos o por vencer; números del mes. |
 | **GPS en vivo** | Todos los camiones en el mapa, actualizado cada 15 segundos, con filtros; al elegir un camión se ve su viaje en curso con el recorrido. |
-| **Viajes** | Los viajes de la app, con lo que completó la oficina, y los cargados a mano: período, búsqueda, filtros por camión y chofer y pestañas por estado (pendientes de completar, en curso, completos, eliminados). El detalle de cada viaje tiene formato de orden de carga, con el recorrido GPS, los remitos y el combustible con sus fotos. La lista se exporta a Excel, PDF y Word, y cada viaje a PDF. Por ahora solo para consultar: editar llega con la parte 3b del plan. |
+| **Viajes** | Los viajes de la app, con lo que completó la oficina, y los cargados a mano: período, búsqueda, filtros por camión y chofer y pestañas por estado (pendientes de completar, en curso, completos, eliminados). El detalle de cada viaje tiene formato de orden de carga, con el recorrido GPS, los remitos y el combustible con sus fotos; en el mapa, lo que midió el GPS y el origen y destino declarados se ven distintos. La lista se exporta a Excel, PDF y Word (los viajes eliminados se pueden exportar, pero no se suman en los totales), y cada viaje a PDF. Por ahora solo para consultar: editar llega con la parte 3b del plan. |
 | Flota, Choferes, Combustible, Mantenimiento, Documentación, Gastos y finanzas, Métricas, Asistente IA, Configuración | Próximamente: cada página dice qué va a hacer y dónde se hace mientras tanto. |
 
 ## Quién entra

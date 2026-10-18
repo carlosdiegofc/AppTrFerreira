@@ -21,7 +21,8 @@ function when(ms: number, now: number): string {
   return day === dayInZone(now) ? formatTime(ms) : `${formatDay(day)} ${formatTime(ms)}`;
 }
 
-function Detail({ unit, now, points, onClose }: { unit: FleetUnit; now: number; points: number | null; onClose: () => void }) {
+/** points: null while the route loads, 'error' when it could not be read. */
+function Detail({ unit, now, points, onClose }: { unit: FleetUnit; now: number; points: number | null | 'error'; onClose: () => void }) {
   const trip = unit.trip;
   return (
     <section className="unit-detail" aria-label={`Detalle de ${unitTitle(unit)}`}>
@@ -43,7 +44,7 @@ function Detail({ unit, now, points, onClose }: { unit: FleetUnit; now: number; 
             <div><dt>Salió</dt><dd>{when(Date.parse(trip.started_at), now)}</dd></div>
             <div><dt>Última posición</dt><dd>{unit.at ? ago(unit.at, now) : 'Todavía ninguna'}</dd></div>
             <div><dt>Carga</dt><dd>{trip.load_type === 'empty' ? 'Sin carga' : 'Con carga'}</dd></div>
-            <div><dt>Puntos del recorrido</dt><dd>{points === null ? '…' : count(points)}</dd></div>
+            <div><dt>Puntos del recorrido</dt><dd>{points === 'error' ? 'No se pudieron leer' : points === null ? '…' : count(points)}</dd></div>
           </>
         ) : (
           <>
@@ -81,7 +82,7 @@ export function Gps() {
       <PageHead
         title="GPS en vivo"
         subtitle={fleet.fetchedAt ? `Actualizado ${ago(fleet.fetchedAt, now)} · se actualiza solo cada ${FLEET_REFRESH_MS / 1000} segundos` : 'Buscando las posiciones…'}
-        actions={<RefreshButton onClick={() => void fleet.refetch()} busy={fleet.isFetching} />}
+        actions={<RefreshButton onClick={() => void Promise.all([fleet.refetch(), unit?.trip ? route.refetch() : null])} busy={fleet.isFetching || route.isFetching} />}
       />
       {fleet.error ? <ErrorNote onRetry={() => void fleet.refetch()}>No se pudo leer la flota.</ErrorNote> : null}
       <div className="gps">
@@ -93,7 +94,7 @@ export function Gps() {
               </button>
             ))}
           </div>
-          {unit && <Detail unit={unit} now={now} points={unit.trip ? (route.data ? drawable(route.data).length : null) : null} onClose={() => choose(null)} />}
+          {unit && <Detail unit={unit} now={now} points={unit.trip ? (route.data ? drawable(route.data).length : route.error ? 'error' : null) : null} onClose={() => choose(null)} />}
           {fleet.isLoading ? (
             <Skeleton lines={5} />
           ) : shown.length === 0 ? (

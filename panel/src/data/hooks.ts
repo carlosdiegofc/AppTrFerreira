@@ -59,21 +59,24 @@ type RouteTrip = Pick<ActiveTrip, 'id' | 'driver_id' | 'started_at'> & { ended_a
 
 /**
  * The route of a trip. While the trip is in progress it refreshes, and after the first load each refresh brings only the
- * readings since the last one; a finished trip is read once.
+ * readings since the last one; a finished trip is read once. A trip that ends while on screen is read once more in full,
+ * so its last readings are never missing; the route already shown stays until that read arrives.
  */
 export function useRoute(trip: RouteTrip | null) {
   const client = useQueryClient();
+  const key = ['route', trip?.id ?? null, trip?.ended_at ? 'ended' : 'live'] as const;
   return useQuery({
-    queryKey: ['route', trip?.id ?? null],
+    queryKey: key,
     queryFn: async (): Promise<RoutePoint[]> => {
       if (!trip) return [];
-      const shown = client.getQueryData<RoutePoint[]>(['route', trip.id]);
+      const shown = client.getQueryData<RoutePoint[]>(key);
       const last = shown?.at(-1);
       return shown && last ? appendReadings(shown, await fetchRoute(trip, last.recorded_at)) : fetchRoute(trip);
     },
     enabled: trip !== null,
     refetchInterval: trip && !trip.ended_at ? ROUTE_REFRESH_MS : false,
     staleTime: trip?.ended_at ? 10 * 60_000 : 0,
+    placeholderData: (previous, previousQuery) => (trip && previousQuery?.queryKey[1] === trip.id ? previous : undefined),
   });
 }
 

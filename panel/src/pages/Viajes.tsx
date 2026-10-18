@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { Link, useLocation, useSearchParams } from 'react-router';
 import { Icon } from '../components/Icon';
 import { Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton } from '../components/ui';
 import { useNow, useTripList } from '../data/hooks';
@@ -27,6 +27,10 @@ const TABS: { value: string; status: StatusFilter | 'bin'; label: string }[] = [
   { value: 'completos', status: 'complete', label: 'Completos' },
   { value: 'eliminados', status: 'bin', label: 'Eliminados' },
 ];
+
+// A chosen truck or driver stays in its list even in a period without trips of it: the filter shows as applied and the
+// list says that nothing matches, instead of looking like "Todos" while still filtering.
+const withChosen = (values: string[], chosen: string) => (chosen && !values.includes(chosen) ? [chosen, ...values] : values);
 
 function TripRow({ trip }: { trip: Trip }) {
   const { model, plate } = truckOf(trip);
@@ -67,6 +71,7 @@ export function Viajes() {
   const now = useNow(30_000);
   const today = dayInZone(now);
   const [params, setParams] = useSearchParams();
+  const location = useLocation();
   const [exporting, setExporting] = useState<ListFormat | null>(null);
   const [exportFailed, setExportFailed] = useState(false);
 
@@ -74,8 +79,14 @@ export function Viajes() {
   const range = period.kind === 'custom' ? { from: params.get('desde') ?? today, to: params.get('hasta') ?? today } : periodRange(period.kind, today);
   const instants = periodToIso(range.from, range.to);
   const tab = TABS.find((t) => t.value === params.get('estado')) ?? TABS[0]!;
-  // The search box keeps its own text: the address follows it, so typing is never slowed down or undone by it.
-  const [q, setQ] = useState(() => params.get('buscar') ?? '');
+  // The search box keeps its own text: the address follows it, so typing is never slowed down or undone by it. An
+  // address that comes from elsewhere (the side menu, a link) brings its own search.
+  const urlQ = params.get('buscar') ?? '';
+  const [q, setQ] = useState(urlQ);
+  const fromHere = (location.state as { filters?: boolean } | null)?.filters === true;
+  useEffect(() => {
+    if (!fromHere) setQ(urlQ);
+  }, [location.key, fromHere, urlQ]);
   const vehicle = params.get('camion') ?? '';
   const driver = params.get('chofer') ?? '';
 
@@ -100,7 +111,7 @@ export function Viajes() {
       else next.set(k, v);
     }
     pending.current = next;
-    setParams(next, { replace: true });
+    setParams(next, { replace: true, state: { filters: true } });
   };
 
   const choosePeriod = (value: string) => {
@@ -190,9 +201,9 @@ export function Viajes() {
         </label>
         <label className="field">
           <span>Camión</span>
-          <select value={known.vehicles.includes(vehicle) ? vehicle : ''} onChange={(e) => set({ camion: e.target.value })}>
+          <select value={vehicle} onChange={(e) => set({ camion: e.target.value })}>
             <option value="">Todos los camiones</option>
-            {known.vehicles.map((v) => (
+            {withChosen(known.vehicles, vehicle).map((v) => (
               <option key={v} value={v}>
                 {v}
               </option>
@@ -201,9 +212,9 @@ export function Viajes() {
         </label>
         <label className="field">
           <span>Chofer</span>
-          <select value={known.drivers.includes(driver) ? driver : ''} onChange={(e) => set({ chofer: e.target.value })}>
+          <select value={driver} onChange={(e) => set({ chofer: e.target.value })}>
             <option value="">Todos los choferes</option>
-            {known.drivers.map((d) => (
+            {withChosen(known.drivers, driver).map((d) => (
               <option key={d} value={d}>
                 {d}
               </option>

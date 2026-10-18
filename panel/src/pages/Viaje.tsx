@@ -8,8 +8,10 @@ import { useCatalog, useRoute, useTripDetail } from '../data/hooks';
 import { formatDay, formatDayTime, formatDuration } from '../lib/dates';
 import { count, money, number } from '../lib/format';
 import { documentLabel, sourceLabel, tripFacts } from '../lib/tripTable';
-import { fuelFromReceipt, parseTripKey, routeStats } from '../lib/trips';
+import { fuelFromReceipt, type LatLng, parseTripKey, routeStats } from '../lib/trips';
 import { STATUS_TONE } from './states';
+
+const samePlace = (a: LatLng | null, b: LatLng | null) => a !== null && b !== null && a[0] === b[0] && a[1] === b[1];
 
 function Back() {
   const navigate = useNavigate();
@@ -86,6 +88,8 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
   const live = trip.active;
   const title = trip.orderNumber ? `Orden de carga ${trip.orderNumber}` : `Viaje de ${trip.driverName ?? 'chofer sin indicar'}`;
   const facts = tripFacts(trip);
+  // Without an origin typed in the panel, an app trip's origin is where the GPS saw it start: that one is measured.
+  const declared = { origin: samePlace(trip.origin, trip.gpsStart) ? null : trip.origin, destination: trip.destination };
 
   return (
     <div className="page">
@@ -136,10 +140,27 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
             </div>
           ) : (
             <>
-              <TripMap route={route.data ?? null} start={trip.gpsStart ?? trip.origin} end={trip.gpsEnd ?? trip.destination} live={live} label="Mapa del recorrido del viaje" />
+              {trip.source === 'app' && route.error && (
+                <div className="card-body route-error">
+                  <ErrorNote onRetry={() => void route.refetch()}>{route.data ? 'No se pudo actualizar el recorrido del GPS.' : 'No se pudo leer el recorrido del GPS.'}</ErrorNote>
+                </div>
+              )}
+              <TripMap route={route.data ?? null} start={trip.gpsStart} end={trip.gpsEnd} declared={declared} live={live} label="Mapa del recorrido del viaje" />
+              <p className="map-legend">
+                {trip.source === 'app' && (
+                  <span>
+                    <i className="lg-gps" aria-hidden="true" /> Medido por el GPS
+                  </span>
+                )}
+                {(declared.origin || declared.destination) && (
+                  <span>
+                    <i className="lg-declared" aria-hidden="true" /> {trip.source === 'app' ? 'Origen y destino declarados por la oficina o el chofer' : 'Origen y destino declarados al cargar el viaje a mano (sin GPS)'}
+                  </span>
+                )}
+              </p>
               {trip.source === 'app' && (
                 <dl className="facts facts-tight route-facts">
-                  <div><dt>Puntos del recorrido</dt><dd>{stats ? count(stats.count) : '…'}</dd></div>
+                  <div><dt>Puntos del recorrido</dt><dd>{stats ? count(stats.count) : route.error ? '—' : '…'}</dd></div>
                   <div><dt>Duración</dt><dd>{stats?.durationMs != null ? formatDuration(stats.durationMs) : '—'}</dd></div>
                   <div><dt>Velocidad máxima</dt><dd>{stats?.maxSpeedKmh != null ? `${number(stats.maxSpeedKmh)} km/h` : '—'}</dd></div>
                 </dl>

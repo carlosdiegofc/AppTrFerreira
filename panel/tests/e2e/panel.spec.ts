@@ -170,6 +170,20 @@ test('Viajes lista los viajes del período por estado y los filtra', async ({ pa
   await tab(page, 'Eliminados').click();
   await expect(rows(page)).toHaveCount(1);
   await expect(rows(page).first()).toContainText('Eliminado');
+
+  // A truck chosen in a period without its trips stays chosen: the list says there is nothing, not "Todos".
+  await tab(page, 'Todos').click();
+  await page.getByLabel('Camión').selectOption('Volvo FH 460 · ABC1234');
+  await expect(rows(page)).toHaveCount(1);
+  await page.getByLabel('Período').selectOption('Mes anterior');
+  await expect(page.getByText('No hay viajes en este período')).toBeVisible();
+  await expect(page.getByLabel('Camión')).toHaveValue('Volvo FH 460 · ABC1234');
+  await page.getByLabel('Buscar').fill('molino');
+  // The side menu opens the list without filters, the search box included.
+  await open(page, 'Viajes');
+  await expect(page.getByLabel('Buscar')).toHaveValue('');
+  await expect(page.getByLabel('Camión')).toHaveValue('');
+  await expect(rows(page)).toHaveCount(6);
 });
 
 test('el detalle de un viaje muestra la orden de carga, el recorrido, los remitos y el combustible', async ({ page }) => {
@@ -208,6 +222,29 @@ test('el detalle de un viaje muestra la orden de carga, el recorrido, los remito
 
   await page.getByRole('button', { name: 'Viajes' }).first().click();
   await expect(rows(page)).toHaveCount(6);
+
+  // A finished trip: the arrival the GPS measured and the destination the office declared are told apart.
+  await rows(page).filter({ hasText: 'Molino San José' }).getByRole('link').click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Orden de carga 24129');
+  await expect(page.locator('.map-trip path.fm-end')).toHaveCount(1);
+  await expect(page.locator('.map-trip path.fm-declared')).toHaveCount(1);
+  await expect(page.locator('.map-legend')).toContainText('Medido por el GPS');
+  await expect(page.locator('.map-legend')).toContainText('Origen y destino declarados por la oficina o el chofer');
+});
+
+test('si no se puede leer el recorrido, el viaje lo dice y deja reintentar', async ({ page }) => {
+  await signIn(page, 'dueno@ejemplo.uy');
+  await open(page, 'Viajes');
+  let fail = true;
+  await page.route('**/rest/v1/trf_driver_location_history*', (route) => (fail ? route.fulfill({ status: 500, contentType: 'application/json', body: '{"message":"falla de prueba"}' }) : route.fallback()));
+  await rows(page).filter({ hasText: 'ABC1234' }).first().getByRole('link').click();
+  const card = page.locator('.card').filter({ has: page.getByRole('heading', { name: 'Recorrido' }) });
+  await expect(card.getByRole('alert')).toContainText('No se pudo leer el recorrido del GPS.');
+  await expect(card.locator('.route-facts div', { hasText: 'Puntos del recorrido' }).locator('dd')).toHaveText('—');
+  fail = false;
+  await card.getByRole('button', { name: 'Reintentar' }).click();
+  await expect(card.locator('.route-facts div', { hasText: 'Puntos del recorrido' }).locator('dd')).toHaveText('12');
+  await expect(card.getByRole('alert')).toBeHidden();
 });
 
 async function saved(download: Download): Promise<Buffer> {
@@ -242,6 +279,12 @@ test('Viajes exporta la lista a Excel, PDF y Word, y un viaje a PDF', async ({ p
   const word = await download('Word');
   expect(word.suggestedFilename()).toBe('viajes_2026-09-16_a_2026-10-15.docx');
   expect(unzipText(await saved(word), 'word/document.xml')).toContain('Molino San José');
+
+  // The trash can be exported too, but its trips never add up.
+  await tab(page, 'Eliminados').click();
+  await expect(rows(page)).toHaveCount(1);
+  expect(unzipText(await saved(await download('Word')), 'word/document.xml')).toContain('Totales: 1 viaje eliminado, que no se suma');
+  await tab(page, 'Todos').click();
 
   await rows(page).filter({ hasText: 'Molino San José' }).getByRole('link').click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Orden de carga 24129');
