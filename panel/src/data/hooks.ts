@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { FLEET_REFRESH_MS, ROUTE_REFRESH_MS } from '../config';
 import { type ActiveTrip, type CatalogTruck, fleetUnits, truckLabel } from '../lib/fleet';
 import { appendReadings } from '../lib/route';
-import { fetchCatalog, fetchFleet, fetchLastTrips, fetchPapers, fetchRoute, fetchTrips, type RoutePoint } from './api';
+import { mergeTrips, tripFromPanel, tripFromSession } from '../lib/trips';
+import { fetchCatalog, fetchFleet, fetchLastTrips, fetchPapers, fetchRoute, fetchTripDetail, fetchTripList, fetchTrips, type RoutePoint } from './api';
 
 /** The current time, refreshed every few seconds so "hace 2 min" keeps moving. */
 export function useNow(everyMs = 10_000): number {
@@ -54,8 +55,13 @@ export const useTrips = (fromIso: string, toIso: string, refreshMs?: number) =>
 
 export const usePapers = () => useQuery({ queryKey: ['papers'], queryFn: fetchPapers, staleTime: 10 * 60_000 });
 
-/** The route of a trip in progress. After the first load each refresh brings only the readings since the last one. */
-export function useRoute(trip: ActiveTrip | null) {
+type RouteTrip = Pick<ActiveTrip, 'id' | 'driver_id' | 'started_at'> & { ended_at?: string | null };
+
+/**
+ * The route of a trip. While the trip is in progress it refreshes, and after the first load each refresh brings only the
+ * readings since the last one; a finished trip is read once.
+ */
+export function useRoute(trip: RouteTrip | null) {
   const client = useQueryClient();
   return useQuery({
     queryKey: ['route', trip?.id ?? null],
@@ -66,6 +72,34 @@ export function useRoute(trip: ActiveTrip | null) {
       return shown && last ? appendReadings(shown, await fetchRoute(trip, last.recorded_at)) : fetchRoute(trip);
     },
     enabled: trip !== null,
-    refetchInterval: ROUTE_REFRESH_MS,
+    refetchInterval: trip && !trip.ended_at ? ROUTE_REFRESH_MS : false,
+    staleTime: trip?.ended_at ? 10 * 60_000 : 0,
   });
+}
+
+/** Trips of a period with the office's data on top, newest first; refreshed every minute while the page is open. */
+export function useTripList(fromIso: string | null, toIso: string | null) {
+  const catalog = useCatalog();
+  const list = useQuery({
+    queryKey: ['tripList', fromIso, toIso],
+    queryFn: () => fetchTripList(fromIso ?? '', toIso ?? ''),
+    enabled: fromIso !== null && toIso !== null,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+  const trips = useMemo(() => (list.data ? mergeTrips(list.data, catalog.data ?? []) : []), [list.data, catalog.data]);
+  return { trips, query: list };
+}
+
+/** One trip and everything its page shows. */
+export function useTripDetail(kind: 'app' | 'web', id: string) {
+  const catalog = useCatalog();
+  const detail = useQuery({ queryKey: ['trip', kind, id], queryFn: () => fetchTripDetail(kind, id), refetchInterval: (q) => (q.state.data?.session?.active ? 60_000 : false) });
+  const trip = useMemo(() => {
+    const d = detail.data;
+    if (!d) return null;
+    if (d.session) return tripFromSession(d.session, d.panel, d.detail, catalog.data ?? []);
+    return d.panel ? tripFromPanel(d.panel, catalog.data ?? []) : null;
+  }, [detail.data, catalog.data]);
+  return { trip, detail };
 }

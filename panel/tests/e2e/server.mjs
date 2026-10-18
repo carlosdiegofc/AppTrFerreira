@@ -2,6 +2,7 @@
 //  /            → the panel built for the tests (dist-e2e)
 //  /sb/rest/v1  → a real PostgREST connected to the local test database
 //  /sb/auth/v1  → password and refresh-token sign-in issuing JWTs that PostgREST accepts
+//  /sb/storage/v1/object/sign → signed links to the invented photos of tests/e2e/db/seed.sql
 import crypto from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import http from 'node:http';
@@ -21,6 +22,14 @@ export const USERS = {
   'chofer1@ejemplo.uy': { id: '00000000-0000-4000-8000-000000000011', name: 'Ana Pereira' },
 };
 const refreshTokens = new Map();
+// The photos the seed points to, and who may open them: like the storage rule trf_panel_admin_read_photos, the
+// accounts of the panel list.
+const TRIP_A = '00000000-0000-4000-8000-000000000011/10000000-0000-4000-8000-00000000000a';
+const PHOTOS = { 'trf-trip-documents': [`${TRIP_A}/30000000-0000-4000-8000-000000000001.jpg`], 'trf-fuel-receipts': [`${TRIP_A}/40000000-0000-4000-8000-000000000001.jpg`] };
+const PHOTO_READERS = new Set([USERS['dueno@ejemplo.uy'].id, USERS['lectura@ejemplo.uy'].id]);
+const photoToken = (object) => crypto.createHmac('sha256', JWT_SECRET).update('photo:' + object).digest('base64url');
+const photoSvg = (title) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="420" viewBox="0 0 600 420"><rect width="600" height="420" fill="#f4f1e8"/><rect x="40" y="40" width="520" height="340" fill="#fff" stroke="#c9c2ad" stroke-width="3"/><text x="300" y="200" text-anchor="middle" font-family="sans-serif" font-size="30" fill="#4f5d73">${title}</text><text x="300" y="245" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#9aa5b6">Foto de prueba</text></svg>`;
 
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
 function signJwt(sub, email, ttl) {
@@ -84,6 +93,20 @@ async function handle(req, res) {
     const claims = verifyJwt(String(req.headers.authorization || '').replace(/^Bearer /, ''));
     if (!claims) return json(res, 401, { code: 401, error_code: 'bad_jwt', msg: 'invalid JWT' });
     return json(res, 200, user(claims.email));
+  }
+  if (p.startsWith('/sb/storage/v1/object/sign/')) {
+    const object = decodeURIComponent(p.slice('/sb/storage/v1/object/sign/'.length));
+    const [bucket, ...rest] = object.split('/');
+    const known = (PHOTOS[bucket] ?? []).includes(rest.join('/'));
+    if (req.method === 'POST') {
+      const claims = verifyJwt(String(req.headers.authorization || '').replace(/^Bearer /, ''));
+      if (!claims || !PHOTO_READERS.has(claims.sub) || !known) return json(res, 400, { statusCode: '404', error: 'not_found', message: 'Object not found' });
+      return json(res, 200, { signedURL: `/object/sign/${object}?token=${photoToken(object)}` });
+    }
+    if (!known || url.searchParams.get('token') !== photoToken(object)) return json(res, 400, { statusCode: '400', error: 'InvalidJWT', message: 'invalid signature' });
+    res.writeHead(200, { 'Content-Type': 'image/svg+xml' });
+    res.end(photoSvg(bucket === 'trf-fuel-receipts' ? 'Boleta de combustible' : 'Remito'));
+    return;
   }
   if (p === '/sb/auth/v1/logout') {
     res.writeHead(204);

@@ -1,7 +1,8 @@
 // The panel in a real browser against PostgREST and the local copy of the database structure, with invented data
 // (tests/e2e/db/seed.sql). The browser clock is fixed at the seed's base instant: 15/10/2026 at noon in Uruguay.
-import { mkdirSync } from 'node:fs';
-import { expect, type Page, test } from '@playwright/test';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { type Download, expect, type Page, test } from '@playwright/test';
+import { strFromU8, unzipSync } from 'fflate';
 
 const BASE = process.env.PANEL_E2E_BASE ?? '2026-10-15T15:00:00Z';
 const SHOTS = 'tests/e2e/shots';
@@ -103,7 +104,7 @@ test('las secciones que faltan dicen qué van a hacer y la sesión se cierra', a
   await signIn(page, 'dueno@ejemplo.uy');
   await expect(stat(page, 'En ruta')).toBeVisible();
   await expect(page.getByRole('navigation').getByRole('link')).toHaveCount(12);
-  await open(page, 'Viajes');
+  await open(page, 'Combustible');
   await expect(page.getByRole('heading', { name: 'Próximamente' })).toBeVisible();
   await expect(page.getByRole('link', { name: /Abrir el panel actual/ })).toHaveAttribute('href', 'https://carlosdiegofc.github.io/AppTrFerreira/');
   await shot(page, 'proximamente');
@@ -127,4 +128,124 @@ test('modo oscuro', async ({ page }) => {
   await expect(stat(page, 'En ruta').locator('.stat-value')).toHaveText('1');
   await expect(page.locator('.map-home .fm')).toHaveCount(5);
   await shot(page, 'inicio-oscuro');
+});
+
+// ---------- Viajes ----------
+// Last 30 days from the fixed day (15/10/2026): the five trips of the app of today and yesterday, the one deleted in the
+// old panel and the one typed by hand three days ago.
+const rows = (page: Page) => page.locator('.trip-rows > li');
+const tab = (page: Page, name: string) => page.locator('.chip', { hasText: name });
+
+test('Viajes lista los viajes del período por estado y los filtra', async ({ page }) => {
+  await signIn(page, 'dueno@ejemplo.uy');
+  await open(page, 'Viajes');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Viajes');
+  await expect(tab(page, 'Todos')).toContainText('6');
+  await expect(tab(page, 'Pendientes')).toContainText('1');
+  await expect(tab(page, 'En curso')).toContainText('3');
+  await expect(tab(page, 'Completos')).toContainText('2');
+  await expect(tab(page, 'Eliminados')).toContainText('1');
+  await expect(rows(page)).toHaveCount(6);
+  // Newest first; the trip of the app completed by the office shows what the office typed.
+  await expect(rows(page).first()).toContainText('DEF5678');
+  await expect(rows(page).nth(3)).toContainText('Paysandú – Salto');
+  await expect(rows(page).nth(3)).toContainText('120 km');
+  await expect(rows(page).last()).toContainText('Cargado a mano · Orden 24101');
+  await shot(page, 'viajes');
+
+  await tab(page, 'Pendientes').click();
+  await expect(rows(page)).toHaveCount(1);
+  await expect(rows(page).first()).toContainText('Falta: Origen, Destino');
+  await expect(page).toHaveURL(/estado=pendientes/);
+
+  await tab(page, 'Todos').click();
+  await page.getByLabel('Buscar').fill('molino');
+  await expect(rows(page)).toHaveCount(1);
+  await expect(rows(page).first()).toContainText('Molino San José');
+  await page.getByLabel('Buscar').fill('');
+  await page.getByLabel('Chofer').selectOption('Ana Pereira');
+  await expect(rows(page)).toHaveCount(3);
+
+  await page.getByLabel('Chofer').selectOption('');
+  await tab(page, 'Eliminados').click();
+  await expect(rows(page)).toHaveCount(1);
+  await expect(rows(page).first()).toContainText('Eliminado');
+});
+
+test('el detalle de un viaje muestra la orden de carga, el recorrido, los remitos y el combustible', async ({ page }) => {
+  await signIn(page, 'dueno@ejemplo.uy');
+  await open(page, 'Viajes');
+  await rows(page).filter({ hasText: 'ABC1234' }).first().getByRole('link').click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Viaje de Ana Pereira');
+  const facts = page.locator('.order-facts');
+  // What Ana typed on the phone: destination, client, cargo and kilos ("30.000").
+  await expect(facts).toContainText('Puerto de Montevideo');
+  await expect(facts).toContainText('Navios');
+  await expect(facts).toContainText('30.000 kg');
+  await expect(facts.locator('div', { hasText: 'Llegada' }).locator('dd')).toHaveText('En curso');
+  await expect(page.locator('.trip-status')).toContainText('En curso');
+  await expect(page.locator('.map-trip path.fm-route')).toHaveCount(3);
+  await expect(page.locator('.route-facts div', { hasText: 'Puntos del recorrido' }).locator('dd')).toHaveText('12');
+
+  const notes = page.locator('.card', { hasText: 'Remitos (2)' });
+  await expect(notes).toContainText('Remito de salida 0001-00012345');
+  await expect(notes).toContainText('Remito de llegada sin número');
+  await notes.getByRole('button', { name: 'Ver foto' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Remito de salida 0001-00012345' });
+  await expect(dialog.locator('img')).toBeVisible();
+  await expect.poll(() => dialog.locator('img').evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+  await shot(page, 'viaje-foto');
+  await dialog.getByRole('button', { name: 'Cerrar la foto' }).click();
+  await expect(dialog).toBeHidden();
+
+  const fuel = page.locator('.card', { hasText: 'Combustible en el viaje (1)' });
+  // The office corrected the receipt: its litres and amount win.
+  await expect(fuel).toContainText('182,5 L · $ 9.950');
+  await fuel.getByRole('button', { name: 'Ver boleta' }).click();
+  await expect(page.getByRole('dialog', { name: /Boleta/ }).locator('img')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await shot(page, 'viaje');
+
+  await page.getByRole('button', { name: 'Viajes' }).first().click();
+  await expect(rows(page)).toHaveCount(6);
+});
+
+async function saved(download: Download): Promise<Buffer> {
+  const file = await download.path();
+  return readFileSync(file);
+}
+const unzipText = (data: Buffer, name: string) => strFromU8(unzipSync(new Uint8Array(data))[name] ?? new Uint8Array());
+
+test('Viajes exporta la lista a Excel, PDF y Word, y un viaje a PDF', async ({ page }) => {
+  test.skip(test.info().project.name !== 'escritorio', 'los archivos son los mismos en el celular');
+  await signIn(page, 'dueno@ejemplo.uy');
+  await open(page, 'Viajes');
+  await expect(rows(page)).toHaveCount(6);
+  const download = async (label: string) => {
+    const [file] = await Promise.all([page.waitForEvent('download'), page.getByRole('group', { name: 'Exportar la lista' }).getByRole('button', { name: label }).click()]);
+    return file;
+  };
+
+  const excel = await download('Excel');
+  expect(excel.suggestedFilename()).toBe('viajes_2026-09-16_a_2026-10-15.xlsx');
+  const sheet = await saved(excel);
+  const strings = unzipText(sheet, 'xl/sharedStrings.xml') + unzipText(sheet, 'xl/worksheets/sheet1.xml');
+  expect(strings).toContain('Molino San José');
+  expect(strings).toContain('Km facturables');
+
+  const pdf = await download('PDF');
+  expect(pdf.suggestedFilename()).toBe('viajes_2026-09-16_a_2026-10-15.pdf');
+  const printed = (await saved(pdf)).toString('latin1');
+  expect(printed.startsWith('%PDF')).toBe(true);
+  expect(printed).toContain('Molino San Jos');
+
+  const word = await download('Word');
+  expect(word.suggestedFilename()).toBe('viajes_2026-09-16_a_2026-10-15.docx');
+  expect(unzipText(await saved(word), 'word/document.xml')).toContain('Molino San José');
+
+  await rows(page).filter({ hasText: 'Molino San José' }).getByRole('link').click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Orden de carga 24129');
+  const [order] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Descargar PDF' }).click()]);
+  expect(order.suggestedFilename()).toBe('viaje_2026-10-15_24129.pdf');
+  expect((await saved(order)).toString('latin1')).toContain('Orden de carga 24129');
 });

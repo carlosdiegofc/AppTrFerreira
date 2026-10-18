@@ -68,6 +68,28 @@ export function formatTime(ms: number, zone = ZONE): string {
   return `${p.hour}:${p.minute}`;
 }
 
+/** "dd/mm/aaaa hh:mm" of an instant in the zone; empty for no instant. */
+export function formatDayTime(ms: number | null, zone = ZONE): string {
+  if (ms === null || !Number.isFinite(ms)) return '';
+  return `${formatDay(dayInZone(ms, zone))} ${formatTime(ms, zone)}`;
+}
+
+/**
+ * The clock time in the zone as a Date whose UTC fields hold it. Spreadsheets have no time zones: a cell shows the UTC
+ * fields of the date it is given, so this is how a 14:05 in Uruguay reads 14:05 in Excel.
+ */
+export function wallClock(ms: number, zone = ZONE): Date {
+  const p = parts(ms, zone);
+  return new Date(Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour), Number(p.minute)));
+}
+
+/** "2 h 40 min", "35 min". */
+export function formatDuration(ms: number): string {
+  const minutes = Math.max(0, Math.round(ms / 60_000));
+  const hours = Math.floor(minutes / 60);
+  return hours === 0 ? `${minutes} min` : `${hours} h ${minutes % 60} min`;
+}
+
 /** "hoy", "mañana", "en 5 días", "ayer", "hace 3 días", as the app says it. */
 export function inDays(target: string, today: string): string {
   const n = daysBetween(today, target);

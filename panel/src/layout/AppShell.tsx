@@ -21,7 +21,7 @@ export function AppShell() {
   const [theme, setTheme] = useState<ThemeChoice>(savedTheme);
   useEffect(() => applyTheme(theme), [theme]);
   useEffect(() => setOpen(false), [location.pathname]);
-  const current = SECTIONS.find((s) => location.pathname === '/' + s.path);
+  const current = SECTIONS.find((s) => location.pathname === '/' + s.path || location.pathname.startsWith('/' + s.path + '/'));
 
   return (
     <div className={`shell${open ? ' nav-open' : ''}`}>

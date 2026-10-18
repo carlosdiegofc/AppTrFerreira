@@ -51,7 +51,9 @@ En la etapa 1, Transportes Ferreira pasa a ser la empresa 1: sus datos se copian
 Va armándose al costado del panel actual y lo reemplaza sección por sección.
 1. [x] Base: React + TypeScript, ingreso con las cuentas de la app (solo la lista de administradores del panel, como el panel actual), menú con las 12 secciones, diseño de la app con modo oscuro, celular y computadora, pruebas automáticas (18/10/2026).
 2. [x] Inicio y GPS en vivo, con las mismas reglas de estado y de vencimientos que la app (18/10/2026).
-3. [ ] Viajes: filtros, recorrido, datos para facturar, papelera y exportación a Excel, PDF y Word.
+3. Viajes, en dos partes (aprobado el 18/10/2026):
+   - 3a. [x] Consultar: lista con período, búsqueda, filtros por camión y chofer y pestañas por estado (pendientes de completar, en curso, completos, eliminados); detalle con formato de orden de carga, recorrido GPS, remitos y combustible con sus fotos; exportación a Excel, PDF y Word. Sin cambios en la base (18/10/2026).
+   - 3b. [ ] Editar: completar los datos para facturar, cargar viajes a mano, papelera y restaurar, con aviso si dos personas editan el mismo viaje a la vez. Necesita la migración de permisos de `trf_panel_trips`.
 4. [ ] Combustible, Mantenimiento y Documentación con lo que ya carga la app.
 5. [ ] Métricas: rendimiento por camión y por chofer, con gráficos.
 6. [x] Publicarlo: el código pasa a `main` y el panel nuevo queda en `/nuevo/` de la dirección del panel actual (18/10/2026).
@@ -60,10 +62,12 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - El rol anónimo tiene todos los permisos de tabla en 8 tablas de la app y del panel (`trf_driver_*`, `trf_trip_*`, `trf_mobile_catalog`, `trf_panel_trips`), y también los de la secuencia que numera los puntos GPS. Es lo que Supabase da por defecto y la seguridad por filas lo frena, pero hay que quitarlos: solo `trf_rates` necesita lectura anónima.
 - Conviven dos tipos de administrador: `trf_private.admin_emails` (administración completa, por correo) y `trf_panel_admins` (panel: lee toda la flota y también administra mantenimiento y documentos). Los datos que se completan en el panel (`trf_panel_trips`) los lee solo la segunda lista. Los dos pasan a ser roles por empresa.
 - Las políticas que usan `trf_is_panel_admin()` sin `(select …)` se evalúan fila por fila; con más datos conviene envolverlas.
-- `trf_panel_trips` solo tiene la política de lectura: las de alta y modificación de `web/sql/001_panel_web.sql` no están en producción, así que el panel actual no puede guardar los datos de un viaje ni mandarlo a la papelera. Antes de la sección Viajes hay que decidir quién edita (¿solo la cuenta de la empresa o también Luis?) y crear esas políticas con una migración.
+- `trf_panel_trips` solo tiene la política de lectura: las de alta y modificación de `web/sql/001_panel_web.sql` no están en producción, así que el panel actual no puede guardar los datos de un viaje ni mandarlo a la papelera. Quién edita quedó decidido el 18/10 (ver decisiones); las políticas van en una migración con la parte 3b de Viajes.
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 18/10/2026: el viaje de un chofer lo pueden editar el propio chofer, el dueño y la administración. Se aplica con la parte 3b de Viajes, con una migración de permisos.
+- 18/10/2026: la app 0.16.3 no se sube todavía a Google Play: se sube junto con un cambio más grande.
 - 18/10/2026: el código de la rama de trabajo pasa a `main` (app 0.16.3 y panel nuevo) y el panel nuevo se publica en `/nuevo/`, al lado del actual.
 - 18/10/2026: el panel nuevo se hace en React + TypeScript, en `panel/`, y el actual sigue funcionando hasta que el nuevo lo reemplace.
 - 16/10/2026: Supabase sigue en el plan gratis, sin Pro. Como ese plan no tiene respaldos descargables, antes de cada migración se hace un respaldo manual completo (estructura y datos) y se le entrega al dueño, nunca en el repositorio. La base entra en reposo si pasa unos días sin uso y vuelve con el uso (la app, el panel) o desde el proyecto en supabase.com. Las ramas de prueba de Supabase quedan descartadas porque requieren Pro.
