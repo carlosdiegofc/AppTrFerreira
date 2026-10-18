@@ -28,7 +28,8 @@ class TripStore(private val c:Context) {
         write(File(dir("details"),"${t.getString("id")}.json"),JSONObject().put("trip_id",t.getString("id")).put("driver_id",user.getString("id")).put("data",details).put("synced",false))
         check(prefs.edit().putString("current",t.getString("id")).commit());t
     }
-    fun update(change:(JSONObject)->Unit):JSONObject?=synchronized(lock){val t=current()?:return@synchronized null;change(t);t.put("revision",t.optInt("revision")+1);save(t);t}
+    /** Changes the trip in progress. send=false keeps the change on the phone until the next one that is sent. */
+    fun update(send:Boolean=true,change:(JSONObject)->Unit):JSONObject?=synchronized(lock){val t=current()?:return@synchronized null;change(t);if(send)t.put("revision",t.optInt("revision")+1);save(t);t}
     fun trips()=synchronized(lock){dir("trips").listFiles()?.filter{it.extension=="json"}?.mapNotNull{read(it)}?.sortedBy{it.optString("started_at")} ?: emptyList()}
     /** Local copy of the route for the live map; GPS points are deleted from the phone once uploaded. */
     fun appendTrack(tripId:String,lat:Double,lng:Double,segment:Int,time:Long)=synchronized(lock){File(dir("track"),"$tripId.csv").appendText(TrackLog.line(lat,lng,segment,time))}

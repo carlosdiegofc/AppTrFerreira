@@ -15,11 +15,13 @@ import java.util.concurrent.atomic.AtomicBoolean
 class GpsService:Service(){
  private lateinit var fused:FusedLocationProviderClient
  private lateinit var store:TripStore
- private val handler=Handler(Looper.getMainLooper());private val distance=DistanceTracker()
+ private val handler=Handler(Looper.getMainLooper());private val distance=DistanceTracker();private val route=RouteSampler()
  private var callback:LocationCallback?=null;private var tripId:String?=null
  private var watchSince=System.currentTimeMillis();private var lastRestart=0L
  private val syncing=AtomicBoolean(false);private val executor=Executors.newSingleThreadExecutor()
- private val timer=object:Runnable{override fun run(){sync();watchdog();handler.postDelayed(this,15000)}}
+ // The live position has its own line out, so it never waits behind the trip, the route or the photos.
+ private val sendingLive=AtomicBoolean(false);private val liveExecutor=Executors.newSingleThreadExecutor();private var tripSentAt=0L
+ private val timer=object:Runnable{override fun run(){sync();watchdog();handler.postDelayed(this,10000)}}
  override fun onBind(i:Intent?):IBinder?=null
  override fun onCreate(){super.onCreate();store=TripStore(this);fused=LocationServices.getFusedLocationProviderClient(this);(getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(NotificationChannel("gps","Viaje en curso",NotificationManager.IMPORTANCE_LOW));(getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(NotificationChannel("gps-alert","Avisos del GPS",NotificationManager.IMPORTANCE_HIGH))}
  override fun onStartCommand(i:Intent?,flags:Int,id:Int):Int{
@@ -27,16 +29,16 @@ class GpsService:Service(){
   // Android 12+ can refuse a foreground start from the background after the system killed the service.
   try{notifyTrip(t.optBoolean("paused"))}catch(_:Exception){store.warning("El GPS se detuvo en segundo plano · abrí la app para continuar");stopSelf();return START_NOT_STICKY}
   watchSince=System.currentTimeMillis()
-  if(tripId!=t.getString("id")){distance.reset();tripId=t.getString("id")}
+  if(tripId!=t.getString("id")){distance.reset();route.reset();tripId=t.getString("id")}
   when(i?.action){
-   PAUSE->{store.update{it.put("paused",true).put("speed_kmh",0.0)};stopGps();distance.reset()}
-   RESUME->{store.update{it.put("paused",false).put("segment",it.optInt("segment")+1)};distance.reset()}
+   PAUSE->{store.update{it.put("paused",true).put("speed_kmh",0.0)};stopGps();distance.reset();sendLive();sync()}
+   RESUME->{store.update{it.put("paused",false).put("segment",it.optInt("segment")+1)};distance.reset();sync()}
    FINISH->{store.update{it.optJSONObject("last_point")?.let{p->it.put("arrival_lat",p.optDouble("latitude")).put("arrival_lng",p.optDouble("longitude"))};it.put("active",false).put("paused",false).put("ended_at",Instant.now().toString()).put("speed_kmh",0.0)};stopGps();Sync.schedule(this);sync();stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();return START_NOT_STICKY}
   }
   val paused=store.current()?.optBoolean("paused")?:false;try{notifyTrip(paused)}catch(_:Exception){};if(paused)stopGps() else startGps();handler.removeCallbacks(timer);handler.post(timer);return START_STICKY
  }
  private fun notifyTrip(paused:Boolean){val open=PendingIntent.getActivity(this,0,Intent(this,MainActivity::class.java),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT);startForeground(7,Notification.Builder(this,"gps").setContentTitle(if(paused)"Viaje pausado" else "Viaje en curso").setContentText(store.warning().ifBlank{"${store.current()?.optString("vehicle")} · Tocá para abrir"}).setContentIntent(open).setSmallIcon(android.R.drawable.ic_menu_mylocation).setOngoing(true).build())}
- @Suppress("MissingPermission") private fun startGps(){if(callback!=null)return;callback=object:LocationCallback(){override fun onLocationResult(r:LocationResult){r.locations.forEach{record(it)}}};try{fused.requestLocationUpdates(LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY,5000).setMinUpdateIntervalMillis(3000).setWaitForAccurateLocation(false).build(),callback!!,mainLooper).addOnFailureListener{store.message("GPS no disponible · revisá los permisos");stopGps()}}catch(_:SecurityException){store.message("Falta permiso de ubicación precisa");stopGps()}}
+ @Suppress("MissingPermission") private fun startGps(){if(callback!=null)return;callback=object:LocationCallback(){override fun onLocationResult(r:LocationResult){r.locations.forEach{record(it)}}};try{fused.requestLocationUpdates(LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY,2000).setMinUpdateIntervalMillis(1000).setWaitForAccurateLocation(false).build(),callback!!,mainLooper).addOnFailureListener{store.message("GPS no disponible · revisá los permisos");stopGps()}}catch(_:SecurityException){store.message("Falta permiso de ubicación precisa");stopGps()}}
  private fun watchdog(){
   val t=store.current()?:return
   if(!t.optBoolean("active")||t.optBoolean("paused")){if(store.warning().isNotEmpty()){store.warning("");clearAlert()};return}
@@ -63,9 +65,19 @@ class GpsService:Service(){
   val delta=distance.add(DistanceTracker.Fix(l.latitude,l.longitude,l.accuracy.toDouble(),l.time),System.currentTimeMillis())
   if(!distance.accepted)return
   val p=JSONObject().put("event_id",UUID.randomUUID().toString()).put("trip_id",t.getString("id")).put("driver_id",t.getString("driver_id")).put("vehicle",t.getString("vehicle")).put("latitude",l.latitude).put("longitude",l.longitude).put("accuracy_m",l.accuracy.toDouble()).put("speed_kmh",if(l.hasSpeed())(l.speed*3.6).coerceAtLeast(0.0) else JSONObject.NULL).put("heading",if(l.hasBearing())l.bearing.toDouble() else JSONObject.NULL).put("recorded_at",Instant.ofEpochMilli(l.time).toString()).put("segment",t.optInt("segment"))
-  store.addPoint(p);store.appendTrack(t.getString("id"),l.latitude,l.longitude,t.optInt("segment"),l.time);store.update{if(!it.has("origin_lat")){it.put("origin_lat",l.latitude).put("origin_lng",l.longitude)};it.put("distance_meters",it.optDouble("distance_meters",0.0)+delta).put("last_point",p).put("speed_kmh",p.optDouble("speed_kmh",0.0))};sync()
+  // The phone's own map draws every reading; the route sent to the panel keeps one every few seconds (RouteSampler).
+  store.appendTrack(t.getString("id"),l.latitude,l.longitude,t.optInt("segment"),l.time)
+  if(route.keep(l.latitude,l.longitude,l.time,t.optInt("segment")))store.addPoint(p)
+  // The trip (distance, last reading) goes up at most every 15 s; a pause, a resume or the end go at once.
+  val now=System.currentTimeMillis();val send=now-tripSentAt>=15000;if(send)tripSentAt=now
+  store.update(send){if(!it.has("origin_lat")){it.put("origin_lat",l.latitude).put("origin_lng",l.longitude)};it.put("distance_meters",it.optDouble("distance_meters",0.0)+delta).put("last_point",p).put("speed_kmh",p.optDouble("speed_kmh",0.0))}
+  sendLive()
  }
  private fun sync(){if(syncing.compareAndSet(false,true))executor.execute{try{Sync.flush(this)}finally{syncing.set(false)}}}
- override fun onDestroy(){handler.removeCallbacksAndMessages(null);stopGps();executor.shutdown();super.onDestroy()}
+ /** The latest reading to the live map; a reading that arrives while one is on its way goes with the next one. */
+ private fun sendLive(){if(sendingLive.compareAndSet(false,true))try{liveExecutor.execute{try{Sync.live(this)}finally{sendingLive.set(false)}}}
+  // A reading delivered while the service is closing has nowhere to go; flush() sends the trip's last one.
+  catch(_:java.util.concurrent.RejectedExecutionException){sendingLive.set(false)}}
+ override fun onDestroy(){handler.removeCallbacksAndMessages(null);stopGps();executor.shutdown();liveExecutor.shutdown();super.onDestroy()}
  companion object{const val PAUSE="trf.PAUSE";const val RESUME="trf.RESUME";const val FINISH="trf.FINISH"}
 }

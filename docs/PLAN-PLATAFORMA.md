@@ -57,7 +57,7 @@ Va armándose al costado del panel actual y lo reemplaza sección por sección.
 4. [ ] Combustible, Mantenimiento y Documentación con lo que ya carga la app.
 5. [ ] Métricas: rendimiento por camión y por chofer, con gráficos.
 6. [x] Publicarlo: el código pasa a `main` y el panel nuevo queda en `/nuevo/` de la dirección del panel actual (18/10/2026).
-7. [ ] GPS en vivo más rápido (aprobado el 18/10/2026, adelanta parte de la etapa 6): posición cada 3 segundos y recorrido cada 5, con la app nueva mandando un punto cada 2 segundos.
+7. [x] GPS en vivo más rápido (aprobado el 18/10/2026, adelanta parte de la etapa 6): posición cada 3 segundos y recorrido cada 5, con la app 0.17.0 mandando un punto cada 2 segundos. La 0.17.0 se sube a Google Play cuando lo decidas (18/10/2026).
 
 Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - El rol anónimo tiene todos los permisos de tabla en 8 tablas de la app y del panel (`trf_driver_*`, `trf_trip_*`, `trf_mobile_catalog`, `trf_panel_trips`), y también los de la secuencia que numera los puntos GPS. Es lo que Supabase da por defecto y la seguridad por filas lo frena, pero hay que quitarlos: solo `trf_rates` necesita lectura anónima.

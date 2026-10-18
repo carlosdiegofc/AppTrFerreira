@@ -63,19 +63,33 @@ class MobileData(private val c:Context){
   }
   return store.cache(key).optJSONArray("points")?:JSONArray()
  }
- /** Trips in progress with their last GPS reading, plus recently finished trips to place idle trucks. */
+ /** Trips in progress with their driver's latest position, plus recently finished trips to place idle trucks. */
  fun fleet(refresh:Boolean=false):JSONObject{
   val key="fleet-${uid()}"
   if(refresh){
    val active=array("/rest/v1/trf_driver_tracking_sessions?active=eq.true&select=id,driver_id,driver_name,vehicle,started_at,paused,load_type,distance_meters&order=started_at.desc&limit=50")
-   // Same rule as the route: older app versions save readings without trip, inside the trip's time window.
-   for(i in 0 until active.length()){val s=active.getJSONObject(i);val p=array("/rest/v1/trf_driver_location_history?driver_id=eq.${enc(s.getString("driver_id"))}&or=(trip_id.eq.${enc(s.getString("id"))},trip_id.is.null)&recorded_at=gte.${enc(s.getString("started_at"))}&select=latitude,longitude,speed_kmh,recorded_at&order=recorded_at.desc&limit=1");if(p.length()>0)s.put("last",p.getJSONObject(0))}
+   withPositions(active,positions())
    val recent=array("/rest/v1/trf_driver_tracking_sessions?active=eq.false&select=driver_name,vehicle,ended_at,arrival_lat,arrival_lng&order=ended_at.desc.nullslast&limit=100")
    // After the latest 100, the last trip of the trucks used rarely; the live data still shows if that lookup fails.
    try{val older=lastTrips(trucks());for(i in 0 until older.length())recent.put(older.getJSONObject(i))}catch(_:Exception){}
    store.cache(key,JSONObject().put("active",active).put("recent",recent).put("fetched_at",System.currentTimeMillis()))
   }
   return store.cache(key)
+ }
+ /** Only the positions, every few seconds while Flota en vivo is open; who is on a trip comes from fleet(true). */
+ fun live():JSONObject{
+  val key="fleet-${uid()}";val f=store.cache(key);val active=f.optJSONArray("active")?:return f
+  withPositions(active,positions());f.put("active",active).put("live_at",System.currentTimeMillis());store.cache(key,f);return f
+ }
+ /** Every driver's latest position: the phone updates its row of trf_driver_locations with each reading (every version). */
+ private fun positions()=array("/rest/v1/trf_driver_locations?select=driver_id,latitude,longitude,speed_kmh,recorded_at&limit=500")
+ /** A trip in progress gets its driver's position when it was read during the trip, the same window as the route. */
+ private fun withPositions(active:JSONArray,positions:JSONArray){
+  val byDriver=(0 until positions.length()).map{positions.getJSONObject(it)}.associateBy{it.optString("driver_id")}
+  for(i in 0 until active.length()){val s=active.getJSONObject(i);val p=byDriver[s.optString("driver_id")]
+   if(p!=null&&FleetStats.readDuring(s.optString("started_at"),p.optString("recorded_at")))
+    s.put("last",JSONObject().put("latitude",p.opt("latitude")).put("longitude",p.opt("longitude")).put("speed_kmh",p.opt("speed_kmh")).put("recorded_at",p.optString("recorded_at")))
+   else s.remove("last")}
  }
  class Performance(val trucks:FleetStats.Summary,val drivers:FleetStats.Summary,val fetchedAt:Long)
  /**

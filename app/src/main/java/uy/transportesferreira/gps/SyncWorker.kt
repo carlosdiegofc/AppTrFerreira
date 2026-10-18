@@ -2,6 +2,7 @@ package uy.transportesferreira.gps
 
 import android.content.Context
 import androidx.work.*
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -16,6 +17,23 @@ object Sync {
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL,15,TimeUnit.SECONDS).build()
         WorkManager.getInstance(c).enqueueUniqueWork("trf-sync",ExistingWorkPolicy.APPEND_OR_REPLACE,request)
     }
+    /** The row of trf_driver_locations for the newest local trip: where the truck is now, for the live maps. */
+    private fun liveRow(latest:JSONObject?):JSONObject?=latest?.optJSONObject("last_point")?.let{p->
+        val loc=JSONObject(p.toString());listOf("trip_id","event_id","segment").forEach{loc.remove(it)}
+        loc.put("driver_name",latest.getString("driver_name")).put("is_tracking",latest.optBoolean("active")&&!latest.optBoolean("paused"))
+            .put("updated_at",java.time.Instant.now().toString())
+    }
+    /**
+     * Only the latest position, right after each reading and without waiting for the rest of the sync (trip, route,
+     * photos), so the live maps follow the truck within seconds. Failures wait for the next reading or for flush().
+     */
+    fun live(c:Context):Boolean=try{
+        // The trip in progress only (reading every saved trip each time would cost battery); flush() covers the rest.
+        val api=Api(c);val uid=api.session()?.getJSONObject("user")?.getString("id")
+        val trip=TripStore(c).current()?.takeIf{uid!=null&&it.optString("driver_id")==uid}
+        liveRow(trip)?.let{api.json("/rest/v1/trf_driver_locations?on_conflict=driver_id",it,"resolution=merge-duplicates")}
+        true
+    }catch(_:Exception){false}
     fun flush(c:Context):Boolean=synchronized(lock){
         val store=TripStore(c);val api=Api(c)
         try{
@@ -32,21 +50,21 @@ object Sync {
               }catch(_:Exception){failures++}
             }
             // The latest location belongs to the newest local trip only; never replay old locations over it.
-            val latest=trips.lastOrNull()
-            try{latest?.optJSONObject("last_point")?.let{p->
-                val loc=JSONObject(p.toString());listOf("trip_id","event_id","segment").forEach{loc.remove(it)}
-                loc.put("driver_name",latest.getString("driver_name")).put("is_tracking",latest.optBoolean("active")&&!latest.optBoolean("paused"))
-                    .put("updated_at",java.time.Instant.now().toString())
-                api.json("/rest/v1/trf_driver_locations?on_conflict=driver_id",loc,"resolution=merge-duplicates")
-            }
-            }catch(_:Exception){failures++}
+            try{liveRow(trips.lastOrNull())?.let{api.json("/rest/v1/trf_driver_locations?on_conflict=driver_id",it,"resolution=merge-duplicates")}}catch(_:Exception){failures++}
             for((file,r) in store.details().filter{it.second.optString("driver_id")==uid&&!it.second.optBoolean("synced")}){
                 try{val body=JSONObject(r.toString());body.remove("synced");body.remove("synced_at")
                 api.json("/rest/v1/trf_trip_details?on_conflict=trip_id",body,"resolution=ignore-duplicates");store.markSynced(file,r)}catch(_:Exception){failures++}
             }
-            for((file,p) in store.points().filter{it.second.optString("driver_id")==uid}.take(250)){
-                try{api.json("/rest/v1/trf_driver_location_history?on_conflict=event_id",p,"resolution=ignore-duplicates")
-                file.delete()}catch(_:Exception){failures++}
+            // The route goes in one request per sync; if that fails, one by one, so a single bad reading does not hold the rest.
+            val points=store.points().filter{it.second.optString("driver_id")==uid}.take(250)
+            if(points.isNotEmpty())try{
+                api.request("/rest/v1/trf_driver_location_history?on_conflict=event_id","POST",JSONArray(points.map{it.second}).toString().toByteArray(),"resolution=ignore-duplicates")
+                points.forEach{it.first.delete()}
+            }catch(_:Exception){
+                for((file,p) in points){
+                    try{api.json("/rest/v1/trf_driver_location_history?on_conflict=event_id",p,"resolution=ignore-duplicates")
+                    file.delete()}catch(_:Exception){failures++}
+                }
             }
             fun upload(records:List<Pair<File,JSONObject>>,table:String,bucket:String){
                 for((file,r) in records.filter{it.second.optString("driver_id")==uid&&!it.second.optBoolean("synced")}){
