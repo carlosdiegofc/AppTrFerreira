@@ -278,10 +278,11 @@ class MainActivity:AppCompatActivity(){
    c.addView(r,LinearLayout.LayoutParams(-1,-2))}
   return values
  }
- private fun kpi(p:LinearLayout,label:String,value:String,index:Int){
+ private fun kpi(p:LinearLayout,label:String,value:String,index:Int,lines:Int=1){
   val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=bg(cardBg,16);elevation=dpf(1.5f);setPadding(dp(16),dp(14),dp(12),dp(14))}
-  v.addView(tv(label,13.5f,muted));v.addView(tv(value,22f,ink,2).apply{setPadding(0,dp(4),0,0);maxLines=1});v.contentDescription="$label: $value"
-  p.addView(v,LinearLayout.LayoutParams(0,-2,1f).apply{if(index>0)marginStart=dp(12)})
+  v.addView(tv(label,13.5f,muted));v.addView(tv(value,22f,ink,2).apply{setPadding(0,dp(4),0,0);maxLines=lines});v.contentDescription="$label: $value"
+  // Full height of the row: cards stay the same size when one shows two lines.
+  p.addView(v,LinearLayout.LayoutParams(0,-1,1f).apply{if(index>0)marginStart=dp(12)})
  }
  private fun stat(p:LinearLayout,value:String,label:String,color:Int,index:Int){
   val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=bg(cardBg,16);elevation=dpf(1.5f);setPadding(dp(14),dp(12),dp(10),dp(12))}
@@ -881,16 +882,17 @@ class MainActivity:AppCompatActivity(){
  private fun fuelList(rows:JSONArray,fleet:Boolean){
   segmented(root,listOf("Este mes","Todos"),if(fuelMonth)0 else 1){fuelMonth=it==0;history("fuel",fuelMonth)}
   val now=YearMonth.now();val list=(0 until rows.length()).map{rows.getJSONObject(it)}.filter{!fuelMonth||fuelDay(it)?.let{d->YearMonth.from(d)}==now}
-  var litres=0.0;var pesos=0.0
-  list.forEach{r->val d=r.optJSONObject("panel_data")?:JSONObject();amount(d,"litros",r,"liters")?.let{litres+=it};if(currency(d)=="UYU")amount(d,"monto",r,"total")?.let{pesos+=it}}
+  // Pesos and dollars are never added together: each currency is totalled on its own line, pesos first.
+  var litres=0.0;val spent=TreeMap<String,Double>(compareBy<String>{it!="UYU"}.thenBy{it})
+  list.forEach{r->val d=panelData(r);amount(d,"litros",r,"liters")?.let{litres+=it};amount(d,"monto",r,"total")?.let{val cur=currency(d);spent[cur]=(spent[cur]?:0.0)+it}}
   val k=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL};root.addView(k,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12)})
-  kpi(k,"Total litros",litre(litres),0);kpi(k,"Total gastado","$ ${money(pesos)}",1)
+  kpi(k,"Total litros",litre(litres),0);kpi(k,"Total gastado",spent.entries.joinToString("\n"){cash(it.key,it.value)}.ifEmpty{cash("UYU",0.0)},1,maxOf(1,spent.size))
   if(list.isEmpty()){emptyCard(R.drawable.ic_fuel,if(fuelMonth)"Sin cargas este mes" else "Todavía no hay cargas",if(fleet)"Las cargas de la flota aparecen acá cuando se registran." else "Tocá + para registrar una carga de combustible.");return}
   val c=card();list.forEach{fuelRow(c,it,fleet)}
  }
  private fun fuelRow(c:LinearLayout,r:JSONObject,fleet:Boolean){
   if(c.childCount>0)divider(c,68)
-  val d=r.optJSONObject("panel_data")?:JSONObject()
+  val d=panelData(r)
   val station=d.optString("estacionNombre").takeIf{it.isNotBlank()&&it!="null"}?:r.optString("station_name").ifBlank{"Estación por completar"}
   val day=fuelDay(r)?.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
   val who=if(fleet)r.optString("driver_name").substringBefore(" ").ifBlank{null} else null
@@ -903,15 +905,18 @@ class MainActivity:AppCompatActivity(){
   val right=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.END}
   val lt=amount(d,"litros",r,"liters");val paid=amount(d,"monto",r,"total");val cur=currency(d)
   right.addView(tv(lt?.let{litre(it)}?:"— L",15f,ink,1).apply{gravity=Gravity.END})
-  right.addView(tv(paid?.let{(if(cur=="UYU")"$ " else "$cur ")+money(it)}?:"Sin monto",13f,muted).apply{gravity=Gravity.END;setPadding(0,dp(3),0,0)})
+  right.addView(tv(paid?.let{cash(cur,it)}?:"Sin monto",13f,muted).apply{gravity=Gravity.END;setPadding(0,dp(3),0,0)})
   v.addView(right);v.contentDescription="$station, ${day?:""}"
   if(!r.isNull("object_path")){v.background=ripple(null);v.isClickable=true;v.isFocusable=true;v.contentDescription="$station, ${day?:""}. Ver boleta";v.setOnClickListener{showPhoto(r,"trf-fuel-receipts")}}
   c.addView(v,LinearLayout.LayoutParams(-1,-2))
  }
  private fun currency(d:JSONObject)=d.optString("moneda").takeIf{it.isNotBlank()&&it!="null"}?:"UYU"
+ private fun cash(cur:String,v:Double)=(when(cur){"UYU"->"$ ";"USD"->"US$ ";else->"$cur "})+money(v)
+ /** The office's corrections on a fuel receipt; older rows keep them as JSON text, like the month summary reads them. */
+ private fun panelData(r:JSONObject):JSONObject=r.optJSONObject("panel_data")?:try{JSONObject(r.optString("panel_data"))}catch(_:Exception){JSONObject()}
  private fun amount(a:JSONObject,k:String,b:JSONObject,l:String):Double?{val raw=a.optString(k).takeUnless{it.isBlank()||it=="null"}?:b.optString(l).takeUnless{it.isBlank()||it=="null"}?:return null;return raw.replace(',','.').toDoubleOrNull()?.takeIf{it.isFinite()}}
  private fun fuelDay(r:JSONObject):LocalDate?{
-  val s=r.optJSONObject("panel_data")?.optString("fecha")?.takeIf{it.isNotBlank()&&it!="null"}?:r.optString("receipt_date")
+  val s=panelData(r).optString("fecha").takeIf{it.isNotBlank()&&it!="null"}?:r.optString("receipt_date")
   return try{LocalDate.parse(s.take(10))}catch(_:Exception){try{LocalDate.parse(s,DateTimeFormatter.ofPattern("dd/MM/yyyy"))}catch(_:Exception){zoned(r.optString("recorded_at"))?.toLocalDate()}}
  }
 
@@ -1367,9 +1372,13 @@ class MainActivity:AppCompatActivity(){
  private fun editDocument(r:JSONObject?){editId=r?.optString("id");editForm=if(r==null)JSONObject().put("scope","driver") else JSONObject(r.toString());paperForm()}
  private fun paperForm(){
   page("docform");bar(if(editId==null)"Nuevo documento" else "Editar documento",back={documents()})
-  val vehicle=editForm.optString("scope")=="vehicle";val c=card(pad=16)
-  if(isOwner()&&editId==null){text(c,"¿De quién es?",16.5f,ink,1);radio(c,"Mío",!vehicle){editForm.put("scope","driver");paperForm()};radio(c,"De un camión",vehicle){editForm.put("scope","vehicle");paperForm()}}
+  val vehicle=editForm.optString("scope")=="vehicle";val other=!vehicle&&editForm.optBoolean("other");val c=card(pad=16)
+  if(isOwner()&&editId==null){text(c,"¿De quién es?",16.5f,ink,1)
+   radio(c,"Mío",!vehicle&&!other){editForm.put("scope","driver").put("other",false);paperForm()}
+   radio(c,"De un chofer",other){editForm.put("scope","driver").put("other",true);paperForm();if(editForm.optString("driver_id").isBlank())pickDriver()}
+   radio(c,"De un camión",vehicle){editForm.put("scope","vehicle").put("other",false);paperForm()}}
   if(vehicle)select(c,"Camión",editForm,"vehicle",truckChoices())
+  if(other)driverField(c)
   select(c,"Tipo de documento",editForm,"kind",if(vehicle)listOf("SOA / Seguro","Patente","Habilitación MTOP") else listOf("Licencia de conducir","Carné de salud")){paperForm()}
   bound(c,"Otro tipo · si no está en la lista",editForm,"kind")
   dateField(c,"Fecha de vencimiento",editForm,"expires_on"){paperForm()}
@@ -1378,12 +1387,30 @@ class MainActivity:AppCompatActivity(){
   button(dock,"Guardar documento",top=0){
    val kind=editForm.optString("kind").trim();val truckName=editForm.optString("vehicle").trim()
    if(kind.isBlank()){toast("Indicá el tipo de documento");return@button};if(vehicle&&truckName.isBlank()){toast("Elegí el camión");return@button}
+   if(other&&editForm.optString("driver_id").isBlank()){toast("Elegí el chofer");return@button}
    val row=JSONObject().put("kind",kind).put("expires_on",dateValue(editForm,"expires_on")).put("notes",editForm.optString("notes").takeUnless{it=="null"}.orEmpty().trim())
    if(vehicle)row.put("vehicle",truckName)
-   if(editId==null){row.put("scope",if(vehicle)"vehicle" else "driver");if(!vehicle)row.put("driver_name",name)}
+   if(editId==null){row.put("scope",if(vehicle)"vehicle" else "driver");if(other)row.put("driver_id",editForm.optString("driver_id")).put("driver_name",editForm.optString("driver_name")) else if(!vehicle)row.put("driver_name",name)}
    saveOnline("trf_documents",row,"Documento guardado"){documents(true)}
   }
   if(editId!=null)link(dock,"Eliminar documento",top=2,color=red){confirmDelete("trf_documents","¿Eliminar este documento?","Documento eliminado"){documents(true)}}
+ }
+ /** Owner only: the driver a new paper is for. */
+ private fun driverField(c:LinearLayout){
+  caption(c,"Chofer");val current=editForm.optString("driver_name").takeUnless{it.isBlank()||it=="null"}
+  c.addView(tv(current?:"Elegir chofer",16f,if(current==null)faint else ink).apply{gravity=Gravity.CENTER_VERTICAL;background=ripple(outline(cardBg,fieldLine,12));setPadding(dp(14),0,dp(14),0);setCompoundDrawablesRelative(null,null,tinted(R.drawable.ic_expand,muted),null);isClickable=true;isFocusable=true;contentDescription="Chofer: ${current?:"sin elegir"}";setOnClickListener{pickDriver()}},LinearLayout.LayoutParams(-1,dp(52)).apply{topMargin=dp(6)})
+ }
+ /** Drivers with trips, plus the ones that only have papers, by name; the owner is left out ("Mío" is for that). */
+ private fun pickDriver(){
+  toast("Buscando choferes…")
+  thread{val found=try{mobile.drivers()}catch(_:Exception){null}
+   runOnUiThread{if(screen!="docform")return@runOnUiThread
+    val known=LinkedHashMap<String,String>();found?.forEach{(id,n)->known[id]=n}
+    mobile.documents().objects().filter{it.optString("scope")=="driver"}.forEach{val id=it.optString("driver_id");val n=it.optString("driver_name").trim();if(id.isNotBlank()&&n.isNotBlank()&&id !in known)known[id]=n}
+    known.remove(uid())
+    if(known.isEmpty()){toast(if(found==null)"Sin conexión. Probá de nuevo cuando tengas señal." else "Todavía no hay choferes con viajes.");return@runOnUiThread}
+    val list=known.entries.sortedBy{it.value.lowercase(uy)}
+    AlertDialog.Builder(this).setTitle("¿De qué chofer?").setItems(list.map{it.value}.toTypedArray()){_,i->editForm.put("driver_id",list[i].key).put("driver_name",list[i].value);paperForm()}.setNegativeButton("Cancelar",null).show()}}
  }
 
  // ---------- Formatting ----------

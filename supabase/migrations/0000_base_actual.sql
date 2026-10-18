@@ -699,6 +699,11 @@ grant delete, insert, maintain, references, select, trigger, truncate, update on
 grant delete, insert, maintain, references, select, trigger, truncate, update on table public.trf_driver_location_history to authenticated;
 grant delete, insert, maintain, references, select, trigger, truncate, update on table public.trf_driver_location_history to service_role;
 
+revoke all on sequence public.trf_driver_location_history_id_seq from public, anon, authenticated, service_role;
+grant select, update, usage on sequence public.trf_driver_location_history_id_seq to anon;
+grant select, update, usage on sequence public.trf_driver_location_history_id_seq to authenticated;
+grant select, update, usage on sequence public.trf_driver_location_history_id_seq to service_role;
+
 revoke all on table public.trf_driver_locations from public, anon, authenticated, service_role;
 grant delete, insert, maintain, references, select, trigger, truncate, update on table public.trf_driver_locations to anon;
 grant delete, insert, maintain, references, select, trigger, truncate, update on table public.trf_driver_locations to authenticated;

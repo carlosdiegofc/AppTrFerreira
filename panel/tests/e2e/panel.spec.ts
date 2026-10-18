@@ -88,9 +88,10 @@ test('el GPS en vivo filtra la flota y sigue a un camión con su recorrido', asy
   await expect(detail).toContainText('Ana Pereira');
   await expect(detail).toContainText('78 km/h');
   await expect(detail).toContainText('152 km');
+  // The reading without a fix is not counted nor drawn.
   await expect(detail.locator('dd').last()).toHaveText('12');
-  // Two stretches: the trip was paused once.
-  await expect(page.locator('path.fm-route')).toHaveCount(2);
+  // Three stretches: the trip was paused once and the signal was lost for five minutes.
+  await expect(page.locator('path.fm-route')).toHaveCount(3);
   await expect(page).toHaveURL(/camion=trip%3A10000000-0000-4000-8000-00000000000a/);
   await shot(page, 'gps');
 

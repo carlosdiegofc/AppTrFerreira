@@ -1,5 +1,6 @@
 // Trucks and live fleet state, with the rules of the Android app (FleetStats.kt and the owner fleet screen of
 // MainActivity.kt) so that the panel and the phones always agree. Pure functions: no network, no React.
+import { validPosition } from './route';
 
 export interface CatalogTruck {
   model: string;
@@ -144,6 +145,8 @@ export function tripState(trip: ActiveTrip, now: number): FleetState {
 
 const ORDER: Record<FleetState, number> = { moving: 0, stopped: 1, paused: 2, nosignal: 3, idle: 4 };
 const finite = (n: number | null | undefined) => (typeof n === 'number' && Number.isFinite(n) ? n : null);
+/** A position the map can show, or none: a reading without a fix (0,0) must not place a truck in the ocean. */
+const place = (lat: number | null | undefined, lng: number | null | undefined) => (validPosition(lat, lng) ? { lat: lat as number, lng: lng as number } : { lat: null, lng: null });
 
 /**
  * Every truck with its state: the ones on a trip first (on the road, stopped, paused, without signal), then the trucks
@@ -165,8 +168,7 @@ export function fleetUnits(active: readonly ActiveTrip[], finished: readonly Fin
       state: tripState(trip, now),
       speedKmh: finite(trip.last?.speed_kmh),
       meters: finite(trip.distance_meters) ?? 0,
-      lat: finite(trip.last?.latitude),
-      lng: finite(trip.last?.longitude),
+      ...place(trip.last?.latitude, trip.last?.longitude),
       at: Number.isFinite(at) ? at : null,
       trip,
     };
@@ -186,8 +188,7 @@ export function fleetUnits(active: readonly ActiveTrip[], finished: readonly Fin
       state: 'idle',
       speedKmh: null,
       meters: 0,
-      lat: finite(last?.arrival_lat),
-      lng: finite(last?.arrival_lng),
+      ...place(last?.arrival_lat, last?.arrival_lng),
       at: Number.isFinite(ended) ? ended : null,
       trip: null,
     });

@@ -12,7 +12,7 @@ Panel web de la plataforma (etapas en [docs/PLAN-PLATAFORMA.md](../docs/PLAN-PLA
 Las mismas cuentas de la app. Igual que el panel actual, este solo se abre para las cuentas de la lista de administradores del panel (`trf_is_panel_admin()`); cualquier otra, chofer o no, ve «Esta cuenta no tiene acceso». Qué datos ve cada cuenta lo deciden los permisos de la base (seguridad por filas), no la pantalla.
 
 ## Reglas compartidas con la app
-Estados de los camiones (en ruta desde 5 km/h, sin señal después de 15 minutos sin lecturas), coincidencia de camiones por matrícula o por modelo, avisos de papeles (30 días) y de services (15 días) y el día en hora de Uruguay están en `src/lib/` con pruebas en `tests/unit/`. Son las mismas reglas de `FleetStats.kt` y `MainActivity.kt`.
+Estados de los camiones (en ruta desde 5 km/h, sin señal después de 15 minutos sin lecturas), coincidencia de camiones por matrícula o por modelo, avisos de papeles (30 días) y de services (15 días), el recorrido en el mapa (sin las lecturas sin posición, como 0,0, y cortado en cada pausa o después de 90 segundos sin lecturas) y el día en hora de Uruguay están en `src/lib/` con pruebas en `tests/unit/`. Son las mismas reglas de `FleetStats.kt` y `MainActivity.kt` y del panel actual.
 
 ## Desarrollo
 ```bash

@@ -10,7 +10,9 @@ La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la
 ## Nuevo en v0.16.3 (correcciones del menú del dueño)
 - **Flota en vivo:** un camión que está en viaje ya no aparece dos veces (una en ruta y otra «sin viaje») cuando el viaje se guardó con un nombre viejo del camión, como «Ford Cargo». El camión se reconoce igual que en Rendimiento: por la matrícula o, si no tiene, por el modelo, cuando ese modelo es de un solo camión del catálogo. Lo mismo para mostrar el último chofer y el lugar de llegada de un camión sin viaje.
 - **Combustible › Este mes:** los totales de litros y de gasto suman todas las cargas del mes. Antes contaban solo las 50 más recientes, así que en una flota con más cargas el total quedaba corto hasta tocar «Cargar más».
-- No cambia nada de lo que se guarda ni de lo que se envía al panel.
+- **Combustible:** el total gastado muestra los pesos y, en otro renglón, los dólares; antes las cargas en dólares no se sumaban. Las correcciones hechas en el panel (litros, monto, moneda, fecha) se toman también en cargas viejas que las guardaron como texto.
+- **Documentos (dueño):** al agregar un documento, además de «Mío» y «De un camión», está **De un chofer**: se elige el chofer de la lista (los que tienen viajes o documentos) y el documento queda a su nombre.
+- Lo que se envía al panel no cambia, salvo que un documento cargado por el dueño ahora puede quedar a nombre de otro chofer.
 
 ## Nuevo en v0.16.2 (confirmación al iniciar en modo sencillo)
 - **Modo sencillo:** al tocar **INICIAR VIAJE** el viaje ya no empieza solo. En el lugar del botón aparece la pregunta **¿Iniciar el viaje?** con el camión y dos botones: **SÍ, INICIAR** y **Cancelar**. El viaje recién empieza al confirmar, para que no arranque por un toque sin querer. El gesto «atrás» también cancela, y un toque doble sobre el botón no cuenta como confirmación.

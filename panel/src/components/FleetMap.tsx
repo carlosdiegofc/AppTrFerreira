@@ -6,6 +6,7 @@ import { useEffect, useRef } from 'react';
 import { DEFAULT_CENTER, DEFAULT_ZOOM, TILE_ATTRIBUTION, TILE_URL } from '../config';
 import type { RoutePoint } from '../data/api';
 import { type FleetUnit, STATE_LABEL, unitTitle } from '../lib/fleet';
+import { routeLines } from '../lib/route';
 
 interface Props {
   units: readonly FleetUnit[];
@@ -122,29 +123,18 @@ export function FleetMap({ units, selected = null, onSelect, route = null, fitTo
     if (!layer) return;
     layer.clearLayers();
     if (!selected) routeShown.current = null;
-    if (!route || route.length === 0) return;
+    // Readings without a fix are left out, and a pause or a gap without signal leaves the route open, as in the app.
+    const lines = route ? routeLines(route) : [];
+    const all = lines.flat();
+    if (all.length === 0) return;
     const m = map.current;
-    if (m && selected && routeShown.current !== selected && route.length > 1) {
+    if (m && selected && routeShown.current !== selected && all.length > 1) {
       routeShown.current = selected;
-      m.fitBounds(L.latLngBounds(route.map((p) => [p.latitude, p.longitude] as [number, number])), { padding: [56, 56], maxZoom: 13, animate: !calm() });
+      m.fitBounds(L.latLngBounds(all), { padding: [56, 56], maxZoom: 13, animate: !calm() });
     }
-    // A new segment starts after a pause or a gap without signal: those stretches stay open, as in the app.
-    let part: [number, number][] = [];
-    let segment = route[0]?.segment;
-    const flush = () => {
-      if (part.length > 1) L.polyline(part, { className: 'fm-route', weight: 4, opacity: 0.9 }).addTo(layer);
-      part = [];
-    };
-    for (const p of route) {
-      if (p.segment !== segment) {
-        flush();
-        segment = p.segment;
-      }
-      part.push([p.latitude, p.longitude]);
-    }
-    flush();
-    const first = route[0];
-    if (first) L.circleMarker([first.latitude, first.longitude], { radius: 6, className: 'fm-start', weight: 3 }).bindTooltip('Salida').addTo(layer);
+    for (const line of lines) if (line.length > 1) L.polyline(line, { className: 'fm-route', weight: 4, opacity: 0.9 }).addTo(layer);
+    const [first] = all;
+    if (first) L.circleMarker(first, { radius: 6, className: 'fm-start', weight: 3 }).bindTooltip('Salida').addTo(layer);
   }, [route, selected]);
 
   return <div ref={box} className={`fleet-map ${className}`} role="region" aria-label={label} />;

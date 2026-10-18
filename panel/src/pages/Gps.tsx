@@ -8,6 +8,7 @@ import { useFleet, useNow, useRoute } from '../data/hooks';
 import { ago, dayInZone, formatDay, formatTime } from '../lib/dates';
 import { type FleetUnit, fleetCounts, STATE_LABEL, unitTitle } from '../lib/fleet';
 import { count, km, kmh } from '../lib/format';
+import { drawable } from '../lib/route';
 import { STATE_TONE } from './states';
 
 type Filter = 'all' | 'moving' | 'halted' | 'idle';
@@ -92,7 +93,7 @@ export function Gps() {
               </button>
             ))}
           </div>
-          {unit && <Detail unit={unit} now={now} points={unit.trip ? (route.data?.length ?? null) : null} onClose={() => choose(null)} />}
+          {unit && <Detail unit={unit} now={now} points={unit.trip ? (route.data ? drawable(route.data).length : null) : null} onClose={() => choose(null)} />}
           {fleet.isLoading ? (
             <Skeleton lines={5} />
           ) : shown.length === 0 ? (

@@ -130,6 +130,12 @@ class MobileData(private val c:Context){
   if(refresh)store.cache(key,JSONObject().put("rows",array("/rest/v1/trf_vehicle_maintenance?select=*&order=created_at.desc&limit=500")).put("fetched_at",System.currentTimeMillis()))
   return store.cache(key).optJSONArray("rows")?:JSONArray()
  }
+ /** Drivers who have trips, by id with their latest name, for the owner's forms; row security shows everyone's trips only to administrators. */
+ fun drivers():List<Pair<String,String>>{
+  val a=array("/rest/v1/trf_driver_tracking_sessions?select=driver_id,driver_name&order=started_at.desc&limit=1000");val out=linkedMapOf<String,String>()
+  for(i in 0 until a.length()){val r=a.getJSONObject(i);val id=r.optString("driver_id");val n=r.optString("driver_name").trim();if(id.isNotBlank()&&n.isNotBlank()&&id !in out)out[id]=n}
+  return out.toList()
+ }
  /** Own driver papers (every driver's for administrators) plus truck papers. */
  fun documents(refresh:Boolean=false):JSONArray{
   val key="documents-${uid()}"

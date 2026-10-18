@@ -9,12 +9,14 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-0000000
 do $$
 begin
   if (select count(*) from public.trf_driver_tracking_sessions) <> 2 then raise exception 'chofer: tendría que ver solo sus 2 viajes'; end if;
-  if (select count(*) from public.trf_driver_location_history) <> 12 then raise exception 'chofer: tendría que ver solo sus 12 lecturas GPS'; end if;
+  if (select count(*) from public.trf_driver_location_history) <> 13 then raise exception 'chofer: tendría que ver solo sus 13 lecturas GPS'; end if;
   if (select count(*) from public.trf_panel_trips) <> 0 then raise exception 'chofer: no tendría que ver los datos del panel'; end if;
   if (select count(*) from public.trf_documents) <> 3 then raise exception 'chofer: tendría que ver sus papeles y los de los camiones'; end if;
   if (select count(*) from public.trf_vehicle_maintenance) <> 3 then raise exception 'chofer: tendría que ver los services'; end if;
   if (select count(*) from public.trf_mobile_catalog) <> 1 then raise exception 'chofer: tendría que leer el catálogo'; end if;
   if public.trf_is_panel_admin() or public.trf_is_admin() then raise exception 'chofer: no es administrador'; end if;
+  -- The app uploads GPS readings without id: the identity column numbers them.
+  insert into public.trf_driver_location_history (driver_id, vehicle, latitude, longitude, recorded_at) values ('00000000-0000-4000-8000-000000000011', 'Volvo FH 460 · ABC1234', -34.9, -56.2, now());
   begin
     insert into public.trf_driver_tracking_sessions (driver_id, driver_name, vehicle) values ('00000000-0000-4000-8000-000000000012', 'Otro chofer', 'Scania R450 · DEF5678');
     raise exception 'chofer: pudo crear un viaje a nombre de otro';
@@ -32,7 +34,7 @@ begin
   if not public.trf_is_panel_admin() then raise exception 'lectura: tendría que ser administrador del panel'; end if;
   if public.trf_is_admin() then raise exception 'lectura: no es administrador completo'; end if;
   if (select count(*) from public.trf_driver_tracking_sessions) <> 6 then raise exception 'lectura: tendría que ver los 6 viajes'; end if;
-  if (select count(*) from public.trf_driver_location_history) <> 14 then raise exception 'lectura: tendría que ver las 14 lecturas GPS'; end if;
+  if (select count(*) from public.trf_driver_location_history) <> 15 then raise exception 'lectura: tendría que ver las 15 lecturas GPS'; end if;
   if (select count(*) from public.trf_panel_trips) <> 1 then raise exception 'lectura: tendría que ver los datos del panel'; end if;
   if (select count(*) from public.trf_documents) <> 3 then raise exception 'lectura: tendría que ver todos los papeles'; end if;
 end $$;

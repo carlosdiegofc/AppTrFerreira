@@ -234,7 +234,8 @@ Versión `0.16.3` (código de versión 25). No cambia permisos, datos recopilado
 ```text
 <es-419>
 • Flota en vivo: un camión en viaje ya no aparece dos veces.
-• Combustible del mes: los totales suman todas las cargas del mes.
+• Combustible del mes: los totales suman todas las cargas del mes, en pesos y en dólares.
+• Documentos: el dueño puede cargar los de cada chofer.
 </es-419>
 ```
 
@@ -246,7 +247,7 @@ Si la 0.16.2 no llegó a subirse, se sube directamente la 0.16.3 (trae todo lo d
 • En modo sencillo, la app pregunta antes de iniciar el viaje.
 • Nuevo: Rendimiento del mes por camión y por chofer, para los dueños.
 • Las pantallas ya no quedan tapadas por las barras del teléfono.
-• Flota en vivo y combustible del mes, corregidos.
+• Flota en vivo y combustible del mes, corregidos. El dueño puede cargar los documentos de cada chofer.
 </es-419>
 ```
 
