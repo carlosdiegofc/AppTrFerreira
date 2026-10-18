@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useLocation, useSearchParams } from 'react-router';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { Icon } from '../components/Icon';
+import { TripFormDialog } from '../components/TripFormDialog';
 import { CatalogNote, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote } from '../components/ui';
 import { useNow, useTripList } from '../data/hooks';
 import type { ListFormat } from '../exports/trips';
@@ -72,6 +73,8 @@ export function Viajes() {
   const today = dayInZone(now);
   const [params, setParams] = useSearchParams();
   const location = useLocation();
+  const navigate = useNavigate();
+  const [adding, setAdding] = useState(false);
   const [exporting, setExporting] = useState<ListFormat | null>(null);
   const [exportFailed, setExportFailed] = useState(false);
 
@@ -156,14 +159,28 @@ export function Viajes() {
         title="Viajes"
         subtitle="Los viajes de la app aparecen solos, con lo que completó la oficina; también los cargados a mano en el panel."
         actions={
-          <div className="export-group" role="group" aria-label="Exportar la lista">
-            <span className="export-label">Exportar</span>
-            {exportButton('xlsx', 'Excel')}
-            {exportButton('pdf', 'PDF')}
-            {exportButton('docx', 'Word')}
-          </div>
+          <>
+            <div className="export-group" role="group" aria-label="Exportar la lista">
+              <span className="export-label">Exportar</span>
+              {exportButton('xlsx', 'Excel')}
+              {exportButton('pdf', 'PDF')}
+              {exportButton('docx', 'Word')}
+            </div>
+            <button type="button" className="btn btn-primary" onClick={() => setAdding(true)}>
+              <Icon name="plus" size={18} /> Nuevo viaje
+            </button>
+          </>
         }
       />
+      {adding && (
+        <TripFormDialog
+          trip={null}
+          onClose={() => setAdding(false)}
+          // The new trip opens on its page; going back returns to this list.
+          onSaved={(row) => navigate(`/viajes/web:${row.id}`, { state: { saved: true } })}
+          onConflict={() => setAdding(false)}
+        />
+      )}
       {exportFailed && <ErrorNote>No se pudo armar el archivo. Probá de nuevo.</ErrorNote>}
 
       <section className="card filters" aria-label="Filtros">

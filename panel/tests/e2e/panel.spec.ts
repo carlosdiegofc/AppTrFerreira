@@ -1,38 +1,11 @@
 // The panel in a real browser against PostgREST and the local copy of the database structure, with invented data
-// (tests/e2e/db/seed.sql). The browser clock is fixed at the seed's base instant: 15/10/2026 at noon in Uruguay.
-import { mkdirSync, readFileSync } from 'node:fs';
-import { type Download, expect, type Page, test } from '@playwright/test';
+// (tests/e2e/db/seed.sql). These tests only read: the ones that save are in edicion.spec.ts and run after them.
+import { readFileSync } from 'node:fs';
+import { type Download, expect, test } from '@playwright/test';
 import { strFromU8, unzipSync } from 'fflate';
+import { open, prepare, rows, shot, signIn, stat, tab } from './helpers';
 
-const BASE = process.env.PANEL_E2E_BASE ?? '2026-10-15T15:00:00Z';
-const SHOTS = 'tests/e2e/shots';
-// 1×1 grey PNG: map tiles are never fetched from OpenStreetMap during the tests.
-const TILE = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN89+7dfwAJ6QPbJ1DSWgAAAABJRU5ErkJggg==', 'base64');
-
-test.beforeAll(() => mkdirSync(SHOTS, { recursive: true }));
-
-test.beforeEach(async ({ page }) => {
-  await page.clock.setFixedTime(new Date(BASE));
-  await page.route('https://tile.openstreetmap.org/**', (route) => route.fulfill({ contentType: 'image/png', body: TILE }));
-});
-
-async function signIn(page: Page, email: string, password = 'clave-de-prueba') {
-  await page.goto('./');
-  await page.getByLabel('Correo').fill(email);
-  await page.getByLabel('Contraseña').fill(password);
-  await page.getByRole('button', { name: 'Ingresar' }).click();
-}
-
-/** Opens a section from the side menu, which on phones sits behind the menu button. */
-async function open(page: Page, section: string) {
-  await expect(page.locator('main#contenido')).toBeVisible();
-  const menu = page.getByRole('button', { name: 'Abrir el menú' });
-  if (await menu.isVisible()) await menu.click();
-  await page.getByRole('navigation').getByRole('link', { name: new RegExp(`^${section}`) }).click();
-}
-
-const stat = (page: Page, label: string) => page.locator('.stat', { hasText: label });
-const shot = (page: Page, name: string) => page.screenshot({ path: `${SHOTS}/${test.info().project.name}-${name}.png`, fullPage: true });
+test.beforeEach(async ({ page }) => prepare(page));
 
 test('rechaza una contraseña incorrecta', async ({ page }) => {
   await signIn(page, 'dueno@ejemplo.uy', 'otra-clave');
@@ -149,8 +122,6 @@ test('modo oscuro', async ({ page }) => {
 // ---------- Viajes ----------
 // Last 30 days from the fixed day (15/10/2026): the five trips of the app of today and yesterday, the one deleted in the
 // old panel and the one typed by hand three days ago.
-const rows = (page: Page) => page.locator('.trip-rows > li');
-const tab = (page: Page, name: string) => page.locator('.chip', { hasText: name });
 
 test('Viajes lista los viajes del período por estado y los filtra', async ({ page }) => {
   await signIn(page, 'dueno@ejemplo.uy');

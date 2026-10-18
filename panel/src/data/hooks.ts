@@ -1,10 +1,25 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { FLEET_REFRESH_MS, ROUTE_REFRESH_MS } from '../config';
 import { type ActiveTrip, type CatalogTruck, fleetUnits, truckLabel } from '../lib/fleet';
 import { appendReadings } from '../lib/route';
-import { mergeTrips, tripFromPanel, tripFromSession } from '../lib/trips';
-import { fetchCatalog, fetchFleet, fetchLastTrips, fetchPapers, fetchRoute, fetchTripDetail, fetchTripList, fetchTrips, type RoutePoint } from './api';
+import type { TripPayload } from '../lib/tripForm';
+import { mergeTrips, type Trip, tripFromPanel, tripFromSession } from '../lib/trips';
+import {
+  fetchCatalog,
+  fetchCatalogLists,
+  fetchDriverNames,
+  fetchFleet,
+  fetchLastTrips,
+  fetchPapers,
+  fetchRoute,
+  fetchTripDetail,
+  fetchTripList,
+  fetchTrips,
+  type RoutePoint,
+  saveTrip,
+  setTripDeleted,
+} from './api';
 
 /** The current time, refreshed every few seconds so "hace 2 min" keeps moving. */
 export function useNow(everyMs = 10_000): number {
@@ -105,6 +120,37 @@ export function useTripList(fromIso: string | null, toIso: string | null) {
   // could not be read.
   return { trips, query: list, catalog };
 }
+
+/** Everything that shows trips reads them again after a change: the list, the trip's page and Inicio. */
+function useTripsChanged() {
+  const client = useQueryClient();
+  return () => Promise.all(['tripList', 'trip', 'trips'].map((key) => client.invalidateQueries({ queryKey: [key] })));
+}
+
+/** Saves the office's data of a trip (a new one when trip is null); on a conflict the screens read the trip again. */
+export function useSaveTrip() {
+  const changed = useTripsChanged();
+  return useMutation({
+    mutationFn: ({ trip, payload }: { trip: Trip | null; payload: TripPayload }) => saveTrip(trip, payload),
+    onSettled: changed,
+  });
+}
+
+/** Sends a trip to the trash or brings it back. */
+export function useSetTripDeleted() {
+  const changed = useTripsChanged();
+  return useMutation({
+    mutationFn: ({ trip, deleted }: { trip: Trip; deleted: boolean }) => setTripDeleted(trip, deleted),
+    onSettled: changed,
+  });
+}
+
+/** What the form suggests: the catalog's clients and cargo, and the drivers of the latest trips. */
+export const useFormSuggestions = (enabled: boolean) => {
+  const lists = useQuery({ queryKey: ['catalogLists'], queryFn: fetchCatalogLists, staleTime: 10 * 60_000, enabled });
+  const drivers = useQuery({ queryKey: ['driverNames'], queryFn: fetchDriverNames, staleTime: 10 * 60_000, enabled });
+  return { clients: lists.data?.clients ?? [], products: lists.data?.products ?? [], drivers: drivers.data ?? [] };
+};
 
 /** One trip and everything its page shows; it keeps refreshing while the trip is in progress and right after it ends. */
 export function useTripDetail(kind: 'app' | 'web', id: string) {

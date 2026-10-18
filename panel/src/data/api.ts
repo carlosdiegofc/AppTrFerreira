@@ -1,16 +1,27 @@
-// Every read the panel makes. Screens never build queries themselves; row security in the database decides what
-// each account gets back.
-import { type ActiveTrip, type CatalogTruck, catalogTrucks, type FinishedTrip, lastTripByTruck, type LastPoint, truckLabel } from '../lib/fleet';
-import type { Tables } from '../lib/database.types';
+// Every read and write the panel makes. Screens never build queries themselves; row security in the database decides
+// what each account gets back and what it may change.
+import type { Tables, TablesInsert } from '../lib/database.types';
+import { type ActiveTrip, type CatalogTruck, catalogTrucks, type FinishedTrip, lastTripByTruck, type LastPoint, text, truckLabel } from '../lib/fleet';
 import type { PaperRow, ServiceRow } from '../lib/papers';
 import { supabase } from '../lib/supabase';
-import type { DetailRow, FuelRow, PanelTripRow, SessionRow } from '../lib/trips';
+import type { TripPayload } from '../lib/tripForm';
+import type { DetailRow, FuelRow, PanelTripRow, SessionRow, Trip } from '../lib/trips';
 
-/** A query that failed; the message is for the office, the cause for the console. */
-export class DataError extends Error {}
+/** A query that failed; the message is for the console, the code (PostgreSQL's or PostgREST's) says why. */
+export class DataError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+  ) {
+    super(message);
+  }
+}
 
-function rows<T>(result: { data: T | null; error: { message: string } | null }): T {
-  if (result.error) throw new DataError(result.error.message);
+/** Someone saved the trip while it was being edited, or created its panel row first: reload it and look again. */
+export class ConflictError extends DataError {}
+
+function rows<T>(result: { data: T | null; error: { message: string; code?: string } | null }): T {
+  if (result.error) throw new DataError(result.error.message, result.error.code);
   if (result.data === null) throw new DataError('Respuesta vacía');
   return result.data;
 }
@@ -205,6 +216,72 @@ export async function fetchTripDetail(kind: 'app' | 'web', id: string): Promise<
   const trip = rows(session)[0];
   if (!trip) return null;
   return { session: trip, panel: rows(panel)[0] ?? null, detail: rows(detail)[0] ?? null, documents: rows(documents), fuel: rows(fuel) };
+}
+
+/**
+ * Saves what the office typed, the same way as the current panel (web/js/data.js). The first save of an app trip
+ * creates its panel row; a later save only applies if nobody saved the trip in between (otherwise ConflictError). The
+ * database notes who and when.
+ */
+export async function saveTrip(trip: Trip | null, payload: TripPayload): Promise<PanelTripRow> {
+  if (!trip?.panelId) {
+    const row: TablesInsert<'trf_panel_trips'> =
+      trip?.source === 'app'
+        ? { ...payload, source: 'app', app_trip_id: trip.appTripId, departure_at: trip.departureAt, driver_id: trip.driverId }
+        : { ...payload, source: 'manual' };
+    const result = await supabase.from('trf_panel_trips').insert(row).select();
+    if (result.error?.code === '23505') throw new ConflictError(result.error.message, result.error.code);
+    const saved = rows(result)[0];
+    if (!saved) throw new DataError('El alta no devolvió la fila');
+    return saved;
+  }
+  if (!trip.updatedAt) throw new ConflictError('Sin fecha de modificación');
+  const result = await supabase.from('trf_panel_trips').update(payload).eq('id', trip.panelId).eq('updated_at', trip.updatedAt).select();
+  const saved = rows(result)[0];
+  if (!saved) throw new ConflictError('Otra persona guardó el viaje');
+  return saved;
+}
+
+/** What went wrong with a save, in the office's words (a conflict is handled apart: the trip is read again). */
+export function describeWriteError(e: unknown): string {
+  const code = e instanceof DataError ? e.code : undefined;
+  if (code === '42501') return 'Esta cuenta no tiene permiso para guardar viajes.';
+  if (code === '23514' || code === '22P02' || code === '22003' || code === '22007' || code === '22008') return 'Algún dato no es válido para guardar. Revisá los números y las fechas.';
+  if (/fetch|network|load failed/i.test(e instanceof Error ? e.message : String(e))) return 'Sin conexión con el servidor. Revisá internet y volvé a intentar.';
+  return 'No se pudo guardar. Volvé a intentar en un momento.';
+}
+
+/** To the trash and back: the trip is never deleted. */
+export const setTripDeleted = (trip: Trip, deleted: boolean) => saveTrip(trip, { deleted_at: deleted ? new Date().toISOString() : null });
+
+export interface CatalogLists {
+  clients: string[];
+  products: string[];
+}
+
+/** The clients and the kinds of cargo of the app's catalog, to suggest them in the form. */
+export async function fetchCatalogLists(): Promise<CatalogLists> {
+  const result = await supabase.from('trf_mobile_catalog').select('data').eq('id', 'fleet').maybeSingle();
+  if (result.error) throw new DataError(result.error.message, result.error.code);
+  let data: unknown = result.data?.data ?? null;
+  // The column is jsonb, but older rows were saved as text holding JSON.
+  if (typeof data === 'string') {
+    try {
+      data = JSON.parse(data);
+    } catch {
+      data = null;
+    }
+  }
+  const names = (value: unknown) =>
+    (Array.isArray(value) ? value : []).map((v: unknown) => text(typeof v === 'string' ? v : (v as { nombre?: unknown } | null)?.nombre)).filter((v): v is string => v !== null);
+  const d = (data ?? {}) as { clientes?: unknown; tiposCarga?: unknown };
+  return { clients: names(d.clientes), products: names(d.tiposCarga) };
+}
+
+/** The drivers of the latest trips of the app, to suggest them for a trip typed by hand. */
+export async function fetchDriverNames(): Promise<string[]> {
+  const result = rows(await supabase.from('trf_driver_tracking_sessions').select('driver_name').order('started_at', { ascending: false }).limit(500));
+  return [...new Set(result.map((r) => text(r.driver_name)).filter((v): v is string => v !== null))];
 }
 
 export type PhotoBucket = 'trf-trip-documents' | 'trf-fuel-receipts';

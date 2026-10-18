@@ -19,7 +19,9 @@ export default defineConfig({
   },
   webServer: { command: 'node tests/e2e/server.mjs', url: 'http://127.0.0.1:8791/healthz', reuseExistingServer: !process.env.CI },
   projects: [
-    { name: 'escritorio', use: { viewport: { width: 1440, height: 900 } } },
-    { name: 'celular', use: { ...devices['Pixel 7'] } },
+    { name: 'escritorio', testIgnore: /edicion\.spec\.ts/, use: { viewport: { width: 1440, height: 900 } } },
+    { name: 'celular', testIgnore: /edicion\.spec\.ts/, use: { ...devices['Pixel 7'] } },
+    // Saving changes the test data: these tests run last, after the others read it as the seed left it.
+    { name: 'edicion', testMatch: /edicion\.spec\.ts/, dependencies: ['escritorio', 'celular'], use: { viewport: { width: 1440, height: 900 } } },
   ],
 });
