@@ -100,6 +100,22 @@ test('el GPS en vivo filtra la flota y sigue a un camión con su recorrido', asy
   await expect(page.locator('.units > li')).toHaveCount(2);
 });
 
+test('si falla la actualización del recorrido en vivo, el GPS lo dice', async ({ page }) => {
+  await signIn(page, 'dueno@ejemplo.uy');
+  await open(page, 'GPS en vivo');
+  await page.getByRole('button', { name: /Volvo FH 460 · ABC1234/ }).click();
+  const detail = page.locator('.unit-detail');
+  await expect(detail.locator('dd').last()).toHaveText('12');
+  let fail = true;
+  await page.route('**/rest/v1/trf_driver_location_history*', (route) => (fail ? route.fulfill({ status: 500, contentType: 'application/json', body: '{"message":"falla de prueba"}' }) : route.fallback()));
+  await page.getByRole('button', { name: 'Actualizar' }).click();
+  await expect(detail.getByRole('alert')).toContainText('No se pudo actualizar el recorrido: se ve el último que se leyó.');
+  await expect(detail.locator('dd').last()).toHaveText('12');
+  fail = false;
+  await detail.getByRole('button', { name: 'Reintentar' }).click();
+  await expect(detail.getByRole('alert')).toBeHidden();
+});
+
 test('las secciones que faltan dicen qué van a hacer y la sesión se cierra', async ({ page }) => {
   await signIn(page, 'dueno@ejemplo.uy');
   await expect(stat(page, 'En ruta')).toBeVisible();
@@ -170,6 +186,10 @@ test('Viajes lista los viajes del período por estado y los filtra', async ({ pa
   await tab(page, 'Eliminados').click();
   await expect(rows(page)).toHaveCount(1);
   await expect(rows(page).first()).toContainText('Eliminado');
+  // A search that leaves out the trip in the trash says so, instead of "no trips deleted".
+  await page.getByLabel('Buscar').fill('molino');
+  await expect(page.getByText('Ningún viaje eliminado coincide con el filtro')).toBeVisible();
+  await page.getByLabel('Buscar').fill('');
 
   // A truck chosen in a period without its trips stays chosen: the list says there is nothing, not "Todos".
   await tab(page, 'Todos').click();
@@ -253,6 +273,15 @@ test('si falla una actualización, la lista y el viaje siguen a la vista con un 
   fail = false;
   await page.getByRole('alert').getByRole('button', { name: 'Reintentar' }).click();
   await expect(page.getByRole('alert')).toBeHidden();
+});
+
+test('si no se puede leer el catálogo de camiones, Viajes lo dice', async ({ page }) => {
+  await page.route('**/rest/v1/trf_mobile_catalog*', (route) => route.fulfill({ status: 500, contentType: 'application/json', body: '{"message":"falla de prueba"}' }));
+  await signIn(page, 'dueno@ejemplo.uy');
+  await open(page, 'Viajes');
+  await expect(page.getByRole('alert').filter({ hasText: 'No se pudo leer el catálogo de camiones' })).toBeVisible();
+  // The trips are still there, each with the truck label it was saved with.
+  await expect(rows(page)).toHaveCount(6);
 });
 
 test('si no se puede leer el recorrido, el viaje lo dice y deja reintentar', async ({ page }) => {

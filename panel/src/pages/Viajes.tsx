@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router';
 import { Icon } from '../components/Icon';
-import { Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote } from '../components/ui';
+import { CatalogNote, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote } from '../components/ui';
 import { useNow, useTripList } from '../data/hooks';
 import type { ListFormat } from '../exports/trips';
 import { ago, dayInZone, formatDay, formatDayTime } from '../lib/dates';
@@ -90,8 +90,10 @@ export function Viajes() {
   const vehicle = params.get('camion') ?? '';
   const driver = params.get('chofer') ?? '';
 
-  const { trips, query } = useTripList(instants?.fromIso ?? null, instants?.toIso ?? null);
+  const { trips, query, catalog } = useTripList(instants?.fromIso ?? null, instants?.toIso ?? null);
   const counts = useMemo(() => countByStatus(trips), [trips]);
+  const bin = tab.status === 'bin';
+  const inTab = bin ? counts.deleted : counts.all;
   const known = useMemo(() => knownValues(trips), [trips]);
   const shown = useMemo(
     () => filterTrips(trips, { q, vehicle, driver, status: tab.status === 'bin' ? 'all' : tab.status, bin: tab.status === 'bin' }),
@@ -243,18 +245,20 @@ export function Viajes() {
 
       {/* Only a first read that failed takes the list: after that, a failed refresh keeps the last list with a note. */}
       {instants !== null && query.error && query.data !== undefined && <StaleNote onRetry={() => void query.refetch()} />}
+      {catalog.error && <CatalogNote onRetry={() => void catalog.refetch()} />}
       {instants === null ? (
         <ErrorNote>Revisá las fechas: «hasta» no puede ser antes de «desde».</ErrorNote>
       ) : query.error && query.data === undefined ? (
         <ErrorNote onRetry={() => void query.refetch()}>No se pudieron leer los viajes.</ErrorNote>
-      ) : query.isLoading ? (
+      ) : query.isLoading || catalog.isLoading ? (
         <div className="card card-body">
           <Skeleton lines={6} />
         </div>
       ) : shown.length === 0 ? (
         <div className="card">
-          <Empty icon="route" title={tab.status === 'bin' ? 'No hay viajes eliminados en este período' : trips.length > 0 ? 'Ningún viaje coincide con el filtro' : 'No hay viajes en este período'}>
-            {trips.length > 0 && tab.status !== 'bin' ? 'Probá con otro estado, camión, chofer o búsqueda.' : null}
+          {/* Trips in this tab that the search, the truck or the driver leave out are not "no trips". */}
+          <Empty icon="route" title={inTab > 0 ? (bin ? 'Ningún viaje eliminado coincide con el filtro' : 'Ningún viaje coincide con el filtro') : bin ? 'No hay viajes eliminados en este período' : 'No hay viajes en este período'}>
+            {inTab > 0 ? (bin ? 'Probá con otro camión, chofer o búsqueda.' : 'Probá con otro estado, camión, chofer o búsqueda.') : null}
           </Empty>
         </div>
       ) : (

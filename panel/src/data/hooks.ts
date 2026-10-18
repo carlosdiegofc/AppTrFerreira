@@ -58,6 +58,16 @@ export const usePapers = () => useQuery({ queryKey: ['papers'], queryFn: fetchPa
 type RouteTrip = Pick<ActiveTrip, 'id' | 'driver_id' | 'started_at'> & { ended_at?: string | null };
 
 /**
+ * A trip that ended a moment ago is still read for a while: the phone sends the trip first and then what goes with it
+ * (details, delivery notes, fuel, queued readings), so the end can arrive before the rest.
+ */
+const SETTLING_MS = 15 * 60_000;
+const settling = (endedAt: string | null | undefined) => {
+  const ms = endedAt ? Date.parse(endedAt) : Number.NaN;
+  return Number.isFinite(ms) && Date.now() - ms < SETTLING_MS;
+};
+
+/**
  * The route of a trip. While the trip is in progress it refreshes, and after the first load each refresh brings only the
  * readings since the last one; a finished trip is read once. A trip that ends while on screen is read once more in full,
  * so its last readings are never missing; the route already shown stays until that read arrives.
@@ -74,7 +84,7 @@ export function useRoute(trip: RouteTrip | null) {
       return shown && last ? appendReadings(shown, await fetchRoute(trip, last.recorded_at)) : fetchRoute(trip);
     },
     enabled: trip !== null,
-    refetchInterval: trip && !trip.ended_at ? ROUTE_REFRESH_MS : false,
+    refetchInterval: trip && (!trip.ended_at || settling(trip.ended_at)) ? ROUTE_REFRESH_MS : false,
     staleTime: trip?.ended_at ? 10 * 60_000 : 0,
     placeholderData: (previous, previousQuery) => (trip && previousQuery?.queryKey[1] === trip.id ? previous : undefined),
   });
@@ -91,18 +101,27 @@ export function useTripList(fromIso: string | null, toIso: string | null) {
     staleTime: 30_000,
   });
   const trips = useMemo(() => (list.data ? mergeTrips(list.data, catalog.data ?? []) : []), [list.data, catalog.data]);
-  return { trips, query: list };
+  // The catalog names the trucks (an older label counts for its catalog truck): the screens wait for it and say when it
+  // could not be read.
+  return { trips, query: list, catalog };
 }
 
-/** One trip and everything its page shows. */
+/** One trip and everything its page shows; it keeps refreshing while the trip is in progress and right after it ends. */
 export function useTripDetail(kind: 'app' | 'web', id: string) {
   const catalog = useCatalog();
-  const detail = useQuery({ queryKey: ['trip', kind, id], queryFn: () => fetchTripDetail(kind, id), refetchInterval: (q) => (q.state.data?.session?.active ? 60_000 : false) });
+  const detail = useQuery({
+    queryKey: ['trip', kind, id],
+    queryFn: () => fetchTripDetail(kind, id),
+    refetchInterval: (q) => {
+      const s = q.state.data?.session;
+      return s && (s.active || settling(s.ended_at)) ? 60_000 : false;
+    },
+  });
   const trip = useMemo(() => {
     const d = detail.data;
     if (!d) return null;
     if (d.session) return tripFromSession(d.session, d.panel, d.detail, catalog.data ?? []);
     return d.panel ? tripFromPanel(d.panel, catalog.data ?? []) : null;
   }, [detail.data, catalog.data]);
-  return { trip, detail };
+  return { trip, detail, catalog };
 }

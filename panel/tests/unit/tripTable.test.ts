@@ -39,6 +39,12 @@ describe('the trip as the screen and the files show it', () => {
     expect(values).toMatchObject({ Salida: '2026-10-15T12:05:00Z', Camión: 'Volvo FH 460', Matrícula: 'ABC1234', 'Km GPS': 152.3, 'Km facturables': 160, Kilos: 30000, Importe: 41000, Moneda: 'UYU', 'Falta completar': null, Registro: 'App GPS' });
   });
 
+  it('an amount of zero keeps its currency in the spreadsheet', () => {
+    const currency = SHEET_COLUMNS.find((c) => c.header === 'Moneda');
+    expect(currency?.value(tripFromSession(session(), panel({ amount: 0, currency: 'USD' }), null))).toBe('USD');
+    expect(currency?.value(tripFromSession(session(), panel({ amount: null }), null))).toBeNull();
+  });
+
   it('the spreadsheet shows the clock time of Uruguay', () => {
     expect(wallClock(Date.parse('2026-10-15T12:05:00Z')).toISOString()).toBe('2026-10-15T09:05:00.000Z');
   });

@@ -75,8 +75,13 @@ export function ErrorNote({ onRetry, children = 'No se pudieron cargar los datos
 }
 
 /** A refresh that failed while what was read before stays on screen: a first read that failed is an ErrorNote. */
-export function StaleNote({ onRetry }: { onRetry: () => void }) {
-  return <ErrorNote onRetry={onRetry}>No se pudo actualizar: se ve lo último que se leyó.</ErrorNote>;
+export function StaleNote({ onRetry, children = 'No se pudo actualizar: se ve lo último que se leyó.' }: { onRetry: () => void; children?: ReactNode }) {
+  return <ErrorNote onRetry={onRetry}>{children}</ErrorNote>;
+}
+
+/** The catalog of trucks could not be read: a trip saved with an older truck label shows that label. */
+export function CatalogNote({ onRetry }: { onRetry: () => void }) {
+  return <ErrorNote onRetry={onRetry}>No se pudo leer el catálogo de camiones: un viaje guardado con un nombre viejo del camión se ve con ese nombre.</ErrorNote>;
 }
 
 export function Skeleton({ lines = 3 }: { lines?: number }) {

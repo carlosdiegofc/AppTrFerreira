@@ -3,8 +3,8 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { Icon } from '../components/Icon';
 import { type Photo, PhotoDialog } from '../components/PhotoDialog';
 import { TripMap } from '../components/TripMap';
-import { Card, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote } from '../components/ui';
-import { useCatalog, useRoute, useTripDetail } from '../data/hooks';
+import { CatalogNote, Card, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote } from '../components/ui';
+import { useRoute, useTripDetail } from '../data/hooks';
 import { calendarDay, formatDay, formatDayTime, formatDuration } from '../lib/dates';
 import { count, money, number } from '../lib/format';
 import { documentLabel, sourceLabel, tripFacts } from '../lib/tripTable';
@@ -39,8 +39,7 @@ function Missing() {
 }
 
 function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
-  const { trip, detail } = useTripDetail(kind, id);
-  const catalog = useCatalog();
+  const { trip, detail, catalog } = useTripDetail(kind, id);
   const session = detail.data?.session ?? null;
   const route = useRoute(session ? { id: session.id, driver_id: session.driver_id, started_at: session.started_at, ended_at: session.ended_at } : null);
   const stats = useMemo(() => (route.data ? routeStats(route.data) : null), [route.data]);
@@ -50,7 +49,7 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfFailed, setPdfFailed] = useState(false);
 
-  if (detail.isLoading) {
+  if (detail.isLoading || catalog.isLoading) {
     return (
       <div className="page">
         <Back />
@@ -111,6 +110,7 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
       />
       {pdfFailed && <ErrorNote>No se pudo armar el PDF. Probá de nuevo.</ErrorNote>}
       {detail.error && <StaleNote onRetry={() => void detail.refetch()} />}
+      {catalog.error && <CatalogNote onRetry={() => void catalog.refetch()} />}
 
       <div className="trip-status">
         <Pill tone={STATUS_TONE[trip.status.code]}>{trip.status.label}</Pill>

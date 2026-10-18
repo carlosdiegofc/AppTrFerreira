@@ -59,7 +59,7 @@ export const SHEET_COLUMNS: SheetColumn[] = [
   { header: 'Km facturables', width: 12, kind: 'number', decimals: 1, value: (t) => t.billableKm },
   { header: 'Kilos', width: 10, kind: 'number', decimals: 0, value: (t) => t.kg },
   { header: 'Importe', width: 12, kind: 'number', decimals: 2, value: (t) => t.amount },
-  { header: 'Moneda', width: 8, kind: 'text', value: (t) => (t.amount ? t.currency : null) },
+  { header: 'Moneda', width: 8, kind: 'text', value: (t) => (t.amount !== null ? t.currency : null) },
   { header: 'Falta completar', width: 26, kind: 'text', value: (t) => (t.deleted ? null : t.status.missing.join(', ') || null) },
   { header: 'Notas', width: 30, kind: 'text', value: (t) => t.notes },
   { header: 'Registro', width: 14, kind: 'text', value: (t) => sourceLabel(t) },
