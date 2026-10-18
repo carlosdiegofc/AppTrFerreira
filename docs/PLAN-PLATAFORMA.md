@@ -53,7 +53,7 @@ Va armándose al costado del panel actual y lo reemplaza sección por sección.
 2. [x] Inicio y GPS en vivo, con las mismas reglas de estado y de vencimientos que la app (18/10/2026).
 3. Viajes, en dos partes (aprobado el 18/10/2026):
    - 3a. [x] Consultar: lista con período, búsqueda, filtros por camión y chofer y pestañas por estado (pendientes de completar, en curso, completos, eliminados); detalle con formato de orden de carga, recorrido GPS, remitos y combustible con sus fotos; exportación a Excel, PDF y Word. Sin cambios en la base (18/10/2026).
-   - 3b. [ ] Editar: completar los datos para facturar, cargar viajes a mano, papelera y restaurar, con aviso si dos personas editan el mismo viaje a la vez. Necesita la migración de permisos de `trf_panel_trips`.
+   - 3b. [x] Editar: completar los datos para facturar, cargar viajes a mano, papelera y restaurar, con aviso si dos personas guardan el mismo viaje a la vez (no se pisa nada). Migración [`0001_panel_trips_edicion.sql`](../supabase/migrations/0001_panel_trips_edicion.sql): guardan las cuentas del panel, la base anota quién y cuándo y no se borra nada; con ella vuelve a andar también el guardado del panel actual. Aplicada en producción el 18/10/2026 a las 20:05 (Uruguay), con un respaldo completo tomado a las 20:01 y probado en una base local. El chofer edita sus viajes desde la app en una próxima versión; buscar lugares en el mapa espera al proveedor de mapas (18/10/2026).
 4. [ ] Combustible, Mantenimiento y Documentación con lo que ya carga la app.
 5. [ ] Métricas: rendimiento por camión y por chofer, con gráficos.
 6. [x] Publicarlo: el código pasa a `main` y el panel nuevo queda en `/nuevo/` de la dirección del panel actual (18/10/2026).
@@ -63,7 +63,7 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - El rol anónimo tiene todos los permisos de tabla en 8 tablas de la app y del panel (`trf_driver_*`, `trf_trip_*`, `trf_mobile_catalog`, `trf_panel_trips`), y también los de la secuencia que numera los puntos GPS. Es lo que Supabase da por defecto y la seguridad por filas lo frena, pero hay que quitarlos: solo `trf_rates` necesita lectura anónima.
 - Conviven dos tipos de administrador: `trf_private.admin_emails` (administración completa, por correo) y `trf_panel_admins` (panel: lee toda la flota y también administra mantenimiento y documentos). Los datos que se completan en el panel (`trf_panel_trips`) los lee solo la segunda lista. Los dos pasan a ser roles por empresa.
 - Las políticas que usan `trf_is_panel_admin()` sin `(select …)` se evalúan fila por fila; con más datos conviene envolverlas.
-- `trf_panel_trips` solo tiene la política de lectura: las de alta y modificación de `web/sql/001_panel_web.sql` no están en producción, así que el panel actual no puede guardar los datos de un viaje ni mandarlo a la papelera. Quién edita quedó decidido el 18/10 (ver decisiones); las políticas van en una migración con la parte 3b de Viajes.
+- `trf_panel_trips` solo tenía la política de lectura: las de alta y modificación de `web/sql/001_panel_web.sql` no estaban en producción, así que el panel actual no podía guardar los datos de un viaje ni mandarlo a la papelera. Resuelto el 18/10/2026 con la migración `0001` de la parte 3b de Viajes, según quién edita (ver decisiones).
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
