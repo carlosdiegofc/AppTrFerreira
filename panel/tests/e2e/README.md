@@ -8,7 +8,7 @@ El panel corre en Chromium (Playwright) contra un **PostgREST real** conectado a
 
 `server.mjs` sirve el panel y reemplaza el ingreso de Supabase. El reloj del navegador queda fijo en el instante base de los datos (15/10/2026 al mediodía en Uruguay), así que el resultado es el mismo a cualquier hora. Los mapas no se descargan de OpenStreetMap durante las pruebas.
 
-`db/permissions.sql` revisa la seguridad por filas con los mismos datos: un chofer ve solo lo suyo, la administración ve toda la flota y sin ingresar no se ve nada.
+`db/permissions.sql` revisa la seguridad por filas con los mismos datos: un chofer ve solo lo suyo, la administración ve toda la flota, un administrador que no está en la lista del panel no lee los datos del panel y sin ingresar no se ve nada.
 
 Para correrlas en una computadora:
 ```bash

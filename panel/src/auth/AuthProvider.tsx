@@ -53,7 +53,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ status: 'checking', user });
     try {
       const access = await fetchAccess();
-      setState(access.panelAdmin || access.admin ? { status: 'ready', user, access } : { status: 'denied', user });
+      // Same rule as the current panel: only trf_panel_admins. The panel trip rows (edits and the bin) are readable only
+      // by them, so a full administrator outside that list would see deleted trips counted.
+      setState(access.panelAdmin ? { status: 'ready', user, access } : { status: 'denied', user });
     } catch {
       checked.current = null;
       setState({ status: 'offline', user });

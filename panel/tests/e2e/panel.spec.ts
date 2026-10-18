@@ -45,6 +45,11 @@ test('una cuenta de chofer no entra al panel', async ({ page }) => {
   await expect(page.getByLabel('Correo')).toBeVisible();
 });
 
+test('un administrador que no está en la lista del panel tampoco entra', async ({ page }) => {
+  await signIn(page, 'admin@ejemplo.uy');
+  await expect(page.getByRole('heading', { name: 'Esta cuenta no tiene acceso' })).toBeVisible();
+});
+
 test('el inicio muestra la flota, los viajes de hoy y lo que hay que tener en cuenta', async ({ page }) => {
   await signIn(page, 'dueno@ejemplo.uy');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Buen día, Dueño');

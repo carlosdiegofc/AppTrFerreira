@@ -835,7 +835,10 @@ class MainActivity:AppCompatActivity(){
   if(kind=="trips")tripList(rows,fleet) else fuelList(rows,fleet)
   if(rows.length()>=historyLimit)button(root,"Cargar más",Kind.LINE){historyLimit+=50;history(kind,true)}
   if(!hub)navBar(kind)
-  if(refresh)thread{try{mobile.history(kind,historyLimit,true,fleet);runOnUiThread{if(screen==key)history(kind)}}catch(_:Exception){runOnUiThread{if(screen==key)toast("Sin conexión. Mostrando los registros guardados en este teléfono.")}}}
+  if(refresh)thread{try{var limit=historyLimit;var loaded=mobile.history(kind,limit,true,fleet)
+    // "Este mes" adds up the whole month: keep loading while the oldest receipt loaded is still from this month.
+    while(kind=="fuel"&&fuelMonth&&loaded.length()>=limit&&limit<2000&&loaded.optJSONObject(loaded.length()-1)?.let{r->zoned(r.optString("recorded_at"))?.let{YearMonth.from(it)}}==YearMonth.now()){limit+=50;loaded=mobile.history(kind,limit,true,fleet)}
+    runOnUiThread{historyLimit=maxOf(historyLimit,limit);if(screen==key)history(kind)}}catch(_:Exception){runOnUiThread{if(screen==key)toast("Sin conexión. Mostrando los registros guardados en este teléfono.")}}}
  }
  private fun tripList(rows:JSONArray,fleet:Boolean){
   val info=mobile.tripInfo(fleet)
@@ -876,7 +879,7 @@ class MainActivity:AppCompatActivity(){
   v.contentDescription="$title. $sub";c.addView(v,LinearLayout.LayoutParams(-1,-2))
  }
  private fun fuelList(rows:JSONArray,fleet:Boolean){
-  segmented(root,listOf("Este mes","Todos"),if(fuelMonth)0 else 1){fuelMonth=it==0;history("fuel")}
+  segmented(root,listOf("Este mes","Todos"),if(fuelMonth)0 else 1){fuelMonth=it==0;history("fuel",fuelMonth)}
   val now=YearMonth.now();val list=(0 until rows.length()).map{rows.getJSONObject(it)}.filter{!fuelMonth||fuelDay(it)?.let{d->YearMonth.from(d)}==now}
   var litres=0.0;var pesos=0.0
   list.forEach{r->val d=r.optJSONObject("panel_data")?:JSONObject();amount(d,"litros",r,"liters")?.let{litres+=it};if(currency(d)=="UYU")amount(d,"monto",r,"total")?.let{pesos+=it}}
@@ -1049,17 +1052,22 @@ class MainActivity:AppCompatActivity(){
  private fun stateColor(state:String)=when(state){"moving"->0xFF178A4C.toInt();"idle"->0xFF8F9BAD.toInt();else->0xFFE69A1E.toInt()}
  private fun fleetItems(f:JSONObject):List<FleetItem>{
   val now=System.currentTimeMillis();val out=mutableListOf<FleetItem>();val busy=mutableSetOf<String>()
+  // Trucks are matched like the month summary: a trip saved with an older label ("Ford Cargo") still marks its catalog
+  // truck as busy, so the truck does not show twice.
+  val fleet=mobile.trucks()
   val running=f.optJSONArray("active")?:JSONArray()
   for(i in 0 until running.length()){val s=running.getJSONObject(i);val last=s.optJSONObject("last")
    val at=instant(last?.optString("recorded_at"))?.toEpochMilli();val kmh=last?.optDouble("speed_kmh",Double.NaN)?:Double.NaN
    val state=when{s.optBoolean("paused")->"paused";at==null||now-at>15*60000->"nosignal";kmh.isFinite()&&kmh>=5->"moving";else->"stopped"}
-   val (model,plate)=truckParts(s.optString("vehicle"));if(plate.isNotBlank())busy.add(plate.uppercase())
+   val label=FleetStats.canonical(s.optString("vehicle"),fleet);if(label!=null)busy.add(label)
+   val (model,plate)=truckParts(label?:s.optString("vehicle"))
    out.add(FleetItem(model,plate,s.optString("driver_name"),state,kmh,s.optDouble("distance_meters",0.0),last?.optDouble("latitude",Double.NaN)?:Double.NaN,last?.optDouble("longitude",Double.NaN)?:Double.NaN,at,s))}
   val recent=f.optJSONArray("recent")?:JSONArray();val equipos=mobile.catalog().optJSONArray("equipos")?:JSONArray()
   for(i in 0 until equipos.length()){val e=equipos.getJSONObject(i);val plate=e.optString("matriculaCamion").trim()
-   if(plate.isNotBlank()&&plate.uppercase() in busy)continue
+   val label=FleetStats.CatalogTruck(e.optString("tipo"),plate).label
+   if(label.isNotBlank()&&label in busy)continue
    var last:JSONObject?=null
-   for(j in 0 until recent.length()){val r=recent.getJSONObject(j);if(plate.isNotBlank()&&r.optString("vehicle").uppercase().contains(plate.uppercase())){last=r;break}}
+   for(j in 0 until recent.length()){val r=recent.getJSONObject(j);if(label.isNotBlank()&&FleetStats.canonical(r.optString("vehicle"),fleet)==label){last=r;break}}
    out.add(FleetItem(e.optString("tipo"),plate,last?.optString("driver_name")?:"","idle",Double.NaN,0.0,last?.optDouble("arrival_lat",Double.NaN)?:Double.NaN,last?.optDouble("arrival_lng",Double.NaN)?:Double.NaN,instant(last?.optString("ended_at"))?.toEpochMilli(),null))}
   return out
  }

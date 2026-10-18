@@ -6,13 +6,15 @@ create temporary table t0 as select :'base'::timestamptz as now, (:'base'::times
 insert into auth.users (id, aud, role, email, email_confirmed_at, raw_user_meta_data) values
   ('00000000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'dueno@ejemplo.uy', now(), '{"full_name":"Dueño de Prueba"}'),
   ('00000000-0000-4000-8000-000000000002', 'authenticated', 'authenticated', 'lectura@ejemplo.uy', now(), '{"full_name":"Socio Lectura"}'),
+  ('00000000-0000-4000-8000-000000000003', 'authenticated', 'authenticated', 'admin@ejemplo.uy', now(), '{"full_name":"Administración"}'),
   ('00000000-0000-4000-8000-000000000011', 'authenticated', 'authenticated', 'chofer1@ejemplo.uy', now(), '{"full_name":"Ana Pereira"}'),
   ('00000000-0000-4000-8000-000000000012', 'authenticated', 'authenticated', 'chofer2@ejemplo.uy', now(), '{"full_name":"Bruno Díaz"}'),
   ('00000000-0000-4000-8000-000000000013', 'authenticated', 'authenticated', 'chofer3@ejemplo.uy', now(), '{"full_name":"Carla Méndez"}'),
   ('00000000-0000-4000-8000-000000000014', 'authenticated', 'authenticated', 'chofer4@ejemplo.uy', now(), '{"full_name":"Diego Silva"}');
 
--- The owner is a full administrator; the partner reads the fleet like the owner who drives.
-insert into trf_private.admin_emails (email) values ('dueno@ejemplo.uy');
+-- The owner is a full administrator; the partner reads the fleet like the owner who drives. admin@ is a full
+-- administrator outside the panel list: the panel does not open for it.
+insert into trf_private.admin_emails (email) values ('dueno@ejemplo.uy'), ('admin@ejemplo.uy');
 insert into public.trf_panel_admins (user_id, email) values
   ('00000000-0000-4000-8000-000000000001', 'dueno@ejemplo.uy'),
   ('00000000-0000-4000-8000-000000000002', 'lectura@ejemplo.uy');

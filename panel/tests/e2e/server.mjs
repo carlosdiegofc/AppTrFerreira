@@ -17,6 +17,7 @@ export const PASSWORD = 'clave-de-prueba';
 export const USERS = {
   'dueno@ejemplo.uy': { id: '00000000-0000-4000-8000-000000000001', name: 'Dueño de Prueba' },
   'lectura@ejemplo.uy': { id: '00000000-0000-4000-8000-000000000002', name: 'Socio Lectura' },
+  'admin@ejemplo.uy': { id: '00000000-0000-4000-8000-000000000003', name: 'Administración' },
   'chofer1@ejemplo.uy': { id: '00000000-0000-4000-8000-000000000011', name: 'Ana Pereira' },
 };
 const refreshTokens = new Map();

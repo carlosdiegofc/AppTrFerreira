@@ -229,6 +229,27 @@ La app de Google Play es una app nueva para Android (nombre de paquete `com.tran
 
 Cada versión nueva lleva un número de versión más alto, y GitHub Actions arma su `.aab` solo. En Play Console: *Prueba interna › Crear versión* › subí el `.aab` nuevo › **Lanzar**. Los teléfonos se actualizan desde Google Play sin hacer nada más.
 
+Versión `0.16.3` (código de versión 25). No cambia permisos, datos recopilados ni la política de privacidad. Notas de la versión si ya está subida la 0.16.2:
+
+```text
+<es-419>
+• Flota en vivo: un camión en viaje ya no aparece dos veces.
+• Combustible del mes: los totales suman todas las cargas del mes.
+</es-419>
+```
+
+Si la 0.16.2 no llegó a subirse, se sube directamente la 0.16.3 (trae todo lo de la 0.16.2), se actualizan las instrucciones de [Acceso a la app](#acceso-a-la-app) y van estas notas:
+
+```text
+<es-419>
+• Al entrar, cada chofer elige el modo: sencillo (solo iniciar y finalizar el viaje, con botones grandes) o normal (todas las opciones).
+• En modo sencillo, la app pregunta antes de iniciar el viaje.
+• Nuevo: Rendimiento del mes por camión y por chofer, para los dueños.
+• Las pantallas ya no quedan tapadas por las barras del teléfono.
+• Flota en vivo y combustible del mes, corregidos.
+</es-419>
+```
+
 Versión `0.16.2` (código de versión 24). No cambia permisos, datos recopilados ni la política de privacidad; solo hay que actualizar las instrucciones de [Acceso a la app](#acceso-a-la-app). Notas de la versión:
 
 ```text

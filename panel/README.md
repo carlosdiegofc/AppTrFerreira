@@ -9,7 +9,7 @@ Panel web de la plataforma (etapas en [docs/PLAN-PLATAFORMA.md](../docs/PLAN-PLA
 | Flota, Viajes, Choferes, Combustible, Mantenimiento, Documentación, Gastos y finanzas, Métricas, Asistente IA, Configuración | Próximamente: cada página dice qué va a hacer y dónde se hace mientras tanto. |
 
 ## Quién entra
-Las mismas cuentas de la app. El panel solo se abre para las cuentas que la base reconoce como administradoras (`trf_is_panel_admin()` o `trf_is_admin()`); un chofer ve «Esta cuenta no tiene acceso». Qué datos ve cada cuenta lo deciden los permisos de la base (seguridad por filas), no la pantalla.
+Las mismas cuentas de la app. Igual que el panel actual, este solo se abre para las cuentas de la lista de administradores del panel (`trf_is_panel_admin()`); cualquier otra, chofer o no, ve «Esta cuenta no tiene acceso». Qué datos ve cada cuenta lo deciden los permisos de la base (seguridad por filas), no la pantalla.
 
 ## Reglas compartidas con la app
 Estados de los camiones (en ruta desde 5 km/h, sin señal después de 15 minutos sin lecturas), coincidencia de camiones por matrícula o por modelo, avisos de papeles (30 días) y de services (15 días) y el día en hora de Uruguay están en `src/lib/` con pruebas en `tests/unit/`. Son las mismas reglas de `FleetStats.kt` y `MainActivity.kt`.

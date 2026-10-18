@@ -49,6 +49,19 @@ begin
 end $$;
 rollback;
 
+-- A full administrator outside the panel list reads the trips but not the panel rows (edits and the bin), so the panel
+-- does not open for that account.
+begin;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-000000000003","role":"authenticated"}', true) is not null as admin;
+do $$
+begin
+  if public.trf_is_panel_admin() or not public.trf_is_admin() then raise exception 'admin: tendría que ser administrador completo fuera de la lista del panel'; end if;
+  if (select count(*) from public.trf_driver_tracking_sessions) <> 6 then raise exception 'admin: tendría que ver los 6 viajes'; end if;
+  if (select count(*) from public.trf_panel_trips) <> 0 then raise exception 'admin: no tendría que leer los datos del panel'; end if;
+end $$;
+rollback;
+
 -- Without signing in nothing of the fleet can be read.
 begin;
 set local role anon;
