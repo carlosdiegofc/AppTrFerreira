@@ -23,5 +23,8 @@ npm test           # reglas
 npm run build      # carpeta dist/, para publicar en cualquier hosting estático
 ```
 
+## Publicación
+El workflow *Publicar panel web* (Actions → Run workflow, desde `main`) publica el panel actual en la dirección de siempre y este en `/nuevo/` de la misma dirección.
+
 ## Pruebas de punta a punta
 Corren en un navegador real contra PostgREST y una base local creada con todas las migraciones de [`supabase/migrations`](../supabase/migrations) y datos inventados (`tests/e2e/db/seed.sql`). Nunca tocan producción. Detalle en [tests/e2e/README.md](tests/e2e/README.md). GitHub las corre en cada cambio del panel o de la base (workflow *Probar panel nuevo y base*) y guarda las capturas de pantalla.
