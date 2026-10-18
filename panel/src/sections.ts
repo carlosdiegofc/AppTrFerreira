@@ -1,0 +1,32 @@
+// The twelve sections of the platform plan (docs/PLAN-PLATAFORMA.md). The ones not built yet say what they will do and
+// where to find that today.
+import { CURRENT_PANEL_URL } from './config';
+import type { IconName } from './components/Icon';
+
+export interface Section {
+  path: string;
+  label: string;
+  icon: IconName;
+  ready: boolean;
+  /** What the section will do, for the "Próximamente" page. */
+  about: string;
+  /** Where to do it in the meantime. */
+  meanwhile?: { text: string; href?: string };
+}
+
+const inCurrentPanel = { text: 'Mientras tanto, usalo en el panel actual.', href: CURRENT_PANEL_URL };
+
+export const SECTIONS: Section[] = [
+  { path: 'inicio', label: 'Inicio', icon: 'home', ready: true, about: 'La flota de un vistazo.' },
+  { path: 'flota', label: 'Flota', icon: 'truck', ready: false, about: 'La ficha de cada camión con foto, sus acoplados y su historial, los kilómetros y los vencimientos.' },
+  { path: 'viajes', label: 'Viajes', icon: 'route', ready: false, about: 'Todos los viajes con filtros por estado, camión, chofer y fechas, el recorrido real, los datos para facturar y la exportación a Excel, PDF y Word.', meanwhile: inCurrentPanel },
+  { path: 'choferes', label: 'Choferes', icon: 'person', ready: false, about: 'La ficha de cada chofer con sus viajes, sus documentos y los vencimientos.' },
+  { path: 'combustible', label: 'Combustible', icon: 'fuel', ready: false, about: 'Las cargas con la foto de la boleta, el control de litros por precio y el consumo de cada camión.', meanwhile: inCurrentPanel },
+  { path: 'gps', label: 'GPS en vivo', icon: 'pin', ready: true, about: 'Dónde está cada camión ahora.' },
+  { path: 'mantenimiento', label: 'Mantenimiento', icon: 'wrench', ready: false, about: 'Los services preventivos y correctivos, con avisos por kilómetros y por fecha.', meanwhile: { text: 'Mientras tanto, está en la app: Menú del dueño › Mantenimiento.' } },
+  { path: 'documentacion', label: 'Documentación', icon: 'doc', ready: false, about: 'Los papeles de camiones y choferes con el archivo y su vencimiento.', meanwhile: { text: 'Mientras tanto, está en la app: Menú del dueño › Documentos.' } },
+  { path: 'finanzas', label: 'Gastos y finanzas', icon: 'money', ready: false, about: 'Gastos, facturas y cobros, la ganancia de cada viaje y un simulador de fletes.' },
+  { path: 'metricas', label: 'Métricas', icon: 'chart', ready: false, about: 'El rendimiento de cada camión y de cada chofer: kilómetros, consumo y facturación, con gráficos.', meanwhile: { text: 'Mientras tanto, está en la app: Menú del dueño › Rendimiento.' } },
+  { path: 'asistente', label: 'Asistente IA', icon: 'sparkle', ready: false, about: 'Consultas por WhatsApp sobre la flota, respondidas con los datos del sistema.' },
+  { path: 'configuracion', label: 'Configuración', icon: 'sliders', ready: false, about: 'La empresa, los usuarios y sus permisos, los catálogos y el plan.' },
+];

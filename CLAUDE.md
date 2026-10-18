@@ -5,4 +5,4 @@
 - Los textos para el usuario van en español de Uruguay, con voseo.
 - No se borran ni se sobrescriben funciones o datos existentes sin autorización y sin respaldo. La base cambia solo con migraciones aditivas, probadas primero fuera de producción.
 - El repositorio es público: nunca subas llaves de firma, contraseñas, correos personales ni datos de la base.
-- App Android en `app/` (Kotlin): cada versión sube `versionCode` (Google Play acepta cada número una sola vez) y se anota en README.md. Panel web en `web/`: pruebas con `npm test`, `tests/db` y `tests/e2e`.
+- App Android en `app/` (Kotlin): cada versión sube `versionCode` (Google Play acepta cada número una sola vez) y se anota en README.md. Panel web actual en `web/`: pruebas con `npm test`, `tests/db` y `tests/e2e`. Panel nuevo en `panel/` (React + TypeScript): `npm run typecheck`, `npm test` y `npm run e2e` (ver `panel/tests/e2e/README.md`).

@@ -45,15 +45,26 @@ En la etapa 1, Transportes Ferreira pasa a ser la empresa 1: sus datos se copian
 - [x] Respaldo completo de la base actual (estructura y datos), entregado al dueño fuera del repositorio: 18/10/2026, 01:47 UTC. Se restauró en una base local vacía con las mismas cantidades de filas y los mismos permisos.
 - [x] Estructura actual de la base como migración inicial [`supabase/migrations/0000_base_actual.sql`](../supabase/migrations/0000_base_actual.sql): tablas, funciones, políticas, permisos y buckets, sin datos.
 - [ ] Entorno de pruebas con la misma estructura y datos de ejemplo.
-- [ ] CI que aplica las migraciones a una base local y corre las pruebas de permisos, sobre lo que ya existe en `web/tests/e2e`.
+- [x] CI que aplica las migraciones a una base local y corre las pruebas de permisos: workflow *Probar panel nuevo y base*, con PostgreSQL 17 como Supabase, [`panel/tests/e2e/db/permissions.sql`](../panel/tests/e2e/db/permissions.sql) y las pruebas del panel nuevo en el navegador.
+
+### Panel web nuevo (`panel/`)
+Va armándose al costado del panel actual y lo reemplaza sección por sección.
+1. [x] Base: React + TypeScript, ingreso con las cuentas de la app (solo administración), menú con las 12 secciones, diseño de la app con modo oscuro, celular y computadora, pruebas automáticas (18/10/2026).
+2. [x] Inicio y GPS en vivo, con las mismas reglas de estado y de vencimientos que la app (18/10/2026).
+3. [ ] Viajes: filtros, recorrido, datos para facturar, papelera y exportación a Excel, PDF y Word.
+4. [ ] Combustible, Mantenimiento y Documentación con lo que ya carga la app.
+5. [ ] Métricas: rendimiento por camión y por chofer, con gráficos.
+6. [ ] Publicarlo (hace falta pasar el código a `main`).
 
 Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - El rol anónimo tiene todos los permisos de tabla en 8 tablas de la app y del panel (`trf_driver_*`, `trf_trip_*`, `trf_mobile_catalog`, `trf_panel_trips`). Es lo que Supabase da por defecto y la seguridad por filas lo frena, pero hay que quitarlos: solo `trf_rates` necesita lectura anónima.
 - Conviven dos tipos de administrador: `trf_private.admin_emails` (administración completa, por correo) y `trf_panel_admins` (panel, solo lectura). Los dos pasan a ser roles por empresa.
 - Las políticas que usan `trf_is_panel_admin()` sin `(select …)` se evalúan fila por fila; con más datos conviene envolverlas.
+- `trf_panel_trips` solo tiene la política de lectura: las de alta y modificación de `web/sql/001_panel_web.sql` no están en producción, así que el panel actual no puede guardar los datos de un viaje ni mandarlo a la papelera. Antes de la sección Viajes hay que decidir quién edita (¿solo la cuenta de la empresa o también Luis?) y crear esas políticas con una migración.
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 18/10/2026: el panel nuevo se hace en React + TypeScript, en `panel/`, y el actual sigue funcionando hasta que el nuevo lo reemplace.
 - 16/10/2026: Supabase sigue en el plan gratis, sin Pro. Como ese plan no tiene respaldos descargables, antes de cada migración se hace un respaldo manual completo (estructura y datos) y se le entrega al dueño, nunca en el repositorio. La base entra en reposo si pasa unos días sin uso y vuelve con el uso (la app, el panel) o desde el proyecto en supabase.com. Las ramas de prueba de Supabase quedan descartadas porque requieren Pro.
 
 ## Decisiones abiertas
@@ -62,4 +73,4 @@ Antes de tocar datos reales:
 - Pasar la v0.16.2 a `main`.
 - Rol de cada cuenta actual: dueños, choferes y la cuenta de revisión de Google, que iría a una empresa de demostración.
 
-Más adelante: tecnología del panel nuevo, proveedor de mapas, método de lectura de boletas, modelo de IA y cupo por plan, transcripción de audios, medio de pago, facturación electrónica (CFE), monedas, nombre comercial, cuánto tiempo se guarda el GPS en el plan FREE y publicidad.
+Más adelante: proveedor de mapas, método de lectura de boletas, modelo de IA y cupo por plan, transcripción de audios, medio de pago, facturación electrónica (CFE), monedas, nombre comercial, cuánto tiempo se guarda el GPS en el plan FREE y publicidad.
