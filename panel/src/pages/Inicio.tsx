@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router';
 import { usePanelUser } from '../auth/AuthProvider';
 import { FleetMap } from '../components/FleetMap';
 import { Icon } from '../components/Icon';
-import { Card, Dot, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, Stat } from '../components/ui';
+import { Card, Dot, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote, Stat } from '../components/ui';
 import type { TripRow } from '../data/api';
 import { useCatalog, useFleet, useNow, usePapers, useTrips } from '../data/hooks';
 import { addDays, ago, dayInZone, firstOfMonth, firstOfNextMonth, formatTime, greeting, longDate, startOfDay } from '../lib/dates';
@@ -118,7 +118,8 @@ export function Inicio() {
         </Card>
 
         <Card title="Para tener en cuenta">
-          {papers.error ? (
+          {papers.error && papers.data !== undefined && <StaleNote onRetry={() => void papers.refetch()} />}
+          {papers.error && papers.data === undefined ? (
             <ErrorNote onRetry={() => void papers.refetch()} />
           ) : papers.isLoading ? (
             <Skeleton />
@@ -139,7 +140,8 @@ export function Inicio() {
 
       <div className="grid-2">
         <Card title="Viajes de hoy">
-          {todays.error ? (
+          {todays.error && todays.data !== undefined && <StaleNote onRetry={() => void todays.refetch()} />}
+          {todays.error && todays.data === undefined ? (
             <ErrorNote onRetry={() => void todays.refetch()} />
           ) : todays.isLoading ? (
             <Skeleton />
@@ -157,7 +159,8 @@ export function Inicio() {
         </Card>
 
         <Card title={<span className="cap">{new Intl.DateTimeFormat('es-UY', { month: 'long', timeZone: 'America/Montevideo' }).format(now)}</span>}>
-          {month.error ? (
+          {month.error && month.data !== undefined && <StaleNote onRetry={() => void month.refetch()} />}
+          {month.error && month.data === undefined ? (
             <ErrorNote onRetry={() => void month.refetch()} />
           ) : !totals ? (
             <Skeleton />

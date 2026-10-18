@@ -25,6 +25,11 @@ export function number(value: number, decimals = 0): string {
   return new Intl.NumberFormat('es-UY', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(value);
 }
 
+/** Up to the given decimals, only when there are: 160 → "160", 12.5 → "12,5". */
+export function decimal(value: number, decimals = 1): string {
+  return new Intl.NumberFormat('es-UY', { maximumFractionDigits: decimals }).format(value);
+}
+
 /** "$ 41.000" in pesos, "US$ 1.250,50" in dollars: cents only when there are. */
 export function money(value: number, currency: 'UYU' | 'USD'): string {
   const decimals = Number.isInteger(value) ? 0 : 2;

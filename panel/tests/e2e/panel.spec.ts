@@ -232,6 +232,29 @@ test('el detalle de un viaje muestra la orden de carga, el recorrido, los remito
   await expect(page.locator('.map-legend')).toContainText('Origen y destino declarados por la oficina o el chofer');
 });
 
+test('si falla una actualización, la lista y el viaje siguen a la vista con un aviso', async ({ page }) => {
+  await signIn(page, 'dueno@ejemplo.uy');
+  await open(page, 'Viajes');
+  await expect(rows(page)).toHaveCount(6);
+  let fail = false;
+  await page.route('**/rest/v1/trf_driver_tracking_sessions*', (route) => (fail ? route.fulfill({ status: 500, contentType: 'application/json', body: '{"message":"falla de prueba"}' }) : route.fallback()));
+  fail = true;
+  await page.getByRole('button', { name: 'Actualizar' }).click();
+  await expect(page.getByRole('alert')).toContainText('No se pudo actualizar: se ve lo último que se leyó.');
+  await expect(rows(page)).toHaveCount(6);
+
+  fail = false;
+  await rows(page).filter({ hasText: 'Molino San José' }).getByRole('link').click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Orden de carga 24129');
+  fail = true;
+  await page.getByRole('button', { name: 'Actualizar' }).click();
+  await expect(page.getByRole('alert')).toContainText('No se pudo actualizar: se ve lo último que se leyó.');
+  await expect(page.locator('.order-facts')).toContainText('Molino San José');
+  fail = false;
+  await page.getByRole('alert').getByRole('button', { name: 'Reintentar' }).click();
+  await expect(page.getByRole('alert')).toBeHidden();
+});
+
 test('si no se puede leer el recorrido, el viaje lo dice y deja reintentar', async ({ page }) => {
   await signIn(page, 'dueno@ejemplo.uy');
   await open(page, 'Viajes');

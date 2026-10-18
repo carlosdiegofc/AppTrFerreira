@@ -16,6 +16,20 @@ export function dayInZone(ms: number, zone = ZONE): string {
   return `${p.year}-${p.month}-${p.day}`;
 }
 
+/**
+ * The calendar day ("2026-10-15") of a value as the office reads it: a date stays as it is ("2026-10-15", or
+ * "15/10/2026" as typed in the panel, like the app reads it) and an instant goes to its day in Uruguay, so 22:00 of the
+ * 15th is still the 15th. Null when it is not a date.
+ */
+export function calendarDay(value: string | null | undefined, zone = ZONE): string | null {
+  const text = (value ?? '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const typed = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(text);
+  if (typed) return `${typed[3]}-${typed[2]}-${typed[1]}`;
+  const ms = /^\d{4}-\d{2}-\d{2}T/.test(text) ? Date.parse(text) : Number.NaN;
+  return Number.isNaN(ms) ? null : dayInZone(ms, zone);
+}
+
 /** Offset of the zone from UTC at an instant, in minutes (Uruguay: -180). */
 export function zoneOffsetMinutes(ms: number, zone = ZONE): number {
   const name = new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'longOffset' }).formatToParts(ms).find((p) => p.type === 'timeZoneName')?.value ?? 'GMT';

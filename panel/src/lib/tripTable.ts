@@ -1,7 +1,7 @@
 // What a trip shows, in the same words on the screen and in every file the office downloads (Excel, PDF, Word).
 import { formatDayTime } from './dates';
 import { truckParts } from './fleet';
-import { money, number } from './format';
+import { decimal, money, number } from './format';
 import { EMPTY_RETURN, type Trip } from './trips';
 
 const ms = (iso: string | null) => (iso ? Date.parse(iso) : null);
@@ -26,9 +26,9 @@ export function routeText(t: Pick<Trip, 'originName' | 'destinationName'>): stri
   return `${t.originName ?? '¿origen?'} – ${t.destinationName ?? '¿destino?'}`;
 }
 
-/** Km facturables when the office typed them, else the km the GPS measured. */
+/** Km facturables when the office typed them (with their tenths), else the km the GPS measured. */
 export function kmText(t: Pick<Trip, 'billableKm' | 'gpsKm'>): string {
-  if (t.billableKm !== null) return `${number(t.billableKm, 0)} km fact.`;
+  if (t.billableKm !== null) return `${decimal(t.billableKm, 1)} km fact.`;
   if (t.gpsKm !== null) return `${number(t.gpsKm, 1)} km GPS`;
   return '';
 }
@@ -118,7 +118,7 @@ export function totalsText(t: TripTotals): string {
   if (t.trips === 0 && t.deleted > 0) return deleted;
   return [
     t.trips === 1 ? '1 viaje' : `${number(t.trips)} viajes`,
-    t.billableKm > 0 ? `${number(t.billableKm, 0)} km facturables` : null,
+    t.billableKm > 0 ? `${decimal(t.billableKm, 1)} km facturables` : null,
     t.gpsKm > 0 ? `${number(t.gpsKm, 1)} km GPS` : null,
     t.kg > 0 ? `${number(t.kg, 0)} kg` : null,
     t.amount.UYU > 0 ? money(t.amount.UYU, 'UYU') : null,
@@ -144,7 +144,7 @@ export function tripFacts(t: Trip): [string, string][] {
     ['Salida', formatDayTime(ms(t.departureAt)) || null],
     ['Llegada', t.active ? 'En curso' : formatDayTime(ms(t.arrivalAt)) || null],
     ['Km GPS', t.gpsKm === null ? null : `${number(t.gpsKm, 1)} km`],
-    ['Km facturables', t.billableKm === null ? null : `${number(t.billableKm, 1)} km`],
+    ['Km facturables', t.billableKm === null ? null : `${decimal(t.billableKm, 1)} km`],
     ['Kilos', t.kg === null ? null : `${number(t.kg, 0)} kg`],
     ['Importe', t.amount === null ? null : money(t.amount, t.currency)],
     ['Carga', t.loadType === null ? null : t.loadType === 'empty' ? EMPTY_RETURN : 'Con carga'],

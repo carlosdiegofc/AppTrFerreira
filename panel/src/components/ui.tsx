@@ -74,6 +74,11 @@ export function ErrorNote({ onRetry, children = 'No se pudieron cargar los datos
   );
 }
 
+/** A refresh that failed while what was read before stays on screen: a first read that failed is an ErrorNote. */
+export function StaleNote({ onRetry }: { onRetry: () => void }) {
+  return <ErrorNote onRetry={onRetry}>No se pudo actualizar: se ve lo último que se leyó.</ErrorNote>;
+}
+
 export function Skeleton({ lines = 3 }: { lines?: number }) {
   return (
     <div className="skeleton" aria-busy="true" aria-label="Cargando">

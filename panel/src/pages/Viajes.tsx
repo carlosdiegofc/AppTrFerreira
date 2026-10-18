@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router';
 import { Icon } from '../components/Icon';
-import { Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton } from '../components/ui';
+import { Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote } from '../components/ui';
 import { useNow, useTripList } from '../data/hooks';
 import type { ListFormat } from '../exports/trips';
 import { ago, dayInZone, formatDay, formatDayTime } from '../lib/dates';
-import { count, number } from '../lib/format';
+import { count, decimal, number } from '../lib/format';
 import { routeText, sourceLabel, truckOf } from '../lib/tripTable';
 import { countByStatus, filterTrips, knownValues, type PeriodKind, periodRange, periodToIso, type StatusFilter, type Trip } from '../lib/trips';
 import { STATUS_TONE } from './states';
@@ -36,7 +36,7 @@ function TripRow({ trip }: { trip: Trip }) {
   const { model, plate } = truckOf(trip);
   const route = routeText(trip) || 'Origen y destino por completar';
   const sub = [trip.client, trip.product].filter(Boolean).join(' · ') || 'Cliente y producto por completar';
-  const [km, kmKind] = trip.billableKm !== null ? [`${number(trip.billableKm, 0)} km`, 'facturables'] : trip.gpsKm !== null ? [`${number(trip.gpsKm, 1)} km`, 'GPS'] : ['—', ''];
+  const [km, kmKind] = trip.billableKm !== null ? [`${decimal(trip.billableKm, 1)} km`, 'facturables'] : trip.gpsKm !== null ? [`${number(trip.gpsKm, 1)} km`, 'GPS'] : ['—', ''];
   return (
     <li>
       <Link className="trip-row" to={`/viajes/${trip.key}`}>
@@ -241,9 +241,11 @@ export function Viajes() {
         </div>
       </div>
 
+      {/* Only a first read that failed takes the list: after that, a failed refresh keeps the last list with a note. */}
+      {instants !== null && query.error && query.data !== undefined && <StaleNote onRetry={() => void query.refetch()} />}
       {instants === null ? (
         <ErrorNote>Revisá las fechas: «hasta» no puede ser antes de «desde».</ErrorNote>
-      ) : query.error ? (
+      ) : query.error && query.data === undefined ? (
         <ErrorNote onRetry={() => void query.refetch()}>No se pudieron leer los viajes.</ErrorNote>
       ) : query.isLoading ? (
         <div className="card card-body">

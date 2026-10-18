@@ -3,9 +3,9 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { Icon } from '../components/Icon';
 import { type Photo, PhotoDialog } from '../components/PhotoDialog';
 import { TripMap } from '../components/TripMap';
-import { Card, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton } from '../components/ui';
+import { Card, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote } from '../components/ui';
 import { useCatalog, useRoute, useTripDetail } from '../data/hooks';
-import { formatDay, formatDayTime, formatDuration } from '../lib/dates';
+import { calendarDay, formatDay, formatDayTime, formatDuration } from '../lib/dates';
 import { count, money, number } from '../lib/format';
 import { documentLabel, sourceLabel, tripFacts } from '../lib/tripTable';
 import { fuelFromReceipt, type LatLng, parseTripKey, routeStats } from '../lib/trips';
@@ -60,7 +60,8 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
       </div>
     );
   }
-  if (detail.error) {
+  // Only a first read that failed takes the page: after that, a failed refresh keeps the trip on screen with a note.
+  if (detail.error && detail.data === undefined) {
     return (
       <div className="page">
         <Back />
@@ -75,7 +76,7 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
     setPdfFailed(false);
     try {
       const { downloadTripPdf } = await import('../exports/trips');
-      const day = trip.departureAt ? trip.departureAt.slice(0, 10) : 'sin-fecha';
+      const day = calendarDay(trip.departureAt) ?? 'sin-fecha';
       await downloadTripPdf(trip, { documents, fuel, stats }, `viaje_${day}_${trip.orderNumber ?? trip.key.slice(4, 12)}`);
     } catch (e) {
       console.error(e);
@@ -90,6 +91,7 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
   const facts = tripFacts(trip);
   // Without an origin typed in the panel, an app trip's origin is where the GPS saw it start: that one is measured.
   const declared = { origin: samePlace(trip.origin, trip.gpsStart) ? null : trip.origin, destination: trip.destination };
+  const binDay = calendarDay(trip.deletedAt);
 
   return (
     <div className="page">
@@ -108,10 +110,11 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
         }
       />
       {pdfFailed && <ErrorNote>No se pudo armar el PDF. Probá de nuevo.</ErrorNote>}
+      {detail.error && <StaleNote onRetry={() => void detail.refetch()} />}
 
       <div className="trip-status">
         <Pill tone={STATUS_TONE[trip.status.code]}>{trip.status.label}</Pill>
-        {trip.deleted && trip.deletedAt && <span>Está en la papelera desde el {formatDay(trip.deletedAt.slice(0, 10))}: no cuenta en los totales.</span>}
+        {trip.deleted && binDay && <span>Está en la papelera desde el {formatDay(binDay)}: no cuenta en los totales.</span>}
         {!trip.deleted && trip.status.missing.length > 0 && <span>Falta completar: {trip.status.missing.join(', ')}.</span>}
       </div>
 
@@ -205,7 +208,7 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
                   <li key={f.id}>
                     <span className="item-main">
                       <strong>{f.station ?? 'Estación sin indicar'}</strong>
-                      <span>{[f.date ? formatDay(f.date.slice(0, 10)) : null, f.liters === null ? null : `${number(f.liters, 1)} L`, f.total === null ? null : money(f.total, f.currency)].filter(Boolean).join(' · ')}</span>
+                      <span>{[f.date ? formatDay(f.date) : null, f.liters === null ? null : `${number(f.liters, 1)} L`, f.total === null ? null : money(f.total, f.currency)].filter(Boolean).join(' · ')}</span>
                     </span>
                     {f.objectPath ? (
                       <button type="button" className="btn btn-quiet" onClick={() => setPhoto({ bucket: 'trf-fuel-receipts', path: f.objectPath as string, title: `Boleta de ${f.station ?? 'combustible'}` })}>

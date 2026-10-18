@@ -98,7 +98,7 @@ export function pdfTrip(trip: Trip, extras: TripExtras, fileBase: string): void 
     table(['Remito', 'Tipo de carga', 'Kilos'], extras.documents.map((d) => [documentLabel(d), d.cargo_type || '—', d.kg === null ? '—' : number(d.kg, 0)]));
   }
   if (extras.fuel.length > 0) {
-    table(['Combustible', 'Fecha', 'Litros', 'Importe'], extras.fuel.map((f) => [f.station ?? 'Estación sin indicar', f.date ? formatDay(f.date.slice(0, 10)) : '—', f.liters === null ? '—' : number(f.liters, 1), f.total === null ? '—' : money(f.total, f.currency)]));
+    table(['Combustible', 'Fecha', 'Litros', 'Importe'], extras.fuel.map((f) => [f.station ?? 'Estación sin indicar', f.date ? formatDay(f.date) : '—', f.liters === null ? '—' : number(f.liters, 1), f.total === null ? '—' : money(f.total, f.currency)]));
   }
   if (trip.notes) table(['Notas'], [[trip.notes]]);
   footer(doc);

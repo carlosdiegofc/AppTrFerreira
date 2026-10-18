@@ -1,7 +1,7 @@
 // Trips as the office reads them: each trip the app recorded, with what the office completed in the panel on top (the
 // panel wins), plus the trips typed by hand in the panel. Same rules as web/js/trips.js. Pure functions.
 import type { Tables } from './database.types';
-import { addDays, firstOfMonth, firstOfNextMonth, startOfDay } from './dates';
+import { addDays, calendarDay, firstOfMonth, firstOfNextMonth, startOfDay } from './dates';
 import { canonical, type CatalogTruck, text, truck } from './fleet';
 import { asObject, fold, toNumber } from './numbers';
 import { validPosition } from './route';
@@ -272,7 +272,7 @@ export function periodToIso(from: string, to: string): { fromIso: string; toIso:
 export interface Fuel {
   id: string;
   tripId: string | null;
-  /** The day of the receipt, as the office corrected it or as the phone sent it. */
+  /** The day of the receipt ("2026-10-15"), as the office corrected it or as the phone sent it, in Uruguay. */
   date: string | null;
   vehicle: string | null;
   driverName: string | null;
@@ -289,7 +289,7 @@ export function fuelFromReceipt(r: FuelRow, catalog: readonly CatalogTruck[] = [
   return {
     id: r.id,
     tripId: r.trip_id ?? null,
-    date: first(text(d.fecha), text(r.receipt_date), text(r.recorded_at)),
+    date: calendarDay(text(d.fecha)) ?? calendarDay(text(r.receipt_date)) ?? calendarDay(text(r.recorded_at)),
     vehicle: canonical(first(text(d.vehicle), truck(r.vehicle)), catalog),
     driverName: text(r.driver_name),
     station: first(text(d.estacionNombre), text(r.station_name)),

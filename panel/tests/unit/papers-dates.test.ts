@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, ago, dayInZone, daysBetween, firstOfMonth, firstOfNextMonth, formatTime, inDays, startOfDay } from '../../src/lib/dates';
+import { addDays, ago, calendarDay, dayInZone, daysBetween, firstOfMonth, firstOfNextMonth, formatTime, inDays, startOfDay } from '../../src/lib/dates';
 import { alerts, paperState, serviceState } from '../../src/lib/papers';
 
 describe('days in Uruguay', () => {
@@ -10,6 +10,14 @@ describe('days in Uruguay', () => {
   it('a day starts at 03:00 UTC', () => {
     expect(startOfDay('2026-10-18')).toBe('2026-10-18T03:00:00.000Z');
     expect(formatTime(Date.parse('2026-10-18T03:05:00Z'))).toBe('00:05');
+  });
+  it('the calendar day of a date or an instant, as the office reads it', () => {
+    // Deleted at 22:00 of the 15th in Uruguay: the 16th in UTC, still the 15th here.
+    expect(calendarDay('2026-10-16T01:00:00+00:00')).toBe('2026-10-15');
+    expect(calendarDay('2026-10-15')).toBe('2026-10-15');
+    expect(calendarDay('15/10/2026')).toBe('2026-10-15');
+    expect(calendarDay('ayer')).toBeNull();
+    expect(calendarDay(null)).toBeNull();
   });
   it('counts days and months', () => {
     expect(addDays('2026-10-31', 1)).toBe('2026-11-01');

@@ -29,6 +29,8 @@ describe('the trip as the screen and the files show it', () => {
     expect(routeText({ originName: null, destinationName: 'Young' })).toBe('¿origen? – Young');
     expect(routeText({ originName: null, destinationName: null })).toBe('');
     expect(kmText({ billableKm: null, gpsKm: 152.34 })).toBe('152,3 km GPS');
+    // The office bills tenths of a kilometre too.
+    expect(kmText({ billableKm: 12.5, gpsKm: null })).toBe('12,5 km fact.');
     expect(kmText({ billableKm: null, gpsKm: null })).toBe('');
   });
 
