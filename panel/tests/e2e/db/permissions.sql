@@ -35,7 +35,8 @@ begin
   if public.trf_is_admin() then raise exception 'lectura: no es administrador completo'; end if;
   if (select count(*) from public.trf_driver_tracking_sessions) <> 6 then raise exception 'lectura: tendría que ver los 6 viajes'; end if;
   if (select count(*) from public.trf_driver_location_history) <> 15 then raise exception 'lectura: tendría que ver las 15 lecturas GPS'; end if;
-  if (select count(*) from public.trf_panel_trips) <> 1 then raise exception 'lectura: tendría que ver los datos del panel'; end if;
+  if (select count(*) from public.trf_panel_trips) <> 3 then raise exception 'lectura: tendría que ver los 3 viajes del panel'; end if;
+  if (select count(*) from public.trf_trip_documents) <> 2 or (select count(*) from public.trf_driver_fuel_receipts) <> 1 then raise exception 'lectura: tendría que ver los remitos y el combustible'; end if;
   if (select count(*) from public.trf_documents) <> 3 then raise exception 'lectura: tendría que ver todos los papeles'; end if;
 end $$;
 rollback;

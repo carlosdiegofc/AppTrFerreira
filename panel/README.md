@@ -6,13 +6,16 @@ Panel web de la plataforma (etapas en [docs/PLAN-PLATAFORMA.md](../docs/PLAN-PLA
 |---|---|
 | **Inicio** | Camiones en ruta, detenidos y sin viaje; mapa de la flota; viajes de hoy; papeles y services vencidos o por vencer; números del mes. |
 | **GPS en vivo** | Todos los camiones en el mapa, actualizado cada 15 segundos, con filtros; al elegir un camión se ve su viaje en curso con el recorrido. |
-| Flota, Viajes, Choferes, Combustible, Mantenimiento, Documentación, Gastos y finanzas, Métricas, Asistente IA, Configuración | Próximamente: cada página dice qué va a hacer y dónde se hace mientras tanto. |
+| **Viajes** | Los viajes de la app, con lo que completó la oficina, y los cargados a mano: período, búsqueda, filtros por camión y chofer y pestañas por estado (pendientes de completar, en curso, completos, eliminados). El detalle de cada viaje tiene formato de orden de carga, con el recorrido GPS, los remitos y el combustible con sus fotos; en el mapa, lo que midió el GPS y el origen y destino declarados se ven distintos. La lista se exporta a Excel, PDF y Word (los viajes eliminados se pueden exportar, pero no se suman en los totales), y cada viaje a PDF. Por ahora solo para consultar: editar llega con la parte 3b del plan. |
+| Flota, Choferes, Combustible, Mantenimiento, Documentación, Gastos y finanzas, Métricas, Asistente IA, Configuración | Próximamente: cada página dice qué va a hacer y dónde se hace mientras tanto. |
 
 ## Quién entra
 Las mismas cuentas de la app. Igual que el panel actual, este solo se abre para las cuentas de la lista de administradores del panel (`trf_is_panel_admin()`); cualquier otra, chofer o no, ve «Esta cuenta no tiene acceso». Qué datos ve cada cuenta lo deciden los permisos de la base (seguridad por filas), no la pantalla.
 
 ## Reglas compartidas con la app
-Estados de los camiones (en ruta desde 5 km/h, sin señal después de 15 minutos sin lecturas), coincidencia de camiones por matrícula o por modelo, avisos de papeles (30 días) y de services (15 días), el recorrido en el mapa (sin las lecturas sin posición, como 0,0, y cortado en cada pausa o después de 90 segundos sin lecturas) y el día en hora de Uruguay están en `src/lib/` con pruebas en `tests/unit/`. Son las mismas reglas de `FleetStats.kt` y `MainActivity.kt` y del panel actual.
+Estados de los camiones (en ruta desde 5 km/h, sin señal después de 15 minutos sin lecturas), cómo se arma un viaje (lo que completó la oficina manda sobre lo que mandó el teléfono, y un viaje está pendiente mientras le falte camión, origen, destino, cliente o producto; en un retorno vacío no hacen falta cliente ni producto), coincidencia de camiones por matrícula o por modelo, avisos de papeles (30 días) y de services (15 días), el recorrido en el mapa (sin las lecturas sin posición, como 0,0, y cortado en cada pausa o después de 90 segundos sin lecturas) y el día en hora de Uruguay están en `src/lib/` con pruebas en `tests/unit/`. Son las mismas reglas de `FleetStats.kt` y `MainActivity.kt` y del panel actual (`web/js/trips.js`).
+
+Los archivos para descargar (Excel, PDF y Word) se arman en el navegador con [write-excel-file](https://www.npmjs.com/package/write-excel-file), [jsPDF](https://www.npmjs.com/package/jspdf) y [docx](https://www.npmjs.com/package/docx). Cada uno se carga solo cuando se pide ese archivo, así que no pesan en la carga del panel. Las fotos de remitos y boletas son privadas: cada vez que se abre una, el almacenamiento da un enlace que vence a los 10 minutos, y sus reglas deciden quién puede verla.
 
 ## Desarrollo
 ```bash

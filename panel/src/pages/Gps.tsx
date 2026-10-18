@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { FleetMap } from '../components/FleetMap';
 import { Icon } from '../components/Icon';
-import { Dot, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton } from '../components/ui';
+import { Dot, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote } from '../components/ui';
 import { FLEET_REFRESH_MS } from '../config';
 import { useFleet, useNow, useRoute } from '../data/hooks';
 import { ago, dayInZone, formatDay, formatTime } from '../lib/dates';
@@ -21,7 +21,8 @@ function when(ms: number, now: number): string {
   return day === dayInZone(now) ? formatTime(ms) : `${formatDay(day)} ${formatTime(ms)}`;
 }
 
-function Detail({ unit, now, points, onClose }: { unit: FleetUnit; now: number; points: number | null; onClose: () => void }) {
+/** points: null while the route loads, 'error' when it could not be read; stale: a refresh of the route failed. */
+function Detail({ unit, now, points, stale, onRetry, onClose }: { unit: FleetUnit; now: number; points: number | null | 'error'; stale: boolean; onRetry: () => void; onClose: () => void }) {
   const trip = unit.trip;
   return (
     <section className="unit-detail" aria-label={`Detalle de ${unitTitle(unit)}`}>
@@ -43,7 +44,7 @@ function Detail({ unit, now, points, onClose }: { unit: FleetUnit; now: number; 
             <div><dt>Salió</dt><dd>{when(Date.parse(trip.started_at), now)}</dd></div>
             <div><dt>Última posición</dt><dd>{unit.at ? ago(unit.at, now) : 'Todavía ninguna'}</dd></div>
             <div><dt>Carga</dt><dd>{trip.load_type === 'empty' ? 'Sin carga' : 'Con carga'}</dd></div>
-            <div><dt>Puntos del recorrido</dt><dd>{points === null ? '…' : count(points)}</dd></div>
+            <div><dt>Puntos del recorrido</dt><dd>{points === 'error' ? 'No se pudieron leer' : points === null ? '…' : count(points)}</dd></div>
           </>
         ) : (
           <>
@@ -52,6 +53,7 @@ function Detail({ unit, now, points, onClose }: { unit: FleetUnit; now: number; 
           </>
         )}
       </dl>
+      {stale && <StaleNote onRetry={onRetry}>No se pudo actualizar el recorrido: se ve el último que se leyó.</StaleNote>}
     </section>
   );
 }
@@ -81,7 +83,7 @@ export function Gps() {
       <PageHead
         title="GPS en vivo"
         subtitle={fleet.fetchedAt ? `Actualizado ${ago(fleet.fetchedAt, now)} · se actualiza solo cada ${FLEET_REFRESH_MS / 1000} segundos` : 'Buscando las posiciones…'}
-        actions={<RefreshButton onClick={() => void fleet.refetch()} busy={fleet.isFetching} />}
+        actions={<RefreshButton onClick={() => void Promise.all([fleet.refetch(), unit?.trip ? route.refetch() : null])} busy={fleet.isFetching || route.isFetching} />}
       />
       {fleet.error ? <ErrorNote onRetry={() => void fleet.refetch()}>No se pudo leer la flota.</ErrorNote> : null}
       <div className="gps">
@@ -93,7 +95,16 @@ export function Gps() {
               </button>
             ))}
           </div>
-          {unit && <Detail unit={unit} now={now} points={unit.trip ? (route.data ? drawable(route.data).length : null) : null} onClose={() => choose(null)} />}
+          {unit && (
+            <Detail
+              unit={unit}
+              now={now}
+              points={unit.trip ? (route.data ? drawable(route.data).length : route.error ? 'error' : null) : null}
+              stale={Boolean(unit.trip && route.error && route.data)}
+              onRetry={() => void route.refetch()}
+              onClose={() => choose(null)}
+            />
+          )}
           {fleet.isLoading ? (
             <Skeleton lines={5} />
           ) : shown.length === 0 ? (

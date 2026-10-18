@@ -1,8 +1,10 @@
 // Every read the panel makes. Screens never build queries themselves; row security in the database decides what
 // each account gets back.
 import { type ActiveTrip, type CatalogTruck, catalogTrucks, type FinishedTrip, lastTripByTruck, type LastPoint, truckLabel } from '../lib/fleet';
+import type { Tables } from '../lib/database.types';
 import type { PaperRow, ServiceRow } from '../lib/papers';
 import { supabase } from '../lib/supabase';
+import type { DetailRow, FuelRow, PanelTripRow, SessionRow } from '../lib/trips';
 
 /** A query that failed; the message is for the office, the cause for the console. */
 export class DataError extends Error {}
@@ -128,6 +130,7 @@ export interface RoutePoint {
   longitude: number;
   recorded_at: string;
   segment: number;
+  speed_kmh: number | null;
 }
 
 /**
@@ -136,8 +139,79 @@ export interface RoutePoint {
  */
 export async function fetchRoute(trip: Pick<ActiveTrip, 'id' | 'driver_id' | 'started_at'> & { ended_at?: string | null }, since?: string): Promise<RoutePoint[]> {
   return all((from, to) => {
-    let q = supabase.from('trf_driver_location_history').select('id,latitude,longitude,recorded_at,segment').eq('driver_id', trip.driver_id).or(`trip_id.eq.${trip.id},trip_id.is.null`).gte('recorded_at', since ?? trip.started_at);
+    let q = supabase.from('trf_driver_location_history').select('id,latitude,longitude,recorded_at,segment,speed_kmh').eq('driver_id', trip.driver_id).or(`trip_id.eq.${trip.id},trip_id.is.null`).gte('recorded_at', since ?? trip.started_at);
     if (trip.ended_at) q = q.lte('recorded_at', trip.ended_at);
     return q.order('recorded_at', { ascending: true }).order('id', { ascending: true }).range(from, to);
   }, 40_000);
+}
+
+export type DocumentRow = Tables<'trf_trip_documents'>;
+
+export interface TripListData {
+  sessions: SessionRow[];
+  panelRows: PanelTripRow[];
+  details: DetailRow[];
+}
+
+/** Lists of ids short enough for one query address. */
+function chunks<T>(list: readonly T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
+  return out;
+}
+
+/**
+ * Trips that started in [fromIso, toIso): the app's trips with what the office completed and what the driver typed on
+ * the phone, and the trips typed by hand in the panel. Deleted trips come too, for the trash.
+ */
+export async function fetchTripList(fromIso: string, toIso: string): Promise<TripListData> {
+  const [sessions, manual] = await Promise.all([
+    all((from, to) => supabase.from('trf_driver_tracking_sessions').select('*').gte('started_at', fromIso).lt('started_at', toIso).order('started_at', { ascending: false }).order('id', { ascending: false }).range(from, to)),
+    all((from, to) => supabase.from('trf_panel_trips').select('*').eq('source', 'manual').gte('departure_at', fromIso).lt('departure_at', toIso).order('departure_at', { ascending: false }).order('id', { ascending: false }).range(from, to)),
+  ]);
+  const parts = await Promise.all(
+    chunks([...new Set(sessions.map((s) => s.id))], 50).map(async (ids) => {
+      const [details, panel] = await Promise.all([
+        supabase.from('trf_trip_details').select('trip_id,data').in('trip_id', ids),
+        supabase.from('trf_panel_trips').select('*').eq('source', 'app').in('app_trip_id', ids),
+      ]);
+      return { details: rows(details), panel: rows(panel) };
+    }),
+  );
+  return { sessions, panelRows: [...parts.flatMap((p) => p.panel), ...manual], details: parts.flatMap((p) => p.details) };
+}
+
+export interface TripDetailData {
+  session: SessionRow | null;
+  panel: PanelTripRow | null;
+  detail: DetailRow | null;
+  documents: DocumentRow[];
+  fuel: FuelRow[];
+}
+
+/** One trip with what its page shows; null when it does not exist or this account cannot see it. */
+export async function fetchTripDetail(kind: 'app' | 'web', id: string): Promise<TripDetailData | null> {
+  if (kind === 'web') {
+    const manual = rows(await supabase.from('trf_panel_trips').select('*').eq('id', id).eq('source', 'manual').limit(1));
+    return manual[0] ? { session: null, panel: manual[0], detail: null, documents: [], fuel: [] } : null;
+  }
+  const [session, panel, detail, documents, fuel] = await Promise.all([
+    supabase.from('trf_driver_tracking_sessions').select('*').eq('id', id).limit(1),
+    supabase.from('trf_panel_trips').select('*').eq('source', 'app').eq('app_trip_id', id).limit(1),
+    supabase.from('trf_trip_details').select('trip_id,data').eq('trip_id', id).limit(1),
+    supabase.from('trf_trip_documents').select('*').eq('trip_id', id).order('created_at', { ascending: true }).order('id', { ascending: true }),
+    supabase.from('trf_driver_fuel_receipts').select('*').eq('trip_id', id).or('archived.is.null,archived.is.false').order('recorded_at', { ascending: true }).order('id', { ascending: true }),
+  ]);
+  const trip = rows(session)[0];
+  if (!trip) return null;
+  return { session: trip, panel: rows(panel)[0] ?? null, detail: rows(detail)[0] ?? null, documents: rows(documents), fuel: rows(fuel) };
+}
+
+export type PhotoBucket = 'trf-trip-documents' | 'trf-fuel-receipts';
+
+/** A link that opens a photo of the private buckets for ten minutes; the storage rules decide who can open it. */
+export async function photoUrl(bucket: PhotoBucket, path: string): Promise<string> {
+  const result = await supabase.storage.from(bucket).createSignedUrl(path, 600);
+  if (result.error) throw new DataError(result.error.message);
+  return result.data.signedUrl;
 }

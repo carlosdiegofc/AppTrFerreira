@@ -16,6 +16,20 @@ export function dayInZone(ms: number, zone = ZONE): string {
   return `${p.year}-${p.month}-${p.day}`;
 }
 
+/**
+ * The calendar day ("2026-10-15") of a value as the office reads it: a date stays as it is ("2026-10-15", or
+ * "15/10/2026" as typed in the panel, like the app reads it) and an instant goes to its day in Uruguay, so 22:00 of the
+ * 15th is still the 15th. Null when it is not a date.
+ */
+export function calendarDay(value: string | null | undefined, zone = ZONE): string | null {
+  const text = (value ?? '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const typed = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(text);
+  if (typed) return `${typed[3]}-${typed[2]}-${typed[1]}`;
+  const ms = /^\d{4}-\d{2}-\d{2}T/.test(text) ? Date.parse(text) : Number.NaN;
+  return Number.isNaN(ms) ? null : dayInZone(ms, zone);
+}
+
 /** Offset of the zone from UTC at an instant, in minutes (Uruguay: -180). */
 export function zoneOffsetMinutes(ms: number, zone = ZONE): number {
   const name = new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'longOffset' }).formatToParts(ms).find((p) => p.type === 'timeZoneName')?.value ?? 'GMT';
@@ -66,6 +80,28 @@ export function formatDay(day: string): string {
 export function formatTime(ms: number, zone = ZONE): string {
   const p = parts(ms, zone);
   return `${p.hour}:${p.minute}`;
+}
+
+/** "dd/mm/aaaa hh:mm" of an instant in the zone; empty for no instant. */
+export function formatDayTime(ms: number | null, zone = ZONE): string {
+  if (ms === null || !Number.isFinite(ms)) return '';
+  return `${formatDay(dayInZone(ms, zone))} ${formatTime(ms, zone)}`;
+}
+
+/**
+ * The clock time in the zone as a Date whose UTC fields hold it. Spreadsheets have no time zones: a cell shows the UTC
+ * fields of the date it is given, so this is how a 14:05 in Uruguay reads 14:05 in Excel.
+ */
+export function wallClock(ms: number, zone = ZONE): Date {
+  const p = parts(ms, zone);
+  return new Date(Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour), Number(p.minute)));
+}
+
+/** "2 h 40 min", "35 min". */
+export function formatDuration(ms: number): string {
+  const minutes = Math.max(0, Math.round(ms / 60_000));
+  const hours = Math.floor(minutes / 60);
+  return hours === 0 ? `${minutes} min` : `${hours} h ${minutes % 60} min`;
 }
 
 /** "hoy", "mañana", "en 5 días", "ayer", "hace 3 días", as the app says it. */

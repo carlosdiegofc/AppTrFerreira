@@ -72,3 +72,20 @@ insert into public.trf_vehicle_maintenance (vehicle, kind, due_on, done_on, odom
   ('Scania R450 · DEF5678', 'Cambio de aceite', (select today from t0) + 5, null, null),
   ('Volvo FH 460 · ABC1234', 'Frenos', (select today from t0) - 2, null, null),
   ('Ford Cargo 1722 · JKL3456', 'Cubiertas', (select today from t0) - 20, (select today from t0) - 18, 412000);
+
+-- Viajes: the office completed the trip that ended today and typed one by hand three days ago, in dollars. The trip on
+-- the road has what Ana typed on the phone, its two delivery notes (the departure one with photo) and a fuel receipt
+-- the office corrected.
+insert into public.trf_panel_trips (source, app_trip_id, departure_at, driver_id, driver_name, order_number, client, product, origin_name, destination_name, destination_lat, destination_lng, billable_km, kg, amount, currency)
+values ('app', '10000000-0000-4000-8000-00000000000d', (select now from t0) - interval '6 hours', '00000000-0000-4000-8000-000000000014', 'Diego Silva', '24129', 'Molino San José', 'Trigo', 'Paysandú', 'Salto', -31.388, -57.96, 120, 28000, 38500, 'UYU');
+insert into public.trf_panel_trips (id, source, departure_at, arrival_at, driver_name, vehicle, order_number, client, product, origin_name, destination_name, billable_km, kg, amount, currency, notes)
+values ('20000000-0000-4000-8000-000000000001', 'manual', (select now from t0) - interval '3 days', (select now from t0) - interval '3 days' + interval '5 hours', 'Ana Pereira', 'Iveco Stralis · MNO7890', '24101', 'Cooperativa Agraria', 'Soja', 'Young', 'Nueva Palmira', 180, 30000, 1250.5, 'USD', 'Pagado por transferencia.');
+insert into public.trf_trip_details (trip_id, driver_id, data) values
+  ('10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000011', '{"destino": "Puerto de Montevideo", "cliente": "Navios", "tipoCarga": "Soja", "kg": "30.000"}');
+insert into public.trf_trip_documents (id, trip_id, driver_id, kind, number, cargo_type, kg, object_path, created_at) values
+  ('30000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000011', 'departure', '0001-00012345', 'Soja', 30000,
+   '00000000-0000-4000-8000-000000000011/10000000-0000-4000-8000-00000000000a/30000000-0000-4000-8000-000000000001.jpg', (select now from t0) - interval '110 minutes'),
+  ('30000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000011', 'arrival', '', '', null, null, (select now from t0) - interval '100 minutes');
+insert into public.trf_driver_fuel_receipts (id, trip_id, driver_id, driver_name, vehicle, recorded_at, receipt_date, object_path, station_name, liters, total, panel_data) values
+  ('40000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000011', 'Ana Pereira', 'Volvo FH 460 · ABC1234', (select now from t0) - interval '90 minutes', (select today from t0),
+   '00000000-0000-4000-8000-000000000011/10000000-0000-4000-8000-00000000000a/40000000-0000-4000-8000-000000000001.jpg', 'Ancap Ruta 5 km 32', 180, 9800, '{"litros": "182,5", "monto": "9.950"}');

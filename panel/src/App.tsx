@@ -9,6 +9,8 @@ import { SECTIONS } from './sections';
 // The map library loads after signing in, so the sign-in screen opens fast.
 const Inicio = lazy(() => import('./pages/Inicio').then((m) => ({ default: m.Inicio })));
 const Gps = lazy(() => import('./pages/Gps').then((m) => ({ default: m.Gps })));
+const Viajes = lazy(() => import('./pages/Viajes').then((m) => ({ default: m.Viajes })));
+const Viaje = lazy(() => import('./pages/Viaje').then((m) => ({ default: m.Viaje })));
 
 const loading = (
   <div className="page">
@@ -24,6 +26,8 @@ export function App() {
           <Route index element={<Navigate to="/inicio" replace />} />
           <Route path="inicio" element={<Suspense fallback={loading}><Inicio /></Suspense>} />
           <Route path="gps" element={<Suspense fallback={loading}><Gps /></Suspense>} />
+          <Route path="viajes" element={<Suspense fallback={loading}><Viajes /></Suspense>} />
+          <Route path="viajes/:key" element={<Suspense fallback={loading}><Viaje /></Suspense>} />
           {SECTIONS.filter((s) => !s.ready).map((s) => (
             <Route key={s.path} path={s.path} element={<Proximamente section={s} />} />
           ))}

@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { FLEET_REFRESH_MS, ROUTE_REFRESH_MS } from '../config';
 import { type ActiveTrip, type CatalogTruck, fleetUnits, truckLabel } from '../lib/fleet';
 import { appendReadings } from '../lib/route';
-import { fetchCatalog, fetchFleet, fetchLastTrips, fetchPapers, fetchRoute, fetchTrips, type RoutePoint } from './api';
+import { mergeTrips, tripFromPanel, tripFromSession } from '../lib/trips';
+import { fetchCatalog, fetchFleet, fetchLastTrips, fetchPapers, fetchRoute, fetchTripDetail, fetchTripList, fetchTrips, type RoutePoint } from './api';
 
 /** The current time, refreshed every few seconds so "hace 2 min" keeps moving. */
 export function useNow(everyMs = 10_000): number {
@@ -54,18 +55,73 @@ export const useTrips = (fromIso: string, toIso: string, refreshMs?: number) =>
 
 export const usePapers = () => useQuery({ queryKey: ['papers'], queryFn: fetchPapers, staleTime: 10 * 60_000 });
 
-/** The route of a trip in progress. After the first load each refresh brings only the readings since the last one. */
-export function useRoute(trip: ActiveTrip | null) {
+type RouteTrip = Pick<ActiveTrip, 'id' | 'driver_id' | 'started_at'> & { ended_at?: string | null };
+
+/**
+ * A trip that ended a moment ago is still read for a while: the phone sends the trip first and then what goes with it
+ * (details, delivery notes, fuel, queued readings), so the end can arrive before the rest.
+ */
+const SETTLING_MS = 15 * 60_000;
+const settling = (endedAt: string | null | undefined) => {
+  const ms = endedAt ? Date.parse(endedAt) : Number.NaN;
+  return Number.isFinite(ms) && Date.now() - ms < SETTLING_MS;
+};
+
+/**
+ * The route of a trip. While the trip is in progress it refreshes, and after the first load each refresh brings only the
+ * readings since the last one; a finished trip is read once. A trip that ends while on screen is read once more in full,
+ * so its last readings are never missing; the route already shown stays until that read arrives.
+ */
+export function useRoute(trip: RouteTrip | null) {
   const client = useQueryClient();
+  const key = ['route', trip?.id ?? null, trip?.ended_at ? 'ended' : 'live'] as const;
   return useQuery({
-    queryKey: ['route', trip?.id ?? null],
+    queryKey: key,
     queryFn: async (): Promise<RoutePoint[]> => {
       if (!trip) return [];
-      const shown = client.getQueryData<RoutePoint[]>(['route', trip.id]);
+      const shown = client.getQueryData<RoutePoint[]>(key);
       const last = shown?.at(-1);
       return shown && last ? appendReadings(shown, await fetchRoute(trip, last.recorded_at)) : fetchRoute(trip);
     },
     enabled: trip !== null,
-    refetchInterval: ROUTE_REFRESH_MS,
+    refetchInterval: trip && (!trip.ended_at || settling(trip.ended_at)) ? ROUTE_REFRESH_MS : false,
+    staleTime: trip?.ended_at ? 10 * 60_000 : 0,
+    placeholderData: (previous, previousQuery) => (trip && previousQuery?.queryKey[1] === trip.id ? previous : undefined),
   });
+}
+
+/** Trips of a period with the office's data on top, newest first; refreshed every minute while the page is open. */
+export function useTripList(fromIso: string | null, toIso: string | null) {
+  const catalog = useCatalog();
+  const list = useQuery({
+    queryKey: ['tripList', fromIso, toIso],
+    queryFn: () => fetchTripList(fromIso ?? '', toIso ?? ''),
+    enabled: fromIso !== null && toIso !== null,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+  const trips = useMemo(() => (list.data ? mergeTrips(list.data, catalog.data ?? []) : []), [list.data, catalog.data]);
+  // The catalog names the trucks (an older label counts for its catalog truck): the screens wait for it and say when it
+  // could not be read.
+  return { trips, query: list, catalog };
+}
+
+/** One trip and everything its page shows; it keeps refreshing while the trip is in progress and right after it ends. */
+export function useTripDetail(kind: 'app' | 'web', id: string) {
+  const catalog = useCatalog();
+  const detail = useQuery({
+    queryKey: ['trip', kind, id],
+    queryFn: () => fetchTripDetail(kind, id),
+    refetchInterval: (q) => {
+      const s = q.state.data?.session;
+      return s && (s.active || settling(s.ended_at)) ? 60_000 : false;
+    },
+  });
+  const trip = useMemo(() => {
+    const d = detail.data;
+    if (!d) return null;
+    if (d.session) return tripFromSession(d.session, d.panel, d.detail, catalog.data ?? []);
+    return d.panel ? tripFromPanel(d.panel, catalog.data ?? []) : null;
+  }, [detail.data, catalog.data]);
+  return { trip, detail, catalog };
 }
