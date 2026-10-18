@@ -50,7 +50,8 @@ values ('app', '10000000-0000-4000-8000-00000000000e', (select now from t0) - in
 
 -- GPS readings: twelve along Ruta 5 for the truck on the road, a minute apart, in three stretches: the trip was paused
 -- after the sixth (new segment) and the signal was lost for five minutes after the ninth. One more reading of that trip
--- has no fix (0,0) and is not drawn. One reading each for the others.
+-- has no fix (0,0) and is not drawn. One reading each for the others; Bruno's comes from an older app version that
+-- saved readings without trip, so it only counts inside the time window of his trip.
 insert into public.trf_driver_location_history (driver_id, vehicle, latitude, longitude, speed_kmh, recorded_at, trip_id, segment)
 select '00000000-0000-4000-8000-000000000011', 'Volvo FH 460 · ABC1234', -34.86 + i * 0.0445, -56.17 - i * 0.0285, case when i = 11 then 78 else 80 end,
        (select now from t0) - (12 - i) * interval '1 minute' - case when i < 9 then interval '5 minutes' else interval '0 minutes' end,
@@ -59,7 +60,7 @@ from generate_series(0, 11) as i;
 insert into public.trf_driver_location_history (driver_id, vehicle, latitude, longitude, speed_kmh, recorded_at, trip_id, segment) values
   ('00000000-0000-4000-8000-000000000011', 'Volvo FH 460 · ABC1234', 0, 0, 80, (select now from t0) - interval '14 minutes 30 seconds', '10000000-0000-4000-8000-00000000000a', 0);
 insert into public.trf_driver_location_history (driver_id, vehicle, latitude, longitude, speed_kmh, recorded_at, trip_id) values
-  ('00000000-0000-4000-8000-000000000012', 'Scania R450 · DEF5678', -34.471, -57.844, 0, (select now from t0) - interval '3 minutes', '10000000-0000-4000-8000-00000000000b'),
+  ('00000000-0000-4000-8000-000000000012', 'Scania R450 · DEF5678', -34.471, -57.844, 0, (select now from t0) - interval '3 minutes', null),
   ('00000000-0000-4000-8000-000000000013', 'Mercedes Benz Actros', -32.318, -58.081, 64, (select now from t0) - interval '40 minutes', '10000000-0000-4000-8000-00000000000c');
 
 -- Papers and services: expired, about to expire, far away; late, coming up, done.

@@ -8,6 +8,7 @@ La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la
 # Transportes Ferreira GPS — v0.16.3
 
 ## Nuevo en v0.16.3 (correcciones del menú del dueño)
+- **Flota en vivo:** la posición de un camión en viaje se toma también de las lecturas de choferes con versiones viejas de la app, que no las guardan con el viaje; antes ese camión figuraba «sin señal». Un camión que se usa poco sigue mostrando su último chofer y dónde terminó, aunque la flota haya hecho más de 100 viajes desde entonces.
 - **Flota en vivo:** un camión que está en viaje ya no aparece dos veces (una en ruta y otra «sin viaje») cuando el viaje se guardó con un nombre viejo del camión, como «Ford Cargo». El camión se reconoce igual que en Rendimiento: por la matrícula o, si no tiene, por el modelo, cuando ese modelo es de un solo camión del catálogo. Lo mismo para mostrar el último chofer y el lugar de llegada de un camión sin viaje.
 - **Combustible › Este mes:** los totales de litros y de gasto suman todas las cargas del mes. Antes contaban solo las 50 más recientes, así que en una flota con más cargas el total quedaba corto hasta tocar «Cargar más».
 - **Combustible:** el total gastado muestra los pesos y, en otro renglón, los dólares; antes las cargas en dólares no se sumaban. Las correcciones hechas en el panel (litros, monto, moneda, fecha) se toman también en cargas viejas que las guardaron como texto, y los números escritos a la uruguaya («30.000», «1.234,5») se leen igual que en Rendimiento.

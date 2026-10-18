@@ -59,7 +59,8 @@ export async function fetchFleet(): Promise<FleetData> {
   const trips = rows(running);
   const last = await Promise.all(
     trips.map(async (t) => {
-      const point = await supabase.from('trf_driver_location_history').select('latitude,longitude,speed_kmh,recorded_at').eq('trip_id', t.id).order('recorded_at', { ascending: false }).limit(1);
+      // Same rule as the route: older app versions save readings without trip, inside the trip's time window.
+      const point = await supabase.from('trf_driver_location_history').select('latitude,longitude,speed_kmh,recorded_at').eq('driver_id', t.driver_id).or(`trip_id.eq.${t.id},trip_id.is.null`).gte('recorded_at', t.started_at).order('recorded_at', { ascending: false }).limit(1);
       return (rows(point)[0] ?? null) as LastPoint | null;
     }),
   );

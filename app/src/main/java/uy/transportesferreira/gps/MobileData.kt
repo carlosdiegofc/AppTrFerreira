@@ -68,8 +68,11 @@ class MobileData(private val c:Context){
   val key="fleet-${uid()}"
   if(refresh){
    val active=array("/rest/v1/trf_driver_tracking_sessions?active=eq.true&select=id,driver_id,driver_name,vehicle,started_at,paused,load_type,distance_meters&order=started_at.desc&limit=50")
-   for(i in 0 until active.length()){val s=active.getJSONObject(i);val p=array("/rest/v1/trf_driver_location_history?trip_id=eq.${enc(s.getString("id"))}&select=latitude,longitude,speed_kmh,recorded_at&order=recorded_at.desc&limit=1");if(p.length()>0)s.put("last",p.getJSONObject(0))}
+   // Same rule as the route: older app versions save readings without trip, inside the trip's time window.
+   for(i in 0 until active.length()){val s=active.getJSONObject(i);val p=array("/rest/v1/trf_driver_location_history?driver_id=eq.${enc(s.getString("driver_id"))}&or=(trip_id.eq.${enc(s.getString("id"))},trip_id.is.null)&recorded_at=gte.${enc(s.getString("started_at"))}&select=latitude,longitude,speed_kmh,recorded_at&order=recorded_at.desc&limit=1");if(p.length()>0)s.put("last",p.getJSONObject(0))}
    val recent=array("/rest/v1/trf_driver_tracking_sessions?active=eq.false&select=driver_name,vehicle,ended_at,arrival_lat,arrival_lng&order=ended_at.desc.nullslast&limit=100")
+   // After the latest 100, the last trip of the trucks used rarely; the live data still shows if that lookup fails.
+   try{val older=lastTrips(trucks());for(i in 0 until older.length())recent.put(older.getJSONObject(i))}catch(_:Exception){}
    store.cache(key,JSONObject().put("active",active).put("recent",recent).put("fetched_at",System.currentTimeMillis()))
   }
   return store.cache(key)
@@ -133,9 +136,22 @@ class MobileData(private val c:Context){
  }
  /** Drivers who have trips, by id with their latest name, for the owner's forms; row security shows everyone's trips only to administrators. */
  fun drivers():List<Pair<String,String>>{
-  val a=array("/rest/v1/trf_driver_tracking_sessions?select=driver_id,driver_name&order=started_at.desc&limit=1000");val out=linkedMapOf<String,String>()
-  for(i in 0 until a.length()){val r=a.getJSONObject(i);val id=r.optString("driver_id");val n=r.optString("driver_name").trim();if(id.isNotBlank()&&n.isNotBlank()&&id !in out)out[id]=n}
+  val out=linkedMapOf<String,String>()
+  for(r in all("/rest/v1/trf_driver_tracking_sessions?select=driver_id,driver_name&order=started_at.desc,id.desc")){val id=r.optString("driver_id");val n=r.optString("driver_name").trim();if(id.isNotBlank()&&n.isNotBlank()&&id !in out)out[id]=n}
   return out.toList()
+ }
+ /**
+  * The last finished trip of each catalog truck, looking past the latest 100 (at most 3000 trips back) so a truck used
+  * rarely keeps its last driver and place. Trucks rarely change it: looked up again at most every 30 minutes.
+  */
+ private fun lastTrips(fleet:List<FleetStats.CatalogTruck>):JSONArray{
+  val key="lasttrips-${uid()}";val saved=store.cache(key)
+  if(System.currentTimeMillis()-saved.optLong("fetched_at",0)<30*60_000L)return saved.optJSONArray("rows")?:JSONArray()
+  val labels=fleet.map{it.label}.toSet();val found=linkedMapOf<String,JSONObject>();var offset=0
+  while(found.size<labels.size&&offset<3000){val page=array("/rest/v1/trf_driver_tracking_sessions?active=eq.false&select=driver_name,vehicle,ended_at,arrival_lat,arrival_lng&order=ended_at.desc.nullslast,id.desc&limit=1000&offset=$offset")
+   for(i in 0 until page.length()){val r=page.getJSONObject(i);val label=FleetStats.canonical(r.optString("vehicle"),fleet);if(label!=null&&label in labels&&label !in found)found[label]=r}
+   if(page.length()<1000)break;offset+=1000}
+  val rows=JSONArray(found.values.toList());store.cache(key,JSONObject().put("rows",rows).put("fetched_at",System.currentTimeMillis()));return rows
  }
  /** Own driver papers (every driver's for administrators) plus truck papers. */
  fun documents(refresh:Boolean=false):JSONArray{
