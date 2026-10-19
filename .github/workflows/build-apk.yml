@@ -51,7 +51,8 @@ jobs:
           fi
           echo "TRF_UPLOAD_KEYSTORE=$key" >> "$GITHUB_ENV"
           echo "TRF_UPLOAD_PASSWORD=$password" >> "$GITHUB_ENV"
-      - run: gradle --no-daemon :app:assembleDebug :app:testDebugUnitTest :app:bundleRelease
+      # La versión release (el .aab y su APK) sale optimizada y ofuscada por R8; las dos llevan el mismo código.
+      - run: gradle --no-daemon :app:assembleDebug :app:testDebugUnitTest :app:bundleRelease :app:assembleRelease
       - name: Borrar la llave del equipo de compilación
         if: always()
         run: rm -f "$RUNNER_TEMP/upload.p12"
@@ -66,3 +67,42 @@ jobs:
           name: Google-Play-Transportes-Ferreira-GPS-v${{ steps.version.outputs.name }}
           path: app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: version-optimizada-para-probar
+          path: app/build/outputs/apk/release/app-release.apk
+          retention-days: 1
+          if-no-files-found: error
+  probar:
+    name: Probar la versión optimizada en un emulador
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: version-optimizada-para-probar
+          path: apk-a-probar
+      - name: Habilitar la aceleración del emulador
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      # Sin DNS (-dns-server 127.0.0.1): la prueba nunca llega a la base real.
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -dns-server 127.0.0.1
+          script: python3 .github/scripts/probar_app_optimizada.py apk-a-probar/app-release.apk prueba-version-optimizada
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prueba-version-optimizada
+          path: prueba-version-optimizada
+          retention-days: 14
+          if-no-files-found: ignore
