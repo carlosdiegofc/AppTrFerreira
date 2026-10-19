@@ -85,6 +85,8 @@ export type Database = {
           station_name: string
           total: number | null
           trip_id: string | null
+          updated_at: string | null
+          updated_by: string | null
           vehicle: string
         }
         Insert: {
@@ -102,6 +104,8 @@ export type Database = {
           station_name?: string
           total?: number | null
           trip_id?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
           vehicle: string
         }
         Update: {
@@ -119,6 +123,8 @@ export type Database = {
           station_name?: string
           total?: number | null
           trip_id?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
           vehicle?: string
         }
         Relationships: [
@@ -317,6 +323,57 @@ export type Database = {
           paused?: boolean
           started_at?: string
           vehicle?: string
+        }
+        Relationships: []
+      }
+      trf_fuel_station_movements: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          currency: string
+          deleted_at: string | null
+          happened_on: string
+          id: string
+          kind: string
+          method: string | null
+          notes: string | null
+          station_key: string
+          station_name: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          currency: string
+          deleted_at?: string | null
+          happened_on: string
+          id?: string
+          kind: string
+          method?: string | null
+          notes?: string | null
+          station_key: string
+          station_name: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          deleted_at?: string | null
+          happened_on?: string
+          id?: string
+          kind?: string
+          method?: string | null
+          notes?: string | null
+          station_key?: string
+          station_name?: string
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: []
       }

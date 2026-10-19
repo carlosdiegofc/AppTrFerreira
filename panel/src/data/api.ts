@@ -1,7 +1,8 @@
 // Every read and write the panel makes. Screens never build queries themselves; row security in the database decides
 // what each account gets back and what it may change.
-import type { Tables, TablesInsert } from '../lib/database.types';
+import type { Tables, TablesInsert, TablesUpdate } from '../lib/database.types';
 import { type ActiveTrip, type CatalogTruck, catalogTrucks, type FinishedTrip, lastTripByTruck, type LivePosition, text, truckLabel } from '../lib/fleet';
+import { type CatalogStation, catalogStations, type Movement, type MovementRow, type Receipt } from '../lib/fuel';
 import type { PaperRow, ServiceRow } from '../lib/papers';
 import type { PresenceRow } from '../lib/presence';
 import { supabase } from '../lib/supabase';
@@ -248,10 +249,10 @@ export async function saveTrip(trip: Trip | null, payload: TripPayload): Promise
   return saved;
 }
 
-/** What went wrong with a save, in the office's words (a conflict is handled apart: the trip is read again). */
-export function describeWriteError(e: unknown): string {
+/** What went wrong with a save, in the office's words (a conflict is handled apart: the row is read again). */
+export function describeWriteError(e: unknown, what = 'viajes'): string {
   const code = e instanceof DataError ? e.code : undefined;
-  if (code === '42501') return 'Esta cuenta no tiene permiso para guardar viajes.';
+  if (code === '42501') return `Esta cuenta no tiene permiso para guardar ${what}.`;
   if (code === '23514' || code === '22P02' || code === '22003' || code === '22007' || code === '22008') return 'Algún dato no es válido para guardar. Revisá los números y las fechas.';
   if (/fetch|network|load failed/i.test(e instanceof Error ? e.message : String(e))) return 'Sin conexión con el servidor. Revisá internet y volvé a intentar.';
   return 'No se pudo guardar. Volvé a intentar en un momento.';
@@ -263,9 +264,11 @@ export const setTripDeleted = (trip: Trip, deleted: boolean) => saveTrip(trip, {
 export interface CatalogLists {
   clients: string[];
   products: string[];
+  /** The service stations the app offers in its fuel form. */
+  stations: CatalogStation[];
 }
 
-/** The clients and the kinds of cargo of the app's catalog, to suggest them in the form. */
+/** The clients, the kinds of cargo and the service stations of the app's catalog, to offer them in the forms. */
 export async function fetchCatalogLists(): Promise<CatalogLists> {
   const result = await supabase.from('trf_mobile_catalog').select('data').eq('id', 'fleet').maybeSingle();
   if (result.error) throw new DataError(result.error.message, result.error.code);
@@ -281,7 +284,7 @@ export async function fetchCatalogLists(): Promise<CatalogLists> {
   const names = (value: unknown) =>
     (Array.isArray(value) ? value : []).map((v: unknown) => text(typeof v === 'string' ? v : (v as { nombre?: unknown } | null)?.nombre)).filter((v): v is string => v !== null);
   const d = (data ?? {}) as { clientes?: unknown; tiposCarga?: unknown };
-  return { clients: names(d.clientes), products: names(d.tiposCarga) };
+  return { clients: names(d.clientes), products: names(d.tiposCarga), stations: catalogStations(data) };
 }
 
 /** The drivers of the latest trips of the app, to suggest them for a trip typed by hand. */
@@ -289,6 +292,69 @@ export async function fetchDriverNames(): Promise<string[]> {
   const result = rows(await supabase.from('trf_driver_tracking_sessions').select('driver_name').order('started_at', { ascending: false }).limit(500));
   return [...new Set(result.map((r) => text(r.driver_name)).filter((v): v is string => v !== null))];
 }
+
+export interface FuelData {
+  /** Every receipt, the ones in the trash too. */
+  receipts: Tables<'trf_driver_fuel_receipts'>[];
+  /** The payments and opening balances of the stations, the annulled ones too. */
+  movements: MovementRow[];
+}
+
+/** All the fuel: the accounts of the stations need every receipt and payment, not only those of a period. */
+export async function fetchFuel(): Promise<FuelData> {
+  const [receipts, movements] = await Promise.all([
+    all((from, to) => supabase.from('trf_driver_fuel_receipts').select('*').order('receipt_date', { ascending: false }).order('id').range(from, to), 50_000),
+    all((from, to) => supabase.from('trf_fuel_station_movements').select('*').order('happened_on', { ascending: false }).order('id').range(from, to)),
+  ]);
+  return { receipts, movements };
+}
+
+/** The photo of a receipt typed in the panel. One already uploaded (a save tried again) counts as uploaded. */
+export async function uploadReceiptPhoto(path: string, photo: Blob): Promise<void> {
+  const result = await supabase.storage.from('trf-fuel-receipts').upload(path, photo, { contentType: 'image/jpeg', upsert: false });
+  if (!result.error) return;
+  const e = result.error as { message: string; statusCode?: string; status?: number };
+  if (e.statusCode === '409' || e.status === 409 || /already exists|duplicate/i.test(e.message)) return;
+  throw new DataError(e.message, e.statusCode ?? (e.status === undefined ? undefined : String(e.status)));
+}
+
+/** A receipt typed in the panel. Saved before (a save tried again after a cut): the saved one. */
+export async function createReceipt(row: TablesInsert<'trf_driver_fuel_receipts'>): Promise<Tables<'trf_driver_fuel_receipts'>> {
+  const result = await supabase.from('trf_driver_fuel_receipts').insert(row).select();
+  if (result.error?.code === '23505') {
+    const saved = rows(await supabase.from('trf_driver_fuel_receipts').select('*').eq('id', row.id).limit(1))[0];
+    if (saved) return saved;
+  }
+  const saved = rows(result)[0];
+  if (!saved) throw new DataError('El alta no devolvió la fila');
+  return saved;
+}
+
+/**
+ * A correction (panel_data) or the trash (archived). It only applies if nobody changed the receipt since it was read
+ * (otherwise ConflictError); the database keeps what was declared and notes who and when.
+ */
+export async function updateReceipt(receipt: Pick<Receipt, 'id' | 'updatedAt'>, changes: Pick<TablesUpdate<'trf_driver_fuel_receipts'>, 'panel_data' | 'archived'>): Promise<Tables<'trf_driver_fuel_receipts'>> {
+  const q = supabase.from('trf_driver_fuel_receipts').update(changes).eq('id', receipt.id);
+  const saved = rows(await (receipt.updatedAt ? q.eq('updated_at', receipt.updatedAt) : q.is('updated_at', null)).select())[0];
+  if (!saved) throw new ConflictError('Otra persona cambió la boleta');
+  return saved;
+}
+
+/** A payment or an opening balance: a new one, or a change that only applies if nobody saved it meanwhile. */
+export async function saveMovement(movement: Movement | null, row: TablesInsert<'trf_fuel_station_movements'> | TablesUpdate<'trf_fuel_station_movements'>): Promise<MovementRow> {
+  if (!movement) {
+    const saved = rows(await supabase.from('trf_fuel_station_movements').insert(row as TablesInsert<'trf_fuel_station_movements'>).select())[0];
+    if (!saved) throw new DataError('El alta no devolvió la fila');
+    return saved;
+  }
+  const saved = rows(await supabase.from('trf_fuel_station_movements').update(row).eq('id', movement.id).eq('updated_at', movement.updatedAt).select())[0];
+  if (!saved) throw new ConflictError('Otra persona cambió el pago');
+  return saved;
+}
+
+/** Annuls a payment or an opening balance, or brings it back: nothing is deleted. */
+export const setMovementDeleted = (movement: Movement, deleted: boolean) => saveMovement(movement, { deleted_at: deleted ? new Date().toISOString() : null });
 
 export type PhotoBucket = 'trf-trip-documents' | 'trf-fuel-receipts';
 

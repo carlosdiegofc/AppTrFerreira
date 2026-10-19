@@ -54,7 +54,14 @@ Va armándose al costado del panel actual y lo reemplaza sección por sección.
 3. Viajes, en dos partes (aprobado el 18/10/2026):
    - 3a. [x] Consultar: lista con período, búsqueda, filtros por camión y chofer y pestañas por estado (pendientes de completar, en curso, completos, eliminados); detalle con formato de orden de carga, recorrido GPS, remitos y combustible con sus fotos; exportación a Excel, PDF y Word. Sin cambios en la base (18/10/2026).
    - 3b. [x] Editar: completar los datos para facturar, cargar viajes a mano, papelera y restaurar, con aviso si dos personas guardan el mismo viaje a la vez (no se pisa nada). Migración [`0001_panel_trips_edicion.sql`](../supabase/migrations/0001_panel_trips_edicion.sql): guardan las cuentas del panel, la base anota quién y cuándo y no se borra nada; con ella vuelve a andar también el guardado del panel actual. Aplicada en producción el 18/10/2026 a las 20:05 (Uruguay), con un respaldo completo tomado a las 20:01 y probado en una base local. El chofer edita sus viajes desde la app en una próxima versión; buscar lugares en el mapa espera al proveedor de mapas (18/10/2026).
-4. [ ] Combustible, Mantenimiento y Documentación con lo que ya carga la app.
+4. Combustible, Mantenimiento y Documentación con lo que ya carga la app:
+   - 4a. [ ] Combustible (aprobado el 19/10/2026):
+     - Las boletas, de un viaje o sin viaje, agrupadas por estación, con los montos sumados en pesos y en dólares por separado.
+     - Cuenta corriente de cada estación: saldo inicial con fecha, más las cargas desde ese día, menos los pagos. Tiene su estado de cuenta.
+     - Desde el panel se cargan boletas nuevas, con foto o a mano, a nombre de quien las carga y sin viaje. También se corrigen, se mandan a la papelera y se registran los pagos y los saldos iniciales.
+     - Migración `0003`, que solo agrega: una tabla para los pagos y saldos iniciales de cada estación y el permiso para que las cuentas del panel corrijan boletas sin tocar lo que declaró el chofer.
+     - En la app 0.17.1, cargar combustible sin viaje o en el viaje también desde el modo sencillo.
+   - 4b. [ ] Mantenimiento y Documentación.
 5. [ ] Métricas: rendimiento por camión y por chofer, con gráficos.
 6. [x] Publicarlo: el código pasa a `main` y el panel nuevo queda en `/nuevo/` de la dirección del panel actual (18/10/2026).
 7. [x] GPS en vivo más rápido (aprobado el 18/10/2026, adelanta parte de la etapa 6): posición cada 3 segundos y recorrido cada 5, con la app 0.17.0 mandando un punto cada 2 segundos. La 0.17.0 se sube a Google Play cuando lo decidas (18/10/2026).
@@ -68,6 +75,13 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 19/10/2026: Combustible.
+  - Cada estación lleva una cuenta corriente: las cargas suman, los pagos restan y se puede cargar el saldo que ya existía, con su fecha. Las boletas anteriores a esa fecha quedan dentro del saldo.
+  - Los pagos y los saldos iniciales se registran desde el panel.
+  - Una boleta cargada desde el panel queda a nombre de quien la carga.
+  - Las cuentas del panel (las mismas que guardan viajes) pueden cargar y corregir boletas.
+  - Las estaciones salen de la lista del catálogo. Las escritas a mano se agrupan por nombre, sin importar mayúsculas, tildes ni espacios. Agregar estaciones a la lista queda para Configuración.
+  - En la app, cargar combustible también desde el modo sencillo.
 - 19/10/2026: la versión de Google Play se arma con R8 desde la 0.17.0: código optimizado y ofuscado, y sin los recursos que no se usan, como pide Play Console. Cada compilación la prueba en un emulador sin llegar a la base real; el viaje con GPS, las fotos y la sincronización se prueban en un teléfono antes de lanzarla. Lo que la app busque por nombre (clases, métodos, recursos) necesita su regla en `app/proguard-rules.pro`.
 - 19/10/2026: el trazado del recorrido se corrige en la app 0.17.0. En cada giro guarda la lectura donde cambió el rumbo y la anterior, donde el camión dobló; también la de donde el camión para, y durante una parada solo lecturas buenas junto a ese lugar, así no se dibuja una «estrella» donde estuvo estacionado. Los viajes ya guardados quedan como están: no se limpian en el panel. Pegar el recorrido a las calles (map matching) queda para cuando se elija el proveedor de mapas.
 - 18/10/2026: «chofer activo»: al ingresar y cada 5 minutos mientras la app está abierta, el teléfono avisa que el chofer está activo, con la versión de la app y, si no está de viaje, dónde está. Con la app cerrada no se sigue a nadie: no se vuelve a pedir la ubicación en segundo plano. Va en una tabla nueva, aparte de la posición del viaje en curso; conviene avisarles a los choferes.

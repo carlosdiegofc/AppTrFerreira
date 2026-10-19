@@ -45,6 +45,17 @@ begin
   update public.trf_panel_trips set client = 'Otro cliente';
   get diagnostics n = row_count;
   if n <> 0 then raise exception 'chofer: no tendría que poder cambiar los datos del panel'; end if;
+  -- Combustible: the driver sees and loads her own receipts; correcting them and the stations' accounts are the office's.
+  if (select count(*) from public.trf_driver_fuel_receipts) <> 2 then raise exception 'chofer: tendría que ver solo sus 2 boletas'; end if;
+  update public.trf_driver_fuel_receipts set panel_data = '{"monto": 1}', archived = true;
+  get diagnostics n = row_count;
+  if n <> 0 then raise exception 'chofer: no tendría que poder corregir boletas'; end if;
+  if (select count(*) from public.trf_fuel_station_movements) <> 0 then raise exception 'chofer: no tendría que ver las cuentas de las estaciones'; end if;
+  begin
+    insert into public.trf_fuel_station_movements (station_key, station_name, kind, happened_on, amount, currency, method) values ('id:est-ruta5', 'Ancap Ruta 5 km 32', 'payment', current_date, 100, 'UYU', 'efectivo');
+    raise exception 'chofer: pudo registrar un pago a una estación';
+  exception when insufficient_privilege then null;
+  end;
 end $$;
 rollback;
 
@@ -61,7 +72,8 @@ begin
   if (select count(*) from public.trf_driver_locations) <> 4 then raise exception 'lectura: tendría que ver la posición en vivo de los 4 choferes'; end if;
   if (select count(*) from public.trf_driver_presence) <> 4 then raise exception 'lectura: tendría que ver quién tiene la app abierta'; end if;
   if (select count(*) from public.trf_panel_trips) <> 3 then raise exception 'lectura: tendría que ver los 3 viajes del panel'; end if;
-  if (select count(*) from public.trf_trip_documents) <> 2 or (select count(*) from public.trf_driver_fuel_receipts) <> 1 then raise exception 'lectura: tendría que ver los remitos y el combustible'; end if;
+  if (select count(*) from public.trf_trip_documents) <> 2 or (select count(*) from public.trf_driver_fuel_receipts) <> 6 then raise exception 'lectura: tendría que ver los remitos y el combustible'; end if;
+  if (select count(*) from public.trf_fuel_station_movements) <> 3 then raise exception 'lectura: tendría que ver los pagos y saldos de las estaciones'; end if;
   if (select count(*) from public.trf_documents) <> 3 then raise exception 'lectura: tendría que ver todos los papeles'; end if;
 end $$;
 
@@ -107,6 +119,91 @@ begin
   delete from public.trf_panel_trips;
   if (select count(*) from public.trf_panel_trips) <> 4 then raise exception 'lectura: no tendría que poder borrar viajes'; end if;
 end $$;
+
+-- Combustible (decision of 19/10/2026): the panel accounts load receipts in their own name and without a trip, correct
+-- any receipt without touching what was declared, send it to the trash, and keep the stations' accounts. Nothing is
+-- deleted.
+do $$
+declare
+  me constant uuid := '00000000-0000-4000-8000-000000000002';
+  bruno constant uuid := '40000000-0000-4000-8000-000000000003';
+  r public.trf_driver_fuel_receipts;
+  m public.trf_fuel_station_movements;
+  before timestamptz;
+  n int;
+begin
+  insert into public.trf_driver_fuel_receipts (id, driver_id, driver_name, vehicle, receipt_date, station_id, station_name, liters, total, object_path, panel_data)
+  values ('40000000-0000-4000-8000-0000000000a1', me, 'Socio Lectura', '', current_date, '', 'Estación El Tala', null, 5000,
+          '00000000-0000-4000-8000-000000000002/standalone/40000000-0000-4000-8000-0000000000a1.jpg', '{"moneda": "USD"}')
+  returning * into r;
+  if r.trip_id is not null or r.updated_at is not null then raise exception 'lectura: la boleta nueva tendría que quedar sin viaje y sin corrección'; end if;
+  begin
+    insert into public.trf_driver_fuel_receipts (id, driver_id, driver_name, vehicle, station_name, total)
+    values ('40000000-0000-4000-8000-0000000000a2', '00000000-0000-4000-8000-000000000011', 'Ana Pereira', '', 'Otra', 1);
+    raise exception 'lectura: pudo cargar una boleta a nombre de un chofer';
+  exception when insufficient_privilege then null;
+  end;
+
+  -- A correction goes in panel_data; what the driver declared stays, whatever the update says.
+  update public.trf_driver_fuel_receipts
+  set panel_data = '{"monto": 320, "litros": 255}', liters = 1, total = 1, station_name = 'Otra', driver_id = me, driver_name = 'Otro', object_path = null, receipt_date = '2000-01-01', updated_by = '00000000-0000-4000-8000-000000000001'
+  where id = bruno and updated_at is null
+  returning * into r;
+  if r.id is null then raise exception 'lectura: tendría que poder corregir una boleta del chofer'; end if;
+  if r.liters <> 250 or r.total <> 310 or r.station_name <> 'Petrobras Salto' or r.driver_id <> '00000000-0000-4000-8000-000000000012' or r.driver_name <> 'Bruno Díaz' or r.receipt_date <> (select receipt_date from public.trf_driver_fuel_receipts where id = bruno) then
+    raise exception 'lectura: la corrección no tendría que tocar lo que declaró el chofer';
+  end if;
+  if r.panel_data->>'monto' <> '320' or r.updated_by is distinct from me or r.updated_at is null then raise exception 'lectura: la corrección tendría que quedar guardada y anotada'; end if;
+  before := r.updated_at;
+  -- Someone saved in between: a save that still carries the old date changes nothing.
+  update public.trf_driver_fuel_receipts set panel_data = '{}' where id = bruno and updated_at is null;
+  get diagnostics n = row_count;
+  if n <> 0 then raise exception 'lectura: una corrección con la fecha vieja no tendría que pisar la otra'; end if;
+  -- The trash and back.
+  update public.trf_driver_fuel_receipts set archived = true where id = bruno and updated_at = before returning * into r;
+  if not r.archived then raise exception 'lectura: tendría que poder mandar la boleta a la papelera'; end if;
+  update public.trf_driver_fuel_receipts set archived = false where id = bruno returning * into r;
+  if r.archived then raise exception 'lectura: tendría que poder restaurar la boleta'; end if;
+  delete from public.trf_driver_fuel_receipts;
+  if (select count(*) from public.trf_driver_fuel_receipts) <> 7 then raise exception 'lectura: no tendría que poder borrar boletas'; end if;
+
+  -- Payments and opening balances: who and when are the database's; one opening per station and currency.
+  insert into public.trf_fuel_station_movements (station_key, station_name, kind, happened_on, amount, currency, method, notes, created_by, created_at)
+  values ('name:estacion el tala', 'Estación El Tala', 'payment', current_date, 6600, 'UYU', 'cheque', 'Cheque 123', '00000000-0000-4000-8000-000000000001', now() - interval '1 year')
+  returning * into m;
+  if m.created_by is distinct from me or m.updated_by is distinct from me or m.created_at < now() - interval '1 day' then raise exception 'lectura: el pago tendría que quedar a su nombre y con la fecha de hoy'; end if;
+  update public.trf_fuel_station_movements set amount = 6500, kind = 'opening', created_by = null where id = m.id and updated_at = m.updated_at returning * into m;
+  if m.amount <> 6500 or m.kind <> 'payment' or m.created_by is distinct from me then raise exception 'lectura: corregir un pago no tendría que cambiar su tipo ni quién lo cargó'; end if;
+  update public.trf_fuel_station_movements set deleted_at = now() where id = m.id returning * into m;
+  if m.deleted_at is null then raise exception 'lectura: tendría que poder anular un pago'; end if;
+  begin
+    insert into public.trf_fuel_station_movements (station_key, station_name, kind, happened_on, amount, currency) values ('id:est-ruta5', 'Ancap Ruta 5 km 32', 'opening', current_date, 1, 'UYU');
+    raise exception 'lectura: pudo cargar un segundo saldo inicial en pesos para la misma estación';
+  exception when unique_violation then null;
+  end;
+  -- In dollars, the same station can have its own.
+  insert into public.trf_fuel_station_movements (station_key, station_name, kind, happened_on, amount, currency) values ('id:est-ruta5', 'Ancap Ruta 5 km 32', 'opening', current_date, -50, 'USD');
+  begin
+    insert into public.trf_fuel_station_movements (station_key, station_name, kind, happened_on, amount, currency, method) values ('id:est-ruta5', 'Ancap Ruta 5 km 32', 'payment', current_date, 0, 'UYU', 'efectivo');
+    raise exception 'lectura: pudo registrar un pago de cero';
+  exception when check_violation then null;
+  end;
+  begin
+    insert into public.trf_fuel_station_movements (station_key, station_name, kind, happened_on, amount, currency) values ('id:est-ruta5', 'Ancap Ruta 5 km 32', 'payment', current_date, 10, 'UYU');
+    raise exception 'lectura: pudo registrar un pago sin forma de pago';
+  exception when check_violation then null;
+  end;
+  begin
+    insert into public.trf_fuel_station_movements (station_key, station_name, kind, happened_on, amount, currency, method) values ('name:', 'Sin nombre', 'payment', current_date, 10, 'UYU', 'efectivo');
+    raise exception 'lectura: pudo registrar un pago sin estación';
+  exception when check_violation then null;
+  end;
+  begin
+    delete from public.trf_fuel_station_movements;
+    raise exception 'lectura: pudo borrar pagos';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
 rollback;
 
 -- The owner is a full administrator.
@@ -141,6 +238,15 @@ begin
   update public.trf_panel_trips set client = 'Otro cliente';
   get diagnostics n = row_count;
   if n <> 0 then raise exception 'admin: no tendría que cambiar los datos del panel'; end if;
+  -- The full administrators keep the access they had to receipts (receipts_admin_update), declared columns included.
+  update public.trf_driver_fuel_receipts set liters = 251 where id = '40000000-0000-4000-8000-000000000003';
+  if (select liters from public.trf_driver_fuel_receipts where id = '40000000-0000-4000-8000-000000000003') <> 251 then raise exception 'admin: tendría que conservar su permiso sobre las boletas'; end if;
+  if (select count(*) from public.trf_fuel_station_movements) <> 0 then raise exception 'admin: no tendría que ver las cuentas de las estaciones sin estar en la lista del panel'; end if;
+  begin
+    insert into public.trf_fuel_station_movements (station_key, station_name, kind, happened_on, amount, currency, method) values ('id:est-ruta5', 'Ancap Ruta 5 km 32', 'payment', current_date, 100, 'UYU', 'efectivo');
+    raise exception 'admin: pudo registrar un pago sin estar en la lista del panel';
+  exception when insufficient_privilege then null;
+  end;
 end $$;
 rollback;
 
@@ -154,6 +260,11 @@ begin
   begin
     perform 1 from public.trf_driver_presence;
     raise exception 'anónimo: pudo leer quién tiene la app abierta';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform 1 from public.trf_fuel_station_movements;
+    raise exception 'anónimo: pudo leer las cuentas de las estaciones';
   exception when insufficient_privilege then null;
   end;
   if (select count(*) from public.trf_mobile_catalog) <> 0 then raise exception 'anónimo: no tendría que leer el catálogo'; end if;
