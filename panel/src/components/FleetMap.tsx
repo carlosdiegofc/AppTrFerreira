@@ -10,8 +10,20 @@ import { type FleetUnit, STATE_LABEL, unitTitle } from '../lib/fleet';
 import { type Glide, glideAt, type Point, startGlide, tailStart } from '../lib/glide';
 import { drawable, routeLines } from '../lib/route';
 
+/** A driver with the app open and no trip, where the phone is («chofer activo»). */
+export interface PersonMark {
+  key: string;
+  name: string;
+  lat: number;
+  lng: number;
+}
+
+const NO_PEOPLE: readonly PersonMark[] = [];
+
 interface Props {
   units: readonly FleetUnit[];
+  /** Drivers with the app open and no trip: drawn apart from the trucks, since the phone is not always in the truck. */
+  people?: readonly PersonMark[];
   selected?: string | null;
   onSelect?: (key: string) => void;
   route?: readonly RoutePoint[] | null;
@@ -43,6 +55,18 @@ function markerElement(u: FleetUnit, selected: boolean): HTMLElement {
   return el;
 }
 
+function personElement(p: PersonMark, selected: boolean): HTMLElement {
+  const el = document.createElement('div');
+  el.className = `fm fm-person${selected ? ' fm-selected' : ''}`;
+  const dot = document.createElement('span');
+  dot.className = 'fm-dot';
+  const tag = document.createElement('span');
+  tag.className = 'fm-tag';
+  tag.textContent = p.name.split(' ')[0] || p.name;
+  el.append(dot, tag);
+  return el;
+}
+
 const located = (u: FleetUnit): u is FleetUnit & { lat: number; lng: number } => u.lat !== null && u.lng !== null;
 
 /**
@@ -52,7 +76,7 @@ const located = (u: FleetUnit): u is FleetUnit & { lat: number; lng: number } =>
  */
 const calm = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-export function FleetMap({ units, selected = null, onSelect, route = null, fitToken = 0, label, className = '' }: Props) {
+export function FleetMap({ units, people = NO_PEOPLE, selected = null, onSelect, route = null, fitToken = 0, label, className = '' }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const markers = useRef(new Map<string, Shown>());
@@ -122,11 +146,25 @@ export function FleetMap({ units, selected = null, onSelect, route = null, fitTo
     const seen = new Set<string>();
     const now = performance.now();
     const still = calm();
-    for (const u of units.filter(located)) {
+    const marks = [
+      ...units.filter(located).map((u) => ({
+        key: u.key,
+        to: [u.lat, u.lng] as Point,
+        look: `${u.state}|${u.plate}|${u.model}|${u.key === selected}`,
+        title: `${unitTitle(u)} · ${STATE_LABEL[u.state]}`,
+        element: () => markerElement(u, u.key === selected),
+      })),
+      ...people.map((p) => ({
+        key: p.key,
+        to: [p.lat, p.lng] as Point,
+        look: `person|${p.name}|${p.key === selected}`,
+        title: `${p.name} · con la app abierta, sin viaje`,
+        element: () => personElement(p, p.key === selected),
+      })),
+    ];
+    for (const u of marks) {
       seen.add(u.key);
-      const to: Point = [u.lat, u.lng];
-      const look = `${u.state}|${u.plate}|${u.model}|${u.key === selected}`;
-      const title = `${unitTitle(u)} · ${STATE_LABEL[u.state]}`;
+      const { to, look, title } = u;
       const current = markers.current.get(u.key);
       if (current) {
         if (current.target[0] !== to[0] || current.target[1] !== to[1]) {
@@ -140,14 +178,14 @@ export function FleetMap({ units, selected = null, onSelect, route = null, fitTo
           } else if (frame.current === 0) frame.current = requestAnimationFrame(step);
         }
         if (current.look !== look) {
-          current.marker.setIcon(L.divIcon({ html: markerElement(u, u.key === selected), className: 'fm-wrap', iconSize: undefined }));
+          current.marker.setIcon(L.divIcon({ html: u.element(), className: 'fm-wrap', iconSize: undefined }));
           current.marker.options.title = title;
           current.look = look;
         }
         current.marker.setZIndexOffset(u.key === selected ? 1000 : 0);
         continue;
       }
-      const marker = L.marker(to, { icon: L.divIcon({ html: markerElement(u, u.key === selected), className: 'fm-wrap', iconSize: undefined }), title, keyboard: true, riseOnHover: true })
+      const marker = L.marker(to, { icon: L.divIcon({ html: u.element(), className: 'fm-wrap', iconSize: undefined }), title, keyboard: true, riseOnHover: true })
         .on('click', () => select.current?.(u.key))
         .addTo(m);
       markers.current.set(u.key, { marker, look, drawn: to, target: to, glide: null });
@@ -158,23 +196,24 @@ export function FleetMap({ units, selected = null, onSelect, route = null, fitTo
         markers.current.delete(key);
       }
     }
-    const placed = units.filter(located);
-    if (fitted.current !== fitToken && placed.length > 0) {
+    if (fitted.current !== fitToken && marks.length > 0) {
       fitted.current = fitToken;
-      m.fitBounds(L.latLngBounds(placed.map((u) => [u.lat, u.lng] as [number, number])), { padding: [48, 48], maxZoom: 12, animate: !calm() });
+      m.fitBounds(L.latLngBounds(marks.map((u) => u.to)), { padding: [48, 48], maxZoom: 12, animate: !calm() });
     }
-  }, [units, selected, fitToken]);
+  }, [units, people, selected, fitToken]);
 
-  // Centre on the selected truck when the selection changes, or once it first gets a position (opened from a link).
-  // Not on every refresh: that would pull the map back while the user is looking around.
+  // Centre on the selected truck or driver when the selection changes, or once it first gets a position (opened from a
+  // link). Not on every refresh: that would pull the map back while the user is looking around.
   const target = units.find((x) => x.key === selected);
-  const targetReady = target !== undefined && located(target);
+  const chosenPerson = people.find((p) => p.key === selected);
+  const focus = target && located(target) ? target : (chosenPerson ?? null);
+  const targetReady = focus !== null;
   useEffect(() => {
     const m = map.current;
-    if (!m || !target || !located(target)) return;
+    if (!m || !focus) return;
     const zoom = Math.max(m.getZoom(), 11);
-    if (calm()) m.setView([target.lat, target.lng], zoom, { animate: false });
-    else m.flyTo([target.lat, target.lng], zoom, { duration: 0.6 });
+    if (calm()) m.setView([focus.lat, focus.lng], zoom, { animate: false });
+    else m.flyTo([focus.lat, focus.lng], zoom, { duration: 0.6 });
   }, [selected, targetReady]);
 
   // The first time the route of a selected trip arrives, show the whole trip; later refreshes keep the user's view.
@@ -184,10 +223,12 @@ export function FleetMap({ units, selected = null, onSelect, route = null, fitTo
     if (!layer) return;
     layer.clearLayers();
     tail.current.line = null;
-    if (!selected) routeShown.current = null;
     // Readings without a fix are left out, and a pause or a gap without signal leaves the route open, as in the app.
     const lines = route ? routeLines(route) : [];
     const all = lines.flat();
+    // Nothing selected, or a selection without a route (a truck without a trip, a driver): the route shown is forgotten,
+    // so choosing that trip again shows all of it again.
+    if (!selected || all.length === 0) routeShown.current = null;
     if (all.length === 0) return;
     const m = map.current;
     if (m && selected && routeShown.current !== selected && all.length > 1) {

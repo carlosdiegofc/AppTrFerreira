@@ -233,6 +233,42 @@ export type Database = {
         }
         Relationships: []
       }
+      trf_driver_presence: {
+        Row: {
+          accuracy_m: number | null
+          app_version: string
+          driver_id: string
+          driver_name: string
+          latitude: number | null
+          located_at: string | null
+          longitude: number | null
+          seen_at: string
+          vehicle: string | null
+        }
+        Insert: {
+          accuracy_m?: number | null
+          app_version: string
+          driver_id: string
+          driver_name: string
+          latitude?: number | null
+          located_at?: string | null
+          longitude?: number | null
+          seen_at?: string
+          vehicle?: string | null
+        }
+        Update: {
+          accuracy_m?: number | null
+          app_version?: string
+          driver_id?: string
+          driver_name?: string
+          latitude?: number | null
+          located_at?: string | null
+          longitude?: number | null
+          seen_at?: string
+          vehicle?: string | null
+        }
+        Relationships: []
+      }
       trf_driver_tracking_sessions: {
         Row: {
           active: boolean

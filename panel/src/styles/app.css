@@ -764,7 +764,8 @@ button {
 /* ---------- Lists ---------- */
 .alert-list,
 .trip-list,
-.units {
+.units,
+.people {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -1117,6 +1118,43 @@ a.trip-line:hover {
 .unit-detail header p {
   color: var(--muted);
   font-size: 13.5px;
+}
+
+/* «Chofer activo»: the drivers with the app, under the trucks. */
+.gps-people {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.gps-people h2 {
+  font-size: 14.5px;
+}
+
+.gps-people-note {
+  font-size: 12.5px;
+}
+
+.unit-static {
+  cursor: default;
+}
+
+.unit-static:hover {
+  background: transparent;
+}
+
+/* A driver with the app open and no trip: a smaller blue dot, apart from the trucks. */
+.fm-person {
+  left: -8px;
+  top: -8px;
+}
+
+.fm-person .fm-dot {
+  width: 16px;
+  height: 16px;
+  background: var(--blue);
 }
 
 @media (max-width: 1023px) {

@@ -58,6 +58,7 @@ Va armándose al costado del panel actual y lo reemplaza sección por sección.
 5. [ ] Métricas: rendimiento por camión y por chofer, con gráficos.
 6. [x] Publicarlo: el código pasa a `main` y el panel nuevo queda en `/nuevo/` de la dirección del panel actual (18/10/2026).
 7. [x] GPS en vivo más rápido (aprobado el 18/10/2026, adelanta parte de la etapa 6): posición cada 3 segundos y recorrido cada 5, con la app 0.17.0 mandando un punto cada 2 segundos. La 0.17.0 se sube a Google Play cuando lo decidas (18/10/2026).
+8. [x] «Chofer activo» (aprobado el 18/10/2026): GPS en vivo y la «Flota en vivo» de la app dicen qué choferes tienen la app abierta, con qué versión y, si no viajan, dónde está el teléfono. Migración [`0002_chofer_activo.sql`](../supabase/migrations/0002_chofer_activo.sql), una tabla nueva: aplicada en producción el 19/10/2026 a las 08:20 (Uruguay). El respaldo completo se tomó a la 01:22, se probó en una base local y se entregó; entre el respaldo y la migración no cambió ningún dato. Avisan los teléfonos con la app 0.17.0 o posterior (19/10/2026).
 
 Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - El rol anónimo tiene todos los permisos de tabla en 8 tablas de la app y del panel (`trf_driver_*`, `trf_trip_*`, `trf_mobile_catalog`, `trf_panel_trips`), y también los de la secuencia que numera los puntos GPS. Es lo que Supabase da por defecto y la seguridad por filas lo frena, pero hay que quitarlos: solo `trf_rates` necesita lectura anónima.
@@ -67,6 +68,7 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 18/10/2026: «chofer activo»: al ingresar y cada 5 minutos mientras la app está abierta, el teléfono avisa que el chofer está activo, con la versión de la app y, si no está de viaje, dónde está. Con la app cerrada no se sigue a nadie: no se vuelve a pedir la ubicación en segundo plano. Va en una tabla nueva, aparte de la posición del viaje en curso; conviene avisarles a los choferes.
 - 18/10/2026: en los mapas en vivo (panel y «Flota en vivo» de la app) el camión que avanza se desliza de una posición a la siguiente, sin saltos, y la línea del recorrido lo acompaña. Salta directo si aparece a más de 3 km o si el equipo tiene pedido reducir el movimiento.
 - 18/10/2026: el GPS en vivo va lo más rápido posible dentro del plan gratis. El panel lee la posición de cada camión cada 3 segundos y el recorrido cada 5; la app (versión nueva) toma un punto cada 2 segundos, manda la posición sola y primero, el historial en tandas, y su «Flota en vivo» se actualiza cada 5 segundos. Supabase Realtime queda para cuando haga falta el plan Pro: con varios camiones y pantallas abiertas se pasaría del límite gratis de mensajes.
 - 18/10/2026: el viaje de un chofer lo pueden editar el propio chofer, el dueño y la administración. Se aplica con la parte 3b de Viajes, con una migración de permisos.

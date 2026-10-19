@@ -13,6 +13,17 @@ begin
   if (select count(*) from public.trf_driver_tracking_sessions) <> 2 then raise exception 'chofer: tendría que ver solo sus 2 viajes'; end if;
   if (select count(*) from public.trf_driver_location_history) <> 13 then raise exception 'chofer: tendría que ver solo sus 13 lecturas GPS'; end if;
   if (select count(*) from public.trf_driver_locations) <> 1 then raise exception 'chofer: tendría que ver solo su posición en vivo'; end if;
+  if (select count(*) from public.trf_driver_presence) <> 1 then raise exception 'chofer: tendría que ver solo su propio «activo»'; end if;
+  -- «Chofer activo»: the phone says it is open; the server notes when, whatever the phone's clock says.
+  insert into public.trf_driver_presence (driver_id, driver_name, vehicle, app_version, seen_at, latitude, longitude, accuracy_m, located_at)
+  values ('00000000-0000-4000-8000-000000000011', 'Ana Pereira', 'Volvo FH 460 · ABC1234', '0.17.0', now() - interval '1 year', -34.9, -56.2, 8, now())
+  on conflict (driver_id) do update set app_version = excluded.app_version, seen_at = excluded.seen_at, latitude = excluded.latitude, longitude = excluded.longitude, accuracy_m = excluded.accuracy_m, located_at = excluded.located_at;
+  if (select seen_at from public.trf_driver_presence where driver_id = '00000000-0000-4000-8000-000000000011') < now() - interval '1 minute' then raise exception 'chofer: la hora de «activo» la pone el servidor'; end if;
+  begin
+    insert into public.trf_driver_presence (driver_id, driver_name, app_version) values ('00000000-0000-4000-8000-000000000012', 'Bruno Díaz', '0.17.0');
+    raise exception 'chofer: pudo marcar como activo a otro chofer';
+  exception when insufficient_privilege then null;
+  end;
   if (select count(*) from public.trf_panel_trips) <> 0 then raise exception 'chofer: no tendría que ver los datos del panel'; end if;
   if (select count(*) from public.trf_documents) <> 3 then raise exception 'chofer: tendría que ver sus papeles y los de los camiones'; end if;
   if (select count(*) from public.trf_vehicle_maintenance) <> 3 then raise exception 'chofer: tendría que ver los services'; end if;
@@ -48,6 +59,7 @@ begin
   if (select count(*) from public.trf_driver_tracking_sessions) <> 6 then raise exception 'lectura: tendría que ver los 6 viajes'; end if;
   if (select count(*) from public.trf_driver_location_history) <> 15 then raise exception 'lectura: tendría que ver las 15 lecturas GPS'; end if;
   if (select count(*) from public.trf_driver_locations) <> 4 then raise exception 'lectura: tendría que ver la posición en vivo de los 4 choferes'; end if;
+  if (select count(*) from public.trf_driver_presence) <> 4 then raise exception 'lectura: tendría que ver quién tiene la app abierta'; end if;
   if (select count(*) from public.trf_panel_trips) <> 3 then raise exception 'lectura: tendría que ver los 3 viajes del panel'; end if;
   if (select count(*) from public.trf_trip_documents) <> 2 or (select count(*) from public.trf_driver_fuel_receipts) <> 1 then raise exception 'lectura: tendría que ver los remitos y el combustible'; end if;
   if (select count(*) from public.trf_documents) <> 3 then raise exception 'lectura: tendría que ver todos los papeles'; end if;
@@ -120,6 +132,7 @@ begin
   if public.trf_is_panel_admin() or not public.trf_is_admin() then raise exception 'admin: tendría que ser administrador completo fuera de la lista del panel'; end if;
   if (select count(*) from public.trf_driver_tracking_sessions) <> 6 then raise exception 'admin: tendría que ver los 6 viajes'; end if;
   if (select count(*) from public.trf_panel_trips) <> 0 then raise exception 'admin: no tendría que leer los datos del panel'; end if;
+  if (select count(*) from public.trf_driver_presence) <> 4 then raise exception 'admin: tendría que ver quién tiene la app abierta'; end if;
   begin
     insert into public.trf_panel_trips (source, departure_at, vehicle) values ('manual', now(), 'Volvo FH 460 · ABC1234');
     raise exception 'admin: pudo cargar un viaje sin estar en la lista del panel';
@@ -138,6 +151,11 @@ do $$
 begin
   if (select count(*) from public.trf_driver_tracking_sessions) <> 0 then raise exception 'anónimo: no tendría que ver viajes'; end if;
   if (select count(*) from public.trf_driver_location_history) <> 0 or (select count(*) from public.trf_driver_locations) <> 0 then raise exception 'anónimo: no tendría que ver el GPS'; end if;
+  begin
+    perform 1 from public.trf_driver_presence;
+    raise exception 'anónimo: pudo leer quién tiene la app abierta';
+  exception when insufficient_privilege then null;
+  end;
   if (select count(*) from public.trf_mobile_catalog) <> 0 then raise exception 'anónimo: no tendría que leer el catálogo'; end if;
   begin
     insert into public.trf_panel_trips (source, departure_at, vehicle) values ('manual', now(), 'Volvo FH 460 · ABC1234');

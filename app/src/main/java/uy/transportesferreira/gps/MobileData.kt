@@ -86,6 +86,15 @@ class MobileData(private val c:Context){
   synchronized(fleetLock){val f=store.cache(key);val active=f.optJSONArray("active")?:return f
    withPositions(active,now);f.put("active",active).put("live_at",System.currentTimeMillis());store.cache(key,f);return f}
  }
+ /**
+  * Who has the app open («chofer activo»), newest notice first, with where the phone was without a trip; kept like the
+  * fleet, so it shows without signal too.
+  */
+ fun presence(refresh:Boolean=false):JSONArray{
+  val key="presence-${uid()}"
+  if(refresh)store.cache(key,JSONObject().put("rows",array("/rest/v1/trf_driver_presence?select=driver_id,driver_name,app_version,seen_at,latitude,longitude,accuracy_m,located_at&order=seen_at.desc&limit=200")))
+  return store.cache(key).optJSONArray("rows")?:JSONArray()
+ }
  /** Every driver's latest position: the phone updates its row of trf_driver_locations with each reading (every version). */
  private fun positions()=array("/rest/v1/trf_driver_locations?select=driver_id,latitude,longitude,speed_kmh,recorded_at&limit=500")
  /** A trip in progress gets its driver's position when it was read during the trip, the same window as the route. */

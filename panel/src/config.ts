@@ -19,3 +19,5 @@ export const DEFAULT_ZOOM = 7;
 export const LIVE_REFRESH_MS = 3_000;
 export const FLEET_REFRESH_MS = 15_000;
 export const ROUTE_REFRESH_MS = 5_000;
+/** Who has the app open: the phones say it every 5 minutes, so reading it every 30 seconds is enough. */
+export const PRESENCE_REFRESH_MS = 30_000;
