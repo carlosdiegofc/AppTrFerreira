@@ -31,7 +31,8 @@ class GpsService:Service(){
   // Android 12+ can refuse a foreground start from the background after the system killed the service.
   try{notifyTrip(t.optBoolean("paused"))}catch(_:Exception){store.warning("El GPS se detuvo en segundo plano · abrí la app para continuar");stopSelf();return START_NOT_STICKY}
   watchSince=System.currentTimeMillis()
-  if(tripId!=t.getString("id")){distance.reset();route.reset();lastReading=null;tripId=t.getString("id")}
+  // A service the system started again goes on with the route's state kept with the trip (where it stopped, jitter).
+  if(tripId!=t.getString("id")){distance.reset();route.restore(t.optString("route_state"));lastReading=null;tripId=t.getString("id")}
   when(i?.action){
    PAUSE->{keepLast();store.update{it.put("paused",true).put("speed_kmh",0.0)};stopGps();distance.reset();sendLive();sync()}
    RESUME->{store.update{it.put("paused",false).put("segment",it.optInt("segment")+1)};distance.reset();sync()}
@@ -78,7 +79,7 @@ class GpsService:Service(){
   lastReading=p
   // The trip (distance, last reading) goes up every 15 s, without waiting for the timer; a pause, a resume or the end go at once.
   val now=System.currentTimeMillis();val send=now-tripSentAt>=15000;if(send)tripSentAt=now
-  store.update(send){if(!it.has("origin_lat")){it.put("origin_lat",l.latitude).put("origin_lng",l.longitude)};it.put("distance_meters",it.optDouble("distance_meters",0.0)+delta).put("last_point",p).put("speed_kmh",p.optDouble("speed_kmh",0.0))}
+  store.update(send){if(!it.has("origin_lat")){it.put("origin_lat",l.latitude).put("origin_lng",l.longitude)};it.put("distance_meters",it.optDouble("distance_meters",0.0)+delta).put("last_point",p).put("speed_kmh",p.optDouble("speed_kmh",0.0)).put("route_state",route.state())}
   sendLive();if(send)sync()
  }
  /**

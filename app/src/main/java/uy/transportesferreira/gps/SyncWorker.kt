@@ -47,7 +47,7 @@ object Sync {
             for(t in trips){
               try{
                 if(t.optInt("revision")<=t.optInt("synced_revision"))continue
-                val body=JSONObject(t.toString());listOf("segment","revision","synced_revision","last_point","speed_kmh","synced_at","pending_documents").forEach{body.remove(it)}
+                val body=JSONObject(t.toString());listOf("segment","revision","synced_revision","last_point","speed_kmh","synced_at","pending_documents","route_state").forEach{body.remove(it)}
                 api.json("/rest/v1/trf_driver_tracking_sessions?on_conflict=id",body,"resolution=merge-duplicates")
                 store.markTripSynced(t.getString("id"),t.optInt("revision"))
               }catch(_:Exception){failures++}

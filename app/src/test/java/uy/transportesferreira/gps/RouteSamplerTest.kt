@@ -95,6 +95,23 @@ class RouteSamplerTest {
         assertTrue(s.keep(-34.9+0.0018,-56.2,16000,0,null,5.0,null))
     }
 
+    @Test fun aServiceStartedAgainGoesOnWithTheStop() {
+        val s=RouteSampler()
+        assertTrue(s.keep(-34.9,-56.2,0,0,0.0,4.0,null))
+        assertFalse(s.keep(-34.9+0.00036,-56.2,32000,0,0.0,6.0,null))
+        // Android starts the service again: the new sampler goes on from the state kept with the trip, so a pause now
+        // leaves that reading out, the driver walking 40 m away is still left out and a good reading where it stands
+        // is kept on time.
+        val again=RouteSampler();again.restore(s.state())
+        assertTrue(again.jittery)
+        assertFalse(again.keep(-34.9+0.00036,-56.2,40000,0,4.0,5.0,null))
+        assertTrue(again.keep(-34.9+0.00001,-56.2,64000,0,0.0,4.0,null))
+        // A state it cannot read starts over.
+        val fresh=RouteSampler();fresh.restore("roto")
+        assertFalse(fresh.jittery)
+        assertTrue(fresh.keep(-34.9,-56.2,0,0))
+    }
+
     @Test fun aStretchDoesNotStartWithAPoorFixOfAParkedTruck() {
         val s=RouteSampler()
         // The first fixes after the GPS starts are often poor: the trip waits for a good one.
