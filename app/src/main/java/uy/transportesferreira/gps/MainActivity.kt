@@ -1035,7 +1035,8 @@ class MainActivity:AppCompatActivity(){
   val now=SystemClock.elapsedRealtime();val at=presenceAt
   if((at!=null&&now-at<Presence.EVERY_MS)||api.session()==null||panelFirst())return
   presenceAt=now
-  Presence.send(applicationContext,name.ifBlank{driverName()},truck.ifBlank{null},appVersion,store.current()?.optBoolean("active")==true,prefs().getBoolean(PRESENCE_POSITION,false)){sent->
+  // Asked before looking for the position and again when it arrives: no trip in progress and the driver's consent.
+  Presence.send(applicationContext,name.ifBlank{driverName()},truck.ifBlank{null},appVersion,{store.current()?.optBoolean("active")!=true&&prefs().getBoolean(PRESENCE_POSITION,false)}){sent->
    if(!sent)runOnUiThread{if(presenceAt==now)presenceAt=now-Presence.EVERY_MS+Presence.RETRY_MS}}
   if(!presenceAsked&&(screen=="home"||screen=="simplehome")&&!prefs().contains(PRESENCE_POSITION)&&locationGranted()){presenceAsked=true;presencePositionDialog{}}
  }
@@ -1079,7 +1080,7 @@ class MainActivity:AppCompatActivity(){
   val k=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL};root.addView(k,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(14)})
   fleetStats=k;fleetStatsInto(k,items)
   alerts()
-  val marks=fleetMarks(items);fleetShape=shapeOf(f,items,marks)
+  val marks=fleetMarks(items,f);fleetShape=shapeOf(f,items,marks)
   val mc=card();val web=TripMap.fleet(this,marks,LIVE_MS);activeMap=web;mc.addView(web,LinearLayout.LayoutParams(-1,dp(260)))
   if(marks.length()==0)note(if(fetched==0L)"Buscando posiciones…" else "Todavía no hay posiciones GPS para mostrar.",mc,0).setPadding(dp(16),dp(10),dp(16),dp(12))
   section("Camiones")
@@ -1087,7 +1088,7 @@ class MainActivity:AppCompatActivity(){
   fleetNote=note(fleetNoteText(f),top=10)
   section("Choferes con la app")
   val pc=card();peopleCard=pc;peopleInto(pc,f)
-  note("Activo es con la app abierta en los últimos 10 minutos. Las versiones anteriores a la 0.17.0 no avisan.",top=8)
+  note("Activo es con la app abierta en los últimos 10 minutos. El punto azul del mapa es el teléfono del chofer activo que no está de viaje. Las versiones anteriores a la 0.17.0 no avisan.",top=8)
   if(!hub)tileGrid(listOf(Tile(R.drawable.ic_list,"Viajes de la flota",null){openHistory("trips",true)},Tile(R.drawable.ic_history,"Combustible de la flota",null){openHistory("fuel",true)},
    Tile(R.drawable.ic_speed,"Rendimiento",null){openPerformance()},Tile(R.drawable.ic_wrench,"Mantenimiento",null){maintenance(true)},Tile(R.drawable.ic_doc,"Documentos",null){documents(true)}))
   sync=note(store.message(),top=16).apply{gravity=Gravity.CENTER}
@@ -1099,10 +1100,15 @@ class MainActivity:AppCompatActivity(){
   k.removeAllViews()
   stat(k,"${items.count{it.state=="moving"}}","En ruta",green,0);stat(k,"${items.count{it.state=="stopped"||it.state=="paused"||it.state=="nosignal"}}","Detenidos",amber,1);stat(k,"${items.count{it.state=="idle"}}","Sin viaje",grey,2)
  }
- /** One marker per truck with a position; the key lets the open map move each marker instead of drawing it again. */
- private fun fleetMarks(items:List<FleetItem>):JSONArray{
+ /**
+  * One marker per truck with a position, and a smaller blue one where the phone of each active driver without a trip is;
+  * the key lets the open map move each marker instead of drawing it again.
+  */
+ private fun fleetMarks(items:List<FleetItem>,f:JSONObject):JSONArray{
   val marks=JSONArray()
   items.filter{FleetStats.validPosition(it.lat,it.lng)}.forEach{marks.put(JSONObject().put("key",it.session?.optString("id")?.let{id->"trip:$id"}?:"truck:${it.model}|${it.plate}").put("lat",it.lat).put("lng",it.lng).put("label",it.plate.ifBlank{it.model}).put("color",hex(stateColor(it.state))))}
+  presenceRows(f).filter{(r,state)->placeOf(r,state)}.forEach{(r,_)->val name=FleetStats.text(r.optString("driver_name"))?:"Chofer"
+   marks.put(JSONObject().put("key","driver:${r.optString("driver_id")}").put("lat",r.optDouble("latitude")).put("lng",r.optDouble("longitude")).put("label",name.split(' ').first()).put("color",hex(0xFF1663E8.toInt())).put("person",true))}
   return marks
  }
  private fun fleetNoteText(f:JSONObject):String{val at=maxOf(f.optLong("fetched_at"),f.optLong("live_at"));return if(at==0L)"Buscando la flota…" else "Actualizado ${ago(at)}. Las posiciones se actualizan solas cada ${LIVE_MS/1000} segundos."}
@@ -1116,7 +1122,7 @@ class MainActivity:AppCompatActivity(){
  private fun shapeOf(f:JSONObject,items:List<FleetItem>,marks:JSONArray)="${items.isEmpty()}|${marks.length()==0}|${f.optLong("fetched_at")==0L}"
  /** False when the screen has to be built again: what it shows changed shape. An empty fleet stays as it is. */
  private fun fleetLive():Boolean{
-  val f=mobile.fleet();val items=fleetItems(f);val marks=fleetMarks(items);val k=fleetStats
+  val f=mobile.fleet();val items=fleetItems(f);val marks=fleetMarks(items,f);val k=fleetStats
   if(k==null||fleetShape!=shapeOf(f,items,marks))return false
   fleetStatsInto(k,items);fleetCard?.let{c->c.removeAllViews();items.forEach{fleetRow(c,it)}}
   activeMap?.evaluateJavascript("window.setMarks&&setMarks(${marks.toString().replace("<","\\u003c")})",null)
@@ -1129,18 +1135,24 @@ class MainActivity:AppCompatActivity(){
   */
  private fun peopleInto(c:LinearLayout,f:JSONObject){
   c.removeAllViews()
-  val rows=mobile.presence().let{a->(0 until a.length()).map{a.getJSONObject(it)}}
+  val rows=presenceRows(f)
   if(rows.isEmpty()){note("Todavía ningún chofer abrió la app nueva.",c,0).setPadding(dp(16),dp(12),dp(16),dp(12));return}
-  val active=f.optJSONArray("active")?:JSONArray();val onTrip=(0 until active.length()).map{active.getJSONObject(it).optString("driver_id")}.toSet()
-  val newest=rows.map{it.optString("app_version")}.reduce{a,b->if(FleetStats.compareVersions(b,a)>0)b else a}
-  val now=System.currentTimeMillis();val order=mapOf("trip" to 0,"active" to 1,"seen" to 2)
-  rows.map{Pair(it,FleetStats.presenceState(it.optString("driver_id") in onTrip,it.optString("seen_at"),now))}.sortedBy{order[it.second]}.forEach{(r,state)->
+  val newest=rows.map{it.first.optString("app_version")}.reduce{a,b->if(FleetStats.compareVersions(b,a)>0)b else a}
+  rows.forEach{(r,state)->
    val seen=FleetStats.seenAt(r.optString("seen_at"))?.let{ago(it)}?:"hace tiempo";val version=r.optString("app_version")
-   val what=when(state){"trip"->"En viaje";"active"->"Activo $seen";else->"Abrió la app $seen"}
+   val what=when(state){"trip"->"En viaje";"active"->"Activo $seen · sin viaje"+if(placeOf(r,state))"" else " · sin posición";else->"Abrió la app $seen"}
    val app="app $version"+if(FleetStats.compareVersions(newest,version)>0)" (hay una más nueva: $newest)" else ""
    row(c,R.drawable.ic_person,FleetStats.text(r.optString("driver_name"))?:"Chofer","$what · $app",tint=when(state){"trip"->blue;"active"->green;else->grey})
   }
  }
+ /** Each presence row with its state («trip», «active» or «seen»), on a trip first; who is on a trip comes from the fleet. */
+ private fun presenceRows(f:JSONObject):List<Pair<JSONObject,String>>{
+  val active=f.optJSONArray("active")?:JSONArray();val onTrip=(0 until active.length()).map{active.getJSONObject(it).optString("driver_id")}.toSet()
+  val now=System.currentTimeMillis();val order=mapOf("trip" to 0,"active" to 1,"seen" to 2)
+  return mobile.presence().let{a->(0 until a.length()).map{a.getJSONObject(it)}}.map{Pair(it,FleetStats.presenceState(it.optString("driver_id") in onTrip,it.optString("seen_at"),now))}.sortedBy{order[it.second]}
+ }
+ /** Whether the map shows where this driver's phone is: active without a trip and a recent position (FleetStats.presencePlace). */
+ private fun placeOf(r:JSONObject,state:String)=FleetStats.presencePlace(state,r.optString("seen_at"),r.optString("located_at"),r.optDouble("latitude"),r.optDouble("longitude"))
  private fun loadFleet(manual:Boolean=false){
   if(fleetLoading)return;fleetLoading=true;if(manual)toast("Actualizando la flota…")
   thread{val ok=try{mobile.catalog(true);mobile.fleet(true);true}catch(_:Exception){false}

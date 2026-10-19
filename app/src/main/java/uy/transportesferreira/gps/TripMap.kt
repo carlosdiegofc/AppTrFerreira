@@ -59,7 +59,8 @@ object TripMap {
   return WebView(c).apply{settings.javaScriptEnabled=true;settings.allowFileAccess=false;settings.allowContentAccess=false;settings.mixedContentMode=WebSettings.MIXED_CONTENT_NEVER_ALLOW;webViewClient=object:WebViewClient(){override fun shouldOverrideUrlLoading(view:WebView?,request:WebResourceRequest?)=true};loadDataWithBaseURL("https://transportes-ferreira-gestion.carlosdiegofc2001.chatgpt.site/",html,"text/html","UTF-8",null)}
  }
  /**
-  * Owner view: one marker per truck, colored by state, moved in place by setMarks(). Labels are inserted as text, never as HTML.
+  * Owner view: one marker per truck, colored by state, and a smaller one (person) where the phone of an active driver without
+  * a trip is, moved in place by setMarks(). Labels are inserted as text, never as HTML.
   * A truck glides to its new position over glideMs, about the time until the next one, instead of jumping.
   */
  @SuppressLint("SetJavaScriptEnabled","ClickableViewAccessibility") fun fleet(c:Context,marks:JSONArray,glideMs:Long):WebView{
@@ -77,7 +78,7 @@ object TripMap {
   function draw(list){const seen={};list.forEach(m=>{const p=[m.lat,m.lng];seen[m.key]=1;const k=known[m.key];
    if(k){moveTo(k,p);k.marker.setStyle({fillColor:m.color});k.tag.textContent=m.label;return}
    const tag=document.createElement('span');tag.textContent=m.label;
-   known[m.key]={tag:tag,at:p,to:p,glide:null,marker:L.circleMarker(p,{radius:9,color:'#fff',weight:3,fillColor:m.color,fillOpacity:1}).addTo(map).bindTooltip(tag,{permanent:true,direction:'right',offset:[10,0],className:'tag'})}});
+   known[m.key]={tag:tag,at:p,to:p,glide:null,marker:L.circleMarker(p,{radius:m.person?6:9,color:'#fff',weight:m.person?2:3,fillColor:m.color,fillOpacity:1}).addTo(map).bindTooltip(tag,{permanent:true,direction:'right',offset:[10,0],className:'tag'})}});
    Object.keys(known).forEach(id=>{if(!seen[id]){map.removeLayer(known[id].marker);delete known[id]}})}
   draw(marks);
   const pts=marks.map(m=>[m.lat,m.lng]);

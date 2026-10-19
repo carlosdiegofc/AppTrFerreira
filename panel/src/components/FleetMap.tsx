@@ -223,10 +223,12 @@ export function FleetMap({ units, people = NO_PEOPLE, selected = null, onSelect,
     if (!layer) return;
     layer.clearLayers();
     tail.current.line = null;
-    if (!selected) routeShown.current = null;
     // Readings without a fix are left out, and a pause or a gap without signal leaves the route open, as in the app.
     const lines = route ? routeLines(route) : [];
     const all = lines.flat();
+    // Nothing selected, or a selection without a route (a truck without a trip, a driver): the route shown is forgotten,
+    // so choosing that trip again shows all of it again.
+    if (!selected || all.length === 0) routeShown.current = null;
     if (all.length === 0) return;
     const m = map.current;
     if (m && selected && routeShown.current !== selected && all.length > 1) {

@@ -75,6 +75,17 @@ object FleetStats {
     fun presenceState(onTrip:Boolean,seenAt:String?,now:Long):String{val at=instant(seenAt)?.toEpochMilli();return when{onTrip->"trip";at!=null&&now-at<ACTIVE_FOR_MS->"active";else->"seen"}}
     /** When the presence row was seen, in milliseconds, or null. */
     fun seenAt(seenAt:String?):Long?=instant(seenAt)?.toEpochMilli()
+    /** How far ahead of the server a phone clock may be for its position to count. */
+    const val CLOCK_SLACK_MS=2*60_000L
+    /**
+     * Whether the map shows where an active driver's phone is, the same rule as the panel: only while active without a
+     * trip, and only a position taken in the 10 minutes before the notice and not more than 2 minutes after it (located_at
+     * is the phone's clock, seen_at the server's).
+     */
+    fun presencePlace(state:String,seenAt:String?,locatedAt:String?,lat:Double,lng:Double):Boolean{
+        val seen=instant(seenAt)?.toEpochMilli()?:return false;val located=instant(locatedAt)?.toEpochMilli()?:return false
+        return state=="active"&&seen-located<ACTIVE_FOR_MS&&located-seen<=CLOCK_SLACK_MS&&validPosition(lat,lng)
+    }
     /** Compares app versions like 0.16.3 and 0.17.0 part by part; a part that is not a number counts as 0. */
     fun compareVersions(a:String,b:String):Int{
         val pa=a.split('.').map{it.trim().toIntOrNull()?:0};val pb=b.split('.').map{it.trim().toIntOrNull()?:0}

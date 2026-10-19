@@ -106,6 +106,29 @@ test('el GPS en vivo dice qué choferes tienen la app abierta y dónde está el 
   await shot(page, 'gps-choferes');
 });
 
+test('al volver a un camión después de mirar a un chofer, el mapa muestra todo el recorrido otra vez', async ({ page }) => {
+  await signIn(page, 'dueno@ejemplo.uy');
+  await open(page, 'GPS en vivo');
+  const lines = page.locator('.map-live path.fm-route:not(.fm-tail)');
+  // How wide the route is drawn: the same once the map frames it again.
+  const width = () =>
+    lines.evaluateAll((paths) => {
+      const boxes = paths.map((p) => p.getBoundingClientRect());
+      return Math.max(...boxes.map((b) => b.right)) - Math.min(...boxes.map((b) => b.left));
+    });
+  const truck = page.getByRole('button', { name: /Volvo FH 460 · ABC1234/ });
+  await truck.click();
+  await expect(lines).toHaveCount(3);
+  const whole = await width();
+  // Diego has the app open and no trip: his phone shows, without a route. The owner zooms in around him.
+  await page.locator('.gps-people .people > li', { hasText: 'Diego Silva' }).getByRole('button').click();
+  await expect(lines).toHaveCount(0);
+  for (let i = 0; i < 3; i++) await page.locator('.map-live .leaflet-control-zoom-in').click();
+  await truck.click();
+  await expect(lines).toHaveCount(3);
+  await expect.poll(async () => Math.abs((await width()) - whole)).toBeLessThan(2);
+});
+
 test('si falla la actualización del recorrido en vivo, el GPS lo dice', async ({ page }) => {
   await signIn(page, 'dueno@ejemplo.uy');
   await open(page, 'GPS en vivo');

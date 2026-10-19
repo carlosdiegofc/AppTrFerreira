@@ -25,6 +25,19 @@ class FleetStatsTest {
         assertTrue(FleetStats.compareVersions("0.17.0","0.16.3")>0);assertTrue(FleetStats.compareVersions("0.16.10","0.16.9")>0)
         assertEquals(0,FleetStats.compareVersions("0.17","0.17.0"));assertTrue(FleetStats.compareVersions("0.17.0","0.17.1")<0)
     }
+    @Test fun anActiveDriverShowsWhereThePhoneIsWhileThePositionIsRecent(){
+        val seen="2026-10-18T14:58:00Z"
+        assertTrue(FleetStats.presencePlace("active",seen,"2026-10-18T14:56:00Z",-31.385,-57.955))
+        // On a trip the truck shows where it is; only seen, with a position older than 10 minutes or without a fix: nothing.
+        assertFalse(FleetStats.presencePlace("trip",seen,"2026-10-18T14:56:00Z",-31.385,-57.955))
+        assertFalse(FleetStats.presencePlace("seen",seen,"2026-10-18T14:56:00Z",-31.385,-57.955))
+        assertFalse(FleetStats.presencePlace("active",seen,"2026-10-18T14:47:00Z",-31.385,-57.955))
+        assertFalse(FleetStats.presencePlace("active",seen,"2026-10-18T14:56:00Z",0.0,0.0))
+        assertFalse(FleetStats.presencePlace("active",seen,null,Double.NaN,Double.NaN))
+        // located_at is the phone's clock: an hour ahead does not keep the position current; a minute ahead still counts.
+        assertFalse(FleetStats.presencePlace("active",seen,"2026-10-18T15:58:00Z",-31.385,-57.955))
+        assertTrue(FleetStats.presencePlace("active",seen,"2026-10-18T14:59:00.123456+00:00",-31.385,-57.955))
+    }
     @Test fun positionsWithoutAFixAreNotShown(){
         assertFalse(FleetStats.validPosition(0.0,0.0));assertFalse(FleetStats.validPosition(91.0,10.0));assertFalse(FleetStats.validPosition(10.0,-181.0));assertFalse(FleetStats.validPosition(Double.NaN,10.0))
         assertTrue(FleetStats.validPosition(-34.9,-56.16));assertTrue(FleetStats.validPosition(0.0,-56.16))

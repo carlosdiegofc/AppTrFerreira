@@ -27,15 +27,21 @@ object Presence {
     /** The app left the screen: a position still being looked for is dropped, and nothing more goes out. */
     fun closed(){open=false;pending?.cancel();pending=null}
     /**
-     * Sends the notice for the account signed in now. The position goes with it only without a trip, with the driver's
-     * consent (withPosition) and the location permission. done(sent) is called on another thread.
+     * Sends the notice for the account signed in now. The position goes with it only while place() allows it (no trip in
+     * progress and the driver's consent) and with the location permission. Both are asked again when the position
+     * arrives: a trip that started, or a consent withdrawn, while it was being looked for sends the notice without it.
+     * done(sent) is called on another thread.
      */
-    fun send(c:Context,name:String,vehicle:String?,version:String,onTrip:Boolean,withPosition:Boolean,done:(Boolean)->Unit){
+    fun send(c:Context,name:String,vehicle:String?,version:String,place:()->Boolean,done:(Boolean)->Unit){
         val uid=Api(c).session()?.optJSONObject("user")?.optString("id")?.takeIf{it.isNotBlank()}?:return done(false)
-        val granted=listOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION).any{c.checkSelfPermission(it)==PackageManager.PERMISSION_GRANTED}
-        if(onTrip||!withPosition||!granted)thread{done(post(c,uid,name,vehicle,version,null))} else locate(c){fix->thread{done(post(c,uid,name,vehicle,version,fix))}}
+        if(!place()||!granted(c))thread{done(post(c,uid,name,vehicle,version,null))}
+        else locate(c){fix->val still=fix?.takeIf{place()&&granted(c)};thread{done(post(c,uid,name,vehicle,version,still))}}
     }
-    /** One position, as precise as the battery allows: the trip has its own, every 2 seconds; this is only "where is he". */
+    private fun granted(c:Context)=listOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION).any{c.checkSelfPermission(it)==PackageManager.PERMISSION_GRANTED}
+    /**
+     * One position, as precise as the battery allows: the trip has its own, every 2 seconds; this is only "where is he".
+     * done runs on the main thread, where place() reads the trip and the consent.
+     */
     @SuppressLint("MissingPermission") private fun locate(c:Context,done:(Location?)->Unit){
         val token=CancellationTokenSource();pending=token
         try{LocationServices.getFusedLocationProviderClient(c).getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY,token.token)
