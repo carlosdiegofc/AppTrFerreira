@@ -166,10 +166,15 @@ try:
     # The emulator starts without DNS (-dns-server 127.0.0.1): the sign-in must not reach the real database.
     adb('shell', 'svc', 'wifi', 'disable', check=False)
     adb('shell', 'svc', 'data', 'disable', check=False)
+    # ping exits with 2 when it cannot look the name up, whatever the wording of the resolver ("unknown host",
+    # "Temporary failure in name resolution"); a name it did resolve shows its address. A ping that is missing (127) or
+    # that resolved the name and got no answer (1) means the lookup was not proven to fail.
     ping = adb('shell', 'ping', '-c', '1', '-W', '2', 'supabase.co', check=False)
     said = (ping.stdout + ping.stderr).lower()
-    if re.search(r'\(\d+\.\d+\.\d+\.\d+\)', said) or 'unknown host' not in said:
-        fail('el emulador todavía resuelve nombres de internet, y el ingreso de prueba podría llegar a la base real')
+    resolved = re.search(r'\(\d+\.\d+\.\d+\.\d+\)', said)
+    lookup_failed = ping.returncode == 2 or any(w in said for w in ('unknown host', 'name resolution', 'no address associated', 'name or service not known'))
+    if resolved or not lookup_failed:
+        fail('no quedó comprobado que el emulador no resuelve nombres de internet, y el ingreso de prueba podría llegar a la base real')
     # Without a soft keyboard the button stays on screen; adb types into the field anyway.
     for ime in adb('shell', 'ime', 'list', '-s', check=False).stdout.split():
         adb('shell', 'ime', 'disable', ime, check=False)
