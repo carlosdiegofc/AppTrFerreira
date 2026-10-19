@@ -10,6 +10,8 @@ El panel corre en Chromium (Playwright) contra un **PostgREST real** conectado a
 
 `db/permissions.sql` revisa la seguridad por filas con los mismos datos: un chofer ve solo lo suyo, la administración ve toda la flota, un administrador que no está en la lista del panel no lee los datos del panel y sin ingresar no se ve nada. También revisa lo que se guarda en `trf_panel_trips`: solo las cuentas del panel completan, cargan y mandan a la papelera; la base anota quién y cuándo, no deja cambiar el origen de una fila, un guardado con una fecha de modificación vieja no cambia nada y borrar no borra.
 
+Las pruebas corren con «reducir movimiento», así los mapas no animan y los camiones saltan a cada posición nueva. `movimiento.spec.ts` lo permite (solo en la computadora: en el celular el código del mapa es el mismo) y comprueba dos cosas. En GPS en vivo, un camión que avanza 2,5 km se desliza por las posiciones intermedias y la línea del recorrido llega hasta él. En la página de un viaje en curso, el camión recorre la lectura nueva.
+
 Las pruebas que guardan están en `edicion.spec.ts` y corren al final (proyecto *edicion*), cuando las demás ya leyeron los datos como los deja `seed.sql`: completar un viaje de la app, cargar uno a mano, la papelera y restaurar, dos pestañas que guardan el mismo viaje a la vez y el formulario en el celular.
 
 Para correrlas en una computadora:

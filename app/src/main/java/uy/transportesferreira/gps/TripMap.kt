@@ -58,17 +58,26 @@ object TripMap {
   </script></body></html>"""
   return WebView(c).apply{settings.javaScriptEnabled=true;settings.allowFileAccess=false;settings.allowContentAccess=false;settings.mixedContentMode=WebSettings.MIXED_CONTENT_NEVER_ALLOW;webViewClient=object:WebViewClient(){override fun shouldOverrideUrlLoading(view:WebView?,request:WebResourceRequest?)=true};loadDataWithBaseURL("https://transportes-ferreira-gestion.carlosdiegofc2001.chatgpt.site/",html,"text/html","UTF-8",null)}
  }
- /** Owner view: one marker per truck, colored by state, moved in place by setMarks(). Labels are inserted as text, never as HTML. */
- @SuppressLint("SetJavaScriptEnabled","ClickableViewAccessibility") fun fleet(c:Context,marks:JSONArray):WebView{
+ /**
+  * Owner view: one marker per truck, colored by state, moved in place by setMarks(). Labels are inserted as text, never as HTML.
+  * A truck glides to its new position over glideMs, about the time until the next one, instead of jumping.
+  */
+ @SuppressLint("SetJavaScriptEnabled","ClickableViewAccessibility") fun fleet(c:Context,marks:JSONArray,glideMs:Long):WebView{
   val js=c.assets.open("map/leaflet.js").bufferedReader().use{it.readText()};val css=c.assets.open("map/leaflet.css").bufferedReader().use{it.readText()}
   val html="""<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="strict-origin-when-cross-origin"><style>$css html,body{height:100%;margin:0}body{display:flex;flex-direction:column;font-family:sans-serif}#map{flex:1;min-height:0}header{padding:6px 8px;background:white;color:#172b45}select{font-size:14px;padding:6px;border:1px solid #bbb;border-radius:6px;max-width:100%}#notice{font-size:12px;color:#9a3010}.tag{font:600 11px sans-serif;color:#111c2e;background:#fff;border:1px solid #cbd3df;border-radius:6px;padding:2px 6px;box-shadow:none}.tag:before{display:none}</style></head><body><header><select id="style" aria-label="Vista del mapa"><option value="streets">Rutas y ciudades</option><option value="terrain">Relieve</option><option value="satellite">Satélite + rutas</option></select><div id="notice" role="status"></div></header><div id="map"></div><script>$js</script><script>
   const marks=${marks.toString().replace("<","\\u003c")};const map=L.map('map').setView([-30.9,-57.3],8);
   $TILES_JS
   const known={};
+  // A move longer than 3 km (the signal came back after a while), or the phone set to remove animations, is a jump.
+  const GLIDE=$glideMs;const still=matchMedia('(prefers-reduced-motion: reduce)').matches;let frame=0;
+  function meters(a,b){const r=Math.PI/180,h=Math.sin((b[0]-a[0])*r/2)**2+Math.cos(a[0]*r)*Math.cos(b[0]*r)*Math.sin((b[1]-a[1])*r/2)**2;return 12742000*Math.asin(Math.sqrt(Math.min(1,h)))}
+  function step(){frame=0;const now=performance.now();let more=false;Object.values(known).forEach(k=>{const g=k.glide;if(!g)return;const t=Math.min(1,(now-g.t)/GLIDE);k.at=[g.a[0]+(g.b[0]-g.a[0])*t,g.a[1]+(g.b[1]-g.a[1])*t];k.marker.setLatLng(k.at);if(t<1)more=true;else k.glide=null});if(more)frame=requestAnimationFrame(step)}
+  // From where the truck is drawn, even halfway through the previous glide, to its new position.
+  function moveTo(k,p){if(k.to[0]===p[0]&&k.to[1]===p[1])return;k.to=p;if(still||meters(k.at,p)>3000){k.glide=null;k.at=p;k.marker.setLatLng(p);return}k.glide={a:k.at.slice(),b:p,t:performance.now()};if(!frame)frame=requestAnimationFrame(step)}
   function draw(list){const seen={};list.forEach(m=>{const p=[m.lat,m.lng];seen[m.key]=1;const k=known[m.key];
-   if(k){k.marker.setLatLng(p);k.marker.setStyle({fillColor:m.color});k.tag.textContent=m.label;return}
+   if(k){moveTo(k,p);k.marker.setStyle({fillColor:m.color});k.tag.textContent=m.label;return}
    const tag=document.createElement('span');tag.textContent=m.label;
-   known[m.key]={tag:tag,marker:L.circleMarker(p,{radius:9,color:'#fff',weight:3,fillColor:m.color,fillOpacity:1}).addTo(map).bindTooltip(tag,{permanent:true,direction:'right',offset:[10,0],className:'tag'})}});
+   known[m.key]={tag:tag,at:p,to:p,glide:null,marker:L.circleMarker(p,{radius:9,color:'#fff',weight:3,fillColor:m.color,fillOpacity:1}).addTo(map).bindTooltip(tag,{permanent:true,direction:'right',offset:[10,0],className:'tag'})}});
    Object.keys(known).forEach(id=>{if(!seen[id]){map.removeLayer(known[id].marker);delete known[id]}})}
   draw(marks);
   const pts=marks.map(m=>[m.lat,m.lng]);

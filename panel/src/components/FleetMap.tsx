@@ -1,12 +1,14 @@
 // Leaflet map of the fleet: one marker per truck with a known position, coloured by state, and optionally the route of
-// the selected trip. Markers are reused and moved between refreshes, so the map does not flicker every few seconds.
+// the selected trip. Markers are reused between refreshes and glide to each new position (decision of 18/10/2026), so
+// the map neither flickers nor jumps every few seconds; the route of the selected truck reaches the marker.
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useEffect, useRef } from 'react';
-import { DEFAULT_CENTER, DEFAULT_ZOOM, TILE_ATTRIBUTION, TILE_URL } from '../config';
+import { DEFAULT_CENTER, DEFAULT_ZOOM, LIVE_REFRESH_MS, TILE_ATTRIBUTION, TILE_URL } from '../config';
 import type { RoutePoint } from '../data/api';
 import { type FleetUnit, STATE_LABEL, unitTitle } from '../lib/fleet';
-import { routeLines } from '../lib/route';
+import { type Glide, glideAt, type Point, startGlide, tailStart } from '../lib/glide';
+import { drawable, routeLines } from '../lib/route';
 
 interface Props {
   units: readonly FleetUnit[];
@@ -17,6 +19,15 @@ interface Props {
   fitToken?: number;
   label: string;
   className?: string;
+}
+
+/** A marker on the map: where it is drawn now, where it is going, and the glide between the two. */
+interface Shown {
+  marker: L.Marker;
+  look: string;
+  drawn: Point;
+  target: Point;
+  glide: Glide | null;
 }
 
 function markerElement(u: FleetUnit, selected: boolean): HTMLElement {
@@ -36,18 +47,54 @@ const located = (u: FleetUnit): u is FleetUnit & { lat: number; lng: number } =>
 
 /**
  * Reduced motion turns the map animations off. It has to be done in Leaflet itself: its zoom animation waits for a CSS
- * transition, and with transitions switched off the map would stay half-zoomed and ignore every later move.
+ * transition, and with transitions switched off the map would stay half-zoomed and ignore every later move. The trucks
+ * then jump to each new position instead of gliding.
  */
 const calm = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export function FleetMap({ units, selected = null, onSelect, route = null, fitToken = 0, label, className = '' }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
-  const markers = useRef(new Map<string, { marker: L.Marker; look: string }>());
+  const markers = useRef(new Map<string, Shown>());
   const routeLayer = useRef<L.LayerGroup | null>(null);
+  // The line from the last reading of the selected route to its truck, redrawn while the truck glides.
+  const tail = useRef<{ from: Point | null; line: L.Polyline | null }>({ from: null, line: null });
+  const frame = useRef(0);
   const fitted = useRef(-1);
   const select = useRef(onSelect);
   select.current = onSelect;
+  const chosen = useRef(selected);
+  chosen.current = selected;
+
+  const drawTail = () => {
+    const layer = routeLayer.current;
+    const { from, line } = tail.current;
+    const truck = chosen.current ? markers.current.get(chosen.current) : undefined;
+    if (!layer || !from || !truck) {
+      line?.remove();
+      tail.current.line = null;
+      return;
+    }
+    if (line) line.setLatLngs([from, truck.drawn]);
+    else tail.current.line = L.polyline([from, truck.drawn], { className: 'fm-route fm-tail', weight: 4, opacity: 0.9 }).addTo(layer);
+  };
+
+  // One animation loop for every truck that is gliding; it stops once they have all arrived.
+  const step = () => {
+    frame.current = 0;
+    const now = performance.now();
+    let moving = false;
+    for (const shown of markers.current.values()) {
+      if (!shown.glide) continue;
+      const { at, done } = glideAt(shown.glide, now);
+      shown.drawn = at;
+      shown.marker.setLatLng(at);
+      if (done) shown.glide = null;
+      else moving = true;
+    }
+    drawTail();
+    if (moving) frame.current = requestAnimationFrame(step);
+  };
 
   useEffect(() => {
     if (!box.current) return;
@@ -60,6 +107,8 @@ export function FleetMap({ units, selected = null, onSelect, route = null, fitTo
     resize.observe(box.current);
     const known = markers.current;
     return () => {
+      cancelAnimationFrame(frame.current);
+      frame.current = 0;
       resize.disconnect();
       known.clear();
       m.remove();
@@ -71,13 +120,25 @@ export function FleetMap({ units, selected = null, onSelect, route = null, fitTo
     const m = map.current;
     if (!m) return;
     const seen = new Set<string>();
+    const now = performance.now();
+    const still = calm();
     for (const u of units.filter(located)) {
       seen.add(u.key);
+      const to: Point = [u.lat, u.lng];
       const look = `${u.state}|${u.plate}|${u.model}|${u.key === selected}`;
       const title = `${unitTitle(u)} · ${STATE_LABEL[u.state]}`;
       const current = markers.current.get(u.key);
       if (current) {
-        current.marker.setLatLng([u.lat, u.lng]);
+        if (current.target[0] !== to[0] || current.target[1] !== to[1]) {
+          current.target = to;
+          // From where it is drawn, even halfway through the previous glide, to the new position, over about the time
+          // until the next one arrives; a long move (or reduced motion) is a jump.
+          current.glide = still ? null : startGlide([current.drawn, to], now, LIVE_REFRESH_MS);
+          if (!current.glide) {
+            current.drawn = to;
+            current.marker.setLatLng(to);
+          } else if (frame.current === 0) frame.current = requestAnimationFrame(step);
+        }
         if (current.look !== look) {
           current.marker.setIcon(L.divIcon({ html: markerElement(u, u.key === selected), className: 'fm-wrap', iconSize: undefined }));
           current.marker.options.title = title;
@@ -86,10 +147,10 @@ export function FleetMap({ units, selected = null, onSelect, route = null, fitTo
         current.marker.setZIndexOffset(u.key === selected ? 1000 : 0);
         continue;
       }
-      const marker = L.marker([u.lat, u.lng], { icon: L.divIcon({ html: markerElement(u, u.key === selected), className: 'fm-wrap', iconSize: undefined }), title, keyboard: true, riseOnHover: true })
+      const marker = L.marker(to, { icon: L.divIcon({ html: markerElement(u, u.key === selected), className: 'fm-wrap', iconSize: undefined }), title, keyboard: true, riseOnHover: true })
         .on('click', () => select.current?.(u.key))
         .addTo(m);
-      markers.current.set(u.key, { marker, look });
+      markers.current.set(u.key, { marker, look, drawn: to, target: to, glide: null });
     }
     for (const [key, { marker }] of markers.current) {
       if (!seen.has(key)) {
@@ -122,6 +183,7 @@ export function FleetMap({ units, selected = null, onSelect, route = null, fitTo
     const layer = routeLayer.current;
     if (!layer) return;
     layer.clearLayers();
+    tail.current.line = null;
     if (!selected) routeShown.current = null;
     // Readings without a fix are left out, and a pause or a gap without signal leaves the route open, as in the app.
     const lines = route ? routeLines(route) : [];
@@ -136,6 +198,14 @@ export function FleetMap({ units, selected = null, onSelect, route = null, fitTo
     const [first] = all;
     if (first) L.circleMarker(first, { radius: 6, className: 'fm-start', weight: 3 }).bindTooltip('Salida').addTo(layer);
   }, [route, selected]);
+
+  // The route is saved every few seconds and read every few more, so its last reading is behind the truck: while the
+  // truck is on a trip with signal a line joins the two, and follows the truck as it glides.
+  const from = target && route ? tailStart(drawable(route).at(-1), target) : null;
+  useEffect(() => {
+    tail.current.from = from;
+    drawTail();
+  });
 
   return <div ref={box} className={`fleet-map ${className}`} role="region" aria-label={label} />;
 }
