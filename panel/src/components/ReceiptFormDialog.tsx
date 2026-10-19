@@ -46,7 +46,8 @@ export function ReceiptFormDialog({ receipt: opened, today, stations, writtenSta
   // A new receipt keeps its id while the dialog is open: a save tried again does not make a second one. Its photo goes
   // to a path made with the id and stays there, so another photo after a try needs another id.
   const [newId, setNewId] = useState(() => crypto.randomUUID());
-  const triedPhoto = useRef<Blob | null>(null);
+  // The last save tried with that id, and the photo it had (none is a photo too).
+  const tried = useRef<{ photo: Blob | null } | null>(null);
   const [checking, setChecking] = useState(false);
   const [initial] = useState(() => receiptFormValues(receipt, stations, today));
   const [values, setValues] = useState(initial);
@@ -130,19 +131,24 @@ export function ReceiptFormDialog({ receipt: opened, today, stations, writtenSta
       if (!receipt) {
         const blob = photo.status === 'ready' ? photo.blob : null;
         let rid = newId;
-        if (triedPhoto.current && triedPhoto.current !== blob) {
-          // The try with the other photo may have saved the receipt after all: then that one stands.
+        const before = tried.current;
+        if (before && before.photo !== blob) {
+          // The try with the other photo, or without one, may have saved the receipt after all: then that one stands.
           setChecking(true);
-          const before = await receiptExists(rid).finally(() => setChecking(false));
-          if (before) {
-            onDone('Esa boleta ya se había guardado en el intento anterior, con la foto que tenía entonces.');
+          const saved = await receiptExists(rid).finally(() => setChecking(false));
+          if (saved) {
+            onDone(
+              before.photo
+                ? 'Esa boleta ya se había guardado en el intento anterior, con la foto que tenía entonces.'
+                : 'Esa boleta ya se había guardado en el intento anterior, sin foto. Para que tenga la foto, mandala a la papelera y cargala de nuevo con la foto.',
+            );
             return;
           }
-          // Not saved: the first photo stays at that receipt's path, unused, and this one goes with a new id.
+          // Not saved: a photo of that try stays at that receipt's path, unused, and this one goes with a new id.
           rid = crypto.randomUUID();
           setNewId(rid);
         }
-        triedPhoto.current = blob;
+        tried.current = { photo: blob };
         const row = newReceiptRow(rid, user, check.payload, blob !== null);
         const saved = await create.mutateAsync({ row, photo: blob });
         onDone(sameReceipt(saved, row) ? 'Boleta cargada.' : 'Esa boleta ya se había guardado en el intento anterior, con lo que tenía entonces: revisala y, si hace falta, corregila.');

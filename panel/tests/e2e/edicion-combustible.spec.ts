@@ -225,6 +225,40 @@ test('si se corta el alta y se cambia la foto, la boleta no se queda con la foto
   await expect(station(page, 'Ducsa Young').locator('.fs-balance')).toHaveText('Se le debe $ 1.111');
 });
 
+test('si se pierde la respuesta de una boleta sin foto y después se elige una, no la sube a una boleta ya guardada', async ({ page }) => {
+  await signIn(page, 'lectura@ejemplo.uy');
+  await open(page, 'Combustible');
+  let uploads = 0;
+  page.on('request', (r) => {
+    if (r.method() === 'POST' && r.url().includes('/storage/v1/object/trf-fuel-receipts/')) uploads++;
+  });
+  // The first save reaches the database, but its answer never comes back.
+  let inserts = 0;
+  await page.route('**/rest/v1/trf_driver_fuel_receipts*', async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    inserts++;
+    if (inserts > 1) return route.fallback();
+    await route.fetch();
+    return route.abort('connectionfailed');
+  });
+
+  await page.getByRole('button', { name: 'Nueva boleta' }).click();
+  const form = page.getByRole('dialog', { name: 'Nueva boleta' });
+  await form.getByLabel('Estación', { exact: true }).selectOption({ label: 'Petrobras Salto' });
+  await form.getByLabel('Importe').fill('3.333');
+  await form.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(form.getByRole('alert')).toContainText('Sin conexión con el servidor');
+
+  await form.getByLabel('Foto de la boleta').setInputFiles({ name: 'tarde.jpg', mimeType: 'image/jpeg', buffer: await receiptPhoto(page, 'Total $ 3.333') });
+  await expect(form).toContainText('Lista:');
+  await form.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(form).toBeHidden();
+  await expect(page.getByRole('status')).toContainText('ya se había guardado en el intento anterior, sin foto');
+  expect(inserts).toBe(1);
+  expect(uploads).toBe(0);
+  await expect(station(page, 'Petrobras Salto').locator('.fs-period')).toContainText('$ 3.333');
+});
+
 test('si se pierde la respuesta al registrar un pago, el reintento no lo cuenta dos veces', async ({ page }) => {
   await signIn(page, 'dueno@ejemplo.uy');
   await open(page, 'Combustible');

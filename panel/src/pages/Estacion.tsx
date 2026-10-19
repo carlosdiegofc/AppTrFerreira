@@ -9,7 +9,7 @@ import { useFuel, useNow } from '../data/hooks';
 import { dayInZone, formatDay } from '../lib/dates';
 import { count, decimal, money } from '../lib/format';
 import { type Currency, isFuture, type Movement, NO_STATION, PAYMENT_METHODS, parseStationKey, type Receipt, type Station, statement } from '../lib/fuel';
-import { balanceText, balanceTone, fuelReadError } from './fuelText';
+import { balanceText, balanceTone, fuelReadError, NO_LIST } from './fuelText';
 
 const CURRENCY_TITLE: Record<Currency, string> = { UYU: 'Cuenta en pesos', USD: 'Cuenta en dólares' };
 
@@ -182,6 +182,14 @@ function StationPage({ stationKey }: { stationKey: string }) {
       <div className="page">
         <Back />
         <ErrorNote onRetry={() => void query.refetch()}>{fuelReadError(query.error)}</ErrorNote>
+      </div>
+    );
+  }
+  if (lists.error && lists.data === undefined) {
+    return (
+      <div className="page">
+        <Back />
+        <ErrorNote onRetry={() => void lists.refetch()}>{NO_LIST}</ErrorNote>
       </div>
     );
   }

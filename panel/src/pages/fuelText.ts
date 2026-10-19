@@ -24,6 +24,9 @@ export const balanceTone = (a: Account): Tone => (a.balance > 0 ? 'amber' : a.ba
 /** The address of a station's page. */
 export const stationPath = (key: string) => `/combustible/estaciones/${encodeURIComponent(key)}`;
 
+/** The app's list of stations could not be read: without it the accounts would come out wrong, so they are not shown. */
+export const NO_LIST = 'No se pudo leer la lista de estaciones de la app. Sin ella, las cuentas de las estaciones darían mal: reintentá en un momento.';
+
 /** Why the fuel could not be read, in the office's words. */
 export const fuelReadError = (e: unknown) =>
   e instanceof DataError && e.code === TOO_MANY

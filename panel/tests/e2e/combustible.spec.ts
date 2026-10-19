@@ -158,6 +158,31 @@ test('una boleta con fecha posterior a hoy suma en la cuenta y queda marcada par
   await shot(page, 'combustible-fecha-futura-cuenta');
 });
 
+test('sin la lista de estaciones de la app no muestra cuentas que darían mal, y con fechas al revés no da totales', async ({ page }) => {
+  let failing = true;
+  await page.route('**/rest/v1/trf_mobile_catalog*', (route) =>
+    failing ? route.fulfill({ status: 500, contentType: 'application/json', body: '{"message":"falla de prueba"}' }) : route.fallback(),
+  );
+  await signIn(page, 'dueno@ejemplo.uy');
+  await open(page, 'Combustible');
+  const note = page.getByRole('alert').filter({ hasText: 'No se pudo leer la lista de estaciones de la app' });
+  await expect(note).toContainText('las cuentas de las estaciones darían mal');
+  await expect(page.locator('.stat')).toHaveCount(0);
+  await expect(page.locator('.fuel-station')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Registrar pago' })).toBeDisabled();
+  failing = false;
+  await note.getByRole('button', { name: 'Reintentar' }).click();
+  await expect(station(page, 'Ancap Ruta 5 km 32').locator('.fs-balance')).toHaveText('Se le debe $ 31.450');
+  await expect(page.getByRole('button', { name: 'Registrar pago' })).toBeEnabled();
+
+  // «Hasta» before «desde», from an edited address: no period, so no totals for it.
+  await page.goto('./#/combustible?periodo=fechas&desde=2026-10-10&hasta=2026-10-01');
+  await expect(page.getByRole('alert').filter({ hasText: 'Revisá las fechas' })).toBeVisible();
+  await expect(stat(page, 'Cargado en el período').locator('.stat-value')).toHaveText('—');
+  await expect(stat(page, 'Litros en el período').locator('.stat-value')).toHaveText('—');
+  await expect(stat(page, 'Saldo con las estaciones').locator('.amount-lines > span')).toHaveText(['$ 38.050', 'US$ 210']);
+});
+
 test('una estación que no existe lo dice', async ({ page }) => {
   await signIn(page, 'dueno@ejemplo.uy');
   await expect(stat(page, 'En ruta')).toBeVisible();

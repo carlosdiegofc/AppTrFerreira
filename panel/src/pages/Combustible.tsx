@@ -11,7 +11,7 @@ import { ago, dayInZone, formatDay } from '../lib/dates';
 import { count, decimal, money } from '../lib/format';
 import { balances, filterReceipts, isFuture, NO_STATION, type Receipt, receiptVehicles, type Station, totals } from '../lib/fuel';
 import { type PeriodKind, periodRange } from '../lib/trips';
-import { amountParts, amounts, balanceText, balanceTone, fuelReadError, stationPath } from './fuelText';
+import { amountParts, amounts, balanceText, balanceTone, fuelReadError, NO_LIST, stationPath } from './fuelText';
 
 // The filters live in the address (?vista=boletas&periodo=mes…): going back from a station, reloading or sharing the
 // link keeps them.
@@ -167,7 +167,8 @@ export function Combustible() {
   const to = badRange ? undefined : range?.to;
   const names = useMemo(() => new Map(stations.map((s) => [s.key, s.name])), [stations]);
   const nameOf = (r: Receipt) => names.get(r.stationKey) ?? r.station ?? 'Estación sin indicar';
-  const inPeriod = useMemo(() => filterReceipts(receipts, { from, to }), [receipts, from, to]);
+  // Dates the wrong way round give no period at all, not every receipt.
+  const inPeriod = useMemo(() => (badRange ? [] : filterReceipts(receipts, { from, to })), [receipts, from, to, badRange]);
   const shown = useMemo(() => filterReceipts(receipts, { from, to, q: typed, vehicle, station, bin: view.value === 'papelera', names }), [receipts, from, to, typed, vehicle, station, view.value, names]);
   const byStation = useMemo(() => {
     const map = new Map<string, Receipt[]>();
@@ -224,6 +225,9 @@ export function Combustible() {
 
   const loadedAt = query.dataUpdatedAt || null;
   const loading = query.isLoading || catalog.isLoading || lists.isLoading;
+  // Without the app's list of stations, receipts that name a listed station would make an account of their own.
+  const noList = lists.error !== null && lists.data === undefined;
+  const ready = !loading && query.data !== undefined && !noList;
 
   return (
     <div className="page">
@@ -232,10 +236,10 @@ export function Combustible() {
         subtitle="Las boletas de la app y las cargadas acá, agrupadas por estación, con la cuenta de cada una."
         actions={
           <>
-            <button type="button" className="btn" onClick={() => setPaying(true)} disabled={loading}>
+            <button type="button" className="btn" onClick={() => setPaying(true)} disabled={!ready}>
               <Icon name="money" size={18} /> Registrar pago
             </button>
-            <button type="button" className="btn btn-primary" onClick={() => setAdding(true)} disabled={loading}>
+            <button type="button" className="btn btn-primary" onClick={() => setAdding(true)} disabled={!ready}>
               <Icon name="plus" size={18} /> Nueva boleta
             </button>
           </>
@@ -258,12 +262,14 @@ export function Combustible() {
         </p>
       )}
 
-      <div className="stats stats-money">
-        <Stat label="Cargado en el período" value={<Lines parts={amountParts(periodTotals.amounts, '$ 0')} />} detail={`${count(periodTotals.receipts)} boleta${periodTotals.receipts === 1 ? '' : 's'}`} tone="blue" icon="fuel" />
-        <Stat label="Litros en el período" value={decimal(periodTotals.liters, 1)} tone="grey" icon="chart" />
-        <Stat label="Saldo con las estaciones" value={<Lines parts={amountParts(owed, '$ 0')} />} detail={credit.UYU > 0 || credit.USD > 0 ? `Lo que se les debe · a favor: ${amounts(credit)}` : 'Lo que se les debe'} tone={owed.UYU > 0 || owed.USD > 0 ? 'amber' : 'green'} icon="money" />
-        <Stat label="Boletas sin importe" value={count(missing)} detail={missing > 0 ? 'Completalas para que sumen' : 'Todas tienen importe'} tone={missing > 0 ? 'red' : 'green'} icon="warning" />
-      </div>
+      {ready && (
+        <div className="stats stats-money">
+          <Stat label="Cargado en el período" value={badRange ? '—' : <Lines parts={amountParts(periodTotals.amounts, '$ 0')} />} detail={badRange ? 'Revisá las fechas' : `${count(periodTotals.receipts)} boleta${periodTotals.receipts === 1 ? '' : 's'}`} tone="blue" icon="fuel" />
+          <Stat label="Litros en el período" value={badRange ? '—' : decimal(periodTotals.liters, 1)} tone="grey" icon="chart" />
+          <Stat label="Saldo con las estaciones" value={<Lines parts={amountParts(owed, '$ 0')} />} detail={credit.UYU > 0 || credit.USD > 0 ? `Lo que se les debe · a favor: ${amounts(credit)}` : 'Lo que se les debe'} tone={owed.UYU > 0 || owed.USD > 0 ? 'amber' : 'green'} icon="money" />
+          <Stat label="Boletas sin importe" value={count(missing)} detail={missing > 0 ? 'Completalas para que sumen' : 'Todas tienen importe'} tone={missing > 0 ? 'red' : 'green'} icon="warning" />
+        </div>
+      )}
 
       <section className="card filters" aria-label="Filtros">
         <label className="field">
@@ -347,11 +353,13 @@ export function Combustible() {
 
       {query.error && query.data !== undefined && <StaleNote onRetry={() => void query.refetch()} />}
       {catalog.error && <CatalogNote onRetry={() => void catalog.refetch()} />}
-      {lists.error && <ErrorNote onRetry={() => void lists.refetch()}>No se pudo leer la lista de estaciones de la app: las boletas se agrupan por el nombre escrito.</ErrorNote>}
+      {lists.error && !noList && <StaleNote onRetry={() => void lists.refetch()}>No se pudo actualizar la lista de estaciones de la app: se usa la que se leyó antes.</StaleNote>}
       {badRange ? (
         <ErrorNote>Revisá las fechas: «hasta» no puede ser antes de «desde».</ErrorNote>
       ) : query.error && query.data === undefined ? (
         <ErrorNote onRetry={() => void query.refetch()}>{fuelReadError(query.error)}</ErrorNote>
+      ) : noList ? (
+        <ErrorNote onRetry={() => void lists.refetch()}>{NO_LIST}</ErrorNote>
       ) : loading ? (
         <div className="card card-body">
           <Skeleton lines={6} />
