@@ -386,11 +386,11 @@ class MainActivity:AppCompatActivity(){
   val form=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(24),0,dp(24),0)};root.addView(form,LinearLayout.LayoutParams(-1,-2))
   text(form,"Tu viaje empieza acá.",27f,Color.WHITE,2)
   text(form,"Ingresá con tu cuenta de chofer.",15.5f,0xFFA9B6CC.toInt(),0,6)
-  val email=darkField(form,R.drawable.ic_mail,"Correo electrónico",InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS,22);email.setText(prefs().getString("email",""))
+  val email=darkField(form,R.drawable.ic_person,"Nombre de usuario o correo",InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS,22);email.setText(prefs().getString("email",""))
   val pass=darkField(form,R.drawable.ic_lock,"Contraseña",InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD,12)
   val msg=text(form,"",14f,0xFFFFB4B4.toInt(),0,10)
   lateinit var submit:Btn
-  submit=button(form,"Ingresar",top=6){val e=email.text.toString().trim().lowercase();val p=pass.text.toString();if(e.isBlank()||p.isBlank()){msg.text="Completá correo y contraseña";return@button};submit.enable(false);msg.setTextColor(0xFFA9B6CC.toInt());msg.text="Ingresando…"
+  submit=button(form,"Ingresar",top=6){val e=email.text.toString().trim();val p=pass.text.toString();if(e.isBlank()||p.isBlank()){msg.text="Completá nombre de usuario y contraseña";return@button};submit.enable(false);msg.setTextColor(0xFFA9B6CC.toInt());msg.text="Ingresando…"
    thread{try{api.login(e,p);name=driverName();runOnUiThread{pass.text.clear();if(panelFirst())ownerDashboard() else askMode();Sync.schedule(this);refreshCatalog()}}catch(_:Exception){runOnUiThread{submit.enable(true);msg.setTextColor(0xFFFFB4B4.toInt());msg.text="No se pudo ingresar. Revisá tus datos y la conexión."}}}}
   text(form,"Tu sesión queda guardada de forma segura en este teléfono.",13f,0xFF8E9CB4.toInt(),0,18).gravity=Gravity.CENTER
   link(form,"Política de privacidad",top=2,color=0xFFA9B6CC.toInt()){privacy()}

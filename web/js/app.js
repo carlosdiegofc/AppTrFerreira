@@ -87,16 +87,16 @@ function centered(...children) {
 }
 
 function showLogin(message = '') {
-  const email = h('input', { type: 'email', id: 'email', autocomplete: 'username', required: true });
+  const email = h('input', { type: 'text', autocapitalize: 'none', spellcheck: 'false', id: 'email', autocomplete: 'username', required: true });
   const pass = h('input', { type: 'password', id: 'pass', autocomplete: 'current-password', required: true });
   const msg = h('p', { class: 'form-msg', role: 'status' }, message);
   const submit = h('button', { class: 'btn primary block', type: 'submit' }, 'Ingresar');
   const form = h('form', { novalidate: true },
-    h('label', { for: 'email' }, 'Correo electrónico'), email,
+    h('label', { for: 'email' }, 'Nombre de usuario o correo'), email,
     h('label', { for: 'pass' }, 'Contraseña'), pass, msg, submit);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!email.value.trim() || !pass.value) { msg.textContent = 'Completá correo y contraseña.'; return; }
+    if (!email.value.trim() || !pass.value) { msg.textContent = 'Completá nombre de usuario y contraseña.'; return; }
     submit.disabled = true;
     msg.textContent = 'Ingresando…';
     try {
@@ -104,7 +104,7 @@ function showLogin(message = '') {
       pass.value = '';
       start();
     } catch (err) {
-      msg.textContent = err?.status === 400 ? 'Correo o contraseña incorrectos.' : describeError(err);
+      msg.textContent = err?.status === 400 ? 'Usuario o contraseña incorrectos.' : describeError(err);
       submit.disabled = false;
     }
   });

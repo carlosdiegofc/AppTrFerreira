@@ -102,3 +102,7 @@ Más adelante: proveedor de mapas, método de lectura de boletas, modelo de IA y
     - El GPS hoy solo registra con un viaje iniciado y nunca sigue al chofer con la app cerrada fuera de un viaje. Para armar los viajes solos, el chofer iniciaría una sola vez por día una jornada que registre todo el día. Ese cambio en el uso de la ubicación lo tienen que decir la política de privacidad y Google Play.
     - De dónde salen los metros cúbicos de cada viaje: la capacidad de la cisterna o lo que declara el chofer.
     - La tabla de rangos con sus tarifas.
+
+### Ingreso por nombre (pedido del 19/10/2026)
+- [x] Preparado en app 0.17.1 y ambos paneles: nombre de usuario corporativo o correo completo, manteniendo cuenta y permisos. Sin cambios de esquema ni contraseñas en el repositorio.
+- [ ] Publicar ambos paneles y distribuir app 0.17.1 después de validar CI.

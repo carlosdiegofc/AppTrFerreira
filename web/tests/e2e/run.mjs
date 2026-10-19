@@ -120,7 +120,7 @@ async function waitForApi() {
   });
 
   await step('el administrador entra y ve los viajes de la app sin hacer nada', async () => {
-    await login(page, 'luis@trferreira.com');
+    await login(page, '  LUIS  ');
     await page.waitForSelector('.trip-row');
     const tabs = await page.locator('.tab').allInnerTexts();
     assert.deepEqual(tabs, ['Todos (4)', 'Pendientes (1)', 'En curso (1)', 'Completos (2)', 'Eliminados (1)']);
@@ -410,6 +410,11 @@ async function waitForApi() {
     assert.deepEqual(errors, []);
   });
 
+  // Finish intercepted requests before disposing their browser request contexts.
+  for (const ctx of browser.contexts()) {
+    for (const tab of ctx.pages()) await tab.unrouteAll({ behavior: 'wait' });
+    await ctx.unrouteAll({ behavior: 'wait' });
+  }
   await browser.close();
   server.close();
   authTtl.seconds = 3600;

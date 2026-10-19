@@ -1,3 +1,4 @@
+import { loginEmail } from './login-identity.js';
 // Supabase access: login session (kept in this browser), REST queries and friendly error messages.
 import { SUPABASE_KEY, SUPABASE_URL } from './config.js';
 
@@ -74,6 +75,7 @@ async function send(url, { method = 'GET', headers = {}, body, token } = {}) {
 }
 
 export async function login(email, password) {
+  email = loginEmail(email);
   const s = await send(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

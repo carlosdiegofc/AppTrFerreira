@@ -1,3 +1,4 @@
+import { loginEmail } from './loginIdentity';
 import type { Session } from '@supabase/supabase-js';
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
@@ -83,9 +84,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       state,
       async signIn(email, password) {
-        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        let identifier: string;
+        try { identifier = loginEmail(email); } catch { return 'Revisá tu nombre de usuario o correo.'; }
+        const { error } = await supabase.auth.signInWithPassword({ email: identifier, password });
         if (!error) return null;
-        if (error.status === 400 || /invalid/i.test(error.message)) return 'El correo o la contraseña no son correctos.';
+        if (error.status === 400 || /invalid/i.test(error.message)) return 'El usuario o la contraseña no son correctos.';
         if (error.status === 429) return 'Demasiados intentos. Esperá unos minutos y probá de nuevo.';
         return 'No se pudo conectar con el servidor. Revisá la conexión a internet.';
       },
