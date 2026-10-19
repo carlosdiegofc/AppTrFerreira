@@ -17,6 +17,8 @@ class GpsService:Service(){
  private lateinit var store:TripStore
  private val handler=Handler(Looper.getMainLooper());private val distance=DistanceTracker();private val route=RouteSampler()
  private var callback:LocationCallback?=null;private var tripId:String?=null
+ /** The reading before the last one, for the route: when the truck turns, it is the corner (RouteSampler.corner). */
+ private var lastReading:JSONObject?=null
  private var watchSince=System.currentTimeMillis();private var lastRestart=0L
  private val syncing=AtomicBoolean(false);private val executor=Executors.newSingleThreadExecutor()
  // The live position has its own line out, so it never waits behind the trip, the route or the photos.
@@ -29,7 +31,9 @@ class GpsService:Service(){
   // Android 12+ can refuse a foreground start from the background after the system killed the service.
   try{notifyTrip(t.optBoolean("paused"))}catch(_:Exception){store.warning("El GPS se detuvo en segundo plano · abrí la app para continuar");stopSelf();return START_NOT_STICKY}
   watchSince=System.currentTimeMillis()
-  if(tripId!=t.getString("id")){distance.reset();route.reset();tripId=t.getString("id")}
+  // A service the system started again goes on with the route's state kept with the trip (where it stopped, jitter, and
+  // the trip's last reading, which may be the corner of a turn).
+  if(tripId!=t.getString("id")){distance.reset();route.restore(t.optString("route_state"));lastReading=t.optJSONObject("last_point");tripId=t.getString("id")}
   when(i?.action){
    PAUSE->{keepLast();store.update{it.put("paused",true).put("speed_kmh",0.0)};stopGps();distance.reset();sendLive();sync()}
    RESUME->{store.update{it.put("paused",false).put("segment",it.optInt("segment")+1)};distance.reset();sync()}
@@ -65,19 +69,29 @@ class GpsService:Service(){
   val delta=distance.add(DistanceTracker.Fix(l.latitude,l.longitude,l.accuracy.toDouble(),l.time),System.currentTimeMillis())
   if(!distance.accepted)return
   val p=JSONObject().put("event_id",UUID.randomUUID().toString()).put("trip_id",t.getString("id")).put("driver_id",t.getString("driver_id")).put("vehicle",t.getString("vehicle")).put("latitude",l.latitude).put("longitude",l.longitude).put("accuracy_m",l.accuracy.toDouble()).put("speed_kmh",if(l.hasSpeed())(l.speed*3.6).coerceAtLeast(0.0) else JSONObject.NULL).put("heading",if(l.hasBearing())l.bearing.toDouble() else JSONObject.NULL).put("recorded_at",Instant.ofEpochMilli(l.time).toString()).put("segment",t.optInt("segment"))
-  // The phone's own map draws every reading; the route sent to the panel keeps one every few seconds (RouteSampler).
+  // The phone's own map draws every reading; the route sent to the panel keeps one every few seconds, the corners, and no
+  // GPS jitter (RouteSampler). At a turn the reading before it, where the truck went round the corner, goes in first.
   store.appendTrack(t.getString("id"),l.latitude,l.longitude,t.optInt("segment"),l.time)
-  if(route.keep(l.latitude,l.longitude,l.time,t.optInt("segment")))store.addPoint(p)
+  val kmh=if(l.hasSpeed())(l.speed*3.6).coerceAtLeast(0.0) else null
+  if(route.keep(l.latitude,l.longitude,l.time,t.optInt("segment"),kmh,l.accuracy.toDouble(),if(l.hasBearing())l.bearing.toDouble() else null)){
+   if(route.corner)lastReading?.let{store.addPoint(it)}
+   store.addPoint(p)
+  }
+  lastReading=p
   // The trip (distance, last reading) goes up every 15 s, without waiting for the timer; a pause, a resume or the end go at once.
   val now=System.currentTimeMillis();val send=now-tripSentAt>=15000;if(send)tripSentAt=now
-  store.update(send){if(!it.has("origin_lat")){it.put("origin_lat",l.latitude).put("origin_lng",l.longitude)};it.put("distance_meters",it.optDouble("distance_meters",0.0)+delta).put("last_point",p).put("speed_kmh",p.optDouble("speed_kmh",0.0))}
+  store.update(send){if(!it.has("origin_lat")){it.put("origin_lat",l.latitude).put("origin_lng",l.longitude)};it.put("distance_meters",it.optDouble("distance_meters",0.0)+delta).put("last_point",p).put("speed_kmh",p.optDouble("speed_kmh",0.0)).put("route_state",route.state())}
   sendLive();if(send)sync()
  }
  /**
   * The route keeps a reading every few seconds, so the last one may not be in it: a pause or the end adds it, and the
   * route reaches where the truck stopped. It keeps its event_id, so a reading already queued or sent is not repeated.
+  * A last reading the route left out as GPS jitter stays out.
   */
- private fun keepLast(){store.current()?.optJSONObject("last_point")?.let{store.addPoint(it)}}
+ private fun keepLast(){
+  val p=store.current()?.optJSONObject("last_point")?:return
+  if(!route.jittery)store.addPoint(p)
+ }
  private fun sync(){if(syncing.compareAndSet(false,true))executor.execute{try{Sync.flush(this)}finally{syncing.set(false)}}}
  /** The latest reading to the live map; a reading that arrives while one is on its way goes with the next one. */
  private fun sendLive(){if(sendingLive.compareAndSet(false,true))try{liveExecutor.execute{try{Sync.live(this)}finally{sendingLive.set(false)}}}

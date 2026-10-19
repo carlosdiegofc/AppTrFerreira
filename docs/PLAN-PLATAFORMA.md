@@ -68,6 +68,7 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 19/10/2026: el trazado del recorrido se corrige en la app 0.17.0. En cada giro guarda la lectura donde cambió el rumbo y la anterior, donde el camión dobló; también la de donde el camión para, y durante una parada solo lecturas buenas junto a ese lugar, así no se dibuja una «estrella» donde estuvo estacionado. Los viajes ya guardados quedan como están: no se limpian en el panel. Pegar el recorrido a las calles (map matching) queda para cuando se elija el proveedor de mapas.
 - 18/10/2026: «chofer activo»: al ingresar y cada 5 minutos mientras la app está abierta, el teléfono avisa que el chofer está activo, con la versión de la app y, si no está de viaje, dónde está. Con la app cerrada no se sigue a nadie: no se vuelve a pedir la ubicación en segundo plano. Va en una tabla nueva, aparte de la posición del viaje en curso; conviene avisarles a los choferes.
 - 18/10/2026: en los mapas en vivo (panel y «Flota en vivo» de la app) el camión que avanza se desliza de una posición a la siguiente, sin saltos, y la línea del recorrido lo acompaña. Salta directo si aparece a más de 3 km o si el equipo tiene pedido reducir el movimiento.
 - 18/10/2026: el GPS en vivo va lo más rápido posible dentro del plan gratis. El panel lee la posición de cada camión cada 3 segundos y el recorrido cada 5; la app (versión nueva) toma un punto cada 2 segundos, manda la posición sola y primero, el historial en tandas, y su «Flota en vivo» se actualiza cada 5 segundos. Supabase Realtime queda para cuando haga falta el plan Pro: con varios camiones y pantallas abiertas se pasaría del límite gratis de mensajes.
@@ -83,3 +84,21 @@ Antes de tocar datos reales:
 - Rol de cada cuenta actual: dueños, choferes y la cuenta de revisión de Google, que iría a una empresa de demostración.
 
 Más adelante: proveedor de mapas, método de lectura de boletas, modelo de IA y cupo por plan, transcripción de audios, medio de pago, facturación electrónica (CFE), monedas, nombre comercial, cuánto tiempo se guarda el GPS en el plan FREE y publicidad.
+
+### Para presentar más adelante
+- **Viajes de vinasa automáticos** (pedido del 19/10/2026; se presenta como etapa antes de programarla):
+  - **El trabajo:** unos seis viajes por día con vinasa cargada en ALUR, cada uno a una chacra distinta. Se paga por rango de kilómetros: por ejemplo, todas las chacras que están entre 13 y 17 km tienen el mismo precio fijo, y hay varios rangos.
+  - **La idea:** que los viajes se armen solos con el GPS, para que el chofer no tenga que cargar cada uno.
+  - **Cómo funcionaría** (planteo del 19/10/2026):
+    1. En ALUR, dentro de un radio configurable (al principio 150 m), el camión figura «En espera / cargando».
+    2. Cuando sale de esa zona y sigue afuera, empieza un viaje.
+    3. Si entra en una zona de descarga conocida y queda detenido unos 5 minutos, se anota una posible descarga.
+    4. Cuando sale de la chacra, termina el viaje cargado y empieza el regreso vacío.
+    5. Al volver a ALUR, figura otra vez «En espera / cargando». Si el viaje anterior quedó abierto, se propone cerrarlo y se marca que la descarga necesita revisión.
+  - **Una parada sola no es una descarga:** cinco minutos detenido pueden ser una falla o una detención en la ruta. Se combinan el lugar, el tiempo detenido y el movimiento posterior.
+  - **Chacras:** al principio el GPS propone los lugares de descarga. Desde la web se confirman como chacras, con su nombre, su zona y su distancia tarifaria. Esa distancia define el rango (por ejemplo, de 13 a 17 km), sin importar los desvíos del recorrido GPS. El importe es la tarifa del rango por los metros cúbicos transportados.
+  - **Sin viajes falsos:** al principio los viajes automáticos quedan pendientes de revisión, se pueden editar y no se facturan solos. El chofer interviene solo cuando falta un dato o hay una excepción.
+  - **A resolver al presentarla:**
+    - El GPS hoy solo registra con un viaje iniciado y nunca sigue al chofer con la app cerrada fuera de un viaje. Para armar los viajes solos, el chofer iniciaría una sola vez por día una jornada que registre todo el día. Ese cambio en el uso de la ubicación lo tienen que decir la política de privacidad y Google Play.
+    - De dónde salen los metros cúbicos de cada viaje: la capacidad de la cisterna o lo que declara el chofer.
+    - La tabla de rangos con sus tarifas.
