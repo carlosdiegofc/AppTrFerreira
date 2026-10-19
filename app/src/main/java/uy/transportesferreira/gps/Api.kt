@@ -37,7 +37,7 @@ class Api(private val context: Context) {
         check(prefs.edit().putString("encrypted", encrypted).commit()) { "No se pudo guardar la sesión" }
     }
     fun login(email: String, password: String) = synchronized(lock) {
-        val result = request("/auth/v1/token?grant_type=password", "POST", JSONObject().put("email",email).put("password",password).toString().toByteArray(), auth=false)
+        val result = request("/auth/v1/token?grant_type=password", "POST", JSONObject().put("email",LoginIdentity.email(email)).put("password",password).toString().toByteArray(), auth=false)
         val s = JSONObject(result)
         val store=TripStore(context)
         val previous=store.current()

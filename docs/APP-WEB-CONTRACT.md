@@ -1,4 +1,4 @@
-# App/web integration — 0.17.0
+# App/web integration — 0.17.1
 
 Base: Claude 0.12.0, commit e8cc20437fc73ac9cdb82b2ca64ded17ae1ede31.
 Android source is app/ at repository root. The nested 0.10.1 folder is historical and is not compiled.
@@ -23,3 +23,5 @@ Android source is app/ at repository root. The nested 0.10.1 folder is historica
 - The app and website use independent deployments. Build an APK from the desired branch; changing main is not required to test this version.
 
 Validation: workflow runs assembleDebug, JVM unit tests and bundleRelease (signed with the Play upload key from the repository secrets, or a throwaway key when they are missing). Physical GPS, camera, battery restrictions and display remain device acceptance tests.
+
+- 0.17.1: Android and both GitHub web panels accept a short company login (email local part) or a full email. Trim and lowercase the identifier only; append @trferreira.com only to short names matching [a-z0-9][a-z0-9._-]*. Passwords are untouched. Supabase still authenticates the same email account and UUID; existing sessions, history and RLS do not change. Full emails remain supported for other domains. This is not a lookup by display name. Deploy the panels and install the new Android build independently.

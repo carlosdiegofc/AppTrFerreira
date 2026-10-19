@@ -36,8 +36,8 @@ function Login() {
       <p className="login-sub">Ingresá con tu cuenta de Transportes Ferreira.</p>
       <form onSubmit={(e) => void submit(e)} className="login-form">
         <label>
-          Correo
-          <input type="email" name="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />
+          Nombre de usuario o correo
+          <input type="text" autoCapitalize="none" spellCheck={false} name="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />
         </label>
         <label>
           Contraseña

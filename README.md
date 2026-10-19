@@ -5,7 +5,13 @@ Panel web nuevo (React + TypeScript), en construcción al lado del actual: [pane
 # Panel web (nuevo)
 La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
 
-# Transportes Ferreira GPS — v0.17.0
+# Transportes Ferreira GPS — v0.17.1
+
+## Nuevo en v0.17.1 (ingreso por nombre; versionCode 27)
+- La app y ambos paneles permiten ingresar con el nombre de usuario de la cuenta corporativa o con el correo completo.
+- El nombre se convierte internamente al correo corporativo existente; conserva el mismo usuario, viajes y permisos. No se cambia la contraseña desde el cliente.
+- Las contraseñas mantienen sus espacios y mayúsculas. Los cambios de contraseña se administran en Supabase, nunca en el repositorio.
+
 
 ## Nuevo en v0.17.0 (GPS en vivo más rápido y chofer activo; versionCode 26)
 - **Viaje en curso:** el teléfono toma una posición cada 2 segundos (antes cada 3 a 5) y la manda sola y enseguida, sin esperar al resto de lo que tiene para enviar (el viaje, el recorrido, las fotos). Los mapas en vivo del panel y de la app la reciben en unos segundos.

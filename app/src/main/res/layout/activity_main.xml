@@ -42,8 +42,8 @@
                 android:layout_height="56dp"
                 android:layout_marginTop="18dp"
                 android:backgroundTint="@color/tr_blue"
-                android:hint="Correo"
-                android:inputType="textEmailAddress"
+                android:hint="Nombre de usuario o correo"
+                android:inputType="textNoSuggestions"
                 android:textColor="@color/tr_black"
                 android:textColorHint="@color/tr_gray_text" />
 

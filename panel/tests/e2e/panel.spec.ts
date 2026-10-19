@@ -9,14 +9,14 @@ test.beforeEach(async ({ page }) => prepare(page));
 
 test('rechaza una contraseña incorrecta', async ({ page }) => {
   await signIn(page, 'dueno@ejemplo.uy', 'otra-clave');
-  await expect(page.getByRole('alert')).toHaveText('El correo o la contraseña no son correctos.');
+  await expect(page.getByRole('alert')).toHaveText('El usuario o la contraseña no son correctos.');
 });
 
 test('una cuenta de chofer no entra al panel', async ({ page }) => {
   await signIn(page, 'chofer1@ejemplo.uy');
   await expect(page.getByRole('heading', { name: 'Esta cuenta no tiene acceso' })).toBeVisible();
   await page.getByRole('button', { name: 'Ingresar con otra cuenta' }).click();
-  await expect(page.getByLabel('Correo')).toBeVisible();
+  await expect(page.getByLabel('Nombre de usuario o correo')).toBeVisible();
 });
 
 test('un administrador que no está en la lista del panel tampoco entra', async ({ page }) => {
@@ -157,7 +157,7 @@ test('las secciones que faltan dicen qué van a hacer y la sesión se cierra', a
   const menu = page.getByRole('button', { name: 'Abrir el menú' });
   if (await menu.isVisible()) await menu.click();
   await page.getByRole('button', { name: 'Salir' }).click();
-  await expect(page.getByLabel('Correo')).toBeVisible();
+  await expect(page.getByLabel('Nombre de usuario o correo')).toBeVisible();
 });
 
 test('una cuenta que solo lee la flota también entra', async ({ page }) => {

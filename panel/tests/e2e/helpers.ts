@@ -18,7 +18,7 @@ export async function prepare(page: Page) {
 
 export async function signIn(page: Page, email: string, password = 'clave-de-prueba') {
   await page.goto('./');
-  await page.getByLabel('Correo').fill(email);
+  await page.getByLabel('Nombre de usuario o correo').fill(email);
   await page.getByLabel('Contraseña').fill(password);
   await page.getByRole('button', { name: 'Ingresar' }).click();
 }
