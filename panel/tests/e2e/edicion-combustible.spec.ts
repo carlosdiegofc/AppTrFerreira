@@ -82,6 +82,11 @@ test('la oficina corrige una boleta sin tocar lo declarado, la manda a la papele
   await expect(form).toContainText('Se cargó sin viaje · Carla Méndez');
   await expect(form).toContainText('Importe: 6.600');
   await expect(form.getByLabel('Nombre de la estación')).toHaveValue('Estación El Tala');
+  // Another month than the day it arrived: the app and the current panel go on counting it on that day.
+  await form.getByLabel('Fecha de la boleta').fill('2026-09-30');
+  await expect(form).toContainText('El resumen del mes de la app y el panel actual la cuentan el 10/10/2026, el día en que llegó.');
+  await form.getByLabel('Fecha de la boleta').fill('2026-10-10');
+  await expect(form).not.toContainText('el día en que llegó');
   await form.getByLabel('Importe').fill('7.000');
   await form.getByRole('button', { name: 'Guardar', exact: true }).click();
   await expect(form).toBeHidden();

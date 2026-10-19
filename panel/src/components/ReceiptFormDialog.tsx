@@ -7,7 +7,7 @@ import { ConflictError, describeWriteError } from '../data/api';
 import { useCreateReceipt, useUpdateReceipt } from '../data/hooks';
 import { formatDay } from '../lib/dates';
 import { type CatalogStation, type Receipt } from '../lib/fuel';
-import { correctedPanelData, FUEL_LIMITS, newReceiptRow, type ReceiptField, receiptFormChanged, type ReceiptFormValues, receiptFormValues, validateReceiptForm } from '../lib/fuelForm';
+import { arrivalNote, correctedPanelData, FUEL_LIMITS, newReceiptRow, type ReceiptField, receiptFormChanged, type ReceiptFormValues, receiptFormValues, validateReceiptForm } from '../lib/fuelForm';
 import { type CatalogTruck, truckLabel } from '../lib/fleet';
 import { decimal } from '../lib/format';
 import { parseNumber } from '../lib/numbers';
@@ -116,7 +116,7 @@ export function ReceiptFormDialog({ receipt: opened, today, stations, writtenSta
       setFormError('Esperá a que termine de prepararse la foto.');
       return;
     }
-    const check = validateReceiptForm(values, stations, today);
+    const check = validateReceiptForm(values, stations, today, receipt?.declared);
     setErrors(check.errors);
     if (!check.ok) {
       setFormError('Revisá los campos marcados.');
@@ -252,7 +252,7 @@ export function ReceiptFormDialog({ receipt: opened, today, stations, writtenSta
           <fieldset>
             <legend>Carga</legend>
             <div className="form-grid">
-              {field('date', 'Fecha de la boleta', <input {...fieldProps('date')} type="date" value={values.date} max={today} onChange={(e) => set('date', e.target.value)} />)}
+              {field('date', 'Fecha de la boleta', <input {...fieldProps('date')} type="date" value={values.date} max={today} onChange={(e) => set('date', e.target.value)} />, arrivalNote(receipt, values.date, today))}
               {field(
                 'stationId',
                 'Estación',

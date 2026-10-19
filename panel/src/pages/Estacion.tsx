@@ -8,8 +8,8 @@ import { Card, CatalogNote, Empty, ErrorNote, PageHead, Pill, RefreshButton, Ske
 import { useFuel, useNow } from '../data/hooks';
 import { dayInZone, formatDay } from '../lib/dates';
 import { count, decimal, money } from '../lib/format';
-import { type Currency, type Movement, NO_STATION, PAYMENT_METHODS, parseStationKey, type Receipt, type Station, statement } from '../lib/fuel';
-import { balanceText, balanceTone } from './fuelText';
+import { type Currency, isFuture, type Movement, NO_STATION, PAYMENT_METHODS, parseStationKey, type Receipt, type Station, statement } from '../lib/fuel';
+import { balanceText, balanceTone, fuelReadError } from './fuelText';
 
 const CURRENCY_TITLE: Record<Currency, string> = { UYU: 'Cuenta en pesos', USD: 'Cuenta en dólares' };
 
@@ -40,10 +40,11 @@ function Missing() {
 
 type Editing = { kind: 'payment' | 'opening'; movement: Movement | null; currency: Currency } | { kind: 'receipt'; receipt: Receipt };
 
-function StatementCard({ station, currency, onEdit, onPhoto }: { station: Station; currency: Currency; onEdit: (e: Editing) => void; onPhoto: (r: Receipt) => void }) {
+function StatementCard({ station, currency, today, onEdit, onPhoto }: { station: Station; currency: Currency; today: string; onEdit: (e: Editing) => void; onPhoto: (r: Receipt) => void }) {
   const s = statement(station, currency);
   const account = station.accounts.find((a) => a.currency === currency);
   const opening = account?.opening ?? null;
+  const future = s.lines.filter((l) => l.receipt && isFuture(l.receipt, today)).length;
   const method = (m: Movement) => PAYMENT_METHODS.find((p) => p.value === m.method)?.label ?? 'Pago';
   return (
     <Card
@@ -76,6 +77,7 @@ function StatementCard({ station, currency, onEdit, onPhoto }: { station: Statio
           </p>
         )}
         {account && account.withoutAmount > 0 && <p className="note">{count(account.withoutAmount)} {account.withoutAmount === 1 ? 'boleta no tiene' : 'boletas no tienen'} importe: no suman hasta que las corrijas.</p>}
+        {future > 0 && <p className="note">{future === 1 ? 'Una boleta tiene fecha posterior a hoy y ya suma en el saldo: con «Corregir» poné la fecha correcta.' : `${count(future)} boletas tienen fecha posterior a hoy y ya suman en el saldo: con «Corregir» poné la fecha correcta.`}</p>}
       </div>
       {s.lines.length === 0 ? (
         <div className="card-body">
@@ -121,6 +123,12 @@ function StatementCard({ station, currency, onEdit, onPhoto }: { station: Statio
                       <>
                         {' '}
                         <Pill tone="blue">Corregida</Pill>
+                      </>
+                    )}
+                    {r && isFuture(r, today) && (
+                      <>
+                        {' '}
+                        <Pill tone="amber">Fecha futura</Pill>
                       </>
                     )}
                   </td>
@@ -173,7 +181,7 @@ function StationPage({ stationKey }: { stationKey: string }) {
     return (
       <div className="page">
         <Back />
-        <ErrorNote onRetry={() => void query.refetch()}>No se pudo leer el combustible.</ErrorNote>
+        <ErrorNote onRetry={() => void query.refetch()}>{fuelReadError(query.error)}</ErrorNote>
       </div>
     );
   }
@@ -243,6 +251,7 @@ function StationPage({ stationKey }: { stationKey: string }) {
             key={c}
             station={station}
             currency={c}
+            today={today}
             onEdit={(e) => {
               setNotice(null);
               setEditing(e);

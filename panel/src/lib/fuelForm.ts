@@ -2,9 +2,10 @@
 // a station and a station's opening balance. What each form starts with, what it checks and what it saves. A correction
 // never changes what was declared: it goes in panel_data, with the keys the app and both panels read. Pure functions.
 import type { Json, TablesInsert } from './database.types';
+import { dayInZone, formatDay } from './dates';
 import { canonical, type CatalogTruck, text, truck } from './fleet';
 import { parseNumber } from './numbers';
-import { type CatalogStation, type Currency, type Movement, NO_STATION, type PaymentMethod, PAYMENT_METHODS, type Receipt, stationKey } from './fuel';
+import { type CatalogStation, type Currency, type Declared, type Movement, NO_STATION, type PaymentMethod, PAYMENT_METHODS, type Receipt, stationKey } from './fuel';
 
 /** Longest text each field takes (the database checks the station's name and the notes too). */
 export const FUEL_LIMITS = { station: 120, vehicle: 120, notes: 500 } as const;
@@ -73,7 +74,11 @@ export interface ReceiptPayload {
 
 export type Checked<F extends string, P> = { ok: true; payload: P; errors: Partial<Record<F, string>> } | { ok: false; errors: Partial<Record<F, string>> };
 
-export function validateReceiptForm(v: ReceiptFormValues, catalog: readonly CatalogStation[], today: string): Checked<ReceiptField, ReceiptPayload> {
+/**
+ * Checks the form. For a correction, declared is what the receipt was loaded with: a field it had cannot be left blank,
+ * because a correction cannot erase it (the receipt would read as declared again).
+ */
+export function validateReceiptForm(v: ReceiptFormValues, catalog: readonly CatalogStation[], today: string, declared?: Declared): Checked<ReceiptField, ReceiptPayload> {
   const errors: Partial<Record<ReceiptField, string>> = {};
   const day = checkDay(v.date, today);
   if (day) errors.date = day;
@@ -83,8 +88,10 @@ export function validateReceiptForm(v: ReceiptFormValues, catalog: readonly Cata
   else if (!listed && written === null) errors.station = 'Elegí la estación de la lista o escribí su nombre.';
   else if (!listed && (written ?? '').length > FUEL_LIMITS.station) errors.station = `Hasta ${FUEL_LIMITS.station} letras.`;
   if (v.vehicle.trim().length > FUEL_LIMITS.vehicle) errors.vehicle = `Hasta ${FUEL_LIMITS.vehicle} letras.`;
+  else if (v.vehicle.trim() === '' && declared?.vehicle) errors.vehicle = 'La boleta tiene camión: para cambiarlo, escribí el correcto.';
   const liters = checkNumber(v.liters, MAX.liters);
   if (liters.error) errors.liters = liters.error;
+  else if (liters.value === null && declared?.liters != null) errors.liters = 'La boleta tiene litros: para corregirlos, escribí el número correcto.';
   const total = checkNumber(v.total, MAX.total);
   if (total.error) errors.total = total.error;
   else if (total.value === null) errors.total = 'Escribí el importe de la boleta.';
@@ -103,6 +110,18 @@ export function validateReceiptForm(v: ReceiptFormValues, catalog: readonly Cata
       currency: v.currency === 'USD' ? 'USD' : 'UYU',
     },
   };
+}
+
+/**
+ * The app's month summary and the current panel count a receipt on the day it reached the database (recorded_at), not
+ * on its date, and a correction does not move it there: the form says so when the two fall in different months.
+ */
+export function arrivalNote(receipt: Pick<Receipt, 'recordedAt'> | null, date: string, today: string): string | null {
+  const arrived = receipt ? (receipt.recordedAt ? dayInZone(Date.parse(receipt.recordedAt)) : null) : today;
+  if (!arrived || !isDay(date) || date.slice(0, 7) === arrived.slice(0, 7)) return null;
+  return receipt
+    ? `El resumen del mes de la app y el panel actual la cuentan el ${formatDay(arrived)}, el día en que llegó.`
+    : 'El resumen del mes de la app y el panel actual la van a contar hoy, el día en que se carga.';
 }
 
 /** Whether the form changed since it opened: closing asks first, and an unchanged correction saves nothing. */
@@ -144,6 +163,7 @@ export function correctedPanelData(receipt: Receipt, initial: ReceiptFormValues,
     else d.fecha = p.date;
   }
   if (changed('vehicle')) {
+    // Blank only reaches here when nothing was declared (validateReceiptForm): no correction is left.
     if (p.vehicle === '' || canonical(truck(p.vehicle), trucks) === declared.vehicle) delete d.vehicle;
     else d.vehicle = p.vehicle;
   }
@@ -158,6 +178,7 @@ export function correctedPanelData(receipt: Receipt, initial: ReceiptFormValues,
     }
   }
   if (changed('liters')) {
+    // Blank only reaches here when nothing was declared (validateReceiptForm): no correction is left.
     if (p.liters === null || p.liters === declared.liters) delete d.litros;
     else d.litros = p.liters;
   }

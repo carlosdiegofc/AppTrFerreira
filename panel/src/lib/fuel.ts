@@ -216,6 +216,12 @@ function spelling(s: Pick<Station, 'key' | 'receipts' | 'payments' | 'openings'>
 
 const byNewest = (a: Receipt, b: Receipt) => (b.date ?? '').localeCompare(a.date ?? '') || (b.recordedAt ?? '').localeCompare(a.recordedAt ?? '') || a.id.localeCompare(b.id);
 
+/**
+ * A receipt dated after today: the phone's date picker lets a driver choose any day. The fuel was loaded all the same,
+ * so it counts in its station's account; the pages mark it for the office to correct the date.
+ */
+export const isFuture = (r: Pick<Receipt, 'date'>, today: string) => r.date !== null && r.date > today;
+
 /** Whether a day counts in an account that starts on since (null: from the beginning). */
 const counts = (day: string | null, since: string | null) => since === null || (day !== null && day >= since);
 

@@ -62,7 +62,7 @@ Va armándose al costado del panel actual y lo reemplaza sección por sección.
      - Migración `0003`, que solo agrega: una tabla para los pagos y saldos iniciales de cada estación y el permiso para que las cuentas del panel corrijan boletas sin tocar lo que declaró el chofer.
      - En la app 0.17.1, cargar combustible sin viaje o en el viaje también desde el modo sencillo.
    - 4b. [ ] Mantenimiento y Documentación.
-5. [ ] Métricas: rendimiento por camión y por chofer, con gráficos.
+5. [ ] Métricas: rendimiento por camión y por chofer, con gráficos. Queda para resolver con ella: el resumen del mes de la app y el panel actual cuentan cada boleta de combustible el día en que llegó a la base, y el panel nuevo, en su fecha (la corregida en el panel, si la hay). Si caen en meses distintos, el formulario de corrección lo avisa.
 6. [x] Publicarlo: el código pasa a `main` y el panel nuevo queda en `/nuevo/` de la dirección del panel actual (18/10/2026).
 7. [x] GPS en vivo más rápido (aprobado el 18/10/2026, adelanta parte de la etapa 6): posición cada 3 segundos y recorrido cada 5, con la app 0.17.0 mandando un punto cada 2 segundos. La 0.17.0 se sube a Google Play cuando lo decidas (18/10/2026).
 8. [x] «Chofer activo» (aprobado el 18/10/2026): GPS en vivo y la «Flota en vivo» de la app dicen qué choferes tienen la app abierta, con qué versión y, si no viajan, dónde está el teléfono. Migración [`0002_chofer_activo.sql`](../supabase/migrations/0002_chofer_activo.sql), una tabla nueva: aplicada en producción el 19/10/2026 a las 08:20 (Uruguay). El respaldo completo se tomó a la 01:22, se probó en una base local y se entregó; entre el respaldo y la migración no cambió ningún dato. Avisan los teléfonos con la app 0.17.0 o posterior (19/10/2026).

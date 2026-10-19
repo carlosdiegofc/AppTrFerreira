@@ -9,9 +9,9 @@ import { ConflictError, describeWriteError } from '../data/api';
 import { useFuel, useNow, useUpdateReceipt } from '../data/hooks';
 import { ago, dayInZone, formatDay } from '../lib/dates';
 import { count, decimal, money } from '../lib/format';
-import { filterReceipts, NO_STATION, type Receipt, receiptVehicles, type Station, totals } from '../lib/fuel';
+import { filterReceipts, isFuture, NO_STATION, type Receipt, receiptVehicles, type Station, totals } from '../lib/fuel';
 import { type PeriodKind, periodRange } from '../lib/trips';
-import { amountParts, amounts, balanceText, balanceTone, stationPath } from './fuelText';
+import { amountParts, amounts, balanceText, balanceTone, fuelReadError, stationPath } from './fuelText';
 
 // The filters live in the address (?vista=boletas&periodo=mes…): going back from a station, reloading or sharing the
 // link keeps them.
@@ -71,12 +71,14 @@ function StationRow({ station, period }: { station: Station; period: Receipt[] }
   );
 }
 
-function ReceiptRow({ receipt, stationName, onOpen, onPhoto, action }: { receipt: Receipt; stationName: string; onOpen?: () => void; onPhoto: () => void; action?: ReactNode }) {
+function ReceiptRow({ receipt, stationName, today, onOpen, onPhoto, action }: { receipt: Receipt; stationName: string; today: string; onOpen?: () => void; onPhoto: () => void; action?: ReactNode }) {
+  // Under the date, so that it shows on a phone too.
+  const future = !receipt.archived && isFuture(receipt, today);
   const body = (
     <>
-      <span className="fr-date">
+      <span className={`fr-date${future ? ' is-future' : ''}`}>
         <strong>{receipt.date ? formatDay(receipt.date) : 'Sin fecha'}</strong>
-        <small>{receipt.tripId ? 'En un viaje' : 'Sin viaje'}</small>
+        <small>{future ? 'Fecha futura' : receipt.tripId ? 'En un viaje' : 'Sin viaje'}</small>
       </span>
       <span className="fr-station">
         <strong>{stationName}</strong>
@@ -176,7 +178,14 @@ export function Combustible() {
   const owed = { UYU: 0, USD: 0 };
   for (const s of stations) for (const a of s.accounts) owed[a.currency] += a.balance;
   const missing = receipts.filter((r) => !r.archived && r.total === null).length;
+  const future = receipts.filter((r) => !r.archived && isFuture(r, today)).length;
   const binned = receipts.filter((r) => r.archived).length;
+  // The periods end today: only «Todo» without other filters shows the receipts dated after it.
+  const showingAll = view.value === 'boletas' && period.kind === 'all' && !typed && !vehicle && !station;
+  const showFuture = () => {
+    setTyped('');
+    set({ vista: 'boletas', periodo: 'todo', desde: null, hasta: null, buscar: null, camion: null, estacion: null });
+  };
   const shownTotals = totals(shown);
   const written = useMemo(() => stations.filter((s) => !s.listed && s.key !== NO_STATION).map((s) => s.name), [stations]);
 
@@ -226,11 +235,22 @@ export function Combustible() {
           <Icon name={notice.tone === 'ok' ? 'check' : 'warning'} size={18} /> {notice.text}
         </p>
       )}
+      {future > 0 && (
+        <p className="notice notice-warn notice-with-action">
+          <Icon name="warning" size={18} />
+          <span>{future === 1 ? 'Una boleta tiene fecha posterior a hoy y ya suma en la cuenta de su estación: abrila y corregí la fecha.' : `${count(future)} boletas tienen fecha posterior a hoy y ya suman en la cuenta de su estación: abrilas y corregí la fecha.`}</span>
+          {!showingAll && (
+            <button type="button" className="link-button notice-action" onClick={showFuture}>
+              {future === 1 ? 'Ver la boleta' : 'Ver las boletas'}
+            </button>
+          )}
+        </p>
+      )}
 
       <div className="stats stats-money">
         <Stat label="Cargado en el período" value={<Lines parts={amountParts(periodTotals.amounts, '$ 0')} />} detail={`${count(periodTotals.receipts)} boleta${periodTotals.receipts === 1 ? '' : 's'}`} tone="blue" icon="fuel" />
         <Stat label="Litros en el período" value={decimal(periodTotals.liters, 1)} tone="grey" icon="chart" />
-        <Stat label="Saldo con las estaciones" value={<Lines parts={amountParts(owed, '$ 0')} />} detail="Lo que se les debe, a hoy" tone={owed.UYU > 0 || owed.USD > 0 ? 'amber' : 'green'} icon="money" />
+        <Stat label="Saldo con las estaciones" value={<Lines parts={amountParts(owed, '$ 0')} />} detail="Lo que se les debe" tone={owed.UYU > 0 || owed.USD > 0 ? 'amber' : 'green'} icon="money" />
         <Stat label="Boletas sin importe" value={count(missing)} detail={missing > 0 ? 'Completalas para que sumen' : 'Todas tienen importe'} tone={missing > 0 ? 'red' : 'green'} icon="warning" />
       </div>
 
@@ -320,7 +340,7 @@ export function Combustible() {
       {badRange ? (
         <ErrorNote>Revisá las fechas: «hasta» no puede ser antes de «desde».</ErrorNote>
       ) : query.error && query.data === undefined ? (
-        <ErrorNote onRetry={() => void query.refetch()}>No se pudo leer el combustible.</ErrorNote>
+        <ErrorNote onRetry={() => void query.refetch()}>{fuelReadError(query.error)}</ErrorNote>
       ) : loading ? (
         <div className="card card-body">
           <Skeleton lines={6} />
@@ -357,6 +377,7 @@ export function Combustible() {
                 key={r.id}
                 receipt={r}
                 stationName={nameOf(r)}
+                today={today}
                 onOpen={view.value === 'papelera' ? undefined : () => {
                   setNotice(null);
                   setEditing(r);

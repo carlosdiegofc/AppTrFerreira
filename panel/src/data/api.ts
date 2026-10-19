@@ -29,15 +29,22 @@ function rows<T>(result: { data: T | null; error: { message: string; code?: stri
 }
 
 const PAGE = 1000;
+/** The code of a read that has more rows than the panel reads at once. */
+export const TOO_MANY = 'too_many';
 
-/** Every row of a query with a stable order, a page at a time. */
-async function all<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>, max = 20_000): Promise<T[]> {
+/**
+ * Every row of a query with a stable order, a page at a time, up to max rows. With complete, a query with more rows
+ * than that fails instead of coming back cut: sums like a station's account must never be made with part of the rows.
+ */
+async function all<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>, max = 20_000, complete = false): Promise<T[]> {
   const out: T[] = [];
   for (let from = 0; from < max; from += PAGE) {
     const part = rows(await page(from, from + PAGE - 1));
     out.push(...part);
-    if (part.length < PAGE) break;
+    if (part.length < PAGE) return out;
   }
+  // Exactly max rows is complete; one more is not.
+  if (complete && rows(await page(max, max)).length > 0) throw new DataError(`Hay más de ${max} filas para leer de una vez`, TOO_MANY);
   return out;
 }
 
@@ -303,8 +310,8 @@ export interface FuelData {
 /** All the fuel: the accounts of the stations need every receipt and payment, not only those of a period. */
 export async function fetchFuel(): Promise<FuelData> {
   const [receipts, movements] = await Promise.all([
-    all((from, to) => supabase.from('trf_driver_fuel_receipts').select('*').order('receipt_date', { ascending: false }).order('id').range(from, to), 50_000),
-    all((from, to) => supabase.from('trf_fuel_station_movements').select('*').order('happened_on', { ascending: false }).order('id').range(from, to)),
+    all((from, to) => supabase.from('trf_driver_fuel_receipts').select('*').order('receipt_date', { ascending: false }).order('id').range(from, to), 50_000, true),
+    all((from, to) => supabase.from('trf_fuel_station_movements').select('*').order('happened_on', { ascending: false }).order('id').range(from, to), 20_000, true),
   ]);
   return { receipts, movements };
 }

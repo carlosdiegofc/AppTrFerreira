@@ -6,6 +6,7 @@ import {
   filterReceipts,
   type FuelRow,
   groupStations,
+  isFuture,
   type Movement,
   movementFromRow,
   type MovementRow,
@@ -17,7 +18,7 @@ import {
   statement,
   totals,
 } from '../../src/lib/fuel';
-import { correctedPanelData, movementFormValues, movementRow, newReceiptRow, receiptFormValues, validateMovementForm, validateReceiptForm } from '../../src/lib/fuelForm';
+import { arrivalNote, correctedPanelData, movementFormValues, movementRow, newReceiptRow, receiptFormValues, validateMovementForm, validateReceiptForm } from '../../src/lib/fuelForm';
 
 const STATIONS: CatalogStation[] = [
   { id: 'est-ruta5', name: 'Ancap Ruta 5 km 32' },
@@ -171,6 +172,16 @@ describe('cuenta de cada estación', () => {
     expect(s.balance).toBe(22500);
   });
 
+  it('una boleta con fecha posterior a hoy es una carga real: suma en la cuenta y se marca para corregir la fecha', () => {
+    const future = receiptFromRow(row({ id: 'future', receipt_date: '2026-11-15', total: 5000 }), [], STATIONS);
+    expect(isFuture(future, '2026-10-15')).toBe(true);
+    expect(isFuture(receiptFromRow(row(), [], STATIONS), '2026-10-15')).toBe(false);
+    expect(isFuture({ date: null }, '2026-10-15')).toBe(false);
+    const s = groupStations([...receipts, future], movements, STATIONS).find((x) => x.key === 'id:est-ruta5')!;
+    expect(account(s, 'UYU').balance).toBe(27500);
+    expect(statement(s, 'UYU').lines.at(-1)).toMatchObject({ day: '2026-11-15', kind: 'receipt', balance: 27500 });
+  });
+
   it('si aparecen dos saldos iniciales de la misma moneda vale el último guardado', () => {
     const two = [
       movementFromRow(move({ id: 'a', kind: 'opening', amount: 1000, method: null, updated_at: '2026-10-01T00:00:00Z' })),
@@ -202,6 +213,30 @@ describe('formulario de boleta', () => {
       station_name: 'Estación El Tala', liters: null, total: 6600, object_path: 'u2/standalone/r9.jpg', panel_data: { moneda: 'USD' },
     });
     expect(newReceiptRow('r9', { id: 'u2', name: 'Socio Lectura' }, { ...check.payload, currency: 'UYU' }, false)).toMatchObject({ object_path: null, panel_data: null });
+  });
+
+  it('al corregir, lo que la boleta tenía no se puede dejar vacío: volvería a leerse lo declarado', () => {
+    const r = receiptFromRow(row(), TRUCKS, STATIONS);
+    const values = { ...receiptFormValues(r, STATIONS, today), liters: '', vehicle: ' ' };
+    expect(validateReceiptForm(values, STATIONS, today, r.declared).errors).toEqual({
+      liters: 'La boleta tiene litros: para corregirlos, escribí el número correcto.',
+      vehicle: 'La boleta tiene camión: para cambiarlo, escribí el correcto.',
+    });
+    // Without liters or truck declared, they stay optional.
+    const bare = receiptFromRow(row({ liters: null, vehicle: '' }), TRUCKS, STATIONS);
+    expect(validateReceiptForm({ ...receiptFormValues(bare, STATIONS, today), liters: '', vehicle: '' }, STATIONS, today, bare.declared).ok).toBe(true);
+  });
+
+  it('avisa cuando la fecha cae en otro mes que el día en que llegó la boleta, que es como la cuentan la app y el panel actual', () => {
+    const r = receiptFromRow(row({ recorded_at: '2026-10-15T15:00:00Z' }), TRUCKS, STATIONS);
+    expect(arrivalNote(r, '2026-10-01', today)).toBeNull();
+    expect(arrivalNote(r, '2026-09-30', today)).toBe('El resumen del mes de la app y el panel actual la cuentan el 15/10/2026, el día en que llegó.');
+    expect(arrivalNote(r, '', today)).toBeNull();
+    // 23:30 of 31/10 in Uruguay is already November in UTC.
+    expect(arrivalNote(receiptFromRow(row({ recorded_at: '2026-11-01T02:30:00Z' }), TRUCKS, STATIONS), '2026-10-31', today)).toBeNull();
+    // A receipt typed in the panel arrives today.
+    expect(arrivalNote(null, '2026-10-02', today)).toBeNull();
+    expect(arrivalNote(null, '2026-09-28', today)).toBe('El resumen del mes de la app y el panel actual la van a contar hoy, el día en que se carga.');
   });
 
   it('una corrección guarda solo lo que cambió y deja lo declarado como estaba', () => {

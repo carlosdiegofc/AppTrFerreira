@@ -1,4 +1,5 @@
 // How Combustible and a station's page say amounts and balances.
+import { DataError, TOO_MANY } from '../data/api';
 import { money } from '../lib/format';
 import type { Account } from '../lib/fuel';
 import type { Tone } from '../components/ui';
@@ -22,3 +23,9 @@ export const balanceTone = (a: Account): Tone => (a.balance > 0 ? 'amber' : a.ba
 
 /** The address of a station's page. */
 export const stationPath = (key: string) => `/combustible/estaciones/${encodeURIComponent(key)}`;
+
+/** Why the fuel could not be read, in the office's words. */
+export const fuelReadError = (e: unknown) =>
+  e instanceof DataError && e.code === TOO_MANY
+    ? 'Hay demasiadas boletas o pagos para leerlos todos de una vez, y una cuenta con una parte daría mal. Avisá para pasar las cuentas a la base.'
+    : 'No se pudo leer el combustible.';

@@ -125,6 +125,39 @@ test('el estado de cuenta de una estación va del saldo inicial en adelante, con
   await expect(dollars.locator('tbody tr').last()).toContainText('US$ 310US$ 210');
 });
 
+test('una boleta con fecha posterior a hoy suma en la cuenta y queda marcada para corregir la fecha', async ({ page }) => {
+  // The browser two days before the seed: the receipts of 15/10 are dated after «today».
+  await page.clock.setFixedTime(new Date('2026-10-13T15:00:00Z'));
+  await signIn(page, 'dueno@ejemplo.uy');
+  await open(page, 'Combustible');
+  const warning = page.locator('.notice-warn', { hasText: 'fecha posterior a hoy' });
+  await expect(warning).toContainText('2 boletas tienen fecha posterior a hoy y ya suman en la cuenta de su estación: abrilas y corregí la fecha.');
+  // The fuel was loaded: the accounts are the same as on the 15th.
+  await expect(station(page, 'Ancap Ruta 5 km 32').locator('.fs-balance')).toHaveText('Se le debe $ 31.450');
+  await expect(station(page, 'Petrobras Salto').locator('.fs-balance')).toHaveText('Se le debe US$ 210');
+  await shot(page, 'combustible-fecha-futura');
+
+  // The periods end today: the button shows every receipt, the ones dated later first.
+  await warning.getByRole('button', { name: 'Ver las boletas' }).click();
+  await expect(page).toHaveURL(/vista=boletas/);
+  await expect(page.getByLabel('Período')).toHaveValue('todo');
+  await expect(receipts(page).locator('.fr-date.is-future')).toHaveCount(2);
+  await expect(receipts(page).nth(0).locator('.fr-date')).toHaveText('15/10/2026Fecha futura');
+  await expect(receipts(page).nth(2).locator('.fr-date')).toHaveText('13/10/2026Sin viaje');
+  await expect(warning.getByRole('button')).toHaveCount(0);
+  await shot(page, 'combustible-fecha-futura-boletas');
+
+  // In the statement, Ana's line is marked and a note says why.
+  await chip(page, 'Por estación').click();
+  await station(page, 'Ancap Ruta 5 km 32').click();
+  const pesos = page.locator('.card', { hasText: 'Cuenta en pesos' });
+  await expect(pesos).toContainText('Una boleta tiene fecha posterior a hoy y ya suma en el saldo: con «Corregir» poné la fecha correcta.');
+  await expect(pesos.locator('tbody tr').last()).toContainText('Fecha futura');
+  await expect(pesos.locator('tbody tr').last()).toContainText('$ 9.950$ 31.450');
+  await expect(pesos.locator('tbody tr').filter({ hasText: 'Fecha futura' })).toHaveCount(1);
+  await shot(page, 'combustible-fecha-futura-cuenta');
+});
+
 test('una estación que no existe lo dice', async ({ page }) => {
   await signIn(page, 'dueno@ejemplo.uy');
   await expect(stat(page, 'En ruta')).toBeVisible();

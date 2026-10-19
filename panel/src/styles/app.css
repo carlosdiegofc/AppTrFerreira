@@ -2131,6 +2131,32 @@ button.fr-open {
   align-items: flex-end;
 }
 
+.fr-date.is-future small {
+  color: var(--amber);
+  font-weight: 650;
+}
+
+/* A notice with a button: on a narrow screen the button goes under the text instead of squeezing it. */
+.notice-with-action {
+  flex-wrap: wrap;
+}
+
+.notice-with-action > span {
+  flex: 1 1 260px;
+}
+
+.notice .notice-action {
+  flex: none;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .notice .notice-action {
+    margin-left: 28px;
+  }
+}
+
 .fr-actions {
   display: flex;
   flex: none;
