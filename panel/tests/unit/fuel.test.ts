@@ -167,6 +167,17 @@ describe('cuenta de cada estación', () => {
     expect(account(s, 'UYU').balance).toBe(13500);
   });
 
+  it('una estación escrita a mano que después entra en la lista sigue con sus pagos en la misma cuenta', () => {
+    const listed = [...STATIONS, { id: 'est-tala', name: 'Estación El Tala' }];
+    const pay = move({ id: 'p-tala', station_key: 'name:estacion el tala', station_name: 'Estación El Tala', amount: 600, method: 'efectivo' });
+    expect(movementFromRow(pay, listed).stationKey).toBe('id:est-tala');
+    expect(movementFromRow(pay, STATIONS).stationKey).toBe('name:estacion el tala');
+    expect(movementFromRow(move({ station_key: NO_STATION }), listed).stationKey).toBe(NO_STATION);
+    const tala = receiptFromRow(row({ id: 'r-tala', receipt_date: '2026-10-10', total: 6600, station_name: 'Estación El Tala' }), [], listed);
+    const grouped = groupStations([tala], [movementFromRow(pay, listed)], listed).filter((s) => s.receipts.length > 0 || s.payments.length > 0);
+    expect(grouped.map((s) => [s.key, s.accounts.map((a) => a.balance)])).toEqual([['id:est-tala', [6000]]]);
+  });
+
   it('lo que se les debe a unas estaciones no se compensa con lo que otras tienen a favor', () => {
     const favor = groupStations([], [movementFromRow(move({ id: 'f', station_key: 'name:estacion el tala', station_name: 'Estación El Tala', kind: 'opening', amount: -6600, method: null, happened_on: '2026-10-01' }))], STATIONS);
     expect(balances([...stations, ...favor])).toEqual({ owed: { UYU: 29100, USD: 210 }, credit: { UYU: 6600, USD: 0 } });

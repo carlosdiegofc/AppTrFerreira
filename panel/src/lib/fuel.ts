@@ -153,11 +153,16 @@ export interface Movement {
   updatedAt: string;
 }
 
-export function movementFromRow(m: MovementRow): Movement {
+/**
+ * A payment or an opening balance. A station written by hand that is in the catalog list now counts as that one, like
+ * its receipts: the movement goes with them, and a correction saves it with the catalog's key.
+ */
+export function movementFromRow(m: MovementRow, catalog: readonly CatalogStation[] = []): Movement {
   const method = PAYMENT_METHODS.find((p) => p.value === m.method)?.value ?? null;
+  const written = m.station_key.startsWith('name:') && m.station_key !== NO_STATION;
   return {
     id: m.id,
-    stationKey: m.station_key,
+    stationKey: written ? stationKey(null, m.station_key.slice('name:'.length), catalog) : m.station_key,
     stationName: m.station_name,
     kind: m.kind === 'opening' ? 'opening' : 'payment',
     day: m.happened_on,

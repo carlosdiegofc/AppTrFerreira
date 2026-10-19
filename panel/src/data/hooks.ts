@@ -208,7 +208,7 @@ export function useFuel() {
   const query = useQuery({ queryKey: ['fuel'], queryFn: fetchFuel, refetchInterval: 60_000, staleTime: 30_000 });
   const catalogStations = useMemo(() => lists.data?.stations ?? [], [lists.data]);
   const receipts = useMemo(() => (query.data?.receipts ?? []).map((r) => receiptFromRow(r, catalog.data ?? [], catalogStations)), [query.data, catalog.data, catalogStations]);
-  const movements = useMemo(() => (query.data?.movements ?? []).map(movementFromRow), [query.data]);
+  const movements = useMemo(() => (query.data?.movements ?? []).map((m) => movementFromRow(m, catalogStations)), [query.data, catalogStations]);
   const stations = useMemo(() => groupStations(receipts, movements, catalogStations), [receipts, movements, catalogStations]);
   return { receipts, movements, stations, catalogStations, query, catalog, lists };
 }
