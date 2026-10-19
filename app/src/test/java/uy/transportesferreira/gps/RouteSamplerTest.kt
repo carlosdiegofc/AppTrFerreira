@@ -112,6 +112,16 @@ class RouteSamplerTest {
         assertTrue(fresh.keep(-34.9,-56.2,0,0))
     }
 
+    @Test fun aServiceStartedAgainKeepsTheCornerItWasHolding() {
+        val s=RouteSampler()
+        assertTrue(s.keep(-34.9,east(0),0,0,27.0,4.0,90.0))
+        assertFalse(s.keep(-34.9,east(1),2000,0,27.0,4.0,90.0))
+        // Android starts the service again right at the corner: the turn still brings the corner reading in first.
+        val again=RouteSampler();again.restore(s.state())
+        assertTrue(again.keep(-34.9+0.000135,east(1),4000,0,27.0,4.0,0.0))
+        assertTrue(again.corner)
+    }
+
     @Test fun aStretchDoesNotStartWithAPoorFixOfAParkedTruck() {
         val s=RouteSampler()
         // The first fixes after the GPS starts are often poor: the trip waits for a good one.

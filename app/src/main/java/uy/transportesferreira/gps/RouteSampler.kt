@@ -39,16 +39,19 @@ class RouteSampler(
     /** The reading just kept comes after a turn: the one before it, where the truck went round the corner, goes in first. */
     var corner=false;private set
     fun reset(){started=false;heading=null;stopped=false;held=false;jittery=false;corner=false}
-    /** What the sampler knows, as text kept with the trip: a service the system starts again goes on from there. */
-    fun state():String=listOf(if(started)1 else 0,segment,lat,lng,time,heading?:"",if(stopped)1 else 0,stopLat,stopLng,if(jittery)1 else 0).joinToString(";")
+    /**
+     * What the sampler knows, as text kept with the trip: a service the system starts again goes on from there. The
+     * reading it may hold as a corner is the trip's last reading, kept with it too.
+     */
+    fun state():String=listOf(if(started)1 else 0,segment,lat,lng,time,heading?:"",if(stopped)1 else 0,stopLat,stopLng,if(jittery)1 else 0,if(held)1 else 0).joinToString(";")
     /** Goes on from a state saved by state(); anything it cannot read starts over. */
     fun restore(state:String?){
         reset()
         val f=state?.split(';')?:return
-        if(f.size!=10)return
+        if(f.size!=11)return
         try{
             segment=f[1].toInt();lat=f[2].toDouble();lng=f[3].toDouble();time=f[4].toLong();heading=f[5].takeIf{it.isNotEmpty()}?.toDouble()
-            stopLat=f[7].toDouble();stopLng=f[8].toDouble();stopped=f[6]=="1";jittery=f[9]=="1";started=f[0]=="1"
+            stopLat=f[7].toDouble();stopLng=f[8].toDouble();stopped=f[6]=="1";jittery=f[9]=="1";held=f[10]=="1";started=f[0]=="1"
         }catch(_:NumberFormatException){reset()}
     }
     fun keep(lat:Double,lng:Double,time:Long,segment:Int,speedKmh:Double?=null,accuracy:Double?=null,heading:Double?=null):Boolean {

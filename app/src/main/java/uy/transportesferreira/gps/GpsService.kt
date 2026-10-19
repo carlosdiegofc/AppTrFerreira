@@ -31,8 +31,9 @@ class GpsService:Service(){
   // Android 12+ can refuse a foreground start from the background after the system killed the service.
   try{notifyTrip(t.optBoolean("paused"))}catch(_:Exception){store.warning("El GPS se detuvo en segundo plano · abrí la app para continuar");stopSelf();return START_NOT_STICKY}
   watchSince=System.currentTimeMillis()
-  // A service the system started again goes on with the route's state kept with the trip (where it stopped, jitter).
-  if(tripId!=t.getString("id")){distance.reset();route.restore(t.optString("route_state"));lastReading=null;tripId=t.getString("id")}
+  // A service the system started again goes on with the route's state kept with the trip (where it stopped, jitter, and
+  // the trip's last reading, which may be the corner of a turn).
+  if(tripId!=t.getString("id")){distance.reset();route.restore(t.optString("route_state"));lastReading=t.optJSONObject("last_point");tripId=t.getString("id")}
   when(i?.action){
    PAUSE->{keepLast();store.update{it.put("paused",true).put("speed_kmh",0.0)};stopGps();distance.reset();sendLive();sync()}
    RESUME->{store.update{it.put("paused",false).put("segment",it.optInt("segment")+1)};distance.reset();sync()}
