@@ -40,13 +40,15 @@ object Presence {
     private fun granted(c:Context)=listOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION).any{c.checkSelfPermission(it)==PackageManager.PERMISSION_GRANTED}
     /**
      * One position, as precise as the battery allows: the trip has its own, every 2 seconds; this is only "where is he".
-     * done runs on the main thread, where place() reads the trip and the consent.
+     * done runs on the main thread, where place() reads the trip and the consent. A request cancelled when the app left
+     * the screen, or replaced by a newer one, answers nothing, even if the app is open again when its position arrives.
      */
     @SuppressLint("MissingPermission") private fun locate(c:Context,done:(Location?)->Unit){
         val token=CancellationTokenSource();pending=token
+        fun finish(fix:Location?){if(pending!==token)return;pending=null;done(fix)}
         try{LocationServices.getFusedLocationProviderClient(c).getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY,token.token)
-            .addOnSuccessListener{fix:Location?->if(pending===token)pending=null;done(fix)}.addOnFailureListener{if(pending===token)pending=null;done(null)}}
-        catch(_:Exception){done(null)}
+            .addOnSuccessListener{fix:Location?->finish(fix)}.addOnFailureListener{finish(null)}}
+        catch(_:Exception){finish(null)}
     }
     private fun post(c:Context,uid:String,name:String,vehicle:String?,version:String,fix:Location?):Boolean{
         if(!open)return false
