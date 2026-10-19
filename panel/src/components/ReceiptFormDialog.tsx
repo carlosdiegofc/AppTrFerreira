@@ -3,11 +3,11 @@
 // panel_data. Closing it with changes asks first; if someone else saved the receipt meanwhile, nothing is overwritten.
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { usePanelUser } from '../auth/AuthProvider';
-import { ConflictError, describeWriteError } from '../data/api';
+import { ConflictError, describeWriteError, receiptExists } from '../data/api';
 import { useCreateReceipt, useUpdateReceipt } from '../data/hooks';
 import { formatDay } from '../lib/dates';
 import { type CatalogStation, type Receipt } from '../lib/fuel';
-import { arrivalNote, correctedPanelData, FUEL_LIMITS, newReceiptRow, type ReceiptField, receiptFormChanged, type ReceiptFormValues, receiptFormValues, validateReceiptForm } from '../lib/fuelForm';
+import { arrivalNote, correctedPanelData, FUEL_LIMITS, newReceiptRow, type ReceiptField, receiptFormChanged, type ReceiptFormValues, receiptFormValues, sameReceipt, validateReceiptForm } from '../lib/fuelForm';
 import { type CatalogTruck, truckLabel } from '../lib/fleet';
 import { decimal } from '../lib/format';
 import { parseNumber } from '../lib/numbers';
@@ -43,8 +43,11 @@ export function ReceiptFormDialog({ receipt: opened, today, stations, writtenSta
   const { user } = usePanelUser();
   // The receipt as it was when the form opened: the save is checked against this version.
   const [receipt] = useState(opened);
-  // A new receipt keeps its id while the dialog is open: a save tried again does not make a second one.
-  const [newId] = useState(() => crypto.randomUUID());
+  // A new receipt keeps its id while the dialog is open: a save tried again does not make a second one. Its photo goes
+  // to a path made with the id and stays there, so another photo after a try needs another id.
+  const [newId, setNewId] = useState(() => crypto.randomUUID());
+  const triedPhoto = useRef<Blob | null>(null);
+  const [checking, setChecking] = useState(false);
   const [initial] = useState(() => receiptFormValues(receipt, stations, today));
   const [values, setValues] = useState(initial);
   // A listed station shows in the list; one written by hand, in the text box below it.
@@ -57,7 +60,7 @@ export function ReceiptFormDialog({ receipt: opened, today, stations, writtenSta
   const [viewing, setViewing] = useState<Photo | null>(null);
   const create = useCreateReceipt();
   const update = useUpdateReceipt();
-  const busy = create.isPending || update.isPending;
+  const busy = create.isPending || update.isPending || checking;
   const dirty = receiptFormChanged(initial, values) || photo.status === 'ready';
 
   useEffect(() => {
@@ -126,8 +129,23 @@ export function ReceiptFormDialog({ receipt: opened, today, stations, writtenSta
     try {
       if (!receipt) {
         const blob = photo.status === 'ready' ? photo.blob : null;
-        await create.mutateAsync({ row: newReceiptRow(newId, user, check.payload, blob !== null), photo: blob });
-        onDone('Boleta cargada.');
+        let rid = newId;
+        if (triedPhoto.current && triedPhoto.current !== blob) {
+          // The try with the other photo may have saved the receipt after all: then that one stands.
+          setChecking(true);
+          const before = await receiptExists(rid).finally(() => setChecking(false));
+          if (before) {
+            onDone('Esa boleta ya se había guardado en el intento anterior, con la foto que tenía entonces.');
+            return;
+          }
+          // Not saved: the first photo stays at that receipt's path, unused, and this one goes with a new id.
+          rid = crypto.randomUUID();
+          setNewId(rid);
+        }
+        triedPhoto.current = blob;
+        const row = newReceiptRow(rid, user, check.payload, blob !== null);
+        const saved = await create.mutateAsync({ row, photo: blob });
+        onDone(sameReceipt(saved, row) ? 'Boleta cargada.' : 'Esa boleta ya se había guardado en el intento anterior, con lo que tenía entonces: revisala y, si hace falta, corregila.');
         return;
       }
       if (!receiptFormChanged(initial, values)) {

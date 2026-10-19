@@ -311,9 +311,11 @@ export interface ReceiptFilter {
   vehicle?: string;
   /** The trash: only receipts in it. */
   bin?: boolean;
+  /** Each station's name as the page shows it (the catalog's, or the one written most), searched too. */
+  names?: ReadonlyMap<string, string>;
 }
 
-export function filterReceipts(list: readonly Receipt[], { q = '', from, to, station = '', vehicle = '', bin = false }: ReceiptFilter = {}): Receipt[] {
+export function filterReceipts(list: readonly Receipt[], { q = '', from, to, station = '', vehicle = '', bin = false, names }: ReceiptFilter = {}): Receipt[] {
   const needle = fold(q);
   return list
     .filter((r) => {
@@ -323,7 +325,7 @@ export function filterReceipts(list: readonly Receipt[], { q = '', from, to, sta
       if (station && r.stationKey !== station) return false;
       if (vehicle && (r.vehicle ?? '') !== vehicle) return false;
       if (!needle) return true;
-      return [r.station, r.driverName, r.vehicle].some((v) => v !== null && fold(v).includes(needle));
+      return [r.station, names?.get(r.stationKey), r.driverName, r.vehicle].some((v) => v != null && fold(v).includes(needle));
     })
     .sort(byNewest);
 }
@@ -384,7 +386,24 @@ export function statement(station: Pick<Station, 'receipts' | 'payments' | 'open
 /** The trucks of a list of receipts, for the filter. */
 export const receiptVehicles = (list: readonly Receipt[]) => [...new Set(list.map((r) => r.vehicle).filter((v): v is string => v !== null))].sort((a, b) => a.localeCompare(b, 'es'));
 
-/** Parses the station part of a page address: "id:…" or "name:…". */
+/** Parses the station part of a page address: "id:…", "name:…", or the receipts that do not say the station ("name:"). */
 export function parseStationKey(key: string | undefined): string | null {
-  return key && /^(id|name):.+$/.test(key) ? key : null;
+  if (key === undefined) return null;
+  return key === NO_STATION || /^(id|name):.+$/.test(key) ? key : null;
+}
+
+/**
+ * What is owed to the stations and what they hold in favor of the company, per currency. They are separate accounts:
+ * what one station holds in favor does not pay what is owed to another.
+ */
+export function balances(stations: readonly Pick<Station, 'accounts'>[]): { owed: Record<Currency, number>; credit: Record<Currency, number> } {
+  const owed = { UYU: 0, USD: 0 };
+  const credit = { UYU: 0, USD: 0 };
+  for (const s of stations) {
+    for (const a of s.accounts) {
+      if (a.balance > 0) owed[a.currency] = cents(owed[a.currency] + a.balance);
+      else if (a.balance < 0) credit[a.currency] = cents(credit[a.currency] - a.balance);
+    }
+  }
+  return { owed, credit };
 }

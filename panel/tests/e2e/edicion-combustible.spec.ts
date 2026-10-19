@@ -12,8 +12,8 @@ const receipts = (page: Page) => page.locator('.fuel-receipts > li');
 const chip = (page: Page, name: string) => page.locator('.chip', { hasText: name });
 
 /** A real JPEG drawn by the browser, like the photo of a receipt. */
-async function receiptPhoto(page: Page): Promise<Buffer> {
-  const data = await page.evaluate(() => {
+async function receiptPhoto(page: Page, total = 'Total $ 5.500'): Promise<Buffer> {
+  const data = await page.evaluate((line) => {
     const canvas = document.createElement('canvas');
     canvas.width = 600;
     canvas.height = 900;
@@ -23,9 +23,9 @@ async function receiptPhoto(page: Page): Promise<Buffer> {
     g.fillStyle = '#222';
     g.font = '40px sans-serif';
     g.fillText('ESTACIÓN EL TALA', 60, 120);
-    g.fillText('Total $ 5.500', 60, 220);
+    g.fillText(line, 60, 220);
     return canvas.toDataURL('image/jpeg', 0.9).split(',')[1] as string;
-  });
+  }, total);
   return Buffer.from(data, 'base64');
 }
 
@@ -184,4 +184,43 @@ test('si dos personas corrigen la misma boleta a la vez, la segunda no pisa a la
   await expect(receipts(b).first()).toContainText('255 L');
   await expect(receipts(b).first()).toContainText('US$ 310');
   await Promise.all([a.close(), b.close()]);
+});
+
+test('si se corta el alta y se cambia la foto, la boleta no se queda con la foto anterior', async ({ page }) => {
+  await signIn(page, 'lectura@ejemplo.uy');
+  await open(page, 'Combustible');
+  const uploads: string[] = [];
+  page.on('request', (r) => {
+    if (r.method() === 'POST' && r.url().includes('/storage/v1/object/trf-fuel-receipts/')) uploads.push(decodeURIComponent(new URL(r.url()).pathname));
+  });
+  // The first save of the receipt is cut once its photo went up.
+  const inserts: { id: string; object_path: string | null }[] = [];
+  await page.route('**/rest/v1/trf_driver_fuel_receipts*', async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    inserts.push(route.request().postDataJSON());
+    return inserts.length === 1 ? route.abort('connectionfailed') : route.fallback();
+  });
+
+  await page.getByRole('button', { name: 'Nueva boleta' }).click();
+  const form = page.getByRole('dialog', { name: 'Nueva boleta' });
+  await form.getByLabel('Foto de la boleta').setInputFiles({ name: 'primera.jpg', mimeType: 'image/jpeg', buffer: await receiptPhoto(page, 'Total $ 1.111') });
+  await expect(form).toContainText('Lista:');
+  await form.getByLabel('Estación', { exact: true }).selectOption({ label: 'Ducsa Young' });
+  await form.getByLabel('Importe').fill('1.111');
+  await form.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(form.getByRole('alert')).toContainText('Sin conexión con el servidor');
+  expect(uploads).toHaveLength(1);
+
+  // The storage keeps the first photo at that receipt's path: the second one goes with a new receipt.
+  await form.getByLabel('Foto de la boleta').setInputFiles({ name: 'segunda.jpg', mimeType: 'image/jpeg', buffer: await receiptPhoto(page, 'Total $ 2.222') });
+  await expect(form).toContainText('Lista:');
+  await form.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(form).toBeHidden();
+  await expect(page.getByRole('status')).toContainText('Boleta cargada.');
+  expect(inserts).toHaveLength(2);
+  expect(inserts[1]!.id).not.toBe(inserts[0]!.id);
+  expect(uploads).toHaveLength(2);
+  expect(uploads[1]).toContain(`/standalone/${inserts[1]!.id}.jpg`);
+  expect(inserts[1]!.object_path).toMatch(new RegExp(`/standalone/${inserts[1]!.id}\\.jpg$`));
+  await expect(station(page, 'Ducsa Young').locator('.fs-balance')).toHaveText('Se le debe $ 1.111');
 });

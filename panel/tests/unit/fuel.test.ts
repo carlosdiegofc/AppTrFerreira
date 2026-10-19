@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   account,
+  balances,
   type CatalogStation,
   catalogStations,
   filterReceipts,
@@ -18,7 +19,7 @@ import {
   statement,
   totals,
 } from '../../src/lib/fuel';
-import { arrivalNote, correctedPanelData, movementFormValues, movementRow, newReceiptRow, receiptFormValues, validateMovementForm, validateReceiptForm } from '../../src/lib/fuelForm';
+import { arrivalNote, correctedPanelData, movementFormValues, movementRow, newReceiptRow, receiptFormValues, sameReceipt, validateMovementForm, validateReceiptForm } from '../../src/lib/fuelForm';
 
 const STATIONS: CatalogStation[] = [
   { id: 'est-ruta5', name: 'Ancap Ruta 5 km 32' },
@@ -51,8 +52,11 @@ describe('estaciones', () => {
     expect(stationKey('est-salto', 'otro nombre', STATIONS)).toBe('id:est-salto');
     expect(stationKey(null, '  ', STATIONS)).toBe(NO_STATION);
     expect(parseStationKey('name:estacion el tala')).toBe('name:estacion el tala');
-    expect(parseStationKey('name:')).toBeNull();
+    // The receipts that do not say the station have their own page too.
+    expect(parseStationKey(NO_STATION)).toBe(NO_STATION);
+    expect(parseStationKey('id:')).toBeNull();
     expect(parseStationKey('otra cosa')).toBeNull();
+    expect(parseStationKey(undefined)).toBeNull();
   });
 });
 
@@ -94,6 +98,10 @@ describe('boletas', () => {
     expect(filterReceipts(list, { vehicle: 'Volvo FH 460 · ABC1234' }).map((r) => r.id)).toEqual(['a']);
     expect(filterReceipts(list, { q: 'diego' }).map((r) => r.id)).toEqual(['a']);
     expect(filterReceipts(list, { q: 'estacion el' }).map((r) => r.id)).toEqual(['b']);
+    // The station also by the name the page shows: a catalog station saved with an older name or none.
+    const stale = [receiptFromRow(row({ id: 'd', station_id: 'est-salto', station_name: '' }), TRUCKS, STATIONS)];
+    expect(filterReceipts(stale, { q: 'petrobras' })).toEqual([]);
+    expect(filterReceipts(stale, { q: 'petrobras', names: new Map([['id:est-salto', 'Petrobras Salto']]) }).map((r) => r.id)).toEqual(['d']);
   });
 
   it('suma litros y montos por moneda, sin mezclar pesos con dólares', () => {
@@ -159,6 +167,11 @@ describe('cuenta de cada estación', () => {
     expect(account(s, 'UYU').balance).toBe(13500);
   });
 
+  it('lo que se les debe a unas estaciones no se compensa con lo que otras tienen a favor', () => {
+    const favor = groupStations([], [movementFromRow(move({ id: 'f', station_key: 'name:estacion el tala', station_name: 'Estación El Tala', kind: 'opening', amount: -6600, method: null, happened_on: '2026-10-01' }))], STATIONS);
+    expect(balances([...stations, ...favor])).toEqual({ owed: { UYU: 29100, USD: 210 }, credit: { UYU: 6600, USD: 0 } });
+  });
+
   it('el estado de cuenta va del saldo inicial en adelante, con el saldo después de cada renglón', () => {
     const s = statement(find('id:est-ruta5'), 'UYU');
     expect(s.lines.map((l) => [l.day, l.kind, l.amount, l.balance])).toEqual([
@@ -213,6 +226,17 @@ describe('formulario de boleta', () => {
       station_name: 'Estación El Tala', liters: null, total: 6600, object_path: 'u2/standalone/r9.jpg', panel_data: { moneda: 'USD' },
     });
     expect(newReceiptRow('r9', { id: 'u2', name: 'Socio Lectura' }, { ...check.payload, currency: 'UYU' }, false)).toMatchObject({ object_path: null, panel_data: null });
+  });
+
+  it('reconoce cuando la base ya tenía la boleta de un intento anterior con otros datos', () => {
+    const check = validateReceiptForm({ ...receiptFormValues(null, STATIONS, today), stationId: 'est-ruta5', total: '6600', currency: 'USD' }, STATIONS, today);
+    if (!check.ok) throw new Error('tendría que ser válida');
+    const sent = newReceiptRow('r9', { id: 'u2', name: 'Socio Lectura' }, check.payload, true);
+    const saved = { ...row({ id: 'r9', driver_id: 'u2', driver_name: 'Socio Lectura', vehicle: '' }), ...sent } as FuelRow;
+    expect(sameReceipt(saved, sent)).toBe(true);
+    expect(sameReceipt({ ...saved, total: 6000 }, sent)).toBe(false);
+    expect(sameReceipt({ ...saved, object_path: null }, sent)).toBe(false);
+    expect(sameReceipt({ ...saved, panel_data: null }, sent)).toBe(false);
   });
 
   it('al corregir, lo que la boleta tenía no se puede dejar vacío: volvería a leerse lo declarado', () => {

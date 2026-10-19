@@ -325,6 +325,11 @@ export async function uploadReceiptPhoto(path: string, photo: Blob): Promise<voi
   throw new DataError(e.message, e.statusCode ?? (e.status === undefined ? undefined : String(e.status)));
 }
 
+/** Whether a receipt was saved: a save whose answer was cut may have gone through all the same. */
+export async function receiptExists(id: string): Promise<boolean> {
+  return rows(await supabase.from('trf_driver_fuel_receipts').select('id').eq('id', id).limit(1)).length > 0;
+}
+
 /** A receipt typed in the panel. Saved before (a save tried again after a cut): the saved one. */
 export async function createReceipt(row: TablesInsert<'trf_driver_fuel_receipts'>): Promise<Tables<'trf_driver_fuel_receipts'>> {
   const result = await supabase.from('trf_driver_fuel_receipts').insert(row).select();

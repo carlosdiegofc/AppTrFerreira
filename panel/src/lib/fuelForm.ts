@@ -1,7 +1,7 @@
 // The office's forms for fuel: a receipt (a new one typed in the panel, or the correction of any receipt), a payment to
 // a station and a station's opening balance. What each form starts with, what it checks and what it saves. A correction
 // never changes what was declared: it goes in panel_data, with the keys the app and both panels read. Pure functions.
-import type { Json, TablesInsert } from './database.types';
+import type { Json, Tables, TablesInsert } from './database.types';
 import { dayInZone, formatDay } from './dates';
 import { canonical, type CatalogTruck, text, truck } from './fleet';
 import { parseNumber } from './numbers';
@@ -147,6 +147,15 @@ export function newReceiptRow(id: string, user: { id: string; name: string }, p:
     object_path: withPhoto ? `${user.id}/standalone/${id}.jpg` : null,
     panel_data: p.currency === 'USD' ? { moneda: 'USD' } : null,
   };
+}
+
+/**
+ * Whether the receipt the database has is the one this save sent. A try whose answer was cut may have saved it with what
+ * the form had then; a save tried again gets that one back.
+ */
+export function sameReceipt(saved: Tables<'trf_driver_fuel_receipts'>, row: TablesInsert<'trf_driver_fuel_receipts'>): boolean {
+  const keys = ['receipt_date', 'station_id', 'station_name', 'vehicle', 'liters', 'total', 'object_path'] as const;
+  return keys.every((k) => (saved[k] ?? null) === (row[k] ?? null)) && JSON.stringify(saved.panel_data ?? null) === JSON.stringify(row.panel_data ?? null);
 }
 
 /**

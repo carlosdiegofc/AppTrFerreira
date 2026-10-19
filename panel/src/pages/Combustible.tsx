@@ -9,7 +9,7 @@ import { ConflictError, describeWriteError } from '../data/api';
 import { useFuel, useNow, useUpdateReceipt } from '../data/hooks';
 import { ago, dayInZone, formatDay } from '../lib/dates';
 import { count, decimal, money } from '../lib/format';
-import { filterReceipts, isFuture, NO_STATION, type Receipt, receiptVehicles, type Station, totals } from '../lib/fuel';
+import { balances, filterReceipts, isFuture, NO_STATION, type Receipt, receiptVehicles, type Station, totals } from '../lib/fuel';
 import { type PeriodKind, periodRange } from '../lib/trips';
 import { amountParts, amounts, balanceText, balanceTone, fuelReadError, stationPath } from './fuelText';
 
@@ -165,18 +165,29 @@ export function Combustible() {
   // "Todo" has no days: every receipt counts.
   const from = badRange ? undefined : range?.from;
   const to = badRange ? undefined : range?.to;
+  const names = useMemo(() => new Map(stations.map((s) => [s.key, s.name])), [stations]);
+  const nameOf = (r: Receipt) => names.get(r.stationKey) ?? r.station ?? 'Estación sin indicar';
   const inPeriod = useMemo(() => filterReceipts(receipts, { from, to }), [receipts, from, to]);
-  const shown = useMemo(() => filterReceipts(receipts, { from, to, q: typed, vehicle, station, bin: view.value === 'papelera' }), [receipts, from, to, typed, vehicle, station, view.value]);
+  const shown = useMemo(() => filterReceipts(receipts, { from, to, q: typed, vehicle, station, bin: view.value === 'papelera', names }), [receipts, from, to, typed, vehicle, station, view.value, names]);
   const byStation = useMemo(() => {
     const map = new Map<string, Receipt[]>();
     for (const r of inPeriod) map.set(r.stationKey, [...(map.get(r.stationKey) ?? []), r]);
     return map;
   }, [inPeriod]);
-  const names = useMemo(() => new Map(stations.map((s) => [s.key, s.name])), [stations]);
-  const nameOf = (r: Receipt) => names.get(r.stationKey) ?? r.station ?? 'Estación sin indicar';
+  // The trash also offers the stations whose receipts are all in it (the stations are made without them); a station
+  // chosen there stays in the list after leaving it.
+  const stationChoices = useMemo(() => {
+    const choices = stations.map((s) => ({ key: s.key, name: s.name }));
+    const known = new Set(choices.map((c) => c.key));
+    for (const r of receipts) {
+      if (!r.archived || known.has(r.stationKey) || (view.value !== 'papelera' && r.stationKey !== station)) continue;
+      known.add(r.stationKey);
+      choices.push({ key: r.stationKey, name: r.station || 'Estación sin indicar' });
+    }
+    return choices;
+  }, [stations, receipts, view.value, station]);
   const periodTotals = totals(inPeriod);
-  const owed = { UYU: 0, USD: 0 };
-  for (const s of stations) for (const a of s.accounts) owed[a.currency] += a.balance;
+  const { owed, credit } = balances(stations);
   const missing = receipts.filter((r) => !r.archived && r.total === null).length;
   const future = receipts.filter((r) => !r.archived && isFuture(r, today)).length;
   const binned = receipts.filter((r) => r.archived).length;
@@ -250,7 +261,7 @@ export function Combustible() {
       <div className="stats stats-money">
         <Stat label="Cargado en el período" value={<Lines parts={amountParts(periodTotals.amounts, '$ 0')} />} detail={`${count(periodTotals.receipts)} boleta${periodTotals.receipts === 1 ? '' : 's'}`} tone="blue" icon="fuel" />
         <Stat label="Litros en el período" value={decimal(periodTotals.liters, 1)} tone="grey" icon="chart" />
-        <Stat label="Saldo con las estaciones" value={<Lines parts={amountParts(owed, '$ 0')} />} detail="Lo que se les debe" tone={owed.UYU > 0 || owed.USD > 0 ? 'amber' : 'green'} icon="money" />
+        <Stat label="Saldo con las estaciones" value={<Lines parts={amountParts(owed, '$ 0')} />} detail={credit.UYU > 0 || credit.USD > 0 ? `Lo que se les debe · a favor: ${amounts(credit)}` : 'Lo que se les debe'} tone={owed.UYU > 0 || owed.USD > 0 ? 'amber' : 'green'} icon="money" />
         <Stat label="Boletas sin importe" value={count(missing)} detail={missing > 0 ? 'Completalas para que sumen' : 'Todas tienen importe'} tone={missing > 0 ? 'red' : 'green'} icon="warning" />
       </div>
 
@@ -298,7 +309,7 @@ export function Combustible() {
               <span>Estación</span>
               <select value={station} onChange={(e) => set({ estacion: e.target.value })}>
                 <option value="">Todas las estaciones</option>
-                {stations.map((s) => (
+                {stationChoices.map((s) => (
                   <option key={s.key} value={s.key}>
                     {s.name}
                   </option>
