@@ -20,7 +20,8 @@ export default defineConfig({
   webServer: { command: 'node tests/e2e/server.mjs', url: 'http://127.0.0.1:8791/healthz', reuseExistingServer: !process.env.CI },
   projects: [
     { name: 'escritorio', testIgnore: /edicion\.spec\.ts/, use: { viewport: { width: 1440, height: 900 } } },
-    { name: 'celular', testIgnore: /edicion\.spec\.ts/, use: { ...devices['Pixel 7'] } },
+    // The trucks glide the same on a phone; with motion allowed its menu slides in, which the movement tests do not need.
+    { name: 'celular', testIgnore: [/edicion\.spec\.ts/, /movimiento\.spec\.ts/], use: { ...devices['Pixel 7'] } },
     // Saving changes the test data: these tests run last, after the others read it as the seed left it.
     { name: 'edicion', testMatch: /edicion\.spec\.ts/, dependencies: ['escritorio', 'celular'], use: { viewport: { width: 1440, height: 900 } } },
   ],

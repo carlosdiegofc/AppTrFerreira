@@ -1046,7 +1046,7 @@ class MainActivity:AppCompatActivity(){
   fleetStats=k;fleetStatsInto(k,items)
   alerts()
   val marks=fleetMarks(items);fleetShape=shapeOf(f,items,marks)
-  val mc=card();val web=TripMap.fleet(this,marks);activeMap=web;mc.addView(web,LinearLayout.LayoutParams(-1,dp(260)))
+  val mc=card();val web=TripMap.fleet(this,marks,LIVE_MS);activeMap=web;mc.addView(web,LinearLayout.LayoutParams(-1,dp(260)))
   if(marks.length()==0)note(if(fetched==0L)"Buscando posiciones…" else "Todavía no hay posiciones GPS para mostrar.",mc,0).setPadding(dp(16),dp(10),dp(16),dp(12))
   section("Camiones")
   if(items.isEmpty())emptyCard(R.drawable.ic_truck,"Sin camiones cargados","Los equipos del catálogo aparecen acá.") else {val c=card();fleetCard=c;items.forEach{fleetRow(c,it)}}
