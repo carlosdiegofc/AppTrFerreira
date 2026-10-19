@@ -72,10 +72,10 @@ No borres la rama `claude/apptrferreira-g1agmt` en GitHub: si se borra, este enl
 Elegí **Todas las funciones o algunas de ellas están restringidas** y agregá una credencial con el usuario y la contraseña de `cuenta-de-prueba-para-google.txt`. En las instrucciones pegá:
 
 ```text
-Log in with the test account. Keep "Modo sencillo" and tap "Continuar". Tap "INICIAR VIAJE", then "SÍ, INICIAR" (pick any truck if asked). Accept the location notice and permission. During the trip the app shows a "Viaje en curso" notification and the route on the map. End it with "FINALIZAR VIAJE" > "SÍ, FINALIZAR". Fuel receipts and delivery notes: "Cambiar de modo" > "Modo normal" > "Continuar". The company creates the drivers' accounts.
+Log in with the test account. Keep "Modo sencillo" and tap "Continuar". Tap "INICIAR VIAJE", then "SÍ, INICIAR" (pick any truck if asked). Accept the location notice and permission. During the trip the app shows a "Viaje en curso" notification and the route on the map. End it with "FINALIZAR VIAJE" > "SÍ, FINALIZAR". Fuel receipts: "Cargar combustible". Delivery notes: "Cambiar de modo" > "Modo normal" > "Continuar". The company creates the drivers' accounts.
 ```
 
-Desde la versión 0.16 la app pregunta el modo de uso después de ingresar; si en Play Console quedó el texto de la 0.15, reemplazalo por este.
+Desde la versión 0.16 la app pregunta el modo de uso después de ingresar, y desde la 0.17.1 el modo sencillo también carga combustible; si en Play Console quedó un texto anterior, reemplazalo por este.
 
 La cuenta de prueba es un chofer llamado «Revisión Google Play». Los viajes que haga Google aparecen en el panel con ese nombre; se pueden borrar después de la revisión.
 
@@ -231,6 +231,14 @@ La app de Google Play es una app nueva para Android (nombre de paquete `com.tran
 ## 7. Actualizaciones
 
 Cada versión nueva lleva un número de versión más alto, y GitHub Actions arma su `.aab` solo. En Play Console: *Prueba interna › Crear versión* › subí el `.aab` nuevo › **Lanzar**. Los teléfonos se actualizan desde Google Play sin hacer nada más.
+
+Versión `0.17.1` (código de versión 27). Suma la carga de combustible en el modo sencillo. No cambia permisos, datos recopilados ni la política de privacidad. Si la 0.17.0 no llegó a subirse, se sube directamente esta, que la incluye, siguiendo los pasos de la 0.17.0 de acá abajo (Seguridad de los datos y la prueba en el teléfono). Notas de la versión si ya está subida la 0.17.0:
+
+```text
+<es-419>
+• Modo sencillo: botón para cargar combustible, en el viaje o sin viaje.
+</es-419>
+```
 
 Versión `0.17.0` (código de versión 26). Trae todo lo de la 0.16.3, que no se subió, y es la primera armada con R8: el código va optimizado y ofuscado, y los recursos que no se usan quedan afuera. Eso responde al aviso de Play Console «La optimización del código DEX está por debajo de nuestro umbral». No pide permisos nuevos. Antes de lanzarla:
 

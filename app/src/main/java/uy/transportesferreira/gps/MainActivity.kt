@@ -478,6 +478,8 @@ class MainActivity:AppCompatActivity(){
   // The last finished trip confirms that it was saved without the driver doing anything else.
   store.current()?.takeIf{!it.optBoolean("active")&&it.optString("driver_id")==uid()}?.let{t->
    row(card(),R.drawable.ic_check_circle,"Último viaje guardado",listOfNotNull(date(t.optString("started_at")),km(t.optDouble("distance_meters",0.0)),durationText(t.optString("started_at"),t.optString("ended_at"))).joinToString(" · "),tint=green)}
+  // Fuel can be loaded in simple mode too (decision of 19/10/2026): here, out of a trip.
+  button(root,"Cargar combustible",Kind.LINE,R.drawable.ic_fuel){fuelChoice()}
   // The owner who drives gets the owner menu here; changing the mode is inside that menu.
   if(ownerDriver())button(root,"Menú del dueño",Kind.PRIMARY,R.drawable.ic_menu){ownerMenu()} else button(root,"Cambiar de modo",Kind.LINE,R.drawable.ic_list){askMode()}
   sync=note(store.message(),top=12).apply{gravity=Gravity.CENTER}
@@ -528,6 +530,8 @@ class MainActivity:AppCompatActivity(){
   val st=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL};root.addView(st,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12)})
   speed=bigStat(st,"Velocidad","—","km/h",0);distance=bigStat(st,"Distancia",km(t.optDouble("distance_meters",0.0)),null,1)
   gps=note("",top=10).apply{gravity=Gravity.CENTER}
+  // During the trip it asks whether the load belongs to the trip or not.
+  button(root,"Cargar combustible",Kind.LINE,R.drawable.ic_fuel){fuelChoice()}
   if(!(getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName))row(card(),R.drawable.ic_battery,"Evitar cortes del GPS","Permitir que la app siga en segundo plano",tint=amber){batteryExemption()}
   sync=note(store.message(),top=6).apply{gravity=Gravity.CENTER}
   simpleDock()
@@ -594,7 +598,7 @@ class MainActivity:AppCompatActivity(){
   val spinner=Spinner(this).apply{adapter=spinnerAdapter(choices);background=spinnerBg()};c.addView(spinner,LinearLayout.LayoutParams(-1,dp(52)).apply{topMargin=dp(6)})
   spinner.setSelection(choices.indexOf(truck).coerceAtLeast(0));spinner.onItemSelectedListener=object:AdapterView.OnItemSelectedListener{override fun onNothingSelected(p:AdapterView<*>?){};override fun onItemSelected(p:AdapterView<*>?,v:View?,pos:Int,id:Long){saveTruck(if(pos>0)choices[pos] else "")}}
  }
- private fun fuelChoice(){if(active())AlertDialog.Builder(this).setTitle("¿Dónde registrar la carga?").setItems(arrayOf("En el viaje en curso","Fuera de viaje")){_,i->openFuel(if(i==0)store.current() else null)}.show() else openFuel(null)}
+ private fun fuelChoice(){if(active())AlertDialog.Builder(this).setTitle("¿Dónde registrar la carga?").setItems(arrayOf("En el viaje en curso","Sin viaje")){_,i->openFuel(if(i==0)store.current() else null)}.setNegativeButton("Cancelar",null).show() else openFuel(null)}
  private fun syncNow(){Sync.schedule(this);toast("Enviando pendientes y actualizando…");thread{try{mobile.catalog(true);runOnUiThread{toast("Datos actualizados")}}catch(_:Exception){runOnUiThread{toast("Sin conexión. Los datos siguen guardados en el teléfono.")}}}}
  private fun locationPermissions()=mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION).apply{if(Build.VERSION.SDK_INT>=33)add(Manifest.permission.POST_NOTIFICATIONS)}
  private fun checkGps(){
@@ -768,7 +772,7 @@ class MainActivity:AppCompatActivity(){
  private fun openFuel(t:JSONObject?){photoJob++;photoBusy=false;fuelTrip=t;fuelForm=JSONObject().put("receipt_date",LocalDate.now().toString());photo=null;photoMode="fuel";fuel()}
  private fun fuel(){
   page("fuel");photoMode="fuel";bar("Cargar combustible",back={homeOrTrip()})
-  root.addView(pill(fuelTrip?.let{"En este viaje · ${truckParts(it.optString("vehicle")).first}"}?:"Fuera de viaje",blue,blueSoft).apply{(layoutParams as LinearLayout.LayoutParams).topMargin=dp(14)})
+  root.addView(pill(fuelTrip?.let{"En este viaje · ${truckParts(it.optString("vehicle")).first}"}?:"Sin viaje",blue,blueSoft).apply{(layoutParams as LinearLayout.LayoutParams).topMargin=dp(14)})
   val pc=card(pad=16);text(pc,"Foto de la boleta",16.5f,ink,1);note("Sacá una foto o elegí una guardada. También podés guardar sin foto.",pc,4);photoControls(pc)
   val c=card(pad=16)
   if(fuelTrip==null)truckSelector(c,"Camión · opcional")
@@ -919,7 +923,7 @@ class MainActivity:AppCompatActivity(){
   v.addView(square(R.drawable.ic_fuel,green,greenBg))
   val col=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),0,dp(8),0)}
   col.addView(tv(station,15f,ink,1).apply{maxLines=1;ellipsize=TextUtils.TruncateAt.END})
-  col.addView(tv(listOfNotNull(day,who,if(r.isNull("trip_id"))"Fuera de viaje" else "En viaje").joinToString(" · "),13f,muted).apply{setPadding(0,dp(3),0,0)})
+  col.addView(tv(listOfNotNull(day,who,if(r.isNull("trip_id"))"Sin viaje" else "En viaje").joinToString(" · "),13f,muted).apply{setPadding(0,dp(3),0,0)})
   v.addView(col,LinearLayout.LayoutParams(0,-2,1f))
   val right=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.END}
   val lt=amount(d,"litros",r,"liters");val paid=amount(d,"monto",r,"total");val cur=currency(d)
