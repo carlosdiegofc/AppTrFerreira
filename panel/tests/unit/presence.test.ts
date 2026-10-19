@@ -63,4 +63,10 @@ describe('where an active driver is', () => {
     expect(driverPresence([row('d', 'Diego', '0.17.0', 2, { ...at, minutes: 40 })], new Set(), NOW)[0]?.place).toBeNull();
     expect(driverPresence([row('d', 'Diego', '0.17.0', 2, { lat: 0, lng: 0, minutes: 2 })], new Set(), NOW)[0]?.place).toBeNull();
   });
+  it('the position time is checked against the notice time: a phone clock far ahead does not keep it current', () => {
+    const at = { lat: -31.385, lng: -57.955 };
+    expect(driverPresence([row('d', 'Diego', '0.17.0', 2, { ...at, minutes: -60 })], new Set(), NOW)[0]?.place).toBeNull();
+    // A minute ahead is a phone clock slightly off: it still counts.
+    expect(driverPresence([row('d', 'Diego', '0.17.0', 2, { ...at, minutes: 1 })], new Set(), NOW)[0]?.place).not.toBeNull();
+  });
 });

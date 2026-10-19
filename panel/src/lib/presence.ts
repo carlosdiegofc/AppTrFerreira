@@ -20,6 +20,8 @@ export interface PresenceRow {
 
 /** The phone says it is open every 5 minutes: a driver seen in the last 10 counts as active. */
 export const ACTIVE_FOR_MS = 10 * 60_000;
+/** How far ahead of the server a phone clock may be for its position to count. */
+const CLOCK_SLACK_MS = 2 * 60_000;
 
 /** On a trip (the trip says so), active with the app open, or only seen some time ago. */
 export type PresenceState = 'trip' | 'active' | 'seen';
@@ -63,6 +65,10 @@ export function driverPresence(rows: readonly PresenceRow[], onTrip: ReadonlySet
       const fresh = (ms: number) => Number.isFinite(ms) && now - ms < ACTIVE_FOR_MS;
       const state: PresenceState = onTrip.has(r.driver_id) ? 'trip' : fresh(seenAt) ? 'active' : 'seen';
       const located = r.located_at ? Date.parse(r.located_at) : Number.NaN;
+      // The position's time is the phone's; it is checked against the notice's, which is the server's: taken in the
+      // 10 minutes before it (a notice without a fix leaves the last one, which ages) and not after it, give or take
+      // a phone clock off by up to 2 minutes.
+      const locatedFresh = Number.isFinite(located) && seenAt - located < ACTIVE_FOR_MS && located - seenAt <= CLOCK_SLACK_MS;
       const version = r.app_version.trim();
       return {
         driverId: r.driver_id,
@@ -73,7 +79,7 @@ export function driverPresence(rows: readonly PresenceRow[], onTrip: ReadonlySet
         seenAt,
         state,
         place:
-          state === 'active' && fresh(located) && validPosition(r.latitude, r.longitude)
+          state === 'active' && locatedFresh && validPosition(r.latitude, r.longitude)
             ? { lat: r.latitude as number, lng: r.longitude as number, at: located, accuracy: r.accuracy_m }
             : null,
       };
