@@ -274,3 +274,16 @@ export function validateMovementForm(kind: MovementKind, v: MovementFormValues, 
 export function movementRow(kind: MovementKind, p: MovementPayload, stationName: string): TablesInsert<'trf_fuel_station_movements'> {
   return { station_key: p.station, station_name: stationName.trim().slice(0, FUEL_LIMITS.station) || 'Estación', kind, happened_on: p.date, amount: p.amount, currency: p.currency, method: p.method, notes: p.notes };
 }
+
+/** Whether the payment the database has is the one this save sent, and not one saved by a try with other data. */
+export function sameMovement(saved: Tables<'trf_fuel_station_movements'>, row: TablesInsert<'trf_fuel_station_movements'>): boolean {
+  return (
+    saved.kind === row.kind &&
+    saved.station_key === row.station_key &&
+    saved.happened_on === row.happened_on &&
+    Number(saved.amount) === Number(row.amount) &&
+    saved.currency === row.currency &&
+    (saved.method ?? null) === (row.method ?? null) &&
+    (saved.notes ?? null) === (row.notes ?? null)
+  );
+}

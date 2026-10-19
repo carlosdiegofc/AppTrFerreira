@@ -224,3 +224,35 @@ test('si se corta el alta y se cambia la foto, la boleta no se queda con la foto
   expect(inserts[1]!.object_path).toMatch(new RegExp(`/standalone/${inserts[1]!.id}\\.jpg$`));
   await expect(station(page, 'Ducsa Young').locator('.fs-balance')).toHaveText('Se le debe $ 1.111');
 });
+
+test('si se pierde la respuesta al registrar un pago, el reintento no lo cuenta dos veces', async ({ page }) => {
+  await signIn(page, 'dueno@ejemplo.uy');
+  await open(page, 'Combustible');
+  await station(page, 'Petrobras Salto').click();
+  const dollars = page.locator('.card', { hasText: 'Cuenta en dólares' });
+  await expect(dollars.locator('.card-head')).toContainText('Se le debe US$ 210');
+  // The first save reaches the database, but its answer never comes back.
+  let posts = 0;
+  await page.route('**/rest/v1/trf_fuel_station_movements*', async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    posts++;
+    if (posts > 1) return route.fallback();
+    await route.fetch();
+    return route.abort('connectionfailed');
+  });
+
+  await page.getByRole('button', { name: 'Registrar pago' }).click();
+  const pay = page.getByRole('dialog', { name: 'Registrar pago' });
+  await pay.getByLabel('Importe pagado').fill('50');
+  await pay.getByLabel('Moneda').selectOption({ label: 'Dólares (US$)' });
+  await pay.getByLabel('Forma de pago').selectOption({ label: 'Efectivo' });
+  await pay.getByLabel('Nota').fill('Recibo 77');
+  await pay.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(pay.getByRole('alert')).toContainText('Sin conexión con el servidor');
+  await pay.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(pay).toBeHidden();
+  await expect(page.getByRole('status')).toContainText('Pago registrado.');
+  expect(posts).toBe(2);
+  await expect(dollars.locator('tbody tr', { hasText: 'Recibo 77' })).toHaveCount(1);
+  await expect(dollars.locator('.card-head')).toContainText('Se le debe US$ 160');
+});

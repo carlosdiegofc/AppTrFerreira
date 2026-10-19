@@ -353,10 +353,19 @@ export async function updateReceipt(receipt: Pick<Receipt, 'id' | 'updatedAt'>, 
   return saved;
 }
 
-/** A payment or an opening balance: a new one, or a change that only applies if nobody saved it meanwhile. */
+/**
+ * A payment or an opening balance: a new one, or a change that only applies if nobody saved it meanwhile. A new one
+ * comes with its id: saved before (a save tried again after its answer was cut), the saved one, so it never counts twice.
+ */
 export async function saveMovement(movement: Movement | null, row: TablesInsert<'trf_fuel_station_movements'> | TablesUpdate<'trf_fuel_station_movements'>): Promise<MovementRow> {
   if (!movement) {
-    const saved = rows(await supabase.from('trf_fuel_station_movements').insert(row as TablesInsert<'trf_fuel_station_movements'>).select())[0];
+    const result = await supabase.from('trf_fuel_station_movements').insert(row as TablesInsert<'trf_fuel_station_movements'>).select();
+    // The same code is the second opening balance of a station and currency: then there is no row with this id.
+    if (result.error?.code === '23505' && row.id) {
+      const saved = rows(await supabase.from('trf_fuel_station_movements').select('*').eq('id', row.id).limit(1))[0];
+      if (saved) return saved;
+    }
+    const saved = rows(result)[0];
     if (!saved) throw new DataError('El alta no devolvió la fila');
     return saved;
   }

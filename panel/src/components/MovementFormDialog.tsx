@@ -5,7 +5,7 @@ import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } fr
 import { ConflictError, DataError, describeWriteError } from '../data/api';
 import { useSaveMovement, useSetMovementDeleted } from '../data/hooks';
 import { type Currency, type Movement, NO_STATION, PAYMENT_METHODS, type Station } from '../lib/fuel';
-import { FUEL_LIMITS, type MovementField, movementFormChanged, type MovementFormValues, movementFormValues, type MovementKind, movementRow, validateMovementForm } from '../lib/fuelForm';
+import { FUEL_LIMITS, type MovementField, movementFormChanged, type MovementFormValues, movementFormValues, type MovementKind, movementRow, sameMovement, validateMovementForm } from '../lib/fuelForm';
 import { decimal } from '../lib/format';
 import { parseNumber } from '../lib/numbers';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -32,6 +32,8 @@ export function MovementFormDialog({ kind, movement: opened, station, currency, 
   const form = useRef<HTMLFormElement>(null);
   const id = useId();
   const [movement] = useState(opened);
+  // A new one keeps its id while the dialog is open: a save tried again after a cut does not count it twice.
+  const [newId] = useState(() => crypto.randomUUID());
   const [initial] = useState(() => movementFormValues(movement, station, today, currency));
   const [values, setValues] = useState(initial);
   const [errors, setErrors] = useState<Partial<Record<MovementField, string>>>({});
@@ -96,8 +98,13 @@ export function MovementFormDialog({ kind, movement: opened, station, currency, 
       return;
     }
     const name = choices.find((s) => s.key === check.payload.station)?.name ?? '';
+    const row = movement ? movementRow(kind, check.payload, name) : { ...movementRow(kind, check.payload, name), id: newId };
     try {
-      await save.mutateAsync({ movement, row: movementRow(kind, check.payload, name) });
+      const saved = await save.mutateAsync({ movement, row });
+      if (!movement && !sameMovement(saved, row)) {
+        onDone(`${opening ? 'Ese saldo inicial ya se había guardado' : 'Ese pago ya se había registrado'} en el intento anterior, con lo que tenía entonces: revisalo y, si hace falta, corregilo.`);
+        return;
+      }
       onDone(opening ? (movement ? 'Saldo inicial corregido.' : 'Saldo inicial guardado.') : movement ? 'Pago corregido.' : 'Pago registrado.');
     } catch (err) {
       fail(err);

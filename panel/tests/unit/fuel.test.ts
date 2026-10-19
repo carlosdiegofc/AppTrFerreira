@@ -19,7 +19,7 @@ import {
   statement,
   totals,
 } from '../../src/lib/fuel';
-import { arrivalNote, correctedPanelData, movementFormValues, movementRow, newReceiptRow, receiptFormValues, sameReceipt, validateMovementForm, validateReceiptForm } from '../../src/lib/fuelForm';
+import { arrivalNote, correctedPanelData, movementFormValues, movementRow, newReceiptRow, receiptFormValues, sameMovement, sameReceipt, validateMovementForm, validateReceiptForm } from '../../src/lib/fuelForm';
 
 const STATIONS: CatalogStation[] = [
   { id: 'est-ruta5', name: 'Ancap Ruta 5 km 32' },
@@ -307,6 +307,16 @@ describe('pagos y saldos iniciales', () => {
     expect(validateMovementForm('opening', { ...movementFormValues(null, 'id:est-ruta5', today), amount: '0' }, known, today).ok).toBe(true);
     if (!credit.ok) throw new Error('tendría que ser válido');
     expect(movementRow('opening', credit.payload, 'Estación El Tala')).toEqual({ station_key: 'name:estacion el tala', station_name: 'Estación El Tala', kind: 'opening', happened_on: today, amount: -3000, currency: 'USD', method: null, notes: null });
+  });
+
+  it('reconoce cuando la base ya tenía el pago de un intento anterior con otros datos', () => {
+    const ok = validateMovementForm('payment', { ...movementFormValues(null, 'id:est-ruta5', today), amount: '20.000', method: 'transferencia' }, known, today);
+    if (!ok.ok) throw new Error('tendría que ser válido');
+    const sent = { ...movementRow('payment', ok.payload, 'Ancap Ruta 5 km 32'), id: 'm9' };
+    const saved = move({ id: 'm9', happened_on: today, amount: 20000, method: 'transferencia', notes: null });
+    expect(sameMovement(saved, sent)).toBe(true);
+    expect(sameMovement({ ...saved, amount: 2000 }, sent)).toBe(false);
+    expect(sameMovement({ ...saved, method: 'efectivo' }, sent)).toBe(false);
   });
 
   it('al corregir, el formulario arranca con lo guardado', () => {
