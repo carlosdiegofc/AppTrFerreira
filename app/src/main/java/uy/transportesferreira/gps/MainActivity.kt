@@ -49,7 +49,10 @@ import kotlin.math.max
 /** Flota en vivo (owner screen): positions every 5 s, who is on a trip every minute (decision of 18/10/2026). */
 private const val LIVE_MS=5000L
 private const val FLEET_MS=60000L
-/** Preference: whether the driver accepted that the position goes out with the app open and no trip («chofer activo»). */
+/**
+ * Preference: whether the driver accepted that the position goes out with the app open and no trip («chofer activo»).
+ * One per account (presenceKey), so another driver who signs in on the same phone is asked again.
+ */
 private const val PRESENCE_POSITION="presence_position"
 
 class MainActivity:AppCompatActivity(){
@@ -131,6 +134,8 @@ class MainActivity:AppCompatActivity(){
  private fun mode()=UiMode.parse(prefs().getString("mode-${uid()}",null))
  private fun simple()=!panelFirst()&&mode()==UiMode.SIMPLE
  private fun setMode(v:String){prefs().edit().putString("mode-${uid()}",v).apply()}
+ // The consent to send the position with the app open, also one per driver account.
+ private fun presenceKey()="$PRESENCE_POSITION-${uid()}"
 
  private val permissions=registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){
   if(ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED){if(active())try{service()}catch(_:Exception){};homeOrTrip()}
@@ -369,8 +374,8 @@ class MainActivity:AppCompatActivity(){
  // ---------- Login ----------
  private fun login(){
   page("login",header=false);shell.setBackgroundColor(loginBg);(root.parent as View).setBackgroundColor(loginBg);root.setPadding(0,0,0,dp(28))
-  // Whoever signs in next starts on their own lists.
-  fleetView=false;detailFrom="list"
+  // Whoever signs in next starts on their own lists, sends their notice at once and is asked for their own consent.
+  fleetView=false;detailFrom="list";presenceAt=null;presenceAsked=false
   WindowCompat.getInsetsController(window,window.decorView).isAppearanceLightNavigationBars=false
   val hero=FrameLayout(this)
   hero.addView(ImageView(this).apply{setImageResource(R.drawable.login_scene);scaleType=ImageView.ScaleType.CENTER_CROP;importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO},FrameLayout.LayoutParams(-1,-1))
@@ -602,7 +607,7 @@ class MainActivity:AppCompatActivity(){
   if(ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED){permissions.launch(req.toTypedArray());return}
   AlertDialog.Builder(this).setTitle("Uso de tu ubicación")
    .setMessage("Transportes Ferreira GPS usa tu ubicación precisa mientras hay un viaje en curso, incluso con la app cerrada o la pantalla apagada, para registrar el recorrido y los kilómetros y mostrarle a la administración dónde está el camión.\n\nMientras se registra vas a ver una notificación fija. Al pausar o finalizar el viaje, la app deja de registrar el recorrido.\n\nAdemás, con la app abierta y sin viaje, al abrirla y cada 5 minutos le avisa a la administración dónde estás. Con la app cerrada no se envía nada, y podés desactivarlo en Mi cuenta. Los datos quedan en el sistema de Transportes Ferreira y no se usan para publicidad.")
-   .setPositiveButton("Aceptar"){_,_->prefs().edit().putBoolean(PRESENCE_POSITION,true).apply();permissions.launch(req.toTypedArray())}
+   .setPositiveButton("Aceptar"){_,_->prefs().edit().putBoolean(presenceKey(),true).apply();permissions.launch(req.toTypedArray())}
    .setNegativeButton("Ahora no"){_,_->toast("Sin permiso de ubicación no se registra el recorrido del viaje.")}.show()
  }
 
@@ -1014,9 +1019,9 @@ class MainActivity:AppCompatActivity(){
   button(sc,"Enviar pendientes y actualizar",Kind.SOFT,R.drawable.ic_sync){syncNow()}
   section("GPS y privacidad")
   val gc=card();row(gc,R.drawable.ic_gps,"Revisar GPS","Permisos de ubicación y batería"){checkGps()}
-  if(!panelFirst()){val on=prefs().getBoolean(PRESENCE_POSITION,false)
+  if(!panelFirst()){val on=prefs().getBoolean(presenceKey(),false)
    row(gc,R.drawable.ic_pin,"Ubicación con la app abierta",if(on)"Activada: al abrirla y cada 5 minutos, sin viaje · Tocá para desactivarla" else "Desactivada: solo se avisa que estás activo · Tocá para activarla"){
-    if(on){prefs().edit().putBoolean(PRESENCE_POSITION,false).apply();toast("Listo: con la app abierta ya no se envía tu ubicación.");settings()} else presencePositionDialog{settings()}}}
+    if(on){prefs().edit().putBoolean(presenceKey(),false).apply();toast("Listo: con la app abierta ya no se envía tu ubicación.");settings()} else presencePositionDialog{settings()}}}
   row(gc,R.drawable.ic_shield,"Privacidad","Qué datos usa la app y para qué"){privacy()}
   section("Camiones y papeles")
   val pp=card();row(pp,R.drawable.ic_wrench,"Mantenimiento","Services hechos y pendientes"){maintenance(true)};row(pp,R.drawable.ic_doc,"Documentos","Licencia, carné de salud, SOA y más"){documents(true)}
@@ -1035,10 +1040,12 @@ class MainActivity:AppCompatActivity(){
   val now=SystemClock.elapsedRealtime();val at=presenceAt
   if((at!=null&&now-at<Presence.EVERY_MS)||api.session()==null||panelFirst())return
   presenceAt=now
-  // Asked before looking for the position and again when it arrives: no trip in progress and the driver's consent.
-  Presence.send(applicationContext,name.ifBlank{driverName()},truck.ifBlank{null},appVersion,{store.current()?.optBoolean("active")!=true&&prefs().getBoolean(PRESENCE_POSITION,false)}){sent->
+  // Asked before looking for the position and again when it arrives: no trip in progress and the consent of the account
+  // that started the notice.
+  val consent=presenceKey()
+  Presence.send(applicationContext,name.ifBlank{driverName()},truck.ifBlank{null},appVersion,{store.current()?.optBoolean("active")!=true&&prefs().getBoolean(consent,false)}){sent->
    if(!sent)runOnUiThread{if(presenceAt==now)presenceAt=now-Presence.EVERY_MS+Presence.RETRY_MS}}
-  if(!presenceAsked&&(screen=="home"||screen=="simplehome")&&!prefs().contains(PRESENCE_POSITION)&&locationGranted()){presenceAsked=true;presencePositionDialog{}}
+  if(!presenceAsked&&(screen=="home"||screen=="simplehome")&&!prefs().contains(presenceKey())&&locationGranted()){presenceAsked=true;presencePositionDialog{}}
  }
  private fun locationGranted()=listOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION).any{ContextCompat.checkSelfPermission(this,it)==PackageManager.PERMISSION_GRANTED}
  /**
@@ -1048,8 +1055,8 @@ class MainActivity:AppCompatActivity(){
  private fun presencePositionDialog(then:()->Unit){
   AlertDialog.Builder(this).setTitle("Ubicación con la app abierta")
    .setMessage("Cuando tenés la app abierta y no estás de viaje, la app puede avisarle a la administración de Transportes Ferreira dónde estás: al abrirla y cada 5 minutos mientras está abierta. Con la app cerrada no se envía nada.\n\nPodés cambiarlo cuando quieras en Mi cuenta › GPS y privacidad.")
-   .setPositiveButton("Aceptar"){_,_->prefs().edit().putBoolean(PRESENCE_POSITION,true).apply();presenceAt=null;then()}
-   .setNegativeButton("Ahora no"){_,_->prefs().edit().putBoolean(PRESENCE_POSITION,false).apply();then()}
+   .setPositiveButton("Aceptar"){_,_->prefs().edit().putBoolean(presenceKey(),true).apply();presenceAt=null;then()}
+   .setNegativeButton("Ahora no"){_,_->prefs().edit().putBoolean(presenceKey(),false).apply();then()}
    .setOnCancelListener{then()}.show()
  }
 
