@@ -36,11 +36,24 @@ class RouteSamplerTest {
     @Test fun aTurnKeepsTheCornerReading() {
         val s=RouteSampler()
         assertTrue(s.keep(-34.9,east(0),0,0,27.0,4.0,90.0))
+        // At the corner, still heading east: not a point yet.
         assertFalse(s.keep(-34.9,east(1),2000,0,27.0,4.0,90.0))
-        // It turns north at the corner: kept at once, before five seconds, so the line turns there too.
+        // Heading north after the corner: kept at once, before five seconds, with the reading before it (the corner)
+        // first, so the line turns where the truck did.
         assertTrue(s.keep(-34.9+0.000135,east(1),4000,0,27.0,4.0,0.0))
+        assertTrue(s.corner)
         // Going straight north again: back to one every five seconds.
         assertFalse(s.keep(-34.9+0.00027,east(1),6000,0,27.0,4.0,2.0))
+        assertFalse(s.corner)
+    }
+
+    @Test fun aTurnRightAfterAPointAddsNoCorner() {
+        val s=RouteSampler()
+        assertTrue(s.keep(-34.9,east(0),0,0,27.0,4.0,90.0))
+        // Kept by the five seconds and twenty metres: the corner is already in the route.
+        assertTrue(s.keep(-34.9,east(3),6000,0,27.0,4.0,90.0))
+        assertTrue(s.keep(-34.9+0.000135,east(3),8000,0,27.0,4.0,0.0))
+        assertFalse(s.corner)
     }
 
     @Test fun aSlowTruckDoesNotTurnOnHeadingNoise() {
@@ -54,17 +67,44 @@ class RouteSamplerTest {
         val s=RouteSampler()
         // The trip starts with the truck parked.
         assertTrue(s.keep(-34.9,-56.2,0,0,0.0,4.0,null))
-        // 40 m away with the truck stopped: the GPS jumped, or the driver walked off with the phone.
+        // 40 m away with the truck stopped: the GPS jumped, or the driver walked off with the phone. If the trip pauses
+        // now, that reading does not go in as the last one either.
         assertFalse(s.keep(-34.9+0.00036,-56.2,32000,0,0.0,6.0,null))
         assertFalse(s.keep(-34.9+0.00036,-56.2,64000,0,5.0,6.0,null))
-        assertTrue(s.jitter(-34.9+0.00036,-56.2,6.0))
+        assertTrue(s.jittery)
         // A poor fix where it stands is left out too.
         assertFalse(s.keep(-34.9,-56.2,96000,0,0.0,30.0,null))
+        assertTrue(s.jittery)
+        // A poor fix 60 m away does not end the stop: its 30 m of error leave it within 50 m.
+        assertFalse(s.keep(-34.9+0.00054,-56.2,97000,0,1.0,30.0,null))
+        assertTrue(s.jittery)
         // A good fix where it stands: one every 30 s, as before.
         assertTrue(s.keep(-34.9+0.00002,-56.2,128000,0,0.0,4.0,null))
+        assertFalse(s.jittery)
         // It drives off: faster than 8 km/h the readings count again.
         assertTrue(s.keep(-34.9+0.0004,-56.2,134000,0,20.0,4.0,0.0))
-        assertFalse(s.jitter(-34.9+0.0009,-56.2,4.0))
+        assertFalse(s.jittery)
+    }
+
+    @Test fun aStopAlsoEndsByDistanceWithoutSpeed() {
+        val s=RouteSampler()
+        assertTrue(s.keep(-34.9,-56.2,0,0,0.0,4.0,null))
+        // Readings without speed 100 m away, with a good fix: the truck left, so they count again.
+        assertTrue(s.keep(-34.9+0.0009,-56.2,10000,0,null,5.0,null))
+        assertFalse(s.jittery)
+        assertTrue(s.keep(-34.9+0.0018,-56.2,16000,0,null,5.0,null))
+    }
+
+    @Test fun aPoorReadingOfATruckThatIsNotMovingStaysOutAtThePause() {
+        val s=RouteSampler()
+        assertTrue(s.keep(-34.9,-56.2,0,0,30.0,4.0,0.0))
+        // Slowing down with a poor fix (30 m): not a point, and not a stop either.
+        assertFalse(s.keep(-34.9+0.0002,-56.2,2000,0,1.0,30.0,null))
+        // If the trip pauses now, it does not go in as the last reading.
+        assertTrue(s.jittery)
+        // A good reading at a walking pace is not jitter: at a pause it reaches where the truck is.
+        assertFalse(s.keep(-34.9+0.00022,-56.2,4000,0,4.0,5.0,null))
+        assertFalse(s.jittery)
     }
 
     @Test fun theReadingWhereItStopsIsKept() {
