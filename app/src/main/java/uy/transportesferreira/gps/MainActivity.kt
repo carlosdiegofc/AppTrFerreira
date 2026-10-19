@@ -46,6 +46,10 @@ import java.time.format.DateTimeFormatter
 import java.util.*
 import kotlin.concurrent.thread
 import kotlin.math.max
+/** Flota en vivo (owner screen): positions every 5 s, who is on a trip every minute (decision of 18/10/2026). */
+private const val LIVE_MS=5000L
+private const val FLEET_MS=60000L
+
 class MainActivity:AppCompatActivity(){
  // Palette: light value first, dark value second.
  private val dark by lazy{(resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES}
@@ -99,6 +103,8 @@ class MainActivity:AppCompatActivity(){
  private var fuelTrip:JSONObject?=null;private var historyTrip:JSONObject?=null;private var docTrip:JSONObject?=null
  private var photoMode="fuel";private var docReturn="prepare";private var historyLimit=50;private var historyQuery="";private var fuelMonth=true
  private var fleetLoadedAt=0L;private var fleetLoading=false
+ // Flota en vivo: who is on a trip every minute, the positions every few seconds; these views change in place.
+ private var liveLoadedAt=0L;private var liveLoading=false;private var fleetStats:LinearLayout?=null;private var fleetCard:LinearLayout?=null;private var fleetNote:TextView?=null;private var fleetShape=""
  private var editForm=JSONObject();private var editId:String?=null;private var maintFilter=0;private var maintTruck="";private var papersAt=0L
  private var modePick=UiMode.SIMPLE;private var finishAsk=false;private var tripFilter=0
  // Simple mode asks before starting a trip; startAskAt is when the question came up.
@@ -302,7 +308,7 @@ class MainActivity:AppCompatActivity(){
 
  // ---------- Page frame: navy header, scrolling content, optional bottom dock and navigation ----------
  private fun page(key:String,header:Boolean=true){
-  activeMap?.destroy();activeMap=null;liveMap=null;screen=key;back.isEnabled=key in innerScreens
+  activeMap?.destroy();activeMap=null;liveMap=null;screen=key;back.isEnabled=key in innerScreens;fleetStats=null;fleetCard=null;fleetNote=null
   distance=null;speed=null;limit=null;status=null;statusBox=null;elapsed=null;sync=null;gps=null;count=null;pauseLabel=null;pauseIcon=null
   shell=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(appBg)}
   head=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(barBg);visibility=if(header)View.VISIBLE else View.GONE}
@@ -730,7 +736,7 @@ class MainActivity:AppCompatActivity(){
    .setNegativeButton("Ahora no",null).show()
  }
  private fun refresh(){if(!::store.isInitialized)return;sync?.text=store.message()
-  if(screen=="owner"&&!fleetLoading&&System.currentTimeMillis()-fleetLoadedAt>120000)loadFleet()
+  if(screen=="owner"&&!fleetLoading){val now=System.currentTimeMillis();if(now-fleetLoadedAt>FLEET_MS)loadFleet() else if(!liveLoading&&now-liveLoadedAt>LIVE_MS)loadLive()}
   if(screen!="trip"&&screen!="simpletrip")return;val t=store.current()?:return
   if(!t.optBoolean("active")){home();toast("Viaje finalizado. Los datos pendientes se enviarán con conexión.");return}
   val paused=t.optBoolean("paused")
@@ -1037,27 +1043,57 @@ class MainActivity:AppCompatActivity(){
   if(hub)bar("Flota en vivo",back={homeOrTrip()},trailing=reload) else hello(name,"Flota en vivo",reload)
   val f=mobile.fleet();val items=fleetItems(f);val fetched=f.optLong("fetched_at")
   val k=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL};root.addView(k,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(14)})
-  stat(k,"${items.count{it.state=="moving"}}","En ruta",green,0);stat(k,"${items.count{it.state=="stopped"||it.state=="paused"||it.state=="nosignal"}}","Detenidos",amber,1);stat(k,"${items.count{it.state=="idle"}}","Sin viaje",grey,2)
+  fleetStats=k;fleetStatsInto(k,items)
   alerts()
-  val marks=JSONArray();items.filter{FleetStats.validPosition(it.lat,it.lng)}.forEach{marks.put(JSONObject().put("lat",it.lat).put("lng",it.lng).put("label",it.plate.ifBlank{it.model}).put("color",hex(stateColor(it.state))))}
+  val marks=fleetMarks(items);fleetShape=shapeOf(f,items,marks)
   val mc=card();val web=TripMap.fleet(this,marks);activeMap=web;mc.addView(web,LinearLayout.LayoutParams(-1,dp(260)))
   if(marks.length()==0)note(if(fetched==0L)"Buscando posiciones…" else "Todavía no hay posiciones GPS para mostrar.",mc,0).setPadding(dp(16),dp(10),dp(16),dp(12))
   section("Camiones")
-  if(items.isEmpty())emptyCard(R.drawable.ic_truck,"Sin camiones cargados","Los equipos del catálogo aparecen acá.") else {val c=card();items.forEach{fleetRow(c,it)}}
-  note(if(fetched==0L)"Buscando la flota…" else "Actualizado ${ago(fetched)}. Se actualiza sola cada 2 minutos.",top=10)
+  if(items.isEmpty())emptyCard(R.drawable.ic_truck,"Sin camiones cargados","Los equipos del catálogo aparecen acá.") else {val c=card();fleetCard=c;items.forEach{fleetRow(c,it)}}
+  fleetNote=note(fleetNoteText(f),top=10)
   if(!hub)tileGrid(listOf(Tile(R.drawable.ic_list,"Viajes de la flota",null){openHistory("trips",true)},Tile(R.drawable.ic_history,"Combustible de la flota",null){openHistory("fuel",true)},
    Tile(R.drawable.ic_speed,"Rendimiento",null){openPerformance()},Tile(R.drawable.ic_wrench,"Mantenimiento",null){maintenance(true)},Tile(R.drawable.ic_doc,"Documentos",null){documents(true)}))
   sync=note(store.message(),top=16).apply{gravity=Gravity.CENTER}
   if(!hub)navBar("owner")
-  if(!fleetLoading&&System.currentTimeMillis()-fleetLoadedAt>120000)loadFleet()
+  if(!fleetLoading&&System.currentTimeMillis()-fleetLoadedAt>FLEET_MS)loadFleet()
   refreshPapers()
+ }
+ private fun fleetStatsInto(k:LinearLayout,items:List<FleetItem>){
+  k.removeAllViews()
+  stat(k,"${items.count{it.state=="moving"}}","En ruta",green,0);stat(k,"${items.count{it.state=="stopped"||it.state=="paused"||it.state=="nosignal"}}","Detenidos",amber,1);stat(k,"${items.count{it.state=="idle"}}","Sin viaje",grey,2)
+ }
+ /** One marker per truck with a position; the key lets the open map move each marker instead of drawing it again. */
+ private fun fleetMarks(items:List<FleetItem>):JSONArray{
+  val marks=JSONArray()
+  items.filter{FleetStats.validPosition(it.lat,it.lng)}.forEach{marks.put(JSONObject().put("key",it.session?.optString("id")?.let{id->"trip:$id"}?:"truck:${it.model}|${it.plate}").put("lat",it.lat).put("lng",it.lng).put("label",it.plate.ifBlank{it.model}).put("color",hex(stateColor(it.state))))}
+  return marks
+ }
+ private fun fleetNoteText(f:JSONObject):String{val at=maxOf(f.optLong("fetched_at"),f.optLong("live_at"));return if(at==0L)"Buscando la flota…" else "Actualizado ${ago(at)}. Las posiciones se actualizan solas cada ${LIVE_MS/1000} segundos."}
+ /** New positions while the fleet screen is open: markers, rows and counts change in place; the map keeps its view. */
+ private fun loadLive(){
+  liveLoading=true
+  thread{val ok=try{mobile.live();true}catch(_:Exception){false}
+   runOnUiThread{liveLoading=false;liveLoadedAt=System.currentTimeMillis();if(ok&&screen=="owner"&&!fleetLive())rebuildOwner()}}
+ }
+ /** What decides how the fleet screen is built: trucks or none, positions or none, data or still looking. */
+ private fun shapeOf(f:JSONObject,items:List<FleetItem>,marks:JSONArray)="${items.isEmpty()}|${marks.length()==0}|${f.optLong("fetched_at")==0L}"
+ /** False when the screen has to be built again: what it shows changed shape. An empty fleet stays as it is. */
+ private fun fleetLive():Boolean{
+  val f=mobile.fleet();val items=fleetItems(f);val marks=fleetMarks(items);val k=fleetStats
+  if(k==null||fleetShape!=shapeOf(f,items,marks))return false
+  fleetStatsInto(k,items);fleetCard?.let{c->c.removeAllViews();items.forEach{fleetRow(c,it)}}
+  activeMap?.evaluateJavascript("window.setMarks&&setMarks(${marks.toString().replace("<","\\u003c")})",null)
+  fleetNote?.text=fleetNoteText(f)
+  return true
  }
  private fun loadFleet(manual:Boolean=false){
   if(fleetLoading)return;fleetLoading=true;if(manual)toast("Actualizando la flota…")
   thread{val ok=try{mobile.catalog(true);mobile.fleet(true);true}catch(_:Exception){false}
    runOnUiThread{fleetLoading=false;fleetLoadedAt=System.currentTimeMillis();if(!ok&&manual)toast("Sin conexión. Se muestra la última información guardada.")
-    if(ok&&screen=="owner"){val scroll=root.parent as? ScrollView;val y=scroll?.scrollY?:0;ownerDashboard();(root.parent as? ScrollView)?.post{(root.parent as? ScrollView)?.scrollTo(0,y)}}}}
+    // The refresh every minute updates the open screen in place; a manual one, or a change in what it shows, builds it again.
+    if(ok&&screen=="owner"&&(manual||!fleetLive()))rebuildOwner()}}
  }
+ private fun rebuildOwner(){val scroll=root.parent as? ScrollView;val y=scroll?.scrollY?:0;ownerDashboard();(root.parent as? ScrollView)?.post{(root.parent as? ScrollView)?.scrollTo(0,y)}}
  private fun stateColor(state:String)=when(state){"moving"->0xFF178A4C.toInt();"idle"->0xFF8F9BAD.toInt();else->0xFFE69A1E.toInt()}
  private fun fleetItems(f:JSONObject):List<FleetItem>{
   val now=System.currentTimeMillis();val out=mutableListOf<FleetItem>();val busy=mutableSetOf<String>()

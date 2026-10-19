@@ -1,10 +1,26 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { FLEET_REFRESH_MS, ROUTE_REFRESH_MS } from '../config';
-import { type ActiveTrip, type CatalogTruck, fleetUnits, truckLabel } from '../lib/fleet';
+import { FLEET_REFRESH_MS, LIVE_REFRESH_MS, ROUTE_REFRESH_MS } from '../config';
+import { type ActiveTrip, type CatalogTruck, fleetUnits, truckLabel, withLivePositions } from '../lib/fleet';
 import { appendReadings } from '../lib/route';
-import { mergeTrips, tripFromPanel, tripFromSession } from '../lib/trips';
-import { fetchCatalog, fetchFleet, fetchLastTrips, fetchPapers, fetchRoute, fetchTripDetail, fetchTripList, fetchTrips, type RoutePoint } from './api';
+import type { TripPayload } from '../lib/tripForm';
+import { mergeTrips, type Trip, tripFromPanel, tripFromSession } from '../lib/trips';
+import {
+  fetchCatalog,
+  fetchCatalogLists,
+  fetchDriverNames,
+  fetchFleet,
+  fetchLastTrips,
+  fetchLivePositions,
+  fetchPapers,
+  fetchRoute,
+  fetchTripDetail,
+  fetchTripList,
+  fetchTrips,
+  type RoutePoint,
+  saveTrip,
+  setTripDeleted,
+} from './api';
 
 /** The current time, refreshed every few seconds so "hace 2 min" keeps moving. */
 export function useNow(everyMs = 10_000): number {
@@ -20,6 +36,9 @@ export const useCatalog = () => useQuery({ queryKey: ['catalog'], queryFn: fetch
 
 export const useFleetData = () => useQuery({ queryKey: ['fleet'], queryFn: fetchFleet, refetchInterval: FLEET_REFRESH_MS, refetchIntervalInBackground: false });
 
+/** The position of every truck, every few seconds while the screen is visible (a hidden tab does not read). */
+export const useLivePositions = () => useQuery({ queryKey: ['livePositions'], queryFn: fetchLivePositions, refetchInterval: LIVE_REFRESH_MS, refetchIntervalInBackground: false, staleTime: 0 });
+
 /** The last trip of every truck, further back than the live refresh; trucks rarely change it, so every 30 minutes. */
 const useLastTrips = (catalog: readonly CatalogTruck[] | undefined) =>
   useQuery({
@@ -30,22 +49,28 @@ const useLastTrips = (catalog: readonly CatalogTruck[] | undefined) =>
     refetchInterval: 30 * 60_000,
   });
 
-/** Every truck with its live state, recomputed as time passes (a truck goes "sin señal" without new data). */
+/**
+ * Every truck with its live state, recomputed as time passes (a truck goes "sin señal" without new data). Who is on a
+ * trip is read every 15 seconds; where each truck is, every 3.
+ */
 export function useFleet(now: number) {
   const catalog = useCatalog();
   const fleet = useFleetData();
+  const live = useLivePositions();
   const last = useLastTrips(catalog.data);
   // The live list first: a truck that appears there has its newest trip there.
   const units = useMemo(
-    () => (fleet.data ? fleetUnits(fleet.data.active, [...fleet.data.finished, ...(last.data ?? [])], catalog.data ?? [], now) : []),
-    [fleet.data, last.data, catalog.data, now],
+    () => (fleet.data ? fleetUnits(withLivePositions(fleet.data.active, live.data ?? []), [...fleet.data.finished, ...(last.data ?? [])], catalog.data ?? [], now) : []),
+    [fleet.data, live.data, last.data, catalog.data, now],
   );
   return {
     units,
-    fetchedAt: fleet.data?.fetchedAt ?? null,
-    isLoading: fleet.isLoading || catalog.isLoading,
-    error: fleet.error ?? catalog.error,
-    refetch: () => Promise.all([fleet.refetch(), catalog.refetch(), last.refetch()]),
+    /** When the positions were last read. */
+    fetchedAt: live.dataUpdatedAt || fleet.data?.fetchedAt || null,
+    isLoading: fleet.isLoading || catalog.isLoading || live.isLoading,
+    error: fleet.error ?? catalog.error ?? live.error,
+    refetch: () => Promise.all([fleet.refetch(), live.refetch(), catalog.refetch(), last.refetch()]),
+    // The position refresh every few seconds does not turn the refresh button.
     isFetching: fleet.isFetching || catalog.isFetching,
   };
 }
@@ -105,6 +130,37 @@ export function useTripList(fromIso: string | null, toIso: string | null) {
   // could not be read.
   return { trips, query: list, catalog };
 }
+
+/** Everything that shows trips reads them again after a change: the list, the trip's page and Inicio. */
+function useTripsChanged() {
+  const client = useQueryClient();
+  return () => Promise.all(['tripList', 'trip', 'trips'].map((key) => client.invalidateQueries({ queryKey: [key] })));
+}
+
+/** Saves the office's data of a trip (a new one when trip is null); on a conflict the screens read the trip again. */
+export function useSaveTrip() {
+  const changed = useTripsChanged();
+  return useMutation({
+    mutationFn: ({ trip, payload }: { trip: Trip | null; payload: TripPayload }) => saveTrip(trip, payload),
+    onSettled: changed,
+  });
+}
+
+/** Sends a trip to the trash or brings it back. */
+export function useSetTripDeleted() {
+  const changed = useTripsChanged();
+  return useMutation({
+    mutationFn: ({ trip, deleted }: { trip: Trip; deleted: boolean }) => setTripDeleted(trip, deleted),
+    onSettled: changed,
+  });
+}
+
+/** What the form suggests: the catalog's clients and cargo, and the drivers of the latest trips. */
+export const useFormSuggestions = (enabled: boolean) => {
+  const lists = useQuery({ queryKey: ['catalogLists'], queryFn: fetchCatalogLists, staleTime: 10 * 60_000, enabled });
+  const drivers = useQuery({ queryKey: ['driverNames'], queryFn: fetchDriverNames, staleTime: 10 * 60_000, enabled });
+  return { clients: lists.data?.clients ?? [], products: lists.data?.products ?? [], drivers: drivers.data ?? [] };
+};
 
 /** One trip and everything its page shows; it keeps refreshing while the trip is in progress and right after it ends. */
 export function useTripDetail(kind: 'app' | 'web', id: string) {

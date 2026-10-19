@@ -62,6 +62,13 @@ object FleetStats {
     }
     /** A position a map can show: finite, on the globe and not 0,0, which is what a reading without a fix looks like. */
     fun validPosition(lat:Double,lng:Double)=lat.isFinite()&&lng.isFinite()&&lat in -90.0..90.0&&lng in -180.0..180.0&&!(lat==0.0&&lng==0.0)
+    /**
+     * A driver's latest position belongs to the trip in progress when it was read after the trip started (the same
+     * window as the route); before that it is where the previous trip ended. Instants as ISO text.
+     */
+    fun readDuring(startedAt:String?,recordedAt:String?):Boolean{val start=instant(startedAt);val read=instant(recordedAt);return start!=null&&read!=null&&!read.isBefore(start)}
+    /** "2026-10-18T12:00:00Z" from the phone or "2026-10-18T12:00:00.123456+00:00" from the database (older Androids only read the first). */
+    private fun instant(s:String?):java.time.Instant?=if(s.isNullOrBlank())null else try{java.time.Instant.parse(s)}catch(_:Exception){try{java.time.OffsetDateTime.parse(s).toInstant()}catch(_:Exception){null}}
     /** Trimmed text, or null when there is nothing written. */
     fun text(v:String?):String?=v?.trim()?.takeIf{it.isNotEmpty()}
     /** The app stores "Sin camión asignado" when the driver did not pick a truck: that is not a truck. */

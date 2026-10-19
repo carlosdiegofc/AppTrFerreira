@@ -79,4 +79,14 @@ class FleetStatsTest {
         assertEquals("Ford Cargo 1722 · ITP2187",FleetStats.truck("  Ford Cargo 1722 · ITP2187 "));assertEquals("Leyland",FleetStats.truck("Leyland"))
         assertNull(FleetStats.text(""));assertEquals("Hugo",FleetStats.text(" Hugo "))
     }
+
+    @Test fun aLivePositionCountsForTheTripOnlyWhenReadDuringIt() {
+        assertTrue(FleetStats.readDuring("2026-10-18T12:00:00Z","2026-10-18T12:04:58Z"))
+        assertTrue(FleetStats.readDuring("2026-10-18T12:00:00Z","2026-10-18T12:00:00Z"))
+        // Where the previous trip ended, before this one started.
+        assertFalse(FleetStats.readDuring("2026-10-18T12:00:00Z","2026-10-18T11:30:00Z"))
+        assertFalse(FleetStats.readDuring("2026-10-18T12:00:00Z",null))
+        // The database writes microseconds and an offset.
+        assertTrue(FleetStats.readDuring("2026-10-18T12:00:00.123456+00:00","2026-10-18T12:00:01.5+00:00"))
+    }
 }

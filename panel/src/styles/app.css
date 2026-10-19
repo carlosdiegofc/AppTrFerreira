@@ -1682,6 +1682,284 @@ a.trip-line:hover {
   object-fit: contain;
 }
 
+/* ---------- Editing a trip ---------- */
+.page-actions {
+  flex-wrap: wrap;
+}
+
+.trip-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.btn-danger {
+  border-color: transparent;
+  background: var(--red);
+  color: #fff;
+}
+
+.btn-danger:hover {
+  background: color-mix(in srgb, var(--red) 88%, #000);
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-weight: 560;
+}
+
+.notice svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.notice-ok {
+  background: var(--green-bg);
+  color: var(--green);
+}
+
+.notice-warn {
+  background: var(--amber-bg);
+  color: var(--amber);
+}
+
+.notice-error {
+  background: var(--red-bg);
+  color: var(--red);
+}
+
+.form-dialog,
+.confirm-dialog {
+  max-height: calc(100vh - 32px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.form-dialog {
+  width: min(860px, calc(100vw - 32px));
+}
+
+.form-dialog::backdrop,
+.confirm-dialog::backdrop {
+  background: rgb(10 18 32 / 60%);
+}
+
+.form-dialog form {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 34px);
+}
+
+.form-dialog header,
+.form-dialog footer,
+.confirm-dialog footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.form-dialog header {
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.form-dialog h2,
+.confirm-dialog h2 {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.form-body {
+  overflow-y: auto;
+  padding: 16px 18px 6px;
+}
+
+.form-dialog footer {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  padding: 12px 18px;
+  border-top: 1px solid var(--line);
+}
+
+.form-leave span {
+  margin-right: auto;
+  color: var(--amber);
+  font-weight: 620;
+}
+
+.form-dialog fieldset {
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+}
+
+.form-dialog legend {
+  margin-bottom: 8px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 16px;
+}
+
+.form-dialog .field {
+  min-width: 0;
+}
+
+.form-dialog .field label {
+  color: var(--ink-soft);
+}
+
+.field-full {
+  margin-bottom: 8px;
+}
+
+.field textarea {
+  min-height: 80px;
+  padding: 10px 12px;
+  border: 1px solid var(--field-line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  resize: vertical;
+}
+
+.field textarea:focus {
+  border-color: var(--blue);
+  outline: 3px solid color-mix(in srgb, var(--blue) 30%, transparent);
+  outline-offset: 0;
+}
+
+.field [aria-invalid='true'] {
+  border-color: var(--red);
+}
+
+.hint,
+.field-error {
+  min-height: 17px;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.hint {
+  color: var(--muted);
+}
+
+.field-error {
+  color: var(--red);
+  font-weight: 620;
+}
+
+.coords {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--blue);
+  font: inherit;
+  font-weight: 620;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
+.gps-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--grey-bg);
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.gps-facts strong {
+  flex-basis: 100%;
+  color: var(--ink);
+}
+
+.form-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--red-bg);
+  color: var(--red);
+  font-weight: 600;
+}
+
+.confirm-dialog {
+  width: min(460px, calc(100vw - 32px));
+  padding: 18px;
+}
+
+.confirm-text {
+  margin: 10px 0 18px;
+  color: var(--ink-soft);
+}
+
+.confirm-dialog footer {
+  justify-content: flex-end;
+}
+
+@media (max-width: 600px) {
+  .form-dialog {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100%;
+    max-height: 100%;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .form-dialog form {
+    height: 100%;
+    max-height: 100%;
+  }
+
+  .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .trip-actions {
+    margin-left: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -1,10 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Icon } from '../components/Icon';
 import { type Photo, PhotoDialog } from '../components/PhotoDialog';
+import { TripFormDialog } from '../components/TripFormDialog';
 import { TripMap } from '../components/TripMap';
 import { CatalogNote, Card, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote } from '../components/ui';
-import { useRoute, useTripDetail } from '../data/hooks';
+import { ROUTE_REFRESH_MS } from '../config';
+import { ConflictError, describeWriteError } from '../data/api';
+import { useRoute, useSetTripDeleted, useTripDetail } from '../data/hooks';
 import { calendarDay, formatDay, formatDayTime, formatDuration } from '../lib/dates';
 import { count, money, number } from '../lib/format';
 import { documentLabel, sourceLabel, tripFacts } from '../lib/tripTable';
@@ -12,6 +16,14 @@ import { fuelFromReceipt, type LatLng, parseTripKey, routeStats } from '../lib/t
 import { STATUS_TONE } from './states';
 
 const samePlace = (a: LatLng | null, b: LatLng | null) => a !== null && b !== null && a[0] === b[0] && a[1] === b[1];
+
+/** What happened with the last change, shown on the page until the next one. */
+interface Notice {
+  tone: 'ok' | 'warn' | 'error';
+  text: string;
+}
+
+const CONFLICT = 'Otra persona cambió este viaje mientras lo tenías abierto, y no se guardó nada: ya se ven sus datos nuevos. Revisalos y, si hace falta, volvé a cambiarlo.';
 
 function Back() {
   const navigate = useNavigate();
@@ -48,6 +60,17 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
   const [photo, setPhoto] = useState<Photo | null>(null);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfFailed, setPdfFailed] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [binning, setBinning] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  // A trip typed by hand opens here right after it is saved, and says so once: reloading the page does not repeat it.
+  const justSaved = (location.state as { saved?: boolean } | null)?.saved === true;
+  const [notice, setNotice] = useState<Notice | null>(() => (justSaved ? { tone: 'ok', text: 'Viaje cargado.' } : null));
+  useEffect(() => {
+    if (justSaved) navigate({ pathname: location.pathname, search: location.search }, { replace: true, state: null });
+  }, [justSaved, location.pathname, location.search, navigate]);
+  const bin = useSetTripDeleted();
 
   if (detail.isLoading || catalog.isLoading) {
     return (
@@ -85,6 +108,20 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
     }
   };
 
+  // To the trash and back. The trip is never deleted: what the phone sent and the GPS route stay.
+  const setDeleted = async (deleted: boolean) => {
+    setNotice(null);
+    try {
+      await bin.mutateAsync({ trip, deleted });
+      setNotice({ tone: 'ok', text: deleted ? 'El viaje está en la papelera. Lo podés restaurar desde acá o desde «Eliminados».' : 'Viaje restaurado: vuelve a contar en la lista y en los totales.' });
+    } catch (err) {
+      console.error(err);
+      setNotice(err instanceof ConflictError ? { tone: 'warn', text: CONFLICT } : { tone: 'error', text: describeWriteError(err) });
+    } finally {
+      setBinning(false);
+    }
+  };
+
   const live = trip.active;
   const title = trip.orderNumber ? `Orden de carga ${trip.orderNumber}` : `Viaje de ${trip.driverName ?? 'chofer sin indicar'}`;
   const facts = tripFacts(trip);
@@ -111,11 +148,39 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
       {pdfFailed && <ErrorNote>No se pudo armar el PDF. Probá de nuevo.</ErrorNote>}
       {detail.error && <StaleNote onRetry={() => void detail.refetch()} />}
       {catalog.error && <CatalogNote onRetry={() => void catalog.refetch()} />}
+      {notice && (
+        <p className={`notice notice-${notice.tone}`} role={notice.tone === 'ok' ? 'status' : 'alert'}>
+          <Icon name={notice.tone === 'ok' ? 'check' : 'warning'} size={18} /> {notice.text}
+        </p>
+      )}
 
       <div className="trip-status">
         <Pill tone={STATUS_TONE[trip.status.code]}>{trip.status.label}</Pill>
         {trip.deleted && binDay && <span>Está en la papelera desde el {formatDay(binDay)}: no cuenta en los totales.</span>}
         {!trip.deleted && trip.status.missing.length > 0 && <span>Falta completar: {trip.status.missing.join(', ')}.</span>}
+        <div className="trip-actions">
+          {trip.deleted ? (
+            <button type="button" className={`btn btn-primary${bin.isPending ? ' is-busy' : ''}`} disabled={bin.isPending} onClick={() => void setDeleted(false)}>
+              <Icon name="undo" size={18} /> Restaurar
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  setNotice(null);
+                  setEditing(true);
+                }}
+              >
+                <Icon name="edit" size={18} /> {trip.panelId ? 'Editar datos' : 'Completar datos'}
+              </button>
+              <button type="button" className="btn btn-quiet" onClick={() => setBinning(true)}>
+                <Icon name="trash" size={18} /> Mandar a la papelera
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="grid-2 trip-grid">
@@ -136,7 +201,7 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
           )}
         </Card>
 
-        <Card title="Recorrido" padded={false} action={live ? <Pill tone="blue">En vivo · se actualiza cada 30 s</Pill> : undefined}>
+        <Card title="Recorrido" padded={false} action={live ? <Pill tone="blue">En vivo · se actualiza cada {ROUTE_REFRESH_MS / 1000} s</Pill> : undefined}>
           {trip.source === 'manual' && !trip.origin && !trip.destination ? (
             <div className="card-body">
               <Empty icon="route" title="Sin recorrido">Este viaje se cargó a mano: no tiene recorrido del GPS.</Empty>
@@ -226,6 +291,28 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
       )}
 
       <PhotoDialog photo={photo} onClose={() => setPhoto(null)} />
+      {editing && (
+        <TripFormDialog
+          trip={trip}
+          onClose={() => setEditing(false)}
+          onSaved={() => {
+            setEditing(false);
+            setNotice({ tone: 'ok', text: 'Datos guardados.' });
+          }}
+          onConflict={() => {
+            setEditing(false);
+            setNotice({ tone: 'warn', text: CONFLICT });
+          }}
+        />
+      )}
+      {binning && (
+        <ConfirmDialog title="¿Mandar este viaje a la papelera?" confirmLabel="Mandar a la papelera" danger busy={bin.isPending} onConfirm={() => void setDeleted(true)} onCancel={() => setBinning(false)}>
+          <p>
+            Deja de contar en la lista y en los totales.{' '}
+            {trip.source === 'app' ? 'El recorrido del GPS y lo que mandó el chofer no se borran. ' : ''}Lo podés restaurar cuando quieras desde «Eliminados».
+          </p>
+        </ConfirmDialog>
+      )}
     </div>
   );
 }

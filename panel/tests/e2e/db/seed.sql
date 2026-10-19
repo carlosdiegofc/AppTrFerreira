@@ -63,6 +63,14 @@ insert into public.trf_driver_location_history (driver_id, vehicle, latitude, lo
   ('00000000-0000-4000-8000-000000000012', 'Scania R450 · DEF5678', -34.471, -57.844, 0, (select now from t0) - interval '3 minutes', null),
   ('00000000-0000-4000-8000-000000000013', 'Mercedes Benz Actros', -32.318, -58.081, 64, (select now from t0) - interval '40 minutes', '10000000-0000-4000-8000-00000000000c');
 
+-- The latest position of each driver, as the phones update it with each reading: what the live maps read every few
+-- seconds. Ana's is her last reading on Ruta 5, Bruno's and Carla's their only one, Diego's where his last trip ended.
+insert into public.trf_driver_locations (driver_id, driver_name, vehicle, latitude, longitude, speed_kmh, recorded_at, is_tracking, updated_at) values
+  ('00000000-0000-4000-8000-000000000011', 'Ana Pereira', 'Volvo FH 460 · ABC1234', -34.3705, -56.4835, 78, (select now from t0) - interval '1 minute', true, (select now from t0) - interval '1 minute'),
+  ('00000000-0000-4000-8000-000000000012', 'Bruno Díaz', 'Scania R450 · DEF5678', -34.471, -57.844, 0, (select now from t0) - interval '3 minutes', true, (select now from t0) - interval '3 minutes'),
+  ('00000000-0000-4000-8000-000000000013', 'Carla Méndez', 'Mercedes Benz Actros', -32.318, -58.081, 64, (select now from t0) - interval '40 minutes', true, (select now from t0) - interval '40 minutes'),
+  ('00000000-0000-4000-8000-000000000014', 'Diego Silva', 'Ford Cargo 1722 · JKL3456', -31.39, -57.96, 0, (select now from t0) - interval '3 hours', false, (select now from t0) - interval '3 hours');
+
 -- Papers and services: expired, about to expire, far away; late, coming up, done.
 insert into public.trf_documents (scope, driver_id, driver_name, vehicle, kind, expires_on) values
   ('driver', '00000000-0000-4000-8000-000000000011', 'Ana Pereira', '', 'Licencia de conducir', (select today from t0) + 10),

@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router';
 import { FleetMap } from '../components/FleetMap';
 import { Icon } from '../components/Icon';
 import { Dot, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote } from '../components/ui';
-import { FLEET_REFRESH_MS } from '../config';
+import { LIVE_REFRESH_MS } from '../config';
 import { useFleet, useNow, useRoute } from '../data/hooks';
 import { ago, dayInZone, formatDay, formatTime } from '../lib/dates';
 import { type FleetUnit, fleetCounts, STATE_LABEL, unitTitle } from '../lib/fleet';
@@ -82,7 +82,7 @@ export function Gps() {
     <div className="page page-gps">
       <PageHead
         title="GPS en vivo"
-        subtitle={fleet.fetchedAt ? `Actualizado ${ago(fleet.fetchedAt, now)} · se actualiza solo cada ${FLEET_REFRESH_MS / 1000} segundos` : 'Buscando las posiciones…'}
+        subtitle={fleet.fetchedAt ? `Actualizado ${ago(fleet.fetchedAt, now)} · las posiciones se actualizan solas cada ${LIVE_REFRESH_MS / 1000} segundos` : 'Buscando las posiciones…'}
         actions={<RefreshButton onClick={() => void Promise.all([fleet.refetch(), unit?.trip ? route.refetch() : null])} busy={fleet.isFetching || route.isFetching} />}
       />
       {fleet.error ? <ErrorNote onRetry={() => void fleet.refetch()}>No se pudo leer la flota.</ErrorNote> : null}

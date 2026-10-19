@@ -110,6 +110,25 @@ export interface ActiveTrip {
   last: LastPoint | null;
 }
 
+/** The latest position of a driver, as the phone sends it with each reading (one row per driver). */
+export interface LivePosition extends LastPoint {
+  driver_id: string;
+}
+
+/**
+ * Each trip in progress with its driver's latest position, when that position was read during the trip (the same time
+ * window as the route); a position from before the trip, like the end of the previous one, is not this trip's.
+ */
+export function withLivePositions(active: readonly ActiveTrip[], positions: readonly LivePosition[]): ActiveTrip[] {
+  const byDriver = new Map(positions.map((p) => [p.driver_id, p]));
+  return active.map((trip) => {
+    const p = byDriver.get(trip.driver_id);
+    const read = p ? Date.parse(p.recorded_at) : Number.NaN;
+    const inTrip = p !== undefined && Number.isFinite(read) && read >= Date.parse(trip.started_at);
+    return { ...trip, last: inTrip ? { latitude: p.latitude, longitude: p.longitude, speed_kmh: p.speed_kmh, recorded_at: p.recorded_at } : null };
+  });
+}
+
 export interface FinishedTrip {
   driver_name: string;
   vehicle: string;

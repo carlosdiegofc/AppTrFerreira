@@ -30,6 +30,31 @@ export function calendarDay(value: string | null | undefined, zone = ZONE): stri
   return Number.isNaN(ms) ? null : dayInZone(ms, zone);
 }
 
+/** An instant as the value of an <input type="datetime-local"> in Uruguay ("2026-10-15T09:05"); '' when there is none. */
+export function toZoneInput(iso: string | null | undefined, zone = ZONE): string {
+  const ms = iso ? Date.parse(iso) : Number.NaN;
+  if (Number.isNaN(ms)) return '';
+  const p = parts(ms, zone);
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
+}
+
+/**
+ * The value of an <input type="datetime-local">, read as the time in Uruguay whatever the computer's zone, as an ISO
+ * instant. '' is no date (null); text that is not a date and time gives undefined.
+ */
+export function fromZoneInput(value: string, zone = ZONE): string | null | undefined {
+  const text = value.trim();
+  if (text === '') return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(text);
+  if (!m) return undefined;
+  const [y, mo, d, h, mi, s] = m.slice(1).map((v) => Number(v ?? 0)) as [number, number, number, number, number, number];
+  const wall = Date.UTC(y, mo - 1, d, h, mi, s);
+  const check = new Date(wall);
+  if (check.getUTCFullYear() !== y || check.getUTCMonth() !== mo - 1 || check.getUTCDate() !== d || h > 23 || mi > 59 || s > 59) return undefined;
+  const offset = zoneOffsetMinutes(wall - zoneOffsetMinutes(wall, zone) * 60_000, zone);
+  return new Date(wall - offset * 60_000).toISOString();
+}
+
 /** Offset of the zone from UTC at an instant, in minutes (Uruguay: -180). */
 export function zoneOffsetMinutes(ms: number, zone = ZONE): number {
   const name = new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'longOffset' }).formatToParts(ms).find((p) => p.type === 'timeZoneName')?.value ?? 'GMT';

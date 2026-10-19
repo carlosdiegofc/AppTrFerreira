@@ -5,7 +5,15 @@ Panel web nuevo (React + TypeScript), en construcción al lado del actual: [pane
 # Panel web (nuevo)
 La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
 
-# Transportes Ferreira GPS — v0.16.3
+# Transportes Ferreira GPS — v0.17.0
+
+## Nuevo en v0.17.0 (GPS en vivo más rápido; versionCode 26)
+- **Viaje en curso:** el teléfono toma una posición cada 2 segundos (antes cada 3 a 5) y la manda sola y enseguida, sin esperar al resto de lo que tiene para enviar (el viaje, el recorrido, las fotos). Los mapas en vivo del panel y de la app la reciben en unos segundos.
+- El recorrido que se guarda en el panel lleva un punto cada 5 segundos más o menos mientras el camión anda y uno cada 30 segundos mientras está parado (antes, un punto por lectura aunque estuviera parado), y se manda en una sola tanda cada 10 segundos. Así la base y los datos del celular no crecen con las lecturas más seguidas. Al pausar y al finalizar se agrega la última lectura, para que el recorrido llegue hasta donde quedó el camión. El mapa del propio viaje en el teléfono sigue dibujando todas las lecturas.
+- Los kilómetros y la última lectura del viaje se suben cada 15 segundos; pausar, reanudar y finalizar se mandan en el momento.
+- **Flota en vivo (dueño):** las posiciones se actualizan solas cada 5 segundos (antes cada 2 minutos) sin volver a armar el mapa: los camiones se mueven y el mapa queda donde lo dejó el dueño. Quién está de viaje se lee cada minuto, y un viaje que empieza o termina mientras llegan posiciones nuevas se ve igual. La posición sale de la tabla de posición en vivo, la misma que lee el panel.
+- Lo que se envía al panel no cambia de forma: las mismas tablas y columnas, con lecturas más seguidas en la posición en vivo y menos puntos de recorrido cuando el camión está parado.
+- Incluye todo lo de la v0.16.3, que no se subió a Google Play.
 
 ## Nuevo en v0.16.3 (correcciones del menú del dueño)
 - **Flota en vivo:** la posición de un camión en viaje se toma también de las lecturas de choferes con versiones viejas de la app, que no las guardan con el viaje; antes ese camión figuraba «sin señal». Un camión que se usa poco sigue mostrando su último chofer y dónde terminó, aunque la flota haya hecho más de 100 viajes desde entonces.

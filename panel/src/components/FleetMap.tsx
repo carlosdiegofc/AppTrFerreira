@@ -1,5 +1,5 @@
 // Leaflet map of the fleet: one marker per truck with a known position, coloured by state, and optionally the route of
-// the selected trip. Markers are reused between refreshes so the map does not flicker every 15 seconds.
+// the selected trip. Markers are reused and moved between refreshes, so the map does not flicker every few seconds.
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useEffect, useRef } from 'react';

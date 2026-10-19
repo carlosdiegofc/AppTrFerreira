@@ -8,7 +8,9 @@ El panel corre en Chromium (Playwright) contra un **PostgREST real** conectado a
 
 `server.mjs` sirve el panel y reemplaza el ingreso de Supabase y los enlaces firmados de las fotos (devuelve una imagen de prueba, y solo a las cuentas del panel). El reloj del navegador queda fijo en el instante base de los datos (15/10/2026 al mediodía en Uruguay), así que el resultado es el mismo a cualquier hora. Los mapas no se descargan de OpenStreetMap durante las pruebas.
 
-`db/permissions.sql` revisa la seguridad por filas con los mismos datos: un chofer ve solo lo suyo, la administración ve toda la flota, un administrador que no está en la lista del panel no lee los datos del panel y sin ingresar no se ve nada.
+`db/permissions.sql` revisa la seguridad por filas con los mismos datos: un chofer ve solo lo suyo, la administración ve toda la flota, un administrador que no está en la lista del panel no lee los datos del panel y sin ingresar no se ve nada. También revisa lo que se guarda en `trf_panel_trips`: solo las cuentas del panel completan, cargan y mandan a la papelera; la base anota quién y cuándo, no deja cambiar el origen de una fila, un guardado con una fecha de modificación vieja no cambia nada y borrar no borra.
+
+Las pruebas que guardan están en `edicion.spec.ts` y corren al final (proyecto *edicion*), cuando las demás ya leyeron los datos como los deja `seed.sql`: completar un viaje de la app, cargar uno a mano, la papelera y restaurar, dos pestañas que guardan el mismo viaje a la vez y el formulario en el celular.
 
 Para correrlas en una computadora:
 ```bash

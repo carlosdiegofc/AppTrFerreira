@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type ActiveTrip, canonical, catalogTrucks, type FinishedTrip, fleetCounts, fleetUnits, lastTripByTruck, tripState, truck, truckParts } from '../../src/lib/fleet';
+import { type ActiveTrip, canonical, catalogTrucks, type FinishedTrip, fleetCounts, fleetUnits, lastTripByTruck, tripState, truck, truckParts, withLivePositions } from '../../src/lib/fleet';
 
 const fleet = [
   { model: 'Ford Cargo 1722', plate: 'GTP4265' },
@@ -108,5 +108,21 @@ describe('last trip of each truck (to place the ones without a trip)', () => {
     lastTripByTruck([ended('Dos', 'Leyland · HTP1545', 10), ended('Tres', 'Mercedes Benz 1618 · ATM2661', 9)], fleet, found);
     expect(found.get('Leyland · HTP1545')?.driver_name).toBe('Uno');
     expect(found.get('Mercedes Benz 1618 · ATM2661')?.driver_name).toBe('Tres');
+  });
+});
+
+describe('live positions (one row per driver, updated with each reading)', () => {
+  const started = '2026-10-18T12:00:00Z';
+  const pos = (driver_id: string, recorded_at: string, speed_kmh: number | null = 80) => ({ driver_id, latitude: -33.1, longitude: -57.2, speed_kmh, recorded_at });
+
+  it('gives each trip in progress its driver\'s latest position', () => {
+    const [t] = withLivePositions([trip({ driver_id: 'd1', started_at: started })], [pos('d2', '2026-10-18T12:05:00Z'), pos('d1', '2026-10-18T12:04:58Z', 62)]);
+    expect(t?.last).toEqual({ latitude: -33.1, longitude: -57.2, speed_kmh: 62, recorded_at: '2026-10-18T12:04:58Z' });
+  });
+
+  it('a position from before the trip, like where the previous trip ended, is not this trip\'s', () => {
+    const [t] = withLivePositions([trip({ driver_id: 'd1', started_at: started })], [pos('d1', '2026-10-18T11:30:00Z')]);
+    expect(t?.last).toBeNull();
+    expect(withLivePositions([trip({ driver_id: 'd1', started_at: started })], [])[0]?.last).toBeNull();
   });
 });
