@@ -84,3 +84,21 @@ Antes de tocar datos reales:
 - Rol de cada cuenta actual: dueños, choferes y la cuenta de revisión de Google, que iría a una empresa de demostración.
 
 Más adelante: proveedor de mapas, método de lectura de boletas, modelo de IA y cupo por plan, transcripción de audios, medio de pago, facturación electrónica (CFE), monedas, nombre comercial, cuánto tiempo se guarda el GPS en el plan FREE y publicidad.
+
+### Para presentar más adelante
+- **Viajes de vinasa automáticos** (pedido del 19/10/2026; se presenta como etapa antes de programarla):
+  - **El trabajo:** unos seis viajes por día con vinasa cargada en ALUR, cada uno a una chacra distinta. Se paga por rango de kilómetros: por ejemplo, todas las chacras que están entre 13 y 17 km tienen el mismo precio fijo, y hay varios rangos.
+  - **La idea:** que los viajes se armen solos con el GPS, para que el chofer no tenga que cargar cada uno.
+  - **Cómo funcionaría** (planteo del 19/10/2026):
+    1. En ALUR, dentro de un radio configurable (al principio 150 m), el camión figura «En espera / cargando».
+    2. Cuando sale de esa zona y sigue afuera, empieza un viaje.
+    3. Si entra en una zona de descarga conocida y queda detenido unos 5 minutos, se anota una posible descarga.
+    4. Cuando sale de la chacra, termina el viaje cargado y empieza el regreso vacío.
+    5. Al volver a ALUR, figura otra vez «En espera / cargando». Si el viaje anterior quedó abierto, se propone cerrarlo y se marca que la descarga necesita revisión.
+  - **Una parada sola no es una descarga:** cinco minutos detenido pueden ser una falla o una detención en la ruta. Se combinan el lugar, el tiempo detenido y el movimiento posterior.
+  - **Chacras:** al principio el GPS propone los lugares de descarga. Desde la web se confirman como chacras, con su nombre, su zona y su distancia tarifaria. Esa distancia define el rango (por ejemplo, de 13 a 17 km), sin importar los desvíos del recorrido GPS. El importe es la tarifa del rango por los metros cúbicos transportados.
+  - **Sin viajes falsos:** al principio los viajes automáticos quedan pendientes de revisión, se pueden editar y no se facturan solos. El chofer interviene solo cuando falta un dato o hay una excepción.
+  - **A resolver al presentarla:**
+    - El GPS hoy solo registra con un viaje iniciado y nunca sigue al chofer con la app cerrada fuera de un viaje. Para armar los viajes solos, el chofer iniciaría una sola vez por día una jornada que registre todo el día. Ese cambio en el uso de la ubicación lo tienen que decir la política de privacidad y Google Play.
+    - De dónde salen los metros cúbicos de cada viaje: la capacidad de la cisterna o lo que declara el chofer.
+    - La tabla de rangos con sus tarifas.
