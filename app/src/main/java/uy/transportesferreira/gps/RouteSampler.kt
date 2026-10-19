@@ -5,7 +5,8 @@ import kotlin.math.*
 /**
  * Which readings the saved route keeps. The live position goes out with every reading (every 2 s); the route keeps one
  * every few seconds while the truck moves and one every 30 s while it is stopped, so the database and the driver's
- * data plan do not grow with the faster readings. A new segment (after a pause) always starts with a point.
+ * data plan do not grow with the faster readings. A new segment (the trip or a stretch after a pause) starts with a point:
+ * its first reading that is not GPS jitter.
  * It also keeps where the truck turns: the reading where the heading changed and the one just before it, where the truck
  * went round the corner, so the line on the map turns the corner instead of cutting across the block; and the reading
  * where it stops. During a stop it keeps only good readings next to that place, so neither the jitter of a parked phone's
@@ -41,8 +42,15 @@ class RouteSampler(
     fun keep(lat:Double,lng:Double,time:Long,segment:Int,speedKmh:Double?=null,accuracy:Double?=null,heading:Double?=null):Boolean {
         val poor=(accuracy?:0.0)>stillAccuracy
         corner=false
-        // A trip (or a stretch after a pause) usually starts with the truck parked: that is where the stop is.
-        if(!started||segment!=this.segment){stopped=speedKmh!=null&&speedKmh<stillKmh&&!poor;stopLat=lat;stopLng=lng;held=false;jittery=false;take(lat,lng,time,segment,speedKmh,heading);return true}
+        if(!started||segment!=this.segment){
+            held=false
+            // The first fixes after the GPS starts are often poor: with the truck not moving, the stretch waits for a good one.
+            jittery=speedKmh!=null&&speedKmh<stillKmh&&poor
+            if(jittery)return false
+            // A trip (or a stretch after a pause) usually starts with the truck parked: that is where the stop is.
+            stopped=speedKmh!=null&&speedKmh<stillKmh;stopLat=lat;stopLng=lng
+            take(lat,lng,time,segment,speedKmh,heading);return true
+        }
         val seconds=(time-this.time)/1000.0
         var arrived=false
         if(stopped&&((speedKmh!=null&&speedKmh>=leaveKmh)||meters(stopLat,stopLng,lat,lng)-(accuracy?:0.0)>stopMeters))stopped=false

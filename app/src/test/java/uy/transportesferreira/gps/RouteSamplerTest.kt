@@ -95,6 +95,20 @@ class RouteSamplerTest {
         assertTrue(s.keep(-34.9+0.0018,-56.2,16000,0,null,5.0,null))
     }
 
+    @Test fun aStretchDoesNotStartWithAPoorFixOfAParkedTruck() {
+        val s=RouteSampler()
+        // The first fixes after the GPS starts are often poor: the trip waits for a good one.
+        assertFalse(s.keep(-34.9+0.0003,-56.2,0,0,0.0,40.0,null))
+        assertTrue(s.jittery)
+        assertTrue(s.keep(-34.9,-56.2,2000,0,0.0,5.0,null))
+        assertFalse(s.jittery)
+        // After a pause, the same.
+        assertFalse(s.keep(-34.9+0.0003,-56.2,60000,1,1.0,35.0,null))
+        assertTrue(s.keep(-34.9,-56.2,62000,1,0.0,6.0,null))
+        // A poor fix of a truck already moving does start the stretch.
+        assertTrue(s.keep(-34.9,-56.2,90000,2,40.0,30.0,0.0))
+    }
+
     @Test fun aPoorReadingOfATruckThatIsNotMovingStaysOutAtThePause() {
         val s=RouteSampler()
         assertTrue(s.keep(-34.9,-56.2,0,0,30.0,4.0,0.0))

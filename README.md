@@ -15,6 +15,7 @@ La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la
   - También guarda la lectura de donde el camión para.
   - Mientras está parado, guarda solo lecturas buenas, de menos de 15 m de error, a menos de 12 m de donde paró. La parada termina cuando el camión pasa los 8 km/h o se aleja más de 50 m, descontando el error de la lectura, aunque la lectura no traiga velocidad.
   - Así ni el temblor del GPS ni el chofer caminando con el teléfono dibujan una «estrella» en el mapa. Una lectura descartada por eso tampoco entra al pausar o finalizar.
+  - Al empezar o reanudar el viaje con el camión quieto, el recorrido arranca con la primera lectura buena, porque las primeras del GPS suelen ser imprecisas.
   - Con el viaje real que mostraba la estrella, de 1.860 puntos quedan 412, y la parada queda limpia. Los viajes ya guardados no cambian.
 - Los kilómetros y la última lectura del viaje se suben cada 15 segundos; pausar, reanudar y finalizar se mandan en el momento.
 - **Flota en vivo (dueño):** las posiciones se actualizan solas cada 5 segundos (antes cada 2 minutos) sin volver a armar el mapa: cada camión se desliza hasta su posición nueva, en vez de saltar, y el mapa queda donde lo dejó el dueño. Si el teléfono tiene activado «Quitar animaciones», o si el camión aparece a más de 3 km (volvió la señal), salta directo. Quién está de viaje se lee cada minuto, y un viaje que empieza o termina mientras llegan posiciones nuevas se ve igual. La posición sale de la tabla de posición en vivo, la misma que lee el panel.
