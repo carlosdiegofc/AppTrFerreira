@@ -1,6 +1,6 @@
 # Política de privacidad de Transportes Ferreira GPS
 
-Última actualización: 8 de octubre de 2026
+Última actualización: 19 de octubre de 2026
 
 Transportes Ferreira GPS es la aplicación interna de Transportes Ferreira (Uruguay) para sus choferes y su administración. Sirve para registrar los viajes de los camiones de la empresa, las cargas de combustible, los remitos, el mantenimiento de la flota y los vencimientos de documentos. Solo pueden usarla las personas a las que la empresa les entregó una cuenta.
 
@@ -13,7 +13,8 @@ Transportes Ferreira, empresa de transporte de carga de Uruguay. La empresa admi
 ## Qué datos se recopilan
 
 - Datos de la cuenta: nombre, correo electrónico e identificador de usuario. La empresa crea las cuentas; la aplicación no permite registrarse por cuenta propia.
-- Ubicación precisa: solo mientras hay un viaje en curso, la aplicación registra la posición GPS del teléfono, la precisión, la velocidad y el rumbo. Sigue registrándola aunque la aplicación esté cerrada o la pantalla apagada, y durante todo ese tiempo se muestra una notificación fija. Cuando el viaje está pausado o terminado, la aplicación no registra la ubicación.
+- Ubicación precisa durante un viaje: mientras hay un viaje en curso, la aplicación registra la posición GPS del teléfono, la precisión, la velocidad y el rumbo. Sigue registrándola aunque la aplicación esté cerrada o la pantalla apagada, y durante todo ese tiempo se muestra una notificación fija. Cuando el viaje está pausado o terminado, deja de registrarla.
+- Actividad y ubicación con la aplicación abierta: al abrirla y cada 5 minutos mientras está abierta, la aplicación avisa a la empresa que estás activo, con la versión instalada y el camión guardado en el teléfono. Si no hay un viaje en curso y diste permiso de ubicación, ese aviso lleva también la posición del teléfono y su precisión. Con la aplicación cerrada no se envía nada de esto, y fuera de un viaje la aplicación nunca usa la ubicación en segundo plano.
 - Datos de los viajes: camión, fecha y hora de salida y de llegada, distancia recorrida, lugar de salida y de llegada, destino, cliente, tipo de carga y peso.
 - Combustible: fecha, litros, monto y la foto de la boleta.
 - Remitos: número de remito y las fotos que agregues.
@@ -27,6 +28,7 @@ La aplicación no muestra publicidad, no incluye herramientas de análisis ni de
 
 - Registrar el recorrido y los kilómetros de cada viaje.
 - Mostrarle a la administración de la empresa dónde están los camiones y en qué estado están los viajes.
+- Mostrarle a la administración qué choferes están usando la aplicación, dónde están cuando no viajan y qué versión tienen, para avisarles cuando haya que actualizarla.
 - Llevar el control del combustible, los remitos, el mantenimiento de los camiones y los vencimientos de documentos.
 - Mantener la seguridad de las cuentas y el funcionamiento de la aplicación.
 

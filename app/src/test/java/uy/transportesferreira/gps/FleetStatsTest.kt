@@ -15,6 +15,16 @@ class FleetStatsTest {
         assertEquals(500.0,a.billedUyu,.001);assertEquals(100.0,a.billedUsd,.001);assertEquals(150.0,a.gpsKm,.001);assertEquals(110.0,a.billableKm,.001);assertEquals(1000.0,a.kg,.001)
         assertEquals(2,s.total.trips);assertEquals(300.0,s.total.fuelUyu,.001);assertEquals(10.0,s.total.fuelUsd,.001);assertEquals(40.0,s.total.liters,.001)
     }
+    /** Same cases as panel/tests/unit/presence.test.ts. */
+    @Test fun presenceIsOnATripActiveForTenMinutesOrSeen(){
+        val now=java.time.Instant.parse("2026-10-18T15:00:00Z").toEpochMilli()
+        assertEquals("trip",FleetStats.presenceState(true,"2026-10-18T12:00:00Z",now))
+        assertEquals("active",FleetStats.presenceState(false,"2026-10-18T14:51:00.123456+00:00",now))
+        assertEquals("seen",FleetStats.presenceState(false,"2026-10-18T14:49:00Z",now))
+        assertEquals("seen",FleetStats.presenceState(false,null,now))
+        assertTrue(FleetStats.compareVersions("0.17.0","0.16.3")>0);assertTrue(FleetStats.compareVersions("0.16.10","0.16.9")>0)
+        assertEquals(0,FleetStats.compareVersions("0.17","0.17.0"));assertTrue(FleetStats.compareVersions("0.17.0","0.17.1")<0)
+    }
     @Test fun positionsWithoutAFixAreNotShown(){
         assertFalse(FleetStats.validPosition(0.0,0.0));assertFalse(FleetStats.validPosition(91.0,10.0));assertFalse(FleetStats.validPosition(10.0,-181.0));assertFalse(FleetStats.validPosition(Double.NaN,10.0))
         assertTrue(FleetStats.validPosition(-34.9,-56.16));assertTrue(FleetStats.validPosition(0.0,-56.16))

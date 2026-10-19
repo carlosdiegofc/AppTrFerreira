@@ -69,6 +69,18 @@ object FleetStats {
     fun readDuring(startedAt:String?,recordedAt:String?):Boolean{val start=instant(startedAt);val read=instant(recordedAt);return start!=null&&read!=null&&!read.isBefore(start)}
     /** "2026-10-18T12:00:00Z" from the phone or "2026-10-18T12:00:00.123456+00:00" from the database (older Androids only read the first). */
     private fun instant(s:String?):java.time.Instant?=if(s.isNullOrBlank())null else try{java.time.Instant.parse(s)}catch(_:Exception){try{java.time.OffsetDateTime.parse(s).toInstant()}catch(_:Exception){null}}
+    /** «Chofer activo»: the phone says it is open every 5 minutes, so a driver seen in the last 10 counts as active. */
+    const val ACTIVE_FOR_MS=10*60_000L
+    /** On a trip, active with the app open, or only seen earlier: the same rule as the panel (panel/src/lib/presence.ts). */
+    fun presenceState(onTrip:Boolean,seenAt:String?,now:Long):String{val at=instant(seenAt)?.toEpochMilli();return when{onTrip->"trip";at!=null&&now-at<ACTIVE_FOR_MS->"active";else->"seen"}}
+    /** When the presence row was seen, in milliseconds, or null. */
+    fun seenAt(seenAt:String?):Long?=instant(seenAt)?.toEpochMilli()
+    /** Compares app versions like 0.16.3 and 0.17.0 part by part; a part that is not a number counts as 0. */
+    fun compareVersions(a:String,b:String):Int{
+        val pa=a.split('.').map{it.trim().toIntOrNull()?:0};val pb=b.split('.').map{it.trim().toIntOrNull()?:0}
+        for(i in 0 until maxOf(pa.size,pb.size)){val d=pa.getOrElse(i){0}-pb.getOrElse(i){0};if(d!=0)return d}
+        return 0
+    }
     /** Trimmed text, or null when there is nothing written. */
     fun text(v:String?):String?=v?.trim()?.takeIf{it.isNotEmpty()}
     /** The app stores "Sin camión asignado" when the driver did not pick a truck: that is not a truck. */

@@ -105,6 +105,8 @@ class MainActivity:AppCompatActivity(){
  private var fleetLoadedAt=0L;private var fleetLoading=false
  // Flota en vivo: who is on a trip every minute, the positions every few seconds; these views change in place.
  private var liveLoadedAt=0L;private var liveLoading=false;private var fleetStats:LinearLayout?=null;private var fleetCard:LinearLayout?=null;private var fleetNote:TextView?=null;private var fleetShape=""
+ // «Chofer activo»: when the app opens and every 5 minutes while it is open (Presence); the owner sees who has it.
+ private var presenceAt=0L;private var peopleCard:LinearLayout?=null
  private var editForm=JSONObject();private var editId:String?=null;private var maintFilter=0;private var maintTruck="";private var papersAt=0L
  private var modePick=UiMode.SIMPLE;private var finishAsk=false;private var tripFilter=0
  // Simple mode asks before starting a trip; startAskAt is when the question came up.
@@ -308,7 +310,7 @@ class MainActivity:AppCompatActivity(){
 
  // ---------- Page frame: navy header, scrolling content, optional bottom dock and navigation ----------
  private fun page(key:String,header:Boolean=true){
-  activeMap?.destroy();activeMap=null;liveMap=null;screen=key;back.isEnabled=key in innerScreens;fleetStats=null;fleetCard=null;fleetNote=null
+  activeMap?.destroy();activeMap=null;liveMap=null;screen=key;back.isEnabled=key in innerScreens;fleetStats=null;fleetCard=null;fleetNote=null;peopleCard=null
   distance=null;speed=null;limit=null;status=null;statusBox=null;elapsed=null;sync=null;gps=null;count=null;pauseLabel=null;pauseIcon=null
   shell=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(appBg)}
   head=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(barBg);visibility=if(header)View.VISIBLE else View.GONE}
@@ -735,7 +737,7 @@ class MainActivity:AppCompatActivity(){
    .setPositiveButton("Abrir ajustes"){_,_->try{startActivity(if(appPage)Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:$packageName")) else Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))}catch(_:Exception){toast("Abrí Ajustes › Apps › Transportes Ferreira GPS › Batería y elegí «Sin restricciones»")}}
    .setNegativeButton("Ahora no",null).show()
  }
- private fun refresh(){if(!::store.isInitialized)return;sync?.text=store.message()
+ private fun refresh(){if(!::store.isInitialized)return;sync?.text=store.message();presence()
   if(screen=="owner"&&!fleetLoading){val now=System.currentTimeMillis();if(now-fleetLoadedAt>FLEET_MS)loadFleet() else if(!liveLoading&&now-liveLoadedAt>LIVE_MS)loadLive()}
   if(screen!="trip"&&screen!="simpletrip")return;val t=store.current()?:return
   if(!t.optBoolean("active")){home();toast("Viaje finalizado. Los datos pendientes se enviarán con conexión.");return}
@@ -1016,7 +1018,17 @@ class MainActivity:AppCompatActivity(){
   note("Transportes Ferreira GPS · versión $appVersion",top=18).gravity=Gravity.CENTER
   navBar("more")
  }
- private fun logout(){if(active()||store.pendingCount()>0){toast("Finalizá el viaje y enviá los datos pendientes antes de cerrar sesión.");return};api.clear();login()}
+ private fun logout(){if(active()||store.pendingCount()>0){toast("Finalizá el viaje y enviá los datos pendientes antes de cerrar sesión.");return};api.clear();presenceAt=0L;login()}
+ /**
+  * «Chofer activo»: while the app is open (this runs with the screen tick, which stops with the app), when it opens and
+  * every 5 minutes. The fleet-panel account is not a driver and sends nothing.
+  */
+ private fun presence(){
+  val now=System.currentTimeMillis()
+  if(now-presenceAt<Presence.EVERY_MS||api.session()==null||panelFirst())return
+  presenceAt=now
+  Presence.send(applicationContext,name.ifBlank{driverName()},truck.ifBlank{null},appVersion,store.current()?.optBoolean("active")==true)
+ }
 
  // ---------- Privacy policy: the same text published in docs/legal/privacidad.md ----------
  private fun privacy(){
@@ -1051,6 +1063,9 @@ class MainActivity:AppCompatActivity(){
   section("Camiones")
   if(items.isEmpty())emptyCard(R.drawable.ic_truck,"Sin camiones cargados","Los equipos del catálogo aparecen acá.") else {val c=card();fleetCard=c;items.forEach{fleetRow(c,it)}}
   fleetNote=note(fleetNoteText(f),top=10)
+  section("Choferes con la app")
+  val pc=card();peopleCard=pc;peopleInto(pc,f)
+  note("Activo es con la app abierta en los últimos 10 minutos. Las versiones anteriores a la 0.17.0 no avisan.",top=8)
   if(!hub)tileGrid(listOf(Tile(R.drawable.ic_list,"Viajes de la flota",null){openHistory("trips",true)},Tile(R.drawable.ic_history,"Combustible de la flota",null){openHistory("fuel",true)},
    Tile(R.drawable.ic_speed,"Rendimiento",null){openPerformance()},Tile(R.drawable.ic_wrench,"Mantenimiento",null){maintenance(true)},Tile(R.drawable.ic_doc,"Documentos",null){documents(true)}))
   sync=note(store.message(),top=16).apply{gravity=Gravity.CENTER}
@@ -1083,12 +1098,32 @@ class MainActivity:AppCompatActivity(){
   if(k==null||fleetShape!=shapeOf(f,items,marks))return false
   fleetStatsInto(k,items);fleetCard?.let{c->c.removeAllViews();items.forEach{fleetRow(c,it)}}
   activeMap?.evaluateJavascript("window.setMarks&&setMarks(${marks.toString().replace("<","\\u003c")})",null)
-  fleetNote?.text=fleetNoteText(f)
+  fleetNote?.text=fleetNoteText(f);peopleCard?.let{peopleInto(it,f)}
   return true
+ }
+ /**
+  * The drivers with the app (0.17.0 or later), the same rule as the panel: on a trip first, then active with the app open in
+  * the last 10 minutes, then when they last opened it, with the app version and whether a newer one is in use.
+  */
+ private fun peopleInto(c:LinearLayout,f:JSONObject){
+  c.removeAllViews()
+  val rows=mobile.presence().let{a->(0 until a.length()).map{a.getJSONObject(it)}}
+  if(rows.isEmpty()){note("Todavía ningún chofer abrió la app nueva.",c,0).setPadding(dp(16),dp(12),dp(16),dp(12));return}
+  val active=f.optJSONArray("active")?:JSONArray();val onTrip=(0 until active.length()).map{active.getJSONObject(it).optString("driver_id")}.toSet()
+  val newest=rows.map{it.optString("app_version")}.reduce{a,b->if(FleetStats.compareVersions(b,a)>0)b else a}
+  val now=System.currentTimeMillis();val order=mapOf("trip" to 0,"active" to 1,"seen" to 2)
+  rows.map{Pair(it,FleetStats.presenceState(it.optString("driver_id") in onTrip,it.optString("seen_at"),now))}.sortedBy{order[it.second]}.forEach{(r,state)->
+   val seen=FleetStats.seenAt(r.optString("seen_at"))?.let{ago(it)}?:"hace tiempo";val version=r.optString("app_version")
+   val what=when(state){"trip"->"En viaje";"active"->"Activo $seen";else->"Abrió la app $seen"}
+   val app="app $version"+if(FleetStats.compareVersions(newest,version)>0)" (hay una más nueva: $newest)" else ""
+   row(c,R.drawable.ic_person,FleetStats.text(r.optString("driver_name"))?:"Chofer","$what · $app",tint=when(state){"trip"->blue;"active"->green;else->grey})
+  }
  }
  private fun loadFleet(manual:Boolean=false){
   if(fleetLoading)return;fleetLoading=true;if(manual)toast("Actualizando la flota…")
   thread{val ok=try{mobile.catalog(true);mobile.fleet(true);true}catch(_:Exception){false}
+   // Who has the app open; the fleet still shows if this lookup fails.
+   if(ok)try{mobile.presence(true)}catch(_:Exception){}
    runOnUiThread{fleetLoading=false;fleetLoadedAt=System.currentTimeMillis();if(!ok&&manual)toast("Sin conexión. Se muestra la última información guardada.")
     // The refresh every minute updates the open screen in place; a manual one, or a change in what it shows, builds it again.
     if(ok&&screen=="owner"&&(manual||!fleetLive()))rebuildOwner()}}

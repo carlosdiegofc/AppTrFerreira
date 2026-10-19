@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { FleetMap } from '../components/FleetMap';
+import { FleetMap, type PersonMark } from '../components/FleetMap';
 import { Icon } from '../components/Icon';
-import { Dot, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote } from '../components/ui';
+import { Dot, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote, type Tone } from '../components/ui';
 import { LIVE_REFRESH_MS } from '../config';
-import { useFleet, useNow, useRoute } from '../data/hooks';
+import { useFleet, useNow, usePresence, useRoute } from '../data/hooks';
 import { ago, dayInZone, formatDay, formatTime } from '../lib/dates';
 import { type FleetUnit, fleetCounts, STATE_LABEL, unitTitle } from '../lib/fleet';
 import { count, km, kmh } from '../lib/format';
+import { type DriverPresence, driverPresence, PRESENCE_LABEL, type PresenceState } from '../lib/presence';
 import { drawable } from '../lib/route';
 import { STATE_TONE } from './states';
 
@@ -58,19 +59,66 @@ function Detail({ unit, now, points, stale, onRetry, onClose }: { unit: FleetUni
   );
 }
 
+/** On a trip blue, active with the app open green, not seen for a while grey. */
+const PRESENCE_TONE: Record<PresenceState, Tone> = { trip: 'blue', active: 'green', seen: 'grey' };
+
+const version = (p: DriverPresence) => `app ${p.version}${p.newer ? ` (hay una más nueva: ${p.newer})` : ''}`;
+
+/** What the list says of each driver: on a trip, active and since when, or when the app was last open. */
+function presenceLine(p: DriverPresence, now: number): string {
+  if (p.state === 'trip') return ['En viaje', version(p)].join(' · ');
+  if (p.state === 'active') return [`Activo ${ago(p.seenAt, now)}`, 'sin viaje', p.place ? null : 'sin posición', version(p)].filter(Boolean).join(' · ');
+  return [`Abrió la app ${ago(p.seenAt, now)}`, version(p)].join(' · ');
+}
+
+function PersonDetail({ person, now, onClose }: { person: DriverPresence; now: number; onClose: () => void }) {
+  return (
+    <section className="unit-detail" aria-label={`Detalle de ${person.name}`}>
+      <header>
+        <div>
+          <h2>{person.name}</h2>
+          <p>{person.vehicle ?? 'Sin camión guardado en el teléfono'}</p>
+        </div>
+        <button type="button" className="btn btn-icon" aria-label="Cerrar el detalle" onClick={onClose}>
+          <Icon name="close" size={18} />
+        </button>
+      </header>
+      <Pill tone={PRESENCE_TONE[person.state]}>{person.state === 'active' ? 'Activo, sin viaje' : PRESENCE_LABEL[person.state]}</Pill>
+      <dl className="facts facts-tight">
+        <div><dt>Con la app abierta</dt><dd>{ago(person.seenAt, now)}</dd></div>
+        <div><dt>Posición del teléfono</dt><dd>{person.place ? `${ago(person.place.at, now)}${person.place.accuracy !== null ? ` · ±${Math.round(person.place.accuracy)} m` : ''}` : 'Sin posición'}</dd></div>
+        <div><dt>Versión de la app</dt><dd>{person.version}{person.newer ? ` (hay una más nueva: ${person.newer})` : ''}</dd></div>
+      </dl>
+    </section>
+  );
+}
+
 export function Gps() {
   const now = useNow(5_000);
   const fleet = useFleet(now);
+  const presence = usePresence();
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState<Filter>('all');
   const [fitToken, setFitToken] = useState(0);
-  const selected = params.get('camion');
+  const chofer = params.get('chofer');
+  const selected = params.get('camion') ?? (chofer ? `driver:${chofer}` : null);
   const unit = fleet.units.find((u) => u.key === selected) ?? null;
   const route = useRoute(unit?.trip ?? null);
   const counts = fleetCounts(fleet.units);
   const shown = fleet.units.filter((u) => matches(u, filter));
+  const onTrip = useMemo(() => new Set(fleet.units.flatMap((u) => (u.trip ? [u.trip.driver_id] : []))), [fleet.units]);
+  const drivers = useMemo(() => (presence.data ? driverPresence(presence.data, onTrip, now) : []), [presence.data, onTrip, now]);
+  const people = useMemo(
+    () => drivers.flatMap((d): PersonMark[] => (d.place ? [{ key: `driver:${d.driverId}`, name: d.name, lat: d.place.lat, lng: d.place.lng }] : [])),
+    [drivers],
+  );
+  const person = drivers.find((d) => `driver:${d.driverId}` === selected) ?? null;
 
-  const choose = (key: string | null) => setParams(key && key !== selected ? { camion: key } : {}, { replace: true });
+  const choose = (key: string | null) => {
+    if (!key || key === selected) setParams({}, { replace: true });
+    else if (key.startsWith('driver:')) setParams({ chofer: key.slice('driver:'.length) }, { replace: true });
+    else setParams({ camion: key }, { replace: true });
+  };
   const filters: { value: Filter; label: string; n: number }[] = [
     { value: 'all', label: 'Todos', n: fleet.units.length },
     { value: 'moving', label: 'En ruta', n: counts.moving },
@@ -83,11 +131,11 @@ export function Gps() {
       <PageHead
         title="GPS en vivo"
         subtitle={fleet.fetchedAt ? `Actualizado ${ago(fleet.fetchedAt, now)} · las posiciones se actualizan solas cada ${LIVE_REFRESH_MS / 1000} segundos` : 'Buscando las posiciones…'}
-        actions={<RefreshButton onClick={() => void Promise.all([fleet.refetch(), unit?.trip ? route.refetch() : null])} busy={fleet.isFetching || route.isFetching} />}
+        actions={<RefreshButton onClick={() => void Promise.all([fleet.refetch(), unit?.trip ? route.refetch() : null, presence.refetch()])} busy={fleet.isFetching || route.isFetching} />}
       />
       {fleet.error ? <ErrorNote onRetry={() => void fleet.refetch()}>No se pudo leer la flota.</ErrorNote> : null}
       <div className="gps">
-        <aside className="card gps-side" aria-label="Camiones">
+        <aside className="card gps-side" aria-label="Camiones y choferes">
           <div className="chips" role="group" aria-label="Filtrar camiones">
             {filters.map((f) => (
               <button key={f.value} type="button" className={`chip${filter === f.value ? ' is-on' : ''}`} aria-pressed={filter === f.value} onClick={() => setFilter(f.value)}>
@@ -105,6 +153,7 @@ export function Gps() {
               onClose={() => choose(null)}
             />
           )}
+          {person && <PersonDetail person={person} now={now} onClose={() => choose(null)} />}
           {fleet.isLoading ? (
             <Skeleton lines={5} />
           ) : shown.length === 0 ? (
@@ -132,9 +181,47 @@ export function Gps() {
               ))}
             </ul>
           )}
+          <section className="gps-people" aria-label="Choferes con la app">
+            <h2>Choferes con la app</h2>
+            {presence.error && !presence.data ? (
+              <ErrorNote onRetry={() => void presence.refetch()}>No se pudo leer quién tiene la app abierta.</ErrorNote>
+            ) : presence.isLoading ? (
+              <Skeleton lines={2} />
+            ) : drivers.length === 0 ? (
+              <p className="muted">Todavía ningún chofer abrió la app nueva.</p>
+            ) : (
+              <ul className="people">
+                {drivers.map((d) => {
+                  const key = `driver:${d.driverId}`;
+                  const body = (
+                    <>
+                      <Dot tone={PRESENCE_TONE[d.state]} />
+                      <span className="unit-main">
+                        <strong>{d.name}</strong>
+                        <span>{presenceLine(d, now)}</span>
+                      </span>
+                    </>
+                  );
+                  return (
+                    <li key={d.driverId}>
+                      {d.place ? (
+                        <button type="button" className={`unit${key === selected ? ' is-selected' : ''}`} onClick={() => choose(key)} aria-pressed={key === selected}>
+                          {body}
+                        </button>
+                      ) : (
+                        <div className="unit unit-static">{body}</div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {presence.error && presence.data ? <StaleNote onRetry={() => void presence.refetch()}>No se pudo actualizar quién tiene la app abierta: se ve lo último que se leyó.</StaleNote> : null}
+            <p className="muted gps-people-note">Activo es con la app abierta en los últimos 10 minutos; la posición sin viaje es la del teléfono, con la app abierta. Las versiones anteriores a la 0.17.0 no avisan.</p>
+          </section>
         </aside>
         <div className="card gps-map">
-          <FleetMap units={fleet.units} selected={selected} onSelect={(key) => choose(key)} route={unit?.trip ? (route.data ?? null) : null} fitToken={fitToken} label="Mapa de la flota en vivo" className="map-live" />
+          <FleetMap units={fleet.units} people={people} selected={selected} onSelect={(key) => choose(key)} route={unit?.trip ? (route.data ?? null) : null} fitToken={fitToken} label="Mapa de la flota en vivo" className="map-live" />
           <button
             type="button"
             className="btn map-fit"

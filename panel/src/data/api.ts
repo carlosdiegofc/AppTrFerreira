@@ -3,6 +3,7 @@
 import type { Tables, TablesInsert } from '../lib/database.types';
 import { type ActiveTrip, type CatalogTruck, catalogTrucks, type FinishedTrip, lastTripByTruck, type LivePosition, text, truckLabel } from '../lib/fleet';
 import type { PaperRow, ServiceRow } from '../lib/papers';
+import type { PresenceRow } from '../lib/presence';
 import { supabase } from '../lib/supabase';
 import type { TripPayload } from '../lib/tripForm';
 import type { DetailRow, FuelRow, PanelTripRow, SessionRow, Trip } from '../lib/trips';
@@ -78,6 +79,11 @@ export async function fetchFleet(): Promise<FleetData> {
  */
 export async function fetchLivePositions(): Promise<LivePosition[]> {
   return rows(await supabase.from('trf_driver_locations').select('driver_id,latitude,longitude,speed_kmh,recorded_at').limit(500));
+}
+
+/** Who has the app open («chofer activo»): one row per driver, from app 0.17.0 on. */
+export async function fetchPresence(): Promise<PresenceRow[]> {
+  return rows(await supabase.from('trf_driver_presence').select('driver_id,driver_name,vehicle,app_version,seen_at,latitude,longitude,accuracy_m,located_at').order('seen_at', { ascending: false }).limit(500));
 }
 
 /**

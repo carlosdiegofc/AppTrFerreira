@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { FLEET_REFRESH_MS, LIVE_REFRESH_MS, ROUTE_REFRESH_MS } from '../config';
+import { FLEET_REFRESH_MS, LIVE_REFRESH_MS, PRESENCE_REFRESH_MS, ROUTE_REFRESH_MS } from '../config';
 import { type ActiveTrip, type CatalogTruck, fleetUnits, truckLabel, withLivePositions } from '../lib/fleet';
 import { appendReadings } from '../lib/route';
 import type { TripPayload } from '../lib/tripForm';
@@ -13,6 +13,7 @@ import {
   fetchLastTrips,
   fetchLivePositions,
   fetchPapers,
+  fetchPresence,
   fetchRoute,
   fetchTripDetail,
   fetchTripList,
@@ -38,6 +39,9 @@ export const useFleetData = () => useQuery({ queryKey: ['fleet'], queryFn: fetch
 
 /** The position of every truck, every few seconds while the screen is visible (a hidden tab does not read). */
 export const useLivePositions = () => useQuery({ queryKey: ['livePositions'], queryFn: fetchLivePositions, refetchInterval: LIVE_REFRESH_MS, refetchIntervalInBackground: false, staleTime: 0 });
+
+/** Who has the app open («chofer activo»), every 30 seconds while the screen is visible. */
+export const usePresence = () => useQuery({ queryKey: ['presence'], queryFn: fetchPresence, refetchInterval: PRESENCE_REFRESH_MS, refetchIntervalInBackground: false });
 
 /** The last trip of every truck, further back than the live refresh; trucks rarely change it, so every 30 minutes. */
 const useLastTrips = (catalog: readonly CatalogTruck[] | undefined) =>

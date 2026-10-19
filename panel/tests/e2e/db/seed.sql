@@ -71,6 +71,17 @@ insert into public.trf_driver_locations (driver_id, driver_name, vehicle, latitu
   ('00000000-0000-4000-8000-000000000013', 'Carla Méndez', 'Mercedes Benz Actros', -32.318, -58.081, 64, (select now from t0) - interval '40 minutes', true, (select now from t0) - interval '40 minutes'),
   ('00000000-0000-4000-8000-000000000014', 'Diego Silva', 'Ford Cargo 1722 · JKL3456', -31.39, -57.96, 0, (select now from t0) - interval '3 hours', false, (select now from t0) - interval '3 hours');
 
+-- Who has the app open («chofer activo»): Ana and Bruno, on their trips; Diego, without a trip and with the app open
+-- next to his truck in Salto; Carla opened it three hours ago. Ana and Diego have a newer version (invented, like
+-- everything here) than Bruno and Carla. The server sets seen_at; here it is fixed to the base.
+alter table public.trf_driver_presence disable trigger trf_driver_presence_touch;
+insert into public.trf_driver_presence (driver_id, driver_name, vehicle, app_version, seen_at, latitude, longitude, accuracy_m, located_at) values
+  ('00000000-0000-4000-8000-000000000011', 'Ana Pereira', 'Volvo FH 460 · ABC1234', '0.17.1', (select now from t0) - interval '1 minute', null, null, null, null),
+  ('00000000-0000-4000-8000-000000000012', 'Bruno Díaz', 'Scania R450 · DEF5678', '0.17.0', (select now from t0) - interval '4 minutes', null, null, null, null),
+  ('00000000-0000-4000-8000-000000000013', 'Carla Méndez', 'Mercedes Benz Actros', '0.17.0', (select now from t0) - interval '3 hours', null, null, null, null),
+  ('00000000-0000-4000-8000-000000000014', 'Diego Silva', 'Ford Cargo 1722 · JKL3456', '0.17.1', (select now from t0) - interval '2 minutes', -31.385, -57.955, 12, (select now from t0) - interval '2 minutes');
+alter table public.trf_driver_presence enable trigger trf_driver_presence_touch;
+
 -- Papers and services: expired, about to expire, far away; late, coming up, done.
 insert into public.trf_documents (scope, driver_id, driver_name, vehicle, kind, expires_on) values
   ('driver', '00000000-0000-4000-8000-000000000011', 'Ana Pereira', '', 'Licencia de conducir', (select today from t0) + 10),

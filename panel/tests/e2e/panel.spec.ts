@@ -82,6 +82,30 @@ test('el GPS en vivo filtra la flota y sigue a un camión con su recorrido', asy
   await expect(page.locator('.units > li')).toHaveCount(2);
 });
 
+test('el GPS en vivo dice qué choferes tienen la app abierta y dónde está el que no viaja', async ({ page }) => {
+  await signIn(page, 'dueno@ejemplo.uy');
+  await open(page, 'GPS en vivo');
+  const people = page.locator('.gps-people');
+  const driver = (name: string) => people.locator('.people > li', { hasText: name });
+  await expect(people.locator('.people > li')).toHaveCount(4);
+  // On a trip first, then active with the app open; the trip says where the truck is.
+  await expect(people.locator('.people > li').first()).toContainText('Ana Pereira');
+  await expect(driver('Ana Pereira')).toContainText('En viaje · app 0.17.1');
+  await expect(driver('Bruno Díaz')).toContainText('En viaje · app 0.17.0 (hay una más nueva: 0.17.1)');
+  await expect(driver('Diego Silva')).toContainText('Activo hace 2 min · sin viaje · app 0.17.1');
+  await expect(people).toContainText('Las versiones anteriores a la 0.17.0 no avisan.');
+  // Diego's phone shows on the map apart from his truck, which stays where his last trip ended.
+  await expect(page.locator('.leaflet-marker-icon[title="Diego Silva · con la app abierta, sin viaje"]')).toHaveCount(1);
+  await expect(page.locator('.leaflet-marker-icon[title^="Ford Cargo 1722 · JKL3456"]')).toHaveCount(1);
+  await driver('Diego Silva').getByRole('button').click();
+  const detail = page.locator('.unit-detail');
+  await expect(detail).toContainText('Ford Cargo 1722 · JKL3456');
+  await expect(detail).toContainText('Activo, sin viaje');
+  await expect(detail).toContainText('hace 2 min · ±12 m');
+  await expect(page).toHaveURL(/chofer=00000000-0000-4000-8000-000000000014/);
+  await shot(page, 'gps-choferes');
+});
+
 test('si falla la actualización del recorrido en vivo, el GPS lo dice', async ({ page }) => {
   await signIn(page, 'dueno@ejemplo.uy');
   await open(page, 'GPS en vivo');
