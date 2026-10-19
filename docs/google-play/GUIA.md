@@ -124,7 +124,10 @@ Tipos de datos. En todos: **recopilado: sí**, **compartido: no**, **procesado d
 | Información personal › IDs de usuario | Obligatorio | Funcionalidad de la app, Administración de la cuenta |
 | Información financiera › Historial de compras | Opcional | Funcionalidad de la app |
 | Fotos y videos › Fotos | Opcional | Funcionalidad de la app |
+| Actividad en la app › Interacciones con la app | Obligatorio | Funcionalidad de la app |
 | Actividad en la app › Otro contenido generado por el usuario | Obligatorio | Funcionalidad de la app |
+
+«Interacciones con la app» va desde la versión 0.17.0: el aviso de «chofer activo» le dice a la empresa cuándo tuvo cada chofer la app abierta.
 
 Por qué «compartido: no»: Supabase (la base de datos), los mapas y el servicio de rutas trabajan por cuenta de la empresa, y Google no cuenta eso como compartir. La ubicación figura como opcional porque el chofer puede negar el permiso y el viaje igual se registra, sin recorrido.
 
@@ -151,7 +154,7 @@ Video: grabá la pantalla del teléfono (30 a 60 segundos) mostrando: abrir la a
 Google empezó a pedir una justificación a las apps que usan ubicación precisa durante un período continuo. Si aparece esa declaración:
 
 ```text
-The app records the route and the distance of company trucks during a trip that the driver starts and ends explicitly. Distance is computed from consecutive GPS fixes, so approximate location (about 3 km) cannot measure the kilometers driven or draw the route. Location is collected only while a trip is active and stops when the trip is paused or finished.
+The app records the route and the distance of company trucks during a trip that the driver starts and ends explicitly. Distance is computed from consecutive GPS fixes, so approximate location (about 3 km) cannot measure the kilometers driven or draw the route. Continuous location is collected only while a trip is active and stops when the trip is paused or finished. Outside a trip, only while the app is open and if the driver agrees, the app sends one battery-saving position when it opens and every 5 minutes, so the office knows where available drivers are; it never uses location in the background outside a trip.
 ```
 
 ## 4. Ficha de Play Store
@@ -228,6 +231,37 @@ La app de Google Play es una app nueva para Android (nombre de paquete `com.tran
 ## 7. Actualizaciones
 
 Cada versión nueva lleva un número de versión más alto, y GitHub Actions arma su `.aab` solo. En Play Console: *Prueba interna › Crear versión* › subí el `.aab` nuevo › **Lanzar**. Los teléfonos se actualizan desde Google Play sin hacer nada más.
+
+Versión `0.17.0` (código de versión 26). Trae todo lo de la 0.16.3, que no se subió, y es la primera armada con R8: el código va optimizado y ofuscado, y los recursos que no se usan quedan afuera. Eso responde al aviso de Play Console «La optimización del código DEX está por debajo de nuestro umbral». No pide permisos nuevos. Antes de lanzarla:
+
+- **Seguridad de los datos:** agregá *Actividad en la app › Interacciones con la app* como está en la [tabla](#seguridad-de-los-datos). La ubicación ya figura; ahora también se usa con la app abierta fuera de un viaje, si el chofer lo acepta.
+- Si Play Console pide la justificación de la ubicación precisa, usá el texto de [Ubicación precisa](#ubicación-precisa-solo-si-play-console-la-pide), que ya cuenta el «chofer activo».
+
+Probala en tu teléfono antes de lanzarla a los choferes. La prueba automática del emulador cubre el ingreso, pero el viaje con GPS, las fotos y la sincronización necesitan una cuenta real:
+
+1. *Prueba interna › Crear versión* › subí el `.aab` › **Siguiente** › **Guardar**, sin lanzar todavía.
+2. En *Explorador de paquetes de aplicación* (menú *Prueba y lanzamiento*), elegí la versión 26 › *Descargas* › **APK universal firmado**. Instalalo en tu teléfono: actualiza la app de Google Play sin borrar nada, porque está firmado con la misma llave.
+3. Probá:
+   - cerrar sesión y volver a ingresar;
+   - un viaje corto: la notificación «Viaje en curso», el mapa, pausar, reanudar y finalizar;
+   - combustible con foto (cámara y galería) y un remito;
+   - **Enviar pendientes y actualizar**, hasta ver «Todo guardado en el panel»;
+   - en el panel, el viaje con su recorrido y las fotos;
+   - con la cuenta de Luis, el Menú del dueño: Flota en vivo y Rendimiento.
+4. Si todo anda, volvé a la versión y tocá **Lanzar en prueba interna**. Si algo falla, no la lances y avisame qué pasó.
+
+Notas de la versión (si la última subida es la 0.16.2):
+
+```text
+<es-419>
+• GPS en vivo más rápido: la posición llega al panel en segundos.
+• Recorrido más prolijo: dobla en las esquinas y no dibuja «estrellas» con el camión parado.
+• Chofer activo: con la app abierta, la empresa ve que estás disponible y, si lo aceptás, dónde estás cuando no hay viaje.
+• Flota en vivo: los camiones se mueven sin saltos en el mapa.
+• Combustible del mes corregido; el dueño puede cargar los documentos de cada chofer.
+• App optimizada.
+</es-419>
+```
 
 Versión `0.16.3` (código de versión 25). No cambia permisos, datos recopilados ni la política de privacidad. Notas de la versión si ya está subida la 0.16.2:
 

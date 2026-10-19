@@ -25,7 +25,15 @@ android {
         }
     }
     buildTypes {
-        getByName("release") { signingConfig = signingConfigs.findByName("upload") }
+        getByName("release") {
+            signingConfig = signingConfigs.findByName("upload")
+            // R8 optimizes and obfuscates the Google Play build and leaves out the resources it never uses, as Play Console
+            // asks. The mapping that turns crash reports back into the real names goes inside the .aab, where Play Console
+            // finds it. The rules the app needs are in proguard-rules.pro.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
     }
     // The privacy policy shown in the app is the same file published in docs/legal.
     sourceSets { getByName("main") { assets.srcDir("../docs/legal") } }
