@@ -30,7 +30,8 @@ insert into public.trf_mobile_catalog (id, data) values ('fleet', '{
     {"id": "e4", "tipo": "Ford Cargo 1722", "matriculaCamion": "JKL3456"},
     {"id": "e5", "tipo": "Iveco Stralis", "matriculaCamion": "MNO7890"}
   ],
-  "clientes": ["Cliente Uno"], "estaciones": [], "tiposCarga": ["Granos"], "clientesDetalle": []
+  "clientes": ["Cliente Uno"], "tiposCarga": ["Granos"], "clientesDetalle": [],
+  "estaciones": [{"id": "est-ruta5", "nombre": "Ancap Ruta 5 km 32"}, {"id": "est-salto", "nombre": "Petrobras Salto"}, {"id": "est-young", "nombre": "Ducsa Young"}]
 }');
 
 -- Trips: on the road, stopped, without signal (older label without plate), finished today, deleted today, yesterday.
@@ -105,6 +106,28 @@ insert into public.trf_trip_documents (id, trip_id, driver_id, kind, number, car
   ('30000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000011', 'departure', '0001-00012345', 'Soja', 30000,
    '00000000-0000-4000-8000-000000000011/10000000-0000-4000-8000-00000000000a/30000000-0000-4000-8000-000000000001.jpg', (select now from t0) - interval '110 minutes'),
   ('30000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000011', 'arrival', '', '', null, null, (select now from t0) - interval '100 minutes');
-insert into public.trf_driver_fuel_receipts (id, trip_id, driver_id, driver_name, vehicle, recorded_at, receipt_date, object_path, station_name, liters, total, panel_data) values
+insert into public.trf_driver_fuel_receipts (id, trip_id, driver_id, driver_name, vehicle, recorded_at, receipt_date, object_path, station_name, liters, total, panel_data, updated_at) values
   ('40000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000011', 'Ana Pereira', 'Volvo FH 460 · ABC1234', (select now from t0) - interval '90 minutes', (select today from t0),
-   '00000000-0000-4000-8000-000000000011/10000000-0000-4000-8000-00000000000a/40000000-0000-4000-8000-000000000001.jpg', 'Ancap Ruta 5 km 32', 180, 9800, '{"litros": "182,5", "monto": "9.950"}');
+   '00000000-0000-4000-8000-000000000011/10000000-0000-4000-8000-00000000000a/40000000-0000-4000-8000-000000000001.jpg', 'Ancap Ruta 5 km 32', 180, 9800, '{"litros": "182,5", "monto": "9.950"}', (select now from t0) - interval '60 minutes');
+
+-- Combustible: receipts out of a trip too. Diego typed a catalog station in his own way (it counts for that station) and
+-- sent the photo; Bruno's receipt on his trip is in dollars; Carla loaded at a station that is not in the list; Ana's
+-- of twenty days ago is older than the opening balance of her station; Diego's of yesterday is in the trash.
+insert into public.trf_driver_fuel_receipts (id, trip_id, driver_id, driver_name, vehicle, recorded_at, receipt_date, object_path, station_id, station_name, liters, total, panel_data, archived) values
+  ('40000000-0000-4000-8000-000000000002', null, '00000000-0000-4000-8000-000000000014', 'Diego Silva', 'Ford Cargo 1722 · JKL3456', (select now from t0) - interval '2 days', (select today from t0) - 2,
+   '00000000-0000-4000-8000-000000000014/standalone/40000000-0000-4000-8000-000000000002.jpg', '', 'ANCAP  ruta 5 KM 32', 300, 16500, null, false),
+  ('40000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-00000000000b', '00000000-0000-4000-8000-000000000012', 'Bruno Díaz', 'Scania R450 · DEF5678', (select now from t0) - interval '30 minutes', (select today from t0),
+   null, 'est-salto', 'Petrobras Salto', 250, 310, '{"moneda": "USD"}', false),
+  ('40000000-0000-4000-8000-000000000004', null, '00000000-0000-4000-8000-000000000013', 'Carla Méndez', 'Mercedes Benz Actros', (select now from t0) - interval '5 days', (select today from t0) - 5,
+   null, '', 'Estación El Tala', 120, 6600, null, false),
+  ('40000000-0000-4000-8000-000000000005', null, '00000000-0000-4000-8000-000000000014', 'Diego Silva', 'Ford Cargo 1722 · JKL3456', (select now from t0) - interval '1 day', (select today from t0) - 1,
+   null, 'est-salto', 'Petrobras Salto', 50, 2700, null, true),
+  ('40000000-0000-4000-8000-000000000006', null, '00000000-0000-4000-8000-000000000011', 'Ana Pereira', 'Iveco Stralis · MNO7890', (select now from t0) - interval '20 days', (select today from t0) - 20,
+   null, 'est-ruta5', 'Ancap Ruta 5 km 32', 200, 11000, null, false);
+
+-- The account of each station: Ancap Ruta 5 started with what was owed ten days ago and got a transfer three days ago;
+-- Petrobras Salto got a cash payment in dollars yesterday.
+insert into public.trf_fuel_station_movements (station_key, station_name, kind, happened_on, amount, currency, method, notes) values
+  ('id:est-ruta5', 'Ancap Ruta 5 km 32', 'opening', (select today from t0) - 10, 25000, 'UYU', null, null),
+  ('id:est-ruta5', 'Ancap Ruta 5 km 32', 'payment', (select today from t0) - 3, 20000, 'UYU', 'transferencia', 'Transferencia BROU'),
+  ('id:est-salto', 'Petrobras Salto', 'payment', (select today from t0) - 1, 100, 'USD', 'efectivo', null);

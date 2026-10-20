@@ -2,7 +2,8 @@
 //  /            → the panel built for the tests (dist-e2e)
 //  /sb/rest/v1  → a real PostgREST connected to the local test database
 //  /sb/auth/v1  → password and refresh-token sign-in issuing JWTs that PostgREST accepts
-//  /sb/storage/v1/object/sign → signed links to the invented photos of tests/e2e/db/seed.sql
+//  /sb/storage/v1/object/sign → signed links to the invented photos of tests/e2e/db/seed.sql and to the uploaded ones
+//  /sb/storage/v1/object/trf-fuel-receipts/… → uploads of receipt photos, with the folder rule of the storage
 import crypto from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import http from 'node:http';
@@ -25,7 +26,12 @@ const refreshTokens = new Map();
 // The photos the seed points to, and who may open them: like the storage rule trf_panel_admin_read_photos, the
 // accounts of the panel list.
 const TRIP_A = '00000000-0000-4000-8000-000000000011/10000000-0000-4000-8000-00000000000a';
-const PHOTOS = { 'trf-trip-documents': [`${TRIP_A}/30000000-0000-4000-8000-000000000001.jpg`], 'trf-fuel-receipts': [`${TRIP_A}/40000000-0000-4000-8000-000000000001.jpg`] };
+const PHOTOS = {
+  'trf-trip-documents': [`${TRIP_A}/30000000-0000-4000-8000-000000000001.jpg`],
+  'trf-fuel-receipts': [`${TRIP_A}/40000000-0000-4000-8000-000000000001.jpg`, '00000000-0000-4000-8000-000000000014/standalone/40000000-0000-4000-8000-000000000002.jpg'],
+};
+// Receipt photos uploaded during the tests, as "bucket/path".
+const UPLOADED = new Set();
 const PHOTO_READERS = new Set([USERS['dueno@ejemplo.uy'].id, USERS['lectura@ejemplo.uy'].id]);
 const photoToken = (object) => crypto.createHmac('sha256', JWT_SECRET).update('photo:' + object).digest('base64url');
 const photoSvg = (title) =>
@@ -97,7 +103,7 @@ async function handle(req, res) {
   if (p.startsWith('/sb/storage/v1/object/sign/')) {
     const object = decodeURIComponent(p.slice('/sb/storage/v1/object/sign/'.length));
     const [bucket, ...rest] = object.split('/');
-    const known = (PHOTOS[bucket] ?? []).includes(rest.join('/'));
+    const known = (PHOTOS[bucket] ?? []).includes(rest.join('/')) || UPLOADED.has(object);
     if (req.method === 'POST') {
       const claims = verifyJwt(String(req.headers.authorization || '').replace(/^Bearer /, ''));
       if (!claims || !PHOTO_READERS.has(claims.sub) || !known) return json(res, 400, { statusCode: '404', error: 'not_found', message: 'Object not found' });
@@ -107,6 +113,20 @@ async function handle(req, res) {
     res.writeHead(200, { 'Content-Type': 'image/svg+xml' });
     res.end(photoSvg(bucket === 'trf-fuel-receipts' ? 'Boleta de combustible' : 'Remito'));
     return;
+  }
+  if (p.startsWith('/sb/storage/v1/object/trf-fuel-receipts/') && req.method === 'POST') {
+    // Like the storage rule fuel_photos_insert: a signed-in account uploads into its own folder, out of a trip
+    // ("standalone"); the bucket takes JPEG only. A second upload of the same photo is a duplicate.
+    const object = decodeURIComponent(p.slice('/sb/storage/v1/object/'.length));
+    const [, owner, folder, file] = object.split('/');
+    const claims = verifyJwt(String(req.headers.authorization || '').replace(/^Bearer /, ''));
+    const body = (await readBody(req)).toString('latin1');
+    if (!claims) return json(res, 400, { statusCode: '403', error: 'Unauthorized', message: 'invalid JWT' });
+    if (owner !== claims.sub || folder !== 'standalone' || !/^[0-9a-f-]{36}\.jpg$/.test(file ?? '')) return json(res, 400, { statusCode: '403', error: 'Unauthorized', message: 'new row violates row-level security policy' });
+    if (!/content-type: image\/jpeg/i.test(body) && req.headers['content-type'] !== 'image/jpeg') return json(res, 400, { statusCode: '415', error: 'invalid_mime_type', message: 'mime type not supported' });
+    if (UPLOADED.has(object)) return json(res, 400, { statusCode: '409', error: 'Duplicate', message: 'The resource already exists' });
+    UPLOADED.add(object);
+    return json(res, 200, { Key: object, Id: crypto.randomUUID() });
   }
   if (p === '/sb/auth/v1/logout') {
     res.writeHead(204);

@@ -5,7 +5,13 @@ Panel web nuevo (React + TypeScript), en construcción al lado del actual: [pane
 # Panel web (nuevo)
 La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
 
-# Transportes Ferreira GPS — v0.17.0
+# Transportes Ferreira GPS — v0.17.1
+
+## Nuevo en v0.17.1 (combustible en el modo sencillo; versionCode 27)
+- **Modo sencillo:** el botón **Cargar combustible** está en el Inicio y en el viaje en curso. Con un viaje en curso, la app pregunta si la carga es del viaje o sin viaje; sin viaje, abre la carga directamente. Es la misma pantalla y el mismo registro que en el modo normal.
+- «Fuera de viaje» pasa a decir **Sin viaje**, como el panel.
+- En el panel, las boletas se agrupan por estación, con la cuenta corriente de cada una; la oficina corrige las boletas sin tocar lo que cargó el chofer (migración `0003`). La app las sigue leyendo igual: las correcciones del panel son las que cuentan en Mi combustible y en Combustible de la flota.
+- Lo que se envía al panel no cambia.
 
 ## Nuevo en v0.17.0 (GPS en vivo más rápido y chofer activo; versionCode 26)
 - **Viaje en curso:** el teléfono toma una posición cada 2 segundos (antes cada 3 a 5) y la manda sola y enseguida, sin esperar al resto de lo que tiene para enviar (el viaje, el recorrido, las fotos). Los mapas en vivo del panel y de la app la reciben en unos segundos.

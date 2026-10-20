@@ -11,6 +11,8 @@ const Inicio = lazy(() => import('./pages/Inicio').then((m) => ({ default: m.Ini
 const Gps = lazy(() => import('./pages/Gps').then((m) => ({ default: m.Gps })));
 const Viajes = lazy(() => import('./pages/Viajes').then((m) => ({ default: m.Viajes })));
 const Viaje = lazy(() => import('./pages/Viaje').then((m) => ({ default: m.Viaje })));
+const Combustible = lazy(() => import('./pages/Combustible').then((m) => ({ default: m.Combustible })));
+const Estacion = lazy(() => import('./pages/Estacion').then((m) => ({ default: m.Estacion })));
 
 const loading = (
   <div className="page">
@@ -28,6 +30,8 @@ export function App() {
           <Route path="gps" element={<Suspense fallback={loading}><Gps /></Suspense>} />
           <Route path="viajes" element={<Suspense fallback={loading}><Viajes /></Suspense>} />
           <Route path="viajes/:key" element={<Suspense fallback={loading}><Viaje /></Suspense>} />
+          <Route path="combustible" element={<Suspense fallback={loading}><Combustible /></Suspense>} />
+          <Route path="combustible/estaciones/:key" element={<Suspense fallback={loading}><Estacion /></Suspense>} />
           {SECTIONS.filter((s) => !s.ready).map((s) => (
             <Route key={s.path} path={s.path} element={<Proximamente section={s} />} />
           ))}

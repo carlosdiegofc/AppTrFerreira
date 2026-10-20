@@ -1,6 +1,5 @@
 // The twelve sections of the platform plan (docs/PLAN-PLATAFORMA.md). The ones not built yet say what they will do and
 // where to find that today.
-import { CURRENT_PANEL_URL } from './config';
 import type { IconName } from './components/Icon';
 
 export interface Section {
@@ -14,14 +13,12 @@ export interface Section {
   meanwhile?: { text: string; href?: string };
 }
 
-const inCurrentPanel = { text: 'Mientras tanto, usalo en el panel actual.', href: CURRENT_PANEL_URL };
-
 export const SECTIONS: Section[] = [
   { path: 'inicio', label: 'Inicio', icon: 'home', ready: true, about: 'La flota de un vistazo.' },
   { path: 'flota', label: 'Flota', icon: 'truck', ready: false, about: 'La ficha de cada camión con foto, sus acoplados y su historial, los kilómetros y los vencimientos.' },
   { path: 'viajes', label: 'Viajes', icon: 'route', ready: true, about: 'Todos los viajes con filtros por estado, camión, chofer y fechas, el recorrido real y la exportación a Excel, PDF y Word.' },
   { path: 'choferes', label: 'Choferes', icon: 'person', ready: false, about: 'La ficha de cada chofer con sus viajes, sus documentos y los vencimientos.' },
-  { path: 'combustible', label: 'Combustible', icon: 'fuel', ready: false, about: 'Las cargas con la foto de la boleta, el control de litros por precio y el consumo de cada camión.', meanwhile: inCurrentPanel },
+  { path: 'combustible', label: 'Combustible', icon: 'fuel', ready: true, about: 'Las boletas agrupadas por estación, con la cuenta corriente de cada una: cargas, pagos y saldo.' },
   { path: 'gps', label: 'GPS en vivo', icon: 'pin', ready: true, about: 'Dónde está cada camión ahora.' },
   { path: 'mantenimiento', label: 'Mantenimiento', icon: 'wrench', ready: false, about: 'Los services preventivos y correctivos, con avisos por kilómetros y por fecha.', meanwhile: { text: 'Mientras tanto, está en la app: Menú del dueño › Mantenimiento.' } },
   { path: 'documentacion', label: 'Documentación', icon: 'doc', ready: false, about: 'Los papeles de camiones y choferes con el archivo y su vencimiento.', meanwhile: { text: 'Mientras tanto, está en la app: Menú del dueño › Documentos.' } },

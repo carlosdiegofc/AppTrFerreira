@@ -1,15 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { FLEET_REFRESH_MS, LIVE_REFRESH_MS, PRESENCE_REFRESH_MS, ROUTE_REFRESH_MS } from '../config';
+import type { TablesInsert, TablesUpdate } from '../lib/database.types';
 import { type ActiveTrip, type CatalogTruck, fleetUnits, truckLabel, withLivePositions } from '../lib/fleet';
+import { groupStations, type Movement, movementFromRow, type Receipt, receiptFromRow } from '../lib/fuel';
 import { appendReadings } from '../lib/route';
 import type { TripPayload } from '../lib/tripForm';
 import { mergeTrips, type Trip, tripFromPanel, tripFromSession } from '../lib/trips';
 import {
+  createReceipt,
   fetchCatalog,
   fetchCatalogLists,
   fetchDriverNames,
   fetchFleet,
+  fetchFuel,
   fetchLastTrips,
   fetchLivePositions,
   fetchPapers,
@@ -19,8 +23,12 @@ import {
   fetchTripList,
   fetchTrips,
   type RoutePoint,
+  saveMovement,
   saveTrip,
+  setMovementDeleted,
   setTripDeleted,
+  updateReceipt,
+  uploadReceiptPhoto,
 } from './api';
 
 /** The current time, refreshed every few seconds so "hace 2 min" keeps moving. */
@@ -34,6 +42,9 @@ export function useNow(everyMs = 10_000): number {
 }
 
 export const useCatalog = () => useQuery({ queryKey: ['catalog'], queryFn: fetchCatalog, staleTime: 10 * 60_000 });
+
+/** The catalog's clients, cargo and stations; the forms and Combustible read it. */
+const useCatalogLists = (enabled = true) => useQuery({ queryKey: ['catalogLists'], queryFn: fetchCatalogLists, staleTime: 10 * 60_000, enabled });
 
 export const useFleetData = () => useQuery({ queryKey: ['fleet'], queryFn: fetchFleet, refetchInterval: FLEET_REFRESH_MS, refetchIntervalInBackground: false });
 
@@ -161,7 +172,7 @@ export function useSetTripDeleted() {
 
 /** What the form suggests: the catalog's clients and cargo, and the drivers of the latest trips. */
 export const useFormSuggestions = (enabled: boolean) => {
-  const lists = useQuery({ queryKey: ['catalogLists'], queryFn: fetchCatalogLists, staleTime: 10 * 60_000, enabled });
+  const lists = useCatalogLists(enabled);
   const drivers = useQuery({ queryKey: ['driverNames'], queryFn: fetchDriverNames, staleTime: 10 * 60_000, enabled });
   return { clients: lists.data?.clients ?? [], products: lists.data?.products ?? [], drivers: drivers.data ?? [] };
 };
@@ -184,4 +195,65 @@ export function useTripDetail(kind: 'app' | 'web', id: string) {
     return d.panel ? tripFromPanel(d.panel, catalog.data ?? []) : null;
   }, [detail.data, catalog.data]);
   return { trip, detail, catalog };
+}
+
+
+/**
+ * All the fuel with the office's corrections on top: the receipts, the payments and opening balances, and every station
+ * with its account. Read again every minute while the page is open: the phones keep sending receipts.
+ */
+export function useFuel() {
+  const catalog = useCatalog();
+  const lists = useCatalogLists();
+  const query = useQuery({ queryKey: ['fuel'], queryFn: fetchFuel, refetchInterval: 60_000, staleTime: 30_000 });
+  const catalogStations = useMemo(() => lists.data?.stations ?? [], [lists.data]);
+  const receipts = useMemo(() => (query.data?.receipts ?? []).map((r) => receiptFromRow(r, catalog.data ?? [], catalogStations)), [query.data, catalog.data, catalogStations]);
+  const movements = useMemo(() => (query.data?.movements ?? []).map((m) => movementFromRow(m, catalogStations)), [query.data, catalogStations]);
+  const stations = useMemo(() => groupStations(receipts, movements, catalogStations), [receipts, movements, catalogStations]);
+  return { receipts, movements, stations, catalogStations, query, catalog, lists };
+}
+
+/** Everything that shows fuel reads it again after a change: Combustible and the trip's page. */
+function useFuelChanged() {
+  const client = useQueryClient();
+  return () => Promise.all(['fuel', 'trip'].map((key) => client.invalidateQueries({ queryKey: [key] })));
+}
+
+/** A receipt typed in the panel: its photo first (when there is one), then the receipt. */
+export function useCreateReceipt() {
+  const changed = useFuelChanged();
+  return useMutation({
+    mutationFn: async ({ row, photo }: { row: TablesInsert<'trf_driver_fuel_receipts'>; photo: Blob | null }) => {
+      if (photo && row.object_path) await uploadReceiptPhoto(row.object_path, photo);
+      return createReceipt(row);
+    },
+    onSettled: changed,
+  });
+}
+
+/** A correction or the trash; on a conflict the page reads the receipt again. */
+export function useUpdateReceipt() {
+  const changed = useFuelChanged();
+  return useMutation({
+    mutationFn: ({ receipt, changes }: { receipt: Pick<Receipt, 'id' | 'updatedAt'>; changes: Pick<TablesUpdate<'trf_driver_fuel_receipts'>, 'panel_data' | 'archived'> }) => updateReceipt(receipt, changes),
+    onSettled: changed,
+  });
+}
+
+/** A payment or an opening balance, new or changed. */
+export function useSaveMovement() {
+  const changed = useFuelChanged();
+  return useMutation({
+    mutationFn: ({ movement, row }: { movement: Movement | null; row: TablesInsert<'trf_fuel_station_movements'> | TablesUpdate<'trf_fuel_station_movements'> }) => saveMovement(movement, row),
+    onSettled: changed,
+  });
+}
+
+/** Annuls a payment or an opening balance, or brings it back. */
+export function useSetMovementDeleted() {
+  const changed = useFuelChanged();
+  return useMutation({
+    mutationFn: ({ movement, deleted }: { movement: Movement; deleted: boolean }) => setMovementDeleted(movement, deleted),
+    onSettled: changed,
+  });
 }
