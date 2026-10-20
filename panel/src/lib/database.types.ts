@@ -1,4 +1,4 @@
-// Generated from the production database (Supabase type generator) on 2026-10-19, after migration 0003. Regenerate after
+// Generated from the production database (Supabase type generator) on 2026-10-20, after migration 0004. Regenerate after
 // every migration.
 export type Json =
   | string
