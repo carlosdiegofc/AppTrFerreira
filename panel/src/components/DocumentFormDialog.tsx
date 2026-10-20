@@ -2,7 +2,7 @@
 // like the receipts, or a PDF). Deleting is for good, like in the app, and asks first. Closing with changes asks first;
 // if someone else saved the paper meanwhile, nothing is overwritten.
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
-import { ConflictError, describeWriteError } from '../data/api';
+import { ConflictError, describeWriteError, refused } from '../data/api';
 import { useDeletePaper, usePaperDrivers, useSavePaper } from '../data/hooks';
 import {
   FILE_MAX_BYTES,
@@ -67,6 +67,8 @@ export function DocumentFormDialog({ paper: opened, vehicles, onClose, onDone, o
   // A new paper keeps its id while the dialog is open: a save tried again does not make a second one.
   const [newId] = useState(() => crypto.randomUUID());
   const tried = useRef(false);
+  // The files already sent with a save: one whose answer was cut may be saved, so it is never deleted on a later try.
+  const sentFiles = useRef(new Set<string>());
   const [initial] = useState(() => paperFormValues(paper));
   const [values, setValues] = useState(initial);
   const [errors, setErrors] = useState<Partial<Record<PaperField, string>>>({});
@@ -153,7 +155,9 @@ export function DocumentFormDialog({ paper: opened, vehicles, onClose, onDone, o
       onClose();
       return;
     }
-    const upload = file.status === 'ready' ? { path: paperFilePath(paper?.id ?? newId, file.fileId, file.type), blob: file.blob, type: file.type } : null;
+    const path = file.status === 'ready' ? paperFilePath(paper?.id ?? newId, file.fileId, file.type) : null;
+    const upload = file.status === 'ready' && path ? { path, blob: file.blob, type: file.type, fresh: !sentFiles.current.has(path) } : null;
+    if (path) sentFiles.current.add(path);
     const objectPath = upload ? upload.path : file.status === 'removed' ? null : (paper?.file?.path ?? null);
     try {
       if (!paper) {
@@ -168,6 +172,8 @@ export function DocumentFormDialog({ paper: opened, vehicles, onClose, onDone, o
       await save.mutateAsync({ paper, row: paperChanges(check.payload, objectPath), upload, previous: paper.file?.path ?? null });
       onDone(file.status === 'removed' ? 'Documento guardado, sin archivo.' : 'Documento guardado.');
     } catch (err) {
+      // Refused: the file of that first try was deleted, so a try again uploads it as new.
+      if (upload?.fresh && refused(err)) sentFiles.current.delete(upload.path);
       fail(err);
     }
   };

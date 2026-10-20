@@ -11,7 +11,6 @@ import { appendReadings } from '../lib/route';
 import type { TripPayload } from '../lib/tripForm';
 import { mergeTrips, type Trip, tripFromPanel, tripFromSession } from '../lib/trips';
 import {
-  ConflictError,
   createReceipt,
   deleteDocument,
   deleteService,
@@ -31,6 +30,7 @@ import {
   fetchTripDetail,
   fetchTripList,
   fetchTrips,
+  refused,
   removeDocumentFile,
   type RoutePoint,
   saveDocument,
@@ -182,12 +182,14 @@ export interface PaperFileUpload {
   path: string;
   blob: Blob;
   type: FileType;
+  /** No save tried before with this file: if this one is refused, nothing points to the file. */
+  fresh: boolean;
 }
 
 /**
  * A paper, new or changed: its new file first (when there is one), then the paper, then the file it no longer has goes
- * (if that fails, it stays in the private folder, unused). A change someone else saved first saves nothing, and its
- * new file goes too.
+ * (if that fails, it stays in the private folder, unused). When the database refuses the save, the new file goes too,
+ * unless an earlier try with it may have been saved without its answer arriving.
  */
 export function useSavePaper() {
   const changed = useDocumentsChanged();
@@ -198,8 +200,7 @@ export function useSavePaper() {
       try {
         saved = await saveDocument(paper, row);
       } catch (e) {
-        // Only a change that certainly did not apply leaves the new file unused: a new paper tried again uses it.
-        if (paper && upload && e instanceof ConflictError) await removeDocumentFile(upload.path).catch((err: unknown) => console.error(err));
+        if (upload?.fresh && refused(e)) await removeDocumentFile(upload.path).catch((err: unknown) => console.error(err));
         throw e;
       }
       if (previous && previous !== saved.object_path) await removeDocumentFile(previous).catch((err: unknown) => console.error(err));

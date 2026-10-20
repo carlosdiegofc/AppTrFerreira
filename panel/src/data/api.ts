@@ -23,6 +23,9 @@ export class DataError extends Error {
 /** Someone saved the trip while it was being edited, or created its panel row first: reload it and look again. */
 export class ConflictError extends DataError {}
 
+/** The database certainly did not save: someone else saved first, or it said why. A cut answer is not a refusal. */
+export const refused = (e: unknown) => e instanceof ConflictError || (e instanceof DataError && Boolean(e.code));
+
 function rows<T>(result: { data: T | null; error: { message: string; code?: string } | null }): T {
   if (result.error) throw new DataError(result.error.message, result.error.code);
   if (result.data === null) throw new DataError('Respuesta vacía');

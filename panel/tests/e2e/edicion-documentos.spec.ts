@@ -126,11 +126,43 @@ test('si dos personas cambian el mismo papel a la vez, la segunda no pisa a la p
   await formA.getByRole('button', { name: 'Guardar', exact: true }).click();
   await expect(a.getByRole('status')).toContainText('Documento guardado.');
 
+  // B also replaces the PDF: its save is refused, and the new PDF goes; the one the paper has stays.
+  const seen = storage(b);
   await formB.getByLabel('Notas').fill('Póliza 999');
+  await formB.getByLabel('Archivo del documento').setInputFiles({ name: 'soa-nuevo.pdf', mimeType: 'application/pdf', buffer: PDF });
   await formB.getByRole('button', { name: 'Guardar', exact: true }).click();
   await expect(b.getByRole('alert')).toContainText('Otra persona cambió o borró ese documento');
   // B reads it again: A's date, and not B's notes.
   await expect(group(b, 'GHI9012')).toContainText('Vence el 12/10/2027');
   await expect(group(b, 'GHI9012')).not.toContainText('Póliza 999');
+  expect(seen.uploads).toHaveLength(1);
+  await expect.poll(() => seen.deletes).toEqual(seen.uploads);
+  await group(b, 'GHI9012').getByRole('button', { name: 'Ver PDF' }).click();
+  await expect(b.getByRole('dialog', { name: /^SOA/ }).getByRole('link', { name: 'Abrir el PDF' })).toBeVisible();
   await Promise.all([a.close(), b.close()]);
+});
+
+test('si se corta la respuesta al guardar un archivo, el reintento no lo borra', async ({ page }) => {
+  await signIn(page, 'lectura@ejemplo.uy');
+  await open(page, 'Documentación');
+  const seen = storage(page);
+  // The first change of the paper reaches the database, but its answer is lost.
+  let cut = true;
+  await page.route('**/rest/v1/trf_documents*', async (route) => {
+    if (route.request().method() !== 'PATCH' || !cut) return route.fallback();
+    cut = false;
+    await route.fetch();
+    await route.abort('failed');
+  });
+  await group(page, 'Volvo FH 460').getByRole('button', { name: /Habilitación MTOP/ }).click();
+  const form = page.getByRole('dialog', { name: 'Editar documento' });
+  await form.getByLabel('Archivo del documento').setInputFiles({ name: 'mtop.jpg', mimeType: 'image/jpeg', buffer: await paperPhoto(page) });
+  await form.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(form.getByRole('alert')).toContainText('Sin conexión con el servidor');
+  // Tried again: the database already has it, so it says someone saved first, and the file stays with the paper.
+  await form.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Otra persona cambió o borró ese documento');
+  expect(seen.deletes).toEqual([]);
+  await group(page, 'Volvo FH 460').getByRole('button', { name: 'Ver foto' }).click();
+  await expect(page.getByRole('dialog', { name: /^Habilitación MTOP/ }).locator('img')).toBeVisible();
 });
