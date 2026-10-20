@@ -36,7 +36,9 @@ test('el inicio muestra la flota, los viajes de hoy y lo que hay que tener en cu
   await expect(stat(page, 'Viajes hoy')).toContainText('3 en curso');
   // The trip of 08:30 was sent to the trash in the old panel.
   await expect(page.locator('.trip-time')).toHaveText(['11:00', '10:00', '09:00', '06:00']);
-  await expect(page.locator('.alert-line strong')).toHaveText(['SOA · GHI9012', 'Frenos · ABC1234', 'Cambio de aceite · DEF5678', 'Licencia de conducir · Ana Pereira']);
+  // The Ford's oil is due by kilometres: about 405 km left, estimated today.
+  await expect(page.locator('.alert-line strong')).toHaveText(['SOA · GHI9012', 'Frenos · ABC1234', 'Cambio de aceite · JKL3456', 'Cambio de aceite · DEF5678', 'Licencia de conducir · Ana Pereira']);
+  await expect(page.locator('.alert-line', { hasText: 'JKL3456' })).toContainText('A los 412.500 km · faltan unos 405 km');
   await expect(page.locator('.alert-line').first()).toContainText('Venció el 12/10/2026');
   await expect(page.locator('.map-home .fm')).toHaveCount(5);
   await shot(page, 'inicio');
@@ -149,9 +151,9 @@ test('las secciones que faltan dicen qué van a hacer y la sesión se cierra', a
   await signIn(page, 'dueno@ejemplo.uy');
   await expect(stat(page, 'En ruta')).toBeVisible();
   await expect(page.getByRole('navigation').getByRole('link')).toHaveCount(12);
-  await open(page, 'Mantenimiento');
+  await open(page, 'Métricas');
   await expect(page.getByRole('heading', { name: 'Próximamente' })).toBeVisible();
-  await expect(page.getByText('Mientras tanto, está en la app: Menú del dueño › Mantenimiento.')).toBeVisible();
+  await expect(page.getByText('Mientras tanto, está en la app: Menú del dueño › Rendimiento.')).toBeVisible();
   await shot(page, 'proximamente');
 
   const menu = page.getByRole('button', { name: 'Abrir el menú' });

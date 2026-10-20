@@ -1,5 +1,5 @@
-// A photo of a delivery note or a fuel receipt. The photos are private: each opening asks the storage for a link that
-// expires, and the storage rules decide who may open it.
+// A photo of a delivery note, a fuel receipt or a paper, or the PDF of a paper. The files are private: each opening asks
+// the storage for a link that expires, and the storage rules decide who may open it.
 import { useEffect, useRef, useState } from 'react';
 import { type PhotoBucket, photoUrl } from '../data/api';
 import { Icon } from './Icon';
@@ -16,6 +16,7 @@ type State = { status: 'loading' } | { status: 'ready'; url: string } | { status
 export function PhotoDialog({ photo, onClose }: { photo: Photo | null; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [state, setState] = useState<State>({ status: 'loading' });
+  const pdf = photo !== null && /\.pdf$/i.test(photo.path);
 
   useEffect(() => {
     const d = dialog.current;
@@ -48,14 +49,23 @@ export function PhotoDialog({ photo, onClose }: { photo: Photo | null; onClose: 
     >
       <header>
         <h2>{photo?.title}</h2>
-        <button type="button" className="btn btn-icon" aria-label="Cerrar la foto" onClick={() => dialog.current?.close()}>
+        <button type="button" className="btn btn-icon" aria-label={pdf ? 'Cerrar' : 'Cerrar la foto'} onClick={() => dialog.current?.close()}>
           <Icon name="close" size={18} />
         </button>
       </header>
       {state.status === 'loading' ? (
         <Skeleton lines={4} />
       ) : state.status === 'failed' ? (
-        <ErrorNote>La foto todavía no llegó al servidor o esta cuenta no tiene permiso para verla.</ErrorNote>
+        <ErrorNote>{pdf ? 'El archivo todavía no llegó al servidor o esta cuenta no tiene permiso para verlo.' : 'La foto todavía no llegó al servidor o esta cuenta no tiene permiso para verla.'}</ErrorNote>
+      ) : pdf ? (
+        // The panel does not show other sites inside it (its Content-Security-Policy): a PDF opens in its own tab.
+        <div className="pdf-open">
+          <Icon name="doc" size={40} />
+          <p>Es un PDF: se abre en otra pestaña. El enlace dura diez minutos.</p>
+          <a className="btn btn-primary" href={state.url} target="_blank" rel="noopener noreferrer">
+            Abrir el PDF <Icon name="external" size={16} />
+          </a>
+        </div>
       ) : (
         <>
           <img src={state.url} alt={photo?.title ?? 'Foto'} onError={() => setState({ status: 'failed' })} />

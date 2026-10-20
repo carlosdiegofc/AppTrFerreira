@@ -5,7 +5,13 @@ Panel web nuevo (React + TypeScript), en construcción al lado del actual: [pane
 # Panel web (nuevo)
 La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
 
-# Transportes Ferreira GPS — v0.17.1
+# Transportes Ferreira GPS — v0.17.2
+
+## Nuevo en v0.17.2 (formularios sin autocompletar y kilómetros en los services; versionCode 28)
+- **Formularios:** el autocompletado del teléfono ya no llena los campos de los formularios ni el buscador. Antes llenaba «Otro tipo» de un service o de un documento con el correo de la cuenta, y así quedaba guardado. El ingreso (correo y contraseña) lo sigue usando.
+- **Mantenimiento:** el panel ahora agenda services por kilómetros. La app los muestra en la lista y en el detalle: «a los 412.500 km» para uno por hacer y «cada 10.000 km» para uno que se repite. Editar un service en la app no cambia esos kilómetros. Los avisos por kilómetros, que usan el kilometraje estimado con el GPS, están en el panel.
+- **Documentos:** el panel ya les sube su archivo (foto o PDF). La app todavía no los muestra; llegan en una versión próxima. Si se borra en la app un documento con archivo, el archivo queda en la carpeta privada, sin usar.
+- Lo que se envía al panel no cambia (migración `0004` del panel: solo agrega columnas y la carpeta de los archivos).
 
 ## Nuevo en v0.17.1 (combustible en el modo sencillo; versionCode 27)
 - **Modo sencillo:** el botón **Cargar combustible** está en el Inicio y en el viaje en curso. Con un viaje en curso, la app pregunta si la carga es del viaje o sin viaje; sin viaje, abre la carga directamente. Es la misma pantalla y el mismo registro que en el modo normal.

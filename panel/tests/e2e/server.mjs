@@ -2,8 +2,9 @@
 //  /            → the panel built for the tests (dist-e2e)
 //  /sb/rest/v1  → a real PostgREST connected to the local test database
 //  /sb/auth/v1  → password and refresh-token sign-in issuing JWTs that PostgREST accepts
-//  /sb/storage/v1/object/sign → signed links to the invented photos of tests/e2e/db/seed.sql and to the uploaded ones
+//  /sb/storage/v1/object/sign → signed links to the invented photos and files of tests/e2e/db/seed.sql and to the uploaded ones
 //  /sb/storage/v1/object/trf-fuel-receipts/… → uploads of receipt photos, with the folder rule of the storage
+//  /sb/storage/v1/object/trf-documents… → uploads and deletes of the files of papers (photo or PDF), for the panel accounts
 import crypto from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import http from 'node:http';
@@ -29,9 +30,17 @@ const TRIP_A = '00000000-0000-4000-8000-000000000011/10000000-0000-4000-8000-000
 const PHOTOS = {
   'trf-trip-documents': [`${TRIP_A}/30000000-0000-4000-8000-000000000001.jpg`],
   'trf-fuel-receipts': [`${TRIP_A}/40000000-0000-4000-8000-000000000001.jpg`, '00000000-0000-4000-8000-000000000014/standalone/40000000-0000-4000-8000-000000000002.jpg'],
+  'trf-documents': [
+    '50000000-0000-4000-8000-000000000001/60000000-0000-4000-8000-000000000001.jpg',
+    '50000000-0000-4000-8000-000000000002/60000000-0000-4000-8000-000000000002.pdf',
+    '50000000-0000-4000-8000-000000000004/60000000-0000-4000-8000-000000000004.jpg',
+  ],
 };
-// Receipt photos uploaded during the tests, as "bucket/path".
+// Photos and files uploaded during the tests, and files of papers deleted, as "bucket/path".
 const UPLOADED = new Set();
+const DELETED = new Set();
+// The smallest PDF a browser opens: what a signed link to a paper's PDF hands out.
+const PDF = '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 200]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n';
 const PHOTO_READERS = new Set([USERS['dueno@ejemplo.uy'].id, USERS['lectura@ejemplo.uy'].id]);
 const photoToken = (object) => crypto.createHmac('sha256', JWT_SECRET).update('photo:' + object).digest('base64url');
 const photoSvg = (title) =>
@@ -103,16 +112,55 @@ async function handle(req, res) {
   if (p.startsWith('/sb/storage/v1/object/sign/')) {
     const object = decodeURIComponent(p.slice('/sb/storage/v1/object/sign/'.length));
     const [bucket, ...rest] = object.split('/');
-    const known = (PHOTOS[bucket] ?? []).includes(rest.join('/')) || UPLOADED.has(object);
+    const known = ((PHOTOS[bucket] ?? []).includes(rest.join('/')) || UPLOADED.has(object)) && !DELETED.has(object);
     if (req.method === 'POST') {
       const claims = verifyJwt(String(req.headers.authorization || '').replace(/^Bearer /, ''));
       if (!claims || !PHOTO_READERS.has(claims.sub) || !known) return json(res, 400, { statusCode: '404', error: 'not_found', message: 'Object not found' });
       return json(res, 200, { signedURL: `/object/sign/${object}?token=${photoToken(object)}` });
     }
     if (!known || url.searchParams.get('token') !== photoToken(object)) return json(res, 400, { statusCode: '400', error: 'InvalidJWT', message: 'invalid signature' });
+    if (object.endsWith('.pdf')) {
+      res.writeHead(200, { 'Content-Type': 'application/pdf' });
+      res.end(PDF);
+      return;
+    }
     res.writeHead(200, { 'Content-Type': 'image/svg+xml' });
-    res.end(photoSvg(bucket === 'trf-fuel-receipts' ? 'Boleta de combustible' : 'Remito'));
+    res.end(photoSvg(bucket === 'trf-fuel-receipts' ? 'Boleta de combustible' : bucket === 'trf-documents' ? 'Documento' : 'Remito'));
     return;
+  }
+  if (p.startsWith('/sb/storage/v1/object/trf-documents/') && req.method === 'POST') {
+    // Like the storage rule trf_documents_files_insert: the accounts that manage the fleet upload a photo (JPEG) or a
+    // PDF into the folder of the paper. A second upload of the same file is a duplicate.
+    const object = decodeURIComponent(p.slice('/sb/storage/v1/object/'.length));
+    const name = object.slice('trf-documents/'.length);
+    const claims = verifyJwt(String(req.headers.authorization || '').replace(/^Bearer /, ''));
+    const body = (await readBody(req)).toString('latin1');
+    if (!claims) return json(res, 400, { statusCode: '403', error: 'Unauthorized', message: 'invalid JWT' });
+    if (!PHOTO_READERS.has(claims.sub)) return json(res, 400, { statusCode: '403', error: 'Unauthorized', message: 'new row violates row-level security policy' });
+    const type = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.(jpg|pdf)$/.exec(name)?.[1];
+    if (!type) return json(res, 400, { statusCode: '400', error: 'InvalidKey', message: 'Invalid key' });
+    const mime = type === 'pdf' ? 'application/pdf' : 'image/jpeg';
+    if (!new RegExp(`content-type: ${mime.replace('/', '\\/')}`, 'i').test(body) && req.headers['content-type'] !== mime) return json(res, 400, { statusCode: '415', error: 'invalid_mime_type', message: 'mime type not supported' });
+    if (UPLOADED.has(object)) return json(res, 400, { statusCode: '409', error: 'Duplicate', message: 'The resource already exists' });
+    UPLOADED.add(object);
+    DELETED.delete(object);
+    return json(res, 200, { Key: object, Id: crypto.randomUUID() });
+  }
+  if (p === '/sb/storage/v1/object/trf-documents' && req.method === 'DELETE') {
+    // Like the storage rule trf_documents_files_delete: the accounts that manage the fleet delete; the answer lists
+    // what was deleted.
+    const claims = verifyJwt(String(req.headers.authorization || '').replace(/^Bearer /, ''));
+    const { prefixes = [] } = JSON.parse((await readBody(req)).toString() || '{}');
+    if (!claims) return json(res, 400, { statusCode: '403', error: 'Unauthorized', message: 'invalid JWT' });
+    const gone = [];
+    for (const name of PHOTO_READERS.has(claims.sub) ? prefixes : []) {
+      const object = 'trf-documents/' + name;
+      if (DELETED.has(object) || !(PHOTOS['trf-documents'].includes(name) || UPLOADED.has(object))) continue;
+      UPLOADED.delete(object);
+      DELETED.add(object);
+      gone.push({ name, bucket_id: 'trf-documents' });
+    }
+    return json(res, 200, gone);
   }
   if (p.startsWith('/sb/storage/v1/object/trf-fuel-receipts/') && req.method === 'POST') {
     // Like the storage rule fuel_photos_insert: a signed-in account uploads into its own folder, out of a trip

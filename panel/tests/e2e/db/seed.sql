@@ -83,15 +83,33 @@ insert into public.trf_driver_presence (driver_id, driver_name, vehicle, app_ver
   ('00000000-0000-4000-8000-000000000014', 'Diego Silva', 'Ford Cargo 1722 · JKL3456', '0.17.1', (select now from t0) - interval '2 minutes', -31.385, -57.955, 12, (select now from t0) - interval '2 minutes');
 alter table public.trf_driver_presence enable trigger trf_driver_presence_touch;
 
--- Papers and services: expired, about to expire, far away; late, coming up, done.
-insert into public.trf_documents (scope, driver_id, driver_name, vehicle, kind, expires_on) values
-  ('driver', '00000000-0000-4000-8000-000000000011', 'Ana Pereira', '', 'Licencia de conducir', (select today from t0) + 10),
-  ('vehicle', null, '', 'Mercedes Benz Actros · GHI9012', 'SOA', (select today from t0) - 3),
-  ('vehicle', null, '', 'Volvo FH 460 · ABC1234', 'Habilitación MTOP', (select today from t0) + 200);
-insert into public.trf_vehicle_maintenance (vehicle, kind, due_on, done_on, odometer_km) values
-  ('Scania R450 · DEF5678', 'Cambio de aceite', (select today from t0) + 5, null, null),
-  ('Volvo FH 460 · ABC1234', 'Frenos', (select today from t0) - 2, null, null),
-  ('Ford Cargo 1722 · JKL3456', 'Cubiertas', (select today from t0) - 20, (select today from t0) - 18, 412000);
+-- Papers: expired, about to expire, far away, without date. Ana's licence has its photo and the Mercedes' SOA its PDF,
+-- uploaded in the panel; Bruno's health card, far off, has its photo too.
+insert into public.trf_documents (id, scope, driver_id, driver_name, vehicle, kind, expires_on, notes, object_path) values
+  ('50000000-0000-4000-8000-000000000001', 'driver', '00000000-0000-4000-8000-000000000011', 'Ana Pereira', '', 'Licencia de conducir', (select today from t0) + 10, 'Categoría E',
+   '50000000-0000-4000-8000-000000000001/60000000-0000-4000-8000-000000000001.jpg'),
+  ('50000000-0000-4000-8000-000000000002', 'vehicle', null, '', 'Mercedes Benz Actros · GHI9012', 'SOA', (select today from t0) - 3, '',
+   '50000000-0000-4000-8000-000000000002/60000000-0000-4000-8000-000000000002.pdf'),
+  ('50000000-0000-4000-8000-000000000003', 'vehicle', null, '', 'Volvo FH 460 · ABC1234', 'Habilitación MTOP', (select today from t0) + 200, '', null),
+  ('50000000-0000-4000-8000-000000000004', 'driver', '00000000-0000-4000-8000-000000000012', 'Bruno Díaz', '', 'Carné de salud', (select today from t0) + 400, '',
+   '50000000-0000-4000-8000-000000000004/60000000-0000-4000-8000-000000000004.jpg'),
+  ('50000000-0000-4000-8000-000000000005', 'vehicle', null, '', 'Scania R450 · DEF5678', 'Patente', null, '', null);
+insert into storage.objects (bucket_id, name) values
+  ('trf-documents', '50000000-0000-4000-8000-000000000001/60000000-0000-4000-8000-000000000001.jpg'),
+  ('trf-documents', '50000000-0000-4000-8000-000000000002/60000000-0000-4000-8000-000000000002.pdf'),
+  ('trf-documents', '50000000-0000-4000-8000-000000000004/60000000-0000-4000-8000-000000000004.jpg');
+
+-- Services: late, coming up, done. The Ford's oil every 10.000 km is due at 412.500: it has about 412.095 (412.000
+-- declared 18 days ago, plus the 95 km of the trip that ended today; the trip deleted in the panel does not count). The
+-- Scania has about 250.040 (250.000 a month ago, plus the trip on the road). The Volvo's filters have no kilometres to
+-- compare with.
+insert into public.trf_vehicle_maintenance (id, vehicle, kind, due_on, done_on, odometer_km, due_km, interval_km, notes, created_by_name) values
+  ('70000000-0000-4000-8000-000000000001', 'Scania R450 · DEF5678', 'Cambio de aceite', (select today from t0) + 5, null, null, null, null, '', 'Dueño de Prueba'),
+  ('70000000-0000-4000-8000-000000000002', 'Volvo FH 460 · ABC1234', 'Frenos', (select today from t0) - 2, null, null, null, null, '', 'Ana Pereira'),
+  ('70000000-0000-4000-8000-000000000003', 'Ford Cargo 1722 · JKL3456', 'Cubiertas', (select today from t0) - 20, (select today from t0) - 18, 412000, null, null, 'Taller Salto', 'Diego Silva'),
+  ('70000000-0000-4000-8000-000000000004', 'Ford Cargo 1722 · JKL3456', 'Cambio de aceite', null, null, null, 412500, 10000, '', 'Dueño de Prueba'),
+  ('70000000-0000-4000-8000-000000000005', 'Scania R450 · DEF5678', 'Revisión general', null, (select today from t0) - 30, 250000, null, null, '', 'Bruno Díaz'),
+  ('70000000-0000-4000-8000-000000000006', 'Volvo FH 460 · ABC1234', 'Cambio de filtros', null, null, null, 160000, null, '', 'Dueño de Prueba');
 
 -- Viajes: the office completed the trip that ended today and typed one by hand three days ago, in dollars. The trip on
 -- the road has what Ana typed on the phone, its two delivery notes (the departure one with photo) and a fuel receipt
@@ -124,6 +142,11 @@ insert into public.trf_driver_fuel_receipts (id, trip_id, driver_id, driver_name
    null, 'est-salto', 'Petrobras Salto', 50, 2700, null, true),
   ('40000000-0000-4000-8000-000000000006', null, '00000000-0000-4000-8000-000000000011', 'Ana Pereira', 'Iveco Stralis · MNO7890', (select now from t0) - interval '20 days', (select today from t0) - 20,
    null, 'est-ruta5', 'Ancap Ruta 5 km 32', 200, 11000, null, false);
+-- The photos those rows point to, in the storage (server.mjs hands out the pictures).
+insert into storage.objects (bucket_id, name) values
+  ('trf-trip-documents', '00000000-0000-4000-8000-000000000011/10000000-0000-4000-8000-00000000000a/30000000-0000-4000-8000-000000000001.jpg'),
+  ('trf-fuel-receipts', '00000000-0000-4000-8000-000000000011/10000000-0000-4000-8000-00000000000a/40000000-0000-4000-8000-000000000001.jpg'),
+  ('trf-fuel-receipts', '00000000-0000-4000-8000-000000000014/standalone/40000000-0000-4000-8000-000000000002.jpg');
 
 -- The account of each station: Ancap Ruta 5 started with what was owed ten days ago and got a transfer three days ago;
 -- Petrobras Salto got a cash payment in dollars yesterday.

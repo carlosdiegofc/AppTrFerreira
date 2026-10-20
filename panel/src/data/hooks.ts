@@ -2,32 +2,45 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { FLEET_REFRESH_MS, LIVE_REFRESH_MS, PRESENCE_REFRESH_MS, ROUTE_REFRESH_MS } from '../config';
 import type { TablesInsert, TablesUpdate } from '../lib/database.types';
+import { startOfDay } from '../lib/dates';
+import { type FileType, type Paper, type PaperDocRow, paperFromRow } from '../lib/documents';
 import { type ActiveTrip, type CatalogTruck, fleetUnits, truckLabel, withLivePositions } from '../lib/fleet';
 import { groupStations, type Movement, movementFromRow, type Receipt, receiptFromRow } from '../lib/fuel';
+import { kmReferences, kmSince, type MaintenanceRow, type Service, serviceFromRow, type TruckKm, truckKms } from '../lib/maintenance';
 import { appendReadings } from '../lib/route';
 import type { TripPayload } from '../lib/tripForm';
 import { mergeTrips, type Trip, tripFromPanel, tripFromSession } from '../lib/trips';
 import {
+  ConflictError,
   createReceipt,
+  deleteDocument,
+  deleteService,
   fetchCatalog,
   fetchCatalogLists,
+  fetchDocuments,
   fetchDriverNames,
   fetchFleet,
   fetchFuel,
+  fetchKmTrips,
   fetchLastTrips,
   fetchLivePositions,
-  fetchPapers,
+  fetchPaperDrivers,
   fetchPresence,
   fetchRoute,
+  fetchServices,
   fetchTripDetail,
   fetchTripList,
   fetchTrips,
+  removeDocumentFile,
   type RoutePoint,
+  saveDocument,
   saveMovement,
+  saveService,
   saveTrip,
   setMovementDeleted,
   setTripDeleted,
   updateReceipt,
+  uploadDocumentFile,
   uploadReceiptPhoto,
 } from './api';
 
@@ -93,7 +106,120 @@ export function useFleet(now: number) {
 export const useTrips = (fromIso: string, toIso: string, refreshMs?: number) =>
   useQuery({ queryKey: ['trips', fromIso, toIso], queryFn: () => fetchTrips(fromIso, toIso), refetchInterval: refreshMs ?? false, staleTime: 60_000 });
 
-export const usePapers = () => useQuery({ queryKey: ['papers'], queryFn: fetchPapers, staleTime: 10 * 60_000 });
+/**
+ * Every service with the kilometres of each truck: the odometer written in the latest service done, plus the GPS
+ * kilometres of its trips since that day. The trips are read once the services say since when.
+ */
+export function useMaintenance() {
+  const catalog = useCatalog();
+  const query = useQuery({ queryKey: ['services'], queryFn: fetchServices, refetchInterval: 5 * 60_000, staleTime: 60_000 });
+  const services = useMemo(() => (query.data ?? []).map((r) => serviceFromRow(r, catalog.data ?? [])), [query.data, catalog.data]);
+  const references = useMemo(() => kmReferences(services), [services]);
+  const since = kmSince(references);
+  const trips = useQuery({
+    queryKey: ['kmTrips', since],
+    queryFn: () => fetchKmTrips(startOfDay(since ?? '2000-01-01')),
+    enabled: since !== null,
+    refetchInterval: 5 * 60_000,
+    staleTime: 60_000,
+  });
+  const kms = useMemo(() => (trips.data ? truckKms(references, trips.data, catalog.data ?? []) : new Map<string, TruckKm>()), [references, trips.data, catalog.data]);
+  // Without the trips the kilometres are not known: the screens say so instead of showing "no kilometres".
+  const kmMissing = since !== null && trips.data === undefined;
+  return { services, kms, kmMissing, query, trips, catalog };
+}
+
+/** Everything that shows services reads them again after a change: Mantenimiento and Inicio. */
+function useServicesChanged() {
+  const client = useQueryClient();
+  return () => Promise.all(['services', 'kmTrips'].map((key) => client.invalidateQueries({ queryKey: [key] })));
+}
+
+/**
+ * A service, new or changed. One that repeats every N km and was just done gets its next one, due N km after the
+ * odometer of that day (next); when that fails, the service stays done and nextFailed says so.
+ */
+export function useSaveService() {
+  const changed = useServicesChanged();
+  return useMutation({
+    mutationFn: async ({ service, row, next }: { service: Service | null; row: TablesInsert<'trf_vehicle_maintenance'> | TablesUpdate<'trf_vehicle_maintenance'>; next: ((saved: MaintenanceRow) => TablesInsert<'trf_vehicle_maintenance'> | null) | null }) => {
+      const saved = await saveService(service, row);
+      const nextRow = next ? next(saved) : null;
+      if (!nextRow) return { saved, next: null, nextFailed: false };
+      try {
+        return { saved, next: await saveService(null, nextRow), nextFailed: false };
+      } catch (e) {
+        console.error(e);
+        return { saved, next: null, nextFailed: true };
+      }
+    },
+    onSettled: changed,
+  });
+}
+
+export function useDeleteService() {
+  const changed = useServicesChanged();
+  return useMutation({ mutationFn: (service: Service) => deleteService(service), onSettled: changed });
+}
+
+/** Every paper of trucks and drivers, with the trucks named as the catalog names them now. */
+export function useDocuments() {
+  const catalog = useCatalog();
+  const query = useQuery({ queryKey: ['documents'], queryFn: fetchDocuments, refetchInterval: 5 * 60_000, staleTime: 60_000 });
+  const papers = useMemo(() => (query.data ?? []).map((r) => paperFromRow(r, catalog.data ?? [])), [query.data, catalog.data]);
+  return { papers, query, catalog };
+}
+
+/** The drivers a paper can be for; read when the form opens. */
+export const usePaperDrivers = (enabled: boolean) => useQuery({ queryKey: ['paperDrivers'], queryFn: fetchPaperDrivers, staleTime: 10 * 60_000, enabled });
+
+function useDocumentsChanged() {
+  const client = useQueryClient();
+  return () => Promise.all(['documents', 'paperDrivers'].map((key) => client.invalidateQueries({ queryKey: [key] })));
+}
+
+export interface PaperFileUpload {
+  path: string;
+  blob: Blob;
+  type: FileType;
+}
+
+/**
+ * A paper, new or changed: its new file first (when there is one), then the paper, then the file it no longer has goes
+ * (if that fails, it stays in the private folder, unused). A change someone else saved first saves nothing, and its
+ * new file goes too.
+ */
+export function useSavePaper() {
+  const changed = useDocumentsChanged();
+  return useMutation({
+    mutationFn: async ({ paper, row, upload, previous }: { paper: Paper | null; row: TablesInsert<'trf_documents'> | TablesUpdate<'trf_documents'>; upload: PaperFileUpload | null; previous: string | null }) => {
+      if (upload) await uploadDocumentFile(upload.path, upload.blob, upload.type);
+      let saved: PaperDocRow;
+      try {
+        saved = await saveDocument(paper, row);
+      } catch (e) {
+        // Only a change that certainly did not apply leaves the new file unused: a new paper tried again uses it.
+        if (paper && upload && e instanceof ConflictError) await removeDocumentFile(upload.path).catch((err: unknown) => console.error(err));
+        throw e;
+      }
+      if (previous && previous !== saved.object_path) await removeDocumentFile(previous).catch((err: unknown) => console.error(err));
+      return saved;
+    },
+    onSettled: changed,
+  });
+}
+
+/** Deletes a paper for good, then its file (if that fails, it stays in the private folder, unused). */
+export function useDeletePaper() {
+  const changed = useDocumentsChanged();
+  return useMutation({
+    mutationFn: async (paper: Paper) => {
+      await deleteDocument(paper);
+      if (paper.file) await removeDocumentFile(paper.file.path).catch((err: unknown) => console.error(err));
+    },
+    onSettled: changed,
+  });
+}
 
 type RouteTrip = Pick<ActiveTrip, 'id' | 'driver_id' | 'started_at'> & { ended_at?: string | null };
 

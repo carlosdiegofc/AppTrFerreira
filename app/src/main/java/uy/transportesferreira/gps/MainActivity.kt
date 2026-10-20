@@ -234,7 +234,8 @@ class MainActivity:AppCompatActivity(){
   v.setOnClickListener{action()};p.addView(v,LinearLayout.LayoutParams(-1,dp(54)).apply{topMargin=dp(top)});return Btn(v,label)
  }
  private fun link(p:LinearLayout,s:String,top:Int=8,color:Int=blue,action:()->Unit)=tv(s,15f,color,1).apply{gravity=Gravity.CENTER;minHeight=dp(48);background=ripple(null);isClickable=true;isFocusable=true;setOnClickListener{action()};p.addView(this,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(top)})}
- private fun input(type:Int,hint:String="")=EditText(this).apply{inputType=type;textSize=16f;setTextColor(ink);setHintTextColor(faint);this.hint=hint;background=outline(cardBg,fieldLine,12);setPadding(dp(14),0,dp(14),0)}
+ /** A field of a form. The phone's autofill stays out: it filled «Otro tipo» with the account's email. The sign-in fields (darkField) keep it. */
+ private fun input(type:Int,hint:String="")=EditText(this).apply{inputType=type;textSize=16f;setTextColor(ink);setHintTextColor(faint);this.hint=hint;background=outline(cardBg,fieldLine,12);setPadding(dp(14),0,dp(14),0);importantForAutofill=View.IMPORTANT_FOR_AUTOFILL_NO}
  private fun field(p:LinearLayout,title:String,type:Int,hint:String=""):EditText{caption(p,title);val e=input(type,hint);p.addView(e,LinearLayout.LayoutParams(-1,dp(52)).apply{topMargin=dp(6)});return e}
  private fun bind(v:EditText,data:JSONObject,key:String){
   v.setText(data.optString(key).takeUnless{it=="null"}?:"")
@@ -264,7 +265,7 @@ class MainActivity:AppCompatActivity(){
  private fun searchBox(p:LinearLayout,hint:String,value:String):EditText{
   val box=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;background=outline(cardBg,fieldLine,12);setPadding(dp(14),0,dp(8),0)}
   box.addView(iconView(R.drawable.ic_search,faint,20))
-  val e=EditText(this).apply{inputType=InputType.TYPE_CLASS_TEXT;imeOptions=EditorInfo.IME_ACTION_SEARCH;textSize=15.5f;setTextColor(ink);setHintTextColor(faint);this.hint=hint;background=null;setPadding(dp(10),0,dp(4),0);setText(value)}
+  val e=EditText(this).apply{inputType=InputType.TYPE_CLASS_TEXT;imeOptions=EditorInfo.IME_ACTION_SEARCH;textSize=15.5f;setTextColor(ink);setHintTextColor(faint);this.hint=hint;background=null;setPadding(dp(10),0,dp(4),0);setText(value);importantForAutofill=View.IMPORTANT_FOR_AUTOFILL_NO}
   box.addView(e,LinearLayout.LayoutParams(0,-1,1f));p.addView(box,LinearLayout.LayoutParams(-1,dp(50)).apply{topMargin=dp(12)});return e
  }
  private fun tileGrid(items:List<Tile>){
@@ -1421,11 +1422,15 @@ class MainActivity:AppCompatActivity(){
   note("Los pendientes se marcan como próximos 15 días antes de la fecha.",top=12)
   if(refresh)thread{try{mobile.maintenance(true);runOnUiThread{if(screen=="maintenance")maintenance()}}catch(_:Exception){runOnUiThread{if(screen=="maintenance")toast("Sin conexión. Se muestran los datos guardados en el teléfono.")}}}
  }
+ /** Whole kilometres of a service as Uruguay writes them («412.500»), or null when it has none. */
+ private fun kmOf(r:JSONObject,key:String)=r.optString(key).takeIf{it.isNotBlank()&&it!="null"}?.toDoubleOrNull()?.toLong()?.let{NumberFormat.getIntegerInstance(uy).format(it)}
  private fun maintenanceRow(c:LinearLayout,r:JSONObject){
   if(c.childCount>0)divider(c,70)
   val (state,detail)=maintState(r);val (label,fg,fill)=stateStyle(state,"Próximo")
-  val km=r.optString("odometer_km").takeIf{it.isNotBlank()&&it!="null"}?.toLongOrNull()?.let{"${NumberFormat.getIntegerInstance(uy).format(it)} km"}
-  val sub=listOfNotNull(detail,if(maintTruck.isBlank())truckLabel(r.optString("vehicle")).ifBlank{null} else null,km).joinToString(" · ")
+  val km=kmOf(r,"odometer_km")?.let{"$it km"}
+  // The panel also schedules services by kilometres (it estimates the truck's with the GPS): «a los 412.500 km», «cada 10.000 km».
+  val dueKm=kmOf(r,"due_km")?.takeIf{day(r,"done_on")==null}
+  val sub=listOfNotNull(detail.takeUnless{state=="pending"&&dueKm!=null},if(maintTruck.isBlank())truckLabel(r.optString("vehicle")).ifBlank{null} else null,km,dueKm?.let{"a los $it km"},kmOf(r,"interval_km")?.let{"cada $it km"}).joinToString(" · ").replaceFirstChar{it.uppercase(uy)}
   val v=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(14),dp(12),dp(14),dp(12));background=ripple(null);isClickable=true;isFocusable=true;contentDescription="${r.optString("kind")}. $sub. $label";setOnClickListener{openMaintenance(r)}}
   v.addView(square(kindIcon(r.optString("kind")),tone(0xFF56647B,0xFFB4C0D3),greyBg))
   val col=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),0,dp(8),0)}
@@ -1435,7 +1440,7 @@ class MainActivity:AppCompatActivity(){
  }
  private fun openMaintenance(r:JSONObject){
   if(isOwner()||r.optString("created_by")==uid()){editMaintenance(r);return}
-  val lines=listOfNotNull(r.optString("vehicle").ifBlank{null},maintState(r).second,r.optString("odometer_km").takeIf{it.isNotBlank()&&it!="null"}?.let{"Kilometraje: $it km"},r.optString("notes").ifBlank{null},r.optString("created_by_name").ifBlank{null}?.let{"Cargado por $it"})
+  val lines=listOfNotNull(r.optString("vehicle").ifBlank{null},maintState(r).second,kmOf(r,"odometer_km")?.let{"Kilometraje: $it km"},kmOf(r,"due_km")?.takeIf{day(r,"done_on")==null}?.let{"A los $it km"},kmOf(r,"interval_km")?.let{"Cada $it km"},r.optString("notes").ifBlank{null},r.optString("created_by_name").ifBlank{null}?.let{"Cargado por $it"})
   AlertDialog.Builder(this).setTitle(r.optString("kind")).setMessage(lines.joinToString("\n")).setPositiveButton("Cerrar",null).show()
  }
  private fun editMaintenance(r:JSONObject?){editId=r?.optString("id");editForm=if(r==null)JSONObject().put("vehicle",maintTruck.ifBlank{truck}).put("done",false) else JSONObject(r.toString()).put("done",day(r,"done_on")!=null);maintForm()}

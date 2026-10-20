@@ -61,7 +61,12 @@ Va armándose al costado del panel actual y lo reemplaza sección por sección.
      - Desde el panel se cargan boletas nuevas, con foto o a mano, a nombre de quien las carga y sin viaje. También se corrigen, se mandan a la papelera y se registran los pagos y los saldos iniciales.
      - Migración `0003`, que solo agrega: una tabla para los pagos y saldos iniciales de cada estación y el permiso para que las cuentas del panel corrijan boletas sin tocar lo que declaró el chofer.
      - En la app 0.17.1, cargar combustible sin viaje o en el viaje también desde el modo sencillo.
-   - 4b. [ ] Mantenimiento y Documentación.
+   - 4b. [ ] Mantenimiento y Documentación (aprobado el 20/10/2026). Migración [`0004_mantenimiento_documentos.sql`](../supabase/migrations/0004_mantenimiento_documentos.sql), que solo agrega: se aplica en producción después de su respaldo completo.
+     - Los services de cada camión, con avisos por fecha (15 días antes) y por kilómetros (1.000 km antes). Un service puede repetirse «cada N km»: al marcarlo como hecho con el kilometraje de ese día, se agenda solo el próximo.
+     - Los kilómetros de cada camión son estimados: el kilometraje anotado en el último service hecho, más los kilómetros del GPS de los viajes con la app desde ese día. El panel dice que son estimados (regla 5).
+     - Los papeles de camiones y choferes, con su vencimiento (30 días antes) y su archivo: foto o PDF, en una carpeta privada. La app los va a mostrar en una versión próxima.
+     - Desde el panel se cargan, se cambian y se borran services y papeles. Borrar los borra para siempre, como en la app, preguntando antes; la base anota quién guardó cada uno por última vez.
+     - En la app 0.17.2 el autocompletado del teléfono ya no llena los formularios, y los services muestran sus kilómetros («a los 412.500 km», «cada 10.000 km»).
 5. [ ] Métricas: rendimiento por camión y por chofer, con gráficos. Queda para resolver con ella: el resumen del mes de la app y el panel actual cuentan cada boleta de combustible el día en que llegó a la base, y el panel nuevo, en su fecha (la corregida en el panel, si la hay). Si caen en meses distintos, el formulario de corrección lo avisa.
 6. [x] Publicarlo: el código pasa a `main` y el panel nuevo queda en `/nuevo/` de la dirección del panel actual (18/10/2026).
 7. [x] GPS en vivo más rápido (aprobado el 18/10/2026, adelanta parte de la etapa 6): posición cada 3 segundos y recorrido cada 5, con la app 0.17.0 mandando un punto cada 2 segundos. La 0.17.0 se sube a Google Play cuando lo decidas (18/10/2026).
@@ -75,6 +80,11 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 20/10/2026: Mantenimiento y Documentación.
+  - Borrar un service o un documento lo borra para siempre, como hace la app. Es la excepción a la papelera de la arquitectura: así lo decidió el dueño para estas dos secciones.
+  - Los documentos llevan su archivo: una foto o un PDF, que se sube desde el panel a una carpeta privada. La app los muestra en una versión próxima.
+  - Los services avisan también por kilómetros, con el kilometraje estimado: el último anotado en un service hecho más los kilómetros del GPS desde ese día. Se marcan como próximos 1.000 km antes.
+  - Los 3 services que hay en la base, con el correo del dueño como tipo, son reales: los corrige el dueño desde el panel. El correo llegó por el autocompletado del teléfono, que la app 0.17.2 apaga en los formularios.
 - 19/10/2026: Combustible.
   - Cada estación lleva una cuenta corriente: las cargas suman, los pagos restan y se puede cargar el saldo que ya existía, con su fecha. Las boletas anteriores a esa fecha quedan dentro del saldo.
   - Los pagos y los saldos iniciales se registran desde el panel.

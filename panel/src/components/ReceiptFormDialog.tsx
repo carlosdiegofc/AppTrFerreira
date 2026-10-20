@@ -11,7 +11,7 @@ import { arrivalNote, correctedPanelData, FUEL_LIMITS, newReceiptRow, type Recei
 import { type CatalogTruck, truckLabel } from '../lib/fleet';
 import { decimal } from '../lib/format';
 import { parseNumber } from '../lib/numbers';
-import { receiptJpeg } from '../lib/photo';
+import { photoJpeg } from '../lib/photo';
 import { ConfirmDialog } from './ConfirmDialog';
 import { Icon } from './Icon';
 import { type Photo, PhotoDialog } from './PhotoDialog';
@@ -88,7 +88,7 @@ export function ReceiptFormDialog({ receipt: opened, today, stations, writtenSta
     if (!file) return;
     setPhoto({ status: 'preparing' });
     try {
-      const blob = await receiptJpeg(file);
+      const blob = await photoJpeg(file);
       // A data: address, which the panel's Content-Security-Policy allows for images (blob: is not).
       const preview = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
