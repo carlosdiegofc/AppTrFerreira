@@ -283,7 +283,8 @@ export function groupStations(receipts: readonly Receipt[], movements: readonly 
     s.lastDay = s.receipts[0]?.date ?? null;
     if (!s.listed) s.name = spelling(s);
     const used = new Set<Currency>([...s.receipts.map((r) => r.currency), ...s.payments.map((p) => p.currency), ...s.openings.map((o) => o.currency)]);
-    s.accounts = CURRENCIES.filter((c) => used.has(c)).map((c) => account(s, c));
+    // The receipts that do not say the station are owed to no station: they wait for a correction, without an account.
+    s.accounts = s.key === NO_STATION ? [] : CURRENCIES.filter((c) => used.has(c)).map((c) => account(s, c));
   }
   return [...map.values()].sort((a, b) => (b.lastDay ?? '').localeCompare(a.lastDay ?? '') || a.name.localeCompare(b.name, 'es'));
 }

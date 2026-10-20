@@ -178,6 +178,15 @@ describe('cuenta de cada estación', () => {
     expect(grouped.map((s) => [s.key, s.accounts.map((a) => a.balance)])).toEqual([['id:est-tala', [6000]]]);
   });
 
+  it('las boletas que no dicen la estación no se le deben a ninguna: quedan para corregir, sin cuenta', () => {
+    const lost = receiptFromRow(row({ id: 'sin-estacion', station_id: '', station_name: '  ', total: 4000 }), [], STATIONS);
+    const all = groupStations([...receipts, lost], movements, STATIONS);
+    const none = all.find((s) => s.key === NO_STATION)!;
+    expect(none.receipts.map((r) => r.id)).toEqual(['sin-estacion']);
+    expect(none.accounts).toEqual([]);
+    expect(balances(all)).toEqual(balances(stations));
+  });
+
   it('lo que se les debe a unas estaciones no se compensa con lo que otras tienen a favor', () => {
     const favor = groupStations([], [movementFromRow(move({ id: 'f', station_key: 'name:estacion el tala', station_name: 'Estación El Tala', kind: 'opening', amount: -6600, method: null, happened_on: '2026-10-01' }))], STATIONS);
     expect(balances([...stations, ...favor])).toEqual({ owed: { UYU: 29100, USD: 210 }, credit: { UYU: 6600, USD: 0 } });

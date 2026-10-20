@@ -183,6 +183,38 @@ test('sin la lista de estaciones de la app no muestra cuentas que darían mal, y
   await expect(stat(page, 'Saldo con las estaciones').locator('.amount-lines > span')).toHaveText(['$ 38.050', 'US$ 210']);
 });
 
+test('las boletas que no dicen la estación no suman en ninguna cuenta y se corrigen desde su página', async ({ page }) => {
+  // An old receipt without a station, added to what the database sends.
+  await page.route('**/rest/v1/trf_driver_fuel_receipts*', async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    const response = await route.fetch();
+    const rows = (await response.json()) as Record<string, unknown>[];
+    rows.push({
+      id: '40000000-0000-4000-8000-0000000000aa', trip_id: null, driver_id: '00000000-0000-4000-8000-000000000013', driver_name: 'Carla Méndez', vehicle: 'Mercedes Benz Actros',
+      recorded_at: '2026-10-14T15:00:00Z', receipt_date: '2026-10-14', distance_meters: 0, object_path: null, archived: false, station_id: '', station_name: '', liters: 50, total: 2500,
+      panel_data: null, updated_at: null, updated_by: null,
+    });
+    return route.fulfill({ response, json: rows });
+  });
+  await signIn(page, 'dueno@ejemplo.uy');
+  await open(page, 'Combustible');
+  const none = station(page, 'Estación sin indicar');
+  await expect(none).toContainText('Boletas sin estación');
+  await expect(none.locator('.fs-balance')).toHaveText('No suma en ninguna cuenta');
+  // What is owed to the stations is the same as without it.
+  await expect(stat(page, 'Saldo con las estaciones').locator('.amount-lines > span')).toHaveText(['$ 38.050', 'US$ 210']);
+
+  await none.click();
+  await expect(page).toHaveURL(/\/combustible\/estaciones\/name%3A$/);
+  await expect(page.locator('.notice-warn')).toContainText('Estas boletas no dicen en qué estación se cargaron');
+  const list = page.locator('.card', { hasText: 'Boletas en pesos' });
+  await expect(list.locator('tbody tr')).toHaveCount(1);
+  await expect(list.locator('tbody tr')).toContainText('$ 2.500');
+  await expect(list.locator('thead')).not.toContainText('Saldo');
+  await expect(page.getByRole('button', { name: 'Registrar pago' })).toHaveCount(0);
+  await expect(list.getByRole('button', { name: 'Corregir' })).toBeVisible();
+});
+
 test('una estación que no existe lo dice', async ({ page }) => {
   await signIn(page, 'dueno@ejemplo.uy');
   await expect(stat(page, 'En ruta')).toBeVisible();

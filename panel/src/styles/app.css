@@ -2397,4 +2397,9 @@ button.fr-open {
   .statement .st-opening {
     background: var(--grey-bg);
   }
+
+  /* Without a balance column the actions take the whole last line. */
+  .statement-plain .st-actions {
+    grid-column: 1 / 3;
+  }
 }

@@ -56,7 +56,7 @@ function StationRow({ station, period }: { station: Station; period: Receipt[] }
         </span>
         <span className="fs-balance">
           {station.accounts.length === 0 ? (
-            <small>Sin cuenta todavía</small>
+            <small>{station.key === NO_STATION ? 'No suma en ninguna cuenta' : 'Sin cuenta todavía'}</small>
           ) : (
             station.accounts.map((a) => (
               <Pill key={a.currency} tone={balanceTone(a)}>

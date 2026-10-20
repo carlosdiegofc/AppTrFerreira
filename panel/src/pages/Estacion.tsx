@@ -8,10 +8,11 @@ import { Card, CatalogNote, Empty, ErrorNote, PageHead, Pill, RefreshButton, Ske
 import { useFuel, useNow } from '../data/hooks';
 import { dayInZone, formatDay } from '../lib/dates';
 import { count, decimal, money } from '../lib/format';
-import { type Currency, isFuture, type Movement, NO_STATION, PAYMENT_METHODS, parseStationKey, type Receipt, type Station, statement } from '../lib/fuel';
+import { CURRENCIES, type Currency, isFuture, type Movement, NO_STATION, PAYMENT_METHODS, parseStationKey, type Receipt, type Station, statement } from '../lib/fuel';
 import { balanceText, balanceTone, fuelReadError, NO_LIST } from './fuelText';
 
 const CURRENCY_TITLE: Record<Currency, string> = { UYU: 'Cuenta en pesos', USD: 'Cuenta en dólares' };
+const RECEIPTS_TITLE: Record<Currency, string> = { UYU: 'Boletas en pesos', USD: 'Boletas en dólares' };
 
 function Back() {
   const navigate = useNavigate();
@@ -40,7 +41,11 @@ function Missing() {
 
 type Editing = { kind: 'payment' | 'opening'; movement: Movement | null; currency: Currency } | { kind: 'receipt'; receipt: Receipt };
 
-function StatementCard({ station, currency, today, onEdit, onPhoto }: { station: Station; currency: Currency; today: string; onEdit: (e: Editing) => void; onPhoto: (r: Receipt) => void }) {
+/**
+ * A station's statement of account in one currency. The receipts that do not say the station have no account: they
+ * show as a plain list, to correct them.
+ */
+function StatementCard({ station, currency, today, accountable, onEdit, onPhoto }: { station: Station; currency: Currency; today: string; accountable: boolean; onEdit: (e: Editing) => void; onPhoto: (r: Receipt) => void }) {
   const s = statement(station, currency);
   const account = station.accounts.find((a) => a.currency === currency);
   const opening = account?.opening ?? null;
@@ -48,10 +53,11 @@ function StatementCard({ station, currency, today, onEdit, onPhoto }: { station:
   const method = (m: Movement) => PAYMENT_METHODS.find((p) => p.value === m.method)?.label ?? 'Pago';
   return (
     <Card
-      title={CURRENCY_TITLE[currency]}
+      title={accountable ? CURRENCY_TITLE[currency] : RECEIPTS_TITLE[currency]}
       action={account && <Pill tone={balanceTone(account)}>{balanceText(account)}</Pill>}
       padded={false}
     >
+      {accountable && (
       <div className="card-body account-facts">
         <dl className="facts facts-tight">
           <div>
@@ -79,6 +85,7 @@ function StatementCard({ station, currency, today, onEdit, onPhoto }: { station:
         {account && account.withoutAmount > 0 && <p className="note">{count(account.withoutAmount)} {account.withoutAmount === 1 ? 'boleta no tiene' : 'boletas no tienen'} importe: no suman hasta que las corrijas.</p>}
         {future > 0 && <p className="note">{future === 1 ? 'Una boleta tiene fecha posterior a hoy y ya suma en el saldo: con «Corregir» poné la fecha correcta.' : `${count(future)} boletas tienen fecha posterior a hoy y ya suman en el saldo: con «Corregir» poné la fecha correcta.`}</p>}
       </div>
+      )}
       {s.lines.length === 0 ? (
         <div className="card-body">
           <p className="note">Todavía no hay movimientos en esta cuenta.</p>
@@ -86,7 +93,7 @@ function StatementCard({ station, currency, today, onEdit, onPhoto }: { station:
       ) : (
         // On a phone the statement scrolls sideways inside its card; the page does not.
         <div className="statement-scroll">
-        <table className="statement" aria-label={`Estado de cuenta en ${currency === 'USD' ? 'dólares' : 'pesos'}`}>
+        <table className={`statement${accountable ? '' : ' statement-plain'}`} aria-label={accountable ? `Estado de cuenta en ${currency === 'USD' ? 'dólares' : 'pesos'}` : RECEIPTS_TITLE[currency]}>
           <thead>
             <tr>
               <th scope="col">Fecha</th>
@@ -94,9 +101,11 @@ function StatementCard({ station, currency, today, onEdit, onPhoto }: { station:
               <th scope="col" className="num">
                 Importe
               </th>
-              <th scope="col" className="num">
-                Saldo
-              </th>
+              {accountable && (
+                <th scope="col" className="num">
+                  Saldo
+                </th>
+              )}
               <th scope="col">
                 <span className="visually-hidden">Acciones</span>
               </th>
@@ -133,7 +142,7 @@ function StatementCard({ station, currency, today, onEdit, onPhoto }: { station:
                     )}
                   </td>
                   <td className="num">{line.amount === null ? <span className="muted">Sin importe</span> : money(line.amount, currency)}</td>
-                  <td className="num st-balance">{money(line.balance, currency)}</td>
+                  {accountable && <td className="num st-balance">{money(line.balance, currency)}</td>}
                   <td className="st-actions">
                     {r?.objectPath && (
                       <button type="button" className="link-button" onClick={() => onPhoto(r)}>
@@ -197,7 +206,9 @@ function StationPage({ stationKey }: { stationKey: string }) {
   if (!station) return <Missing />;
 
   const accountable = station.key !== NO_STATION;
-  const currencies: Currency[] = station.accounts.length > 0 ? station.accounts.map((a) => a.currency) : ['UYU'];
+  // Without an account (receipts that do not say the station), the currencies of its receipts.
+  const used: Currency[] = accountable ? station.accounts.map((a) => a.currency) : CURRENCIES.filter((c) => station.receipts.some((r) => r.currency === c));
+  const currencies: Currency[] = used.length > 0 ? used : ['UYU'];
   const written = stations.filter((s) => !s.listed && s.key !== NO_STATION).map((s) => s.name);
   const done = (text: string) => {
     setEditing(null);
@@ -260,6 +271,7 @@ function StationPage({ stationKey }: { stationKey: string }) {
             station={station}
             currency={c}
             today={today}
+            accountable={accountable}
             onEdit={(e) => {
               setNotice(null);
               setEditing(e);
