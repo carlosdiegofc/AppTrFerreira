@@ -211,15 +211,16 @@ function checkKm(raw: string, max: number, min = 0): { value: number | null; err
   return { value: parsed.value, error: null };
 }
 
-export type ServicePayload = Required<Pick<TablesUpdate<'trf_vehicle_maintenance'>, 'vehicle' | 'kind' | 'due_on' | 'due_km' | 'interval_km' | 'done_on' | 'notes'>> &
-  Pick<TablesUpdate<'trf_vehicle_maintenance'>, 'odometer_km'>;
+export type ServicePayload = Required<Pick<TablesUpdate<'trf_vehicle_maintenance'>, 'vehicle' | 'kind' | 'interval_km' | 'done_on' | 'notes'>> &
+  Pick<TablesUpdate<'trf_vehicle_maintenance'>, 'due_on' | 'due_km' | 'odometer_km'>;
 
 export type ServiceCheck = { ok: true; payload: ServicePayload; errors: Partial<Record<ServiceField, string>> } | { ok: false; errors: Partial<Record<ServiceField, string>> };
 
 /**
- * Checks the form. A service done needs its day (not after today); one that repeats every N km needs the odometer of
- * that day, to know when the next one is due. The odometer of a service still to do is not in the form: it stays as
- * it is.
+ * Checks the form, only the fields on screen. A service done needs its day (not after today); one that repeats every N
+ * km needs the odometer of that day, to know when the next one is due. What is not on screen is not sent, so it stays
+ * as it is: the date and kilometres a service done was planned for, as the app keeps them, and the odometer of a service
+ * still to do.
  */
 export function validateServiceForm(v: ServiceFormValues, today: string): ServiceCheck {
   const errors: Partial<Record<ServiceField, string>> = {};
@@ -244,22 +245,16 @@ export function validateServiceForm(v: ServiceFormValues, today: string): Servic
     else if (odometer.value === null && interval.value !== null) errors.odometerKm = 'Para agendar el próximo, escribí el kilometraje del día en que se hizo.';
     else if (odometer.value !== null && interval.value !== null && odometer.value + interval.value > SERVICE_LIMITS.km) errors.odometerKm = 'Es demasiado grande. Revisá el número.';
   }
-  // A service done keeps the date and kilometres it was planned for, as the app does.
-  if (v.dueOn.trim() !== '' && !isDay(v.dueOn)) errors.dueOn = 'La fecha no es válida.';
-  else if (v.dueOn.trim() !== '') dueOn = v.dueOn;
-  if (dueKm.error) errors.dueKm = dueKm.error;
+  if (!v.done) {
+    if (v.dueOn.trim() !== '' && !isDay(v.dueOn)) errors.dueOn = 'La fecha no es válida.';
+    else if (v.dueOn.trim() !== '') dueOn = v.dueOn;
+    if (dueKm.error) errors.dueKm = dueKm.error;
+  }
   if (text(v.notes) !== null && (text(v.notes) as string).length > SERVICE_LIMITS.notes) errors.notes = `Hasta ${SERVICE_LIMITS.notes} letras.`;
   if (Object.keys(errors).length > 0) return { ok: false, errors };
-  const payload: ServicePayload = {
-    vehicle: vehicle as string,
-    kind: kind as string,
-    due_on: dueOn,
-    due_km: dueKm.value,
-    interval_km: interval.value,
-    done_on: doneOn,
-    notes: text(v.notes) ?? '',
-  };
+  const payload: ServicePayload = { vehicle: vehicle as string, kind: kind as string, interval_km: interval.value, done_on: doneOn, notes: text(v.notes) ?? '' };
   if (v.done) payload.odometer_km = odometer.value;
+  else Object.assign(payload, { due_on: dueOn, due_km: dueKm.value });
   return { ok: true, errors, payload };
 }
 
@@ -271,16 +266,9 @@ export function nextService(saved: Pick<MaintenanceRow, 'vehicle' | 'kind' | 'do
   return { id, vehicle: saved.vehicle, kind: saved.kind, interval_km: saved.interval_km, due_km: due, created_by_name: createdByName };
 }
 
-/** Whether a save tried again found the service saved before with what this one sends. */
-export function sameService(saved: MaintenanceRow, row: TablesInsert<'trf_vehicle_maintenance'>): boolean {
-  return (
-    saved.vehicle === row.vehicle &&
-    saved.kind === row.kind &&
-    (saved.due_on ?? null) === (row.due_on ?? null) &&
-    (saved.done_on ?? null) === (row.done_on ?? null) &&
-    (saved.due_km ?? null) === (row.due_km ?? null) &&
-    (saved.interval_km ?? null) === (row.interval_km ?? null) &&
-    (saved.odometer_km ?? null) === (row.odometer_km ?? null) &&
-    (saved.notes ?? '') === (row.notes ?? '')
-  );
+const SAVED_FIELDS = ['vehicle', 'kind', 'due_on', 'done_on', 'due_km', 'interval_km', 'odometer_km', 'notes'] as const;
+
+/** Whether the service has what a save sends (what it does not send, it does not check): a try whose answer was cut went through. */
+export function sameService(saved: MaintenanceRow, row: TablesInsert<'trf_vehicle_maintenance'> | TablesUpdate<'trf_vehicle_maintenance'>): boolean {
+  return SAVED_FIELDS.every((k) => !(k in row) || (saved[k] ?? null) === (row[k] ?? null));
 }

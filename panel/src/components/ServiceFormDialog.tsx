@@ -114,7 +114,12 @@ export function ServiceFormDialog({ service: opened, vehicle, vehicles, services
       const result = await save.mutateAsync({ service, row, next });
       const nextAt = result.next?.due_km != null ? ` El próximo quedó agendado a los ${number(result.next.due_km)} km.` : '';
       if (result.nextFailed) {
-        onDone('El service quedó como hecho, pero no se pudo agendar el próximo: cargalo con «Nuevo service».', 'warn');
+        onDone(
+          result.nextFailed === 'unknown'
+            ? 'El service quedó como hecho, pero no se pudo confirmar si se agendó el próximo: revisá la lista antes de cargarlo de nuevo.'
+            : 'El service quedó como hecho, pero no se pudo agendar el próximo: cargalo con «Nuevo service».',
+          'warn',
+        );
         return;
       }
       if (retried && !sameService(result.saved, { ...p, id: newId })) {

@@ -141,13 +141,21 @@ describe('the service form', () => {
     });
     expect(nextService({ vehicle: 'x', kind: 'y', done_on: null, odometer_km: 1, interval_km: 1 }, 'n2', '')).toBeNull();
   });
-  it('a service still to do keeps the odometer it has: the form does not send it', () => {
+  it('checks and sends only the fields on screen: what is hidden stays as it is', () => {
     const check = validateServiceForm({ ...blank, kindChoice: 'Frenos', odometerKm: '999' }, today);
     expect(check.ok && 'odometer_km' in check.payload).toBe(false);
+    // Kilometres typed wrong while it was to do, then marked done: the planned date and kilometres are not on screen.
+    const done = validateServiceForm({ ...blank, kindChoice: 'Frenos', dueKm: '412,5', dueOn: '31/02', done: true, doneOn: today }, today);
+    expect(done.ok).toBe(true);
+    expect(done.ok && ['due_on', 'due_km'].some((k) => k in done.payload)).toBe(false);
   });
   it('knows a save tried again that found what it sent', () => {
     const saved = row({ id: 'a', vehicle: 'Ford Cargo 1722 · JKL3456', kind: 'Frenos', due_km: 420_000 });
     expect(sameService(saved, { id: 'a', vehicle: 'Ford Cargo 1722 · JKL3456', kind: 'Frenos', due_km: 420_000, due_on: null, done_on: null, interval_km: null, notes: '' })).toBe(true);
     expect(sameService(saved, { id: 'a', vehicle: 'Ford Cargo 1722 · JKL3456', kind: 'Frenos', due_km: 421_000 })).toBe(false);
+    // A change marking it done does not send the planned kilometres: they are not checked.
+    const done = { ...saved, done_on: '2026-10-15', odometer_km: 419_800 };
+    expect(sameService(done, { vehicle: 'Ford Cargo 1722 · JKL3456', kind: 'Frenos', done_on: '2026-10-15', odometer_km: 419_800, interval_km: null, notes: '' })).toBe(true);
+    expect(sameService(done, { vehicle: 'Ford Cargo 1722 · JKL3456', kind: 'Frenos', done_on: '2026-10-14', odometer_km: 419_800, interval_km: null, notes: '' })).toBe(false);
   });
 });

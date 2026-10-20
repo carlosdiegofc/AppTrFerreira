@@ -179,6 +179,11 @@ export async function saveService(service: Pick<Service, 'id' | 'updatedAt'> | n
   return saved;
 }
 
+/** A service as it is now; null when it does not exist (or this account cannot see it). */
+export async function serviceRow(id: string): Promise<MaintenanceRow | null> {
+  return rows(await supabase.from('trf_vehicle_maintenance').select('*').eq('id', id).limit(1))[0] ?? null;
+}
+
 /** Deletes a service for good, like the app; only if nobody changed it meanwhile (otherwise ConflictError). */
 export async function deleteService(service: Pick<Service, 'id' | 'updatedAt'>): Promise<void> {
   const gone = rows(await supabase.from('trf_vehicle_maintenance').delete().eq('id', service.id).eq('updated_at', service.updatedAt).select('id'));

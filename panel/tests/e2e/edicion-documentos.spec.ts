@@ -87,6 +87,35 @@ test('un papel de un chofer con su PDF, que tiene que ser un PDF de verdad', asy
   expect(answer.headers()['content-type']).toBe('application/pdf');
 });
 
+test('si se corta el alta de un papel y se cambia el archivo, el archivo nuevo no queda', async ({ page }) => {
+  await signIn(page, 'lectura@ejemplo.uy');
+  await open(page, 'Documentación');
+  const seen = storage(page);
+  // The first paper saved reaches the database, but its answer is lost.
+  let cut = true;
+  await page.route('**/rest/v1/trf_documents*', async (route) => {
+    if (route.request().method() !== 'POST' || !cut) return route.fallback();
+    cut = false;
+    await route.fetch();
+    await route.abort('failed');
+  });
+  await page.getByRole('button', { name: 'Nuevo documento' }).click();
+  const form = page.getByRole('dialog', { name: 'Nuevo documento' });
+  await form.getByLabel('Camión').selectOption('Mercedes Benz Actros · GHI9012');
+  await form.getByLabel('Tipo de documento').selectOption('Patente');
+  await form.getByLabel('Archivo del documento').setInputFiles({ name: 'patente.jpg', mimeType: 'image/jpeg', buffer: await paperPhoto(page) });
+  await form.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(form.getByRole('alert')).toContainText('Sin conexión con el servidor');
+  // Another file, tried again: the paper was saved with the first one, and the second goes.
+  await form.getByLabel('Archivo del documento').setInputFiles({ name: 'patente.pdf', mimeType: 'application/pdf', buffer: PDF });
+  await form.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(form).toBeHidden();
+  await expect(page.getByRole('alert')).toContainText('Ese documento ya se había guardado en el intento anterior');
+  expect(seen.uploads).toHaveLength(2);
+  await expect.poll(() => seen.deletes).toEqual([seen.uploads[1]]);
+  await expect(group(page, 'GHI9012').locator('.paper-row', { hasText: 'Patente' }).getByRole('button', { name: 'Ver foto' })).toBeVisible();
+});
+
 test('quitar el archivo de un papel y borrar un papel con el suyo', async ({ page }) => {
   await signIn(page, 'lectura@ejemplo.uy');
   await open(page, 'Documentación');

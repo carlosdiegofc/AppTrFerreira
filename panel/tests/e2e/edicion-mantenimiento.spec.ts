@@ -41,6 +41,48 @@ test('marcar como hecho un service que se repite agenda el próximo', async ({ p
   await expect(page.locator('.alert-line', { hasText: 'JKL3456' })).toHaveCount(0);
 });
 
+/** The first request of a kind to the services reaches the database, but its answer is lost. */
+async function cutFirst(page: Page, method: string) {
+  let cut = true;
+  await page.route('**/rest/v1/trf_vehicle_maintenance*', async (route) => {
+    if (route.request().method() !== method || !cut) return route.fallback();
+    cut = false;
+    await route.fetch();
+    await route.abort('failed');
+  });
+}
+
+test('si se corta la respuesta al marcarlo como hecho, el reintento agenda el próximo una sola vez', async ({ page }) => {
+  await signIn(page, 'lectura@ejemplo.uy');
+  await open(page, 'Mantenimiento');
+  await cutFirst(page, 'PATCH');
+  await service(page, 'A los 422.480 km').getByRole('button').click();
+  const form = page.getByRole('dialog', { name: 'Editar service' });
+  await form.getByRole('radio', { name: 'Sí, ya se hizo' }).click();
+  await form.getByLabel('Kilometraje ese día').fill('422.400');
+  await form.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(form.getByRole('alert')).toContainText('Sin conexión con el servidor');
+  // The database already has it done: trying again goes on from there.
+  await form.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(form).toBeHidden();
+  await expect(page.getByRole('status')).toContainText('Service marcado como hecho. El próximo quedó agendado a los 432.400 km.');
+  await expect(service(page, 'A los 432.400 km')).toHaveCount(1);
+});
+
+test('si se corta la respuesta al agendar el próximo, no queda dos veces', async ({ page }) => {
+  await signIn(page, 'lectura@ejemplo.uy');
+  await open(page, 'Mantenimiento');
+  await cutFirst(page, 'POST');
+  await service(page, 'A los 432.400 km').getByRole('button').click();
+  const form = page.getByRole('dialog', { name: 'Editar service' });
+  await form.getByRole('radio', { name: 'Sí, ya se hizo' }).click();
+  await form.getByLabel('Kilometraje ese día').fill('432.500');
+  await form.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(form).toBeHidden();
+  await expect(page.getByRole('status')).toContainText('Service marcado como hecho. El próximo quedó agendado a los 442.500 km.');
+  await expect(service(page, 'A los 442.500 km')).toHaveCount(1);
+});
+
 test('un service nuevo con un tipo escrito a mano', async ({ page }) => {
   await signIn(page, 'dueno@ejemplo.uy');
   await open(page, 'Mantenimiento');

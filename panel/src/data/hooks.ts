@@ -6,11 +6,12 @@ import { startOfDay } from '../lib/dates';
 import { type FileType, type Paper, type PaperDocRow, paperFromRow } from '../lib/documents';
 import { type ActiveTrip, type CatalogTruck, fleetUnits, truckLabel, withLivePositions } from '../lib/fleet';
 import { groupStations, type Movement, movementFromRow, type Receipt, receiptFromRow } from '../lib/fuel';
-import { kmReferences, kmSince, type MaintenanceRow, type Service, serviceFromRow, type TruckKm, truckKms } from '../lib/maintenance';
+import { kmReferences, kmSince, type MaintenanceRow, sameService, type Service, serviceFromRow, type TruckKm, truckKms } from '../lib/maintenance';
 import { appendReadings } from '../lib/route';
 import type { TripPayload } from '../lib/tripForm';
 import { mergeTrips, type Trip, tripFromPanel, tripFromSession } from '../lib/trips';
 import {
+  ConflictError,
   createReceipt,
   deleteDocument,
   deleteService,
@@ -37,6 +38,7 @@ import {
   saveMovement,
   saveService,
   saveTrip,
+  serviceRow,
   setMovementDeleted,
   setTripDeleted,
   updateReceipt,
@@ -135,22 +137,40 @@ function useServicesChanged() {
   return () => Promise.all(['services', 'kmTrips'].map((key) => client.invalidateQueries({ queryKey: [key] })));
 }
 
+export interface SavedService {
+  saved: MaintenanceRow;
+  /** The next one of a service that repeats, when it was scheduled. */
+  next: MaintenanceRow | null;
+  /** It had to be scheduled and was not; unknown when not even reading it back worked. */
+  nextFailed: false | 'failed' | 'unknown';
+}
+
 /**
  * A service, new or changed. One that repeats every N km and was just done gets its next one, due N km after the
- * odometer of that day (next); when that fails, the service stays done and nextFailed says so.
+ * odometer of that day (next); when that fails, the service stays done and nextFailed says so. Both steps survive an
+ * answer that was cut: a change that went through is found in the service as it was sent, and the next one by its id.
  */
 export function useSaveService() {
   const changed = useServicesChanged();
   return useMutation({
-    mutationFn: async ({ service, row, next }: { service: Service | null; row: TablesInsert<'trf_vehicle_maintenance'> | TablesUpdate<'trf_vehicle_maintenance'>; next: ((saved: MaintenanceRow) => TablesInsert<'trf_vehicle_maintenance'> | null) | null }) => {
-      const saved = await saveService(service, row);
+    mutationFn: async ({ service, row, next }: { service: Service | null; row: TablesInsert<'trf_vehicle_maintenance'> | TablesUpdate<'trf_vehicle_maintenance'>; next: ((saved: MaintenanceRow) => TablesInsert<'trf_vehicle_maintenance'> | null) | null }): Promise<SavedService> => {
+      let saved: MaintenanceRow;
+      try {
+        saved = await saveService(service, row);
+      } catch (e) {
+        if (!service || !(e instanceof ConflictError)) throw e;
+        const current = await serviceRow(service.id);
+        if (!current || !sameService(current, row)) throw e;
+        saved = current;
+      }
       const nextRow = next ? next(saved) : null;
-      if (!nextRow) return { saved, next: null, nextFailed: false };
+      if (!nextRow?.id) return { saved, next: null, nextFailed: false };
       try {
         return { saved, next: await saveService(null, nextRow), nextFailed: false };
       } catch (e) {
         console.error(e);
-        return { saved, next: null, nextFailed: true };
+        const there = await serviceRow(nextRow.id).catch(() => undefined);
+        return there ? { saved, next: there, nextFailed: false } : { saved, next: null, nextFailed: there === null ? 'failed' : 'unknown' };
       }
     },
     onSettled: changed,
@@ -204,6 +224,8 @@ export function useSavePaper() {
         throw e;
       }
       if (previous && previous !== saved.object_path) await removeDocumentFile(previous).catch((err: unknown) => console.error(err));
+      // A new paper saved before, with another file, kept that one: this file is in its folder, unused.
+      if (upload && upload.path !== saved.object_path) await removeDocumentFile(upload.path).catch((err: unknown) => console.error(err));
       return saved;
     },
     onSettled: changed,
@@ -273,10 +295,13 @@ export function useTripList(fromIso: string | null, toIso: string | null) {
   return { trips, query: list, catalog };
 }
 
-/** Everything that shows trips reads them again after a change: the list, the trip's page and Inicio. */
+/**
+ * Everything that shows trips reads them again after a change: the list, the trip's page, Inicio, and the kilometres
+ * of the trucks (a trip in the trash does not count).
+ */
 function useTripsChanged() {
   const client = useQueryClient();
-  return () => Promise.all(['tripList', 'trip', 'trips'].map((key) => client.invalidateQueries({ queryKey: [key] })));
+  return () => Promise.all(['tripList', 'trip', 'trips', 'kmTrips'].map((key) => client.invalidateQueries({ queryKey: [key] })));
 }
 
 /** Saves the office's data of a trip (a new one when trip is null); on a conflict the screens read the trip again. */
