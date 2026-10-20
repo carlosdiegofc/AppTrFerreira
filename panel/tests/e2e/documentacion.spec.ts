@@ -36,12 +36,23 @@ test('los papeles de camiones y choferes, con su estado y su archivo', async ({ 
   const photo = page.getByRole('dialog', { name: 'Licencia de conducir · Ana Pereira' });
   await expect(photo.locator('img')).toBeVisible();
   await photo.getByRole('button', { name: 'Cerrar la foto' }).click();
+  // While the link of the PDF arrives, the dialog never shows the one of the photo opened before, not even for a moment.
+  await page.evaluate(() => {
+    const seen: string[] = [];
+    (window as unknown as { shownLinks: string[] }).shownLinks = seen;
+    new MutationObserver(() => {
+      for (const a of document.querySelectorAll('.photo-dialog a')) seen.push(a.getAttribute('href') ?? '');
+    }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['href'] });
+  });
   await group(page, 'GHI9012').getByRole('button', { name: 'Ver PDF' }).click();
   const pdf = page.getByRole('dialog', { name: 'SOA · Mercedes Benz Actros · GHI9012' });
   const link = pdf.getByRole('link', { name: 'Abrir el PDF' });
   await expect(link).toHaveAttribute('target', '_blank');
   const answer = await page.request.get((await link.getAttribute('href')) as string);
   expect(answer.headers()['content-type']).toBe('application/pdf');
+  const shown = await page.evaluate(() => (window as unknown as { shownLinks: string[] }).shownLinks);
+  expect(shown.length).toBeGreaterThan(0);
+  expect(shown.filter((href) => !href.includes('.pdf'))).toEqual([]);
   await pdf.getByRole('button', { name: 'Cerrar' }).click();
 
   // Filters: drivers only, by state, whose, and words; they stay in the address.

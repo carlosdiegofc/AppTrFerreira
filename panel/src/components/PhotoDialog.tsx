@@ -11,11 +11,13 @@ export interface Photo {
   title: string;
 }
 
-type State = { status: 'loading' } | { status: 'ready'; url: string } | { status: 'failed' };
+/** The link of one opening: another file opened after it never shows it, not even for a moment. */
+type State = { photo: Photo | null } & ({ status: 'loading' } | { status: 'ready'; url: string } | { status: 'failed' });
 
 export function PhotoDialog({ photo, onClose }: { photo: Photo | null; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const [state, setState] = useState<State>({ status: 'loading' });
+  const [opened, setState] = useState<State>({ photo: null, status: 'loading' });
+  const state: State = opened.photo === photo ? opened : { photo, status: 'loading' };
   const pdf = photo !== null && /\.pdf$/i.test(photo.path);
 
   useEffect(() => {
@@ -28,10 +30,9 @@ export function PhotoDialog({ photo, onClose }: { photo: Photo | null; onClose: 
   useEffect(() => {
     if (!photo) return;
     let alive = true;
-    setState({ status: 'loading' });
     photoUrl(photo.bucket, photo.path).then(
-      (url) => alive && setState({ status: 'ready', url }),
-      () => alive && setState({ status: 'failed' }),
+      (url) => alive && setState({ photo, status: 'ready', url }),
+      () => alive && setState({ photo, status: 'failed' }),
     );
     return () => {
       alive = false;
@@ -68,7 +69,7 @@ export function PhotoDialog({ photo, onClose }: { photo: Photo | null; onClose: 
         </div>
       ) : (
         <>
-          <img src={state.url} alt={photo?.title ?? 'Foto'} onError={() => setState({ status: 'failed' })} />
+          <img src={state.url} alt={photo?.title ?? 'Foto'} onError={() => setState({ photo, status: 'failed' })} />
           <a className="link" href={state.url} target="_blank" rel="noopener noreferrer">
             Abrir en otra pestaña <Icon name="external" size={16} />
           </a>
