@@ -227,17 +227,11 @@ export function paperChanges(p: PaperPayload, objectPath: string | null): Tables
   return { ...(p.scope === 'vehicle' ? { vehicle: p.vehicle } : {}), kind: p.kind, expires_on: p.expiresOn, notes: p.notes, object_path: objectPath };
 }
 
-/** Whether a save tried again found the paper saved before with what this one sends. */
-export function samePaper(saved: PaperDocRow, row: TablesInsert<'trf_documents'>): boolean {
-  return (
-    saved.scope === row.scope &&
-    saved.kind === row.kind &&
-    (saved.vehicle ?? '') === (row.vehicle ?? '') &&
-    (saved.driver_id ?? null) === (row.driver_id ?? null) &&
-    (saved.expires_on ?? null) === (row.expires_on ?? null) &&
-    (saved.notes ?? '') === (row.notes ?? '') &&
-    (saved.object_path ?? null) === (row.object_path ?? null)
-  );
+const SAVED_FIELDS = ['scope', 'vehicle', 'driver_id', 'driver_name', 'kind', 'expires_on', 'notes', 'object_path'] as const;
+
+/** Whether the paper has what a save sends (what it does not send, it does not check): a try whose answer was cut went through. */
+export function samePaper(saved: PaperDocRow, row: TablesInsert<'trf_documents'> | TablesUpdate<'trf_documents'>): boolean {
+  return SAVED_FIELDS.every((k) => !(k in row) || (saved[k] ?? null) === (row[k] ?? null));
 }
 
 /** The first bytes of every PDF. */

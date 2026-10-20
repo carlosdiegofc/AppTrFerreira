@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { FLEET_REFRESH_MS, LIVE_REFRESH_MS, PRESENCE_REFRESH_MS, ROUTE_REFRESH_MS } from '../config';
 import type { TablesInsert, TablesUpdate } from '../lib/database.types';
 import { startOfDay } from '../lib/dates';
-import { type FileType, type Paper, type PaperDocRow, paperFromRow } from '../lib/documents';
+import { type FileType, type Paper, type PaperDocRow, paperFromRow, samePaper } from '../lib/documents';
 import { type ActiveTrip, type CatalogTruck, fleetUnits, truckLabel, withLivePositions } from '../lib/fleet';
 import { groupStations, type Movement, movementFromRow, type Receipt, receiptFromRow } from '../lib/fuel';
 import { kmReferences, kmSince, type MaintenanceRow, sameService, type Service, serviceFromRow, type TruckKm, truckKms } from '../lib/maintenance';
@@ -15,6 +15,7 @@ import {
   createReceipt,
   deleteDocument,
   deleteService,
+  documentRow,
   fetchCatalog,
   fetchCatalogLists,
   fetchDocuments,
@@ -208,8 +209,9 @@ export interface PaperFileUpload {
 
 /**
  * A paper, new or changed: its new file first (when there is one), then the paper, then the file it no longer has goes
- * (if that fails, it stays in the private folder, unused). When the database refuses the save, the new file goes too,
- * unless an earlier try with it may have been saved without its answer arriving.
+ * (if that fails, it stays in the private folder, unused). A change whose answer was cut, found in the paper as it was
+ * sent, counts as saved. When the database refuses the save, the new file goes too, unless an earlier try with it may
+ * have been saved without its answer arriving.
  */
 export function useSavePaper() {
   const changed = useDocumentsChanged();
@@ -220,8 +222,12 @@ export function useSavePaper() {
       try {
         saved = await saveDocument(paper, row);
       } catch (e) {
-        if (upload?.fresh && refused(e)) await removeDocumentFile(upload.path).catch((err: unknown) => console.error(err));
-        throw e;
+        const current = paper && e instanceof ConflictError ? await documentRow(paper.id).catch(() => null) : null;
+        if (!current || !samePaper(current, row)) {
+          if (upload?.fresh && refused(e)) await removeDocumentFile(upload.path).catch((err: unknown) => console.error(err));
+          throw e;
+        }
+        saved = current;
       }
       if (previous && previous !== saved.object_path) await removeDocumentFile(previous).catch((err: unknown) => console.error(err));
       // A new paper saved before, with another file, kept that one: this file is in its folder, unused.

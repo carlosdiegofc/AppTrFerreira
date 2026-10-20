@@ -57,6 +57,24 @@ export interface KmTrip {
   distance_meters: number;
 }
 
+/** What the office completed for an app trip: it can send the trip to the trash or correct its truck. */
+export interface KmPanelRow {
+  app_trip_id: string | null;
+  vehicle: string | null;
+  deleted_at: string | null;
+}
+
+/** The app's trips as the office left them: without the ones in the trash, and with the truck it corrected. */
+export function kmTripsAsCorrected(trips: readonly KmTrip[], panel: readonly KmPanelRow[]): KmTrip[] {
+  const byTrip = new Map(panel.filter((p) => p.app_trip_id !== null).map((p) => [p.app_trip_id as string, p]));
+  return trips.flatMap((t) => {
+    const p = byTrip.get(t.id);
+    if (p?.deleted_at) return [];
+    const vehicle = text(p?.vehicle);
+    return [vehicle === null ? t : { ...t, vehicle }];
+  });
+}
+
 export interface TruckKm {
   /** The latest service done with the odometer written: where the estimate starts. */
   reference: { km: number; day: string };

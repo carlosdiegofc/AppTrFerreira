@@ -4,6 +4,7 @@ import {
   filterServices,
   kmReferences,
   kmSince,
+  kmTripsAsCorrected,
   type MaintenanceRow,
   nextService,
   OTHER_KIND,
@@ -75,6 +76,26 @@ describe('kilometres of each truck', () => {
     expect(kms.get('Ford Cargo 1722 · JKL3456')).toEqual({ reference: { km: 412_000, day: '2026-09-27' }, gpsKm: 95, estimate: 412_095 });
     expect(kms.get('Scania R450 · DEF5678')?.estimate).toBe(250_040);
     expect(kms.has('Volvo FH 460 · ABC1234')).toBe(false);
+  });
+});
+
+describe('the trips the kilometres count', () => {
+  it('are the app trips as the office left them: without the trash, with the truck it corrected', () => {
+    const trips = [
+      { id: 't1', vehicle: 'Scania R450 · DEF5678', started_at: '2026-10-15T14:00:00Z', distance_meters: 40_100 },
+      { id: 't2', vehicle: 'Ford Cargo 1722 · JKL3456', started_at: '2026-10-15T09:00:00Z', distance_meters: 95_000 },
+      { id: 't3', vehicle: 'Ford Cargo 1722 · JKL3456', started_at: '2026-10-15T11:30:00Z', distance_meters: 1_200 },
+    ];
+    const panel = [
+      { app_trip_id: 't1', vehicle: 'Volvo FH 460 · ABC1234', deleted_at: null },
+      { app_trip_id: 't2', vehicle: '  ', deleted_at: null },
+      { app_trip_id: 't3', vehicle: null, deleted_at: '2026-10-15T14:00:00Z' },
+      { app_trip_id: null, vehicle: 'Iveco Stralis · MNO7890', deleted_at: null },
+    ];
+    expect(kmTripsAsCorrected(trips, panel).map((t) => [t.id, t.vehicle])).toEqual([
+      ['t1', 'Volvo FH 460 · ABC1234'],
+      ['t2', 'Ford Cargo 1722 · JKL3456'],
+    ]);
   });
 });
 

@@ -74,7 +74,9 @@ export function Inicio() {
   const maintenance = useMaintenance();
 
   const counts = fleetCounts(fleet.units);
-  const papersLoaded = documents.query.data !== undefined && maintenance.query.data !== undefined;
+  // The warnings by kilometres need the trips: until they arrive (or fail), the list is not complete.
+  const kmWaiting = maintenance.kmMissing && !maintenance.trips.error;
+  const papersLoaded = documents.query.data !== undefined && maintenance.query.data !== undefined && !kmWaiting;
   const papersError = documents.query.error ?? maintenance.query.error;
   const pending = useMemo(() => {
     if (!papersLoaded) return [];
@@ -131,8 +133,10 @@ export function Inicio() {
 
         <Card title="Para tener en cuenta">
           {papersError && papersLoaded && <StaleNote onRetry={() => void refreshPapers()} />}
-          {maintenance.trips.error && maintenance.kmMissing && papersLoaded && (
-            <StaleNote onRetry={() => void maintenance.trips.refetch()}>No se pudieron leer los viajes: los avisos por kilómetros no se ven ahora.</StaleNote>
+          {maintenance.trips.error && papersLoaded && (
+            <StaleNote onRetry={() => void maintenance.trips.refetch()}>
+              {maintenance.kmMissing ? 'No se pudieron leer los viajes: los avisos por kilómetros no se ven ahora.' : 'No se pudieron actualizar los viajes: los avisos por kilómetros son de la última lectura.'}
+            </StaleNote>
           )}
           {papersError && !papersLoaded ? (
             <ErrorNote onRetry={() => void refreshPapers()} />

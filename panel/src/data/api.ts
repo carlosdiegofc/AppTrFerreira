@@ -4,7 +4,7 @@ import type { Tables, TablesInsert, TablesUpdate } from '../lib/database.types';
 import { type DriverChoice, driverChoices, type FileType, type Paper, type PaperDocRow } from '../lib/documents';
 import { type ActiveTrip, type CatalogTruck, catalogTrucks, type FinishedTrip, lastTripByTruck, type LivePosition, text, truckLabel } from '../lib/fleet';
 import { type CatalogStation, catalogStations, type Movement, type MovementRow, type Receipt } from '../lib/fuel';
-import type { KmTrip, MaintenanceRow, Service } from '../lib/maintenance';
+import { type KmTrip, kmTripsAsCorrected, type MaintenanceRow, type Service } from '../lib/maintenance';
 import type { PresenceRow } from '../lib/presence';
 import { supabase } from '../lib/supabase';
 import type { TripPayload } from '../lib/tripForm';
@@ -152,13 +152,16 @@ export async function fetchServices(): Promise<MaintenanceRow[]> {
   return all((from, to) => supabase.from('trf_vehicle_maintenance').select('*').order('created_at', { ascending: false }).order('id').range(from, to), 20_000, true);
 }
 
-/** The app's trips that started since an instant, with what the kilometres of each truck need, without the deleted ones. */
+/**
+ * The app's trips that started since an instant, with what the kilometres of each truck need, as the office left them:
+ * without the ones in the trash, and with the truck it corrected (the panel row of an app trip starts at its start).
+ */
 export async function fetchKmTrips(sinceIso: string): Promise<KmTrip[]> {
-  const [trips, deleted] = await Promise.all([
+  const [trips, panel] = await Promise.all([
     all((from, to) => supabase.from('trf_driver_tracking_sessions').select('id,vehicle,started_at,distance_meters').gte('started_at', sinceIso).order('started_at').order('id').range(from, to), 50_000, true),
-    deletedAppTrips(sinceIso, '2100-01-01T00:00:00Z'),
+    all((from, to) => supabase.from('trf_panel_trips').select('app_trip_id,vehicle,deleted_at').eq('source', 'app').gte('departure_at', sinceIso).order('id').range(from, to), 50_000, true),
   ]);
-  return trips.filter((t) => !deleted.has(t.id));
+  return kmTripsAsCorrected(trips, panel);
 }
 
 /** A service, new or changed; a change only applies if nobody saved it meanwhile (otherwise ConflictError). */
@@ -224,6 +227,11 @@ export async function saveDocument(paper: Pick<Paper, 'id' | 'updatedAt'> | null
   const saved = rows(await supabase.from('trf_documents').update(row).eq('id', paper.id).eq('updated_at', paper.updatedAt).select())[0];
   if (!saved) throw new ConflictError('Otra persona cambió el documento');
   return saved;
+}
+
+/** A paper as it is now; null when it does not exist (or this account cannot see it). */
+export async function documentRow(id: string): Promise<PaperDocRow | null> {
+  return rows(await supabase.from('trf_documents').select('*').eq('id', id).limit(1))[0] ?? null;
 }
 
 /** Deletes a paper for good, like the app; only if nobody changed it meanwhile (otherwise ConflictError). */

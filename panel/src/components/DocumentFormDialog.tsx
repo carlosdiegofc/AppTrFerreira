@@ -102,28 +102,39 @@ export function DocumentFormDialog({ paper: opened, vehicles, onClose, onDone, o
     setLeaving(false);
   };
 
+  // Each file chosen gets a number: a big photo still being prepared does not replace one chosen after it.
+  const picks = useRef(0);
+  /** A choice made with the buttons: a file still being prepared does not come after it. */
+  const settle = (state: FileState) => {
+    picks.current++;
+    setFile(state);
+  };
   const pick = async (picked: File | undefined) => {
     if (!picked) return;
-    setFile({ status: 'preparing' });
+    const turn = ++picks.current;
+    const show = (state: FileState) => {
+      if (turn === picks.current) setFile(state);
+    };
+    show({ status: 'preparing' });
     try {
       if (picked.type === 'application/pdf' || /\.pdf$/i.test(picked.name)) {
         if (picked.size > FILE_MAX_BYTES) {
-          setFile({ status: 'failed', reason: 'Ese PDF pesa más de 10 MB. Probá con uno más liviano o con una foto.' });
+          show({ status: 'failed', reason: 'Ese PDF pesa más de 10 MB. Probá con uno más liviano o con una foto.' });
           return;
         }
         if (!looksLikePdf(new Uint8Array(await picked.slice(0, 5).arrayBuffer()))) {
-          setFile({ status: 'failed', reason: 'Ese archivo no es un PDF que se pueda abrir.' });
+          show({ status: 'failed', reason: 'Ese archivo no es un PDF que se pueda abrir.' });
           return;
         }
-        setFile({ status: 'ready', blob: picked, type: 'pdf', preview: null, name: picked.name, fileId: crypto.randomUUID() });
+        show({ status: 'ready', blob: picked, type: 'pdf', preview: null, name: picked.name, fileId: crypto.randomUUID() });
         return;
       }
       const blob = await photoJpeg(picked);
       // A data: address, which the panel's Content-Security-Policy allows for images (blob: is not).
-      setFile({ status: 'ready', blob, type: 'photo', preview: await dataUrl(blob), name: picked.name, fileId: crypto.randomUUID() });
+      show({ status: 'ready', blob, type: 'photo', preview: await dataUrl(blob), name: picked.name, fileId: crypto.randomUUID() });
     } catch (e) {
       console.error(e);
-      setFile({ status: 'failed', reason: 'No se pudo leer ese archivo. Probá con una foto (JPG o PNG) o un PDF.' });
+      show({ status: 'failed', reason: 'No se pudo leer ese archivo. Probá con una foto (JPG o PNG) o un PDF.' });
     }
   };
 
@@ -333,14 +344,14 @@ export function DocumentFormDialog({ paper: opened, vehicles, onClose, onDone, o
                 {file.status === 'ready' ? (
                   <>
                     {fileInput('Cambiar archivo')}
-                    <button type="button" className="link-button" onClick={() => setFile({ status: 'keep' })} disabled={busy}>
+                    <button type="button" className="link-button" onClick={() => settle({ status: 'keep' })} disabled={busy}>
                       {current ? 'Dejar el que tenía' : 'Quitarlo'}
                     </button>
                     <p className="hint">{file.type === 'pdf' ? `PDF listo: ${file.name} (${size(file.blob.size)}).` : `Foto lista: ${size(file.blob.size)}.`}</p>
                   </>
                 ) : file.status === 'removed' ? (
                   <>
-                    <button type="button" className="btn" onClick={() => setFile({ status: 'keep' })} disabled={busy}>
+                    <button type="button" className="btn" onClick={() => settle({ status: 'keep' })} disabled={busy}>
                       <Icon name="undo" size={18} /> No quitarlo
                     </button>
                     <p className="hint">El archivo se borra al guardar.</p>
@@ -351,7 +362,7 @@ export function DocumentFormDialog({ paper: opened, vehicles, onClose, onDone, o
                       <Icon name={current.type === 'pdf' ? 'doc' : 'external'} size={18} /> {current.type === 'pdf' ? 'Ver el PDF' : 'Ver la foto'}
                     </button>
                     {fileInput('Reemplazar')}
-                    <button type="button" className="link-button" onClick={() => setFile({ status: 'removed' })} disabled={busy}>
+                    <button type="button" className="link-button" onClick={() => settle({ status: 'removed' })} disabled={busy}>
                       Quitar el archivo
                     </button>
                     <p className="hint">{current.type === 'pdf' ? 'Tiene un PDF.' : 'Tiene una foto.'}</p>

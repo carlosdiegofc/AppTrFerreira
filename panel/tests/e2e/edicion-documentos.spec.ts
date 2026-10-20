@@ -171,7 +171,7 @@ test('si dos personas cambian el mismo papel a la vez, la segunda no pisa a la p
   await Promise.all([a.close(), b.close()]);
 });
 
-test('si se corta la respuesta al guardar un archivo, el reintento no lo borra', async ({ page }) => {
+test('si se corta la respuesta al cambiar el archivo, el reintento lo da por guardado y borra el anterior', async ({ page }) => {
   await signIn(page, 'lectura@ejemplo.uy');
   await open(page, 'Documentación');
   const seen = storage(page);
@@ -183,15 +183,21 @@ test('si se corta la respuesta al guardar un archivo, el reintento no lo borra',
     await route.fetch();
     await route.abort('failed');
   });
-  await group(page, 'Volvo FH 460').getByRole('button', { name: /Habilitación MTOP/ }).click();
+  // The Iveco's SOA, loaded above with a photo: a PDF takes its place.
+  await group(page, 'MNO7890').getByRole('button', { name: /SOA/ }).click();
   const form = page.getByRole('dialog', { name: 'Editar documento' });
-  await form.getByLabel('Archivo del documento').setInputFiles({ name: 'mtop.jpg', mimeType: 'image/jpeg', buffer: await paperPhoto(page) });
+  await expect(form).toContainText('Tiene una foto.');
+  await form.getByLabel('Archivo del documento').setInputFiles({ name: 'soa.pdf', mimeType: 'application/pdf', buffer: PDF });
   await form.getByRole('button', { name: 'Guardar', exact: true }).click();
   await expect(form.getByRole('alert')).toContainText('Sin conexión con el servidor');
-  // Tried again: the database already has it, so it says someone saved first, and the file stays with the paper.
+  // Tried again: the paper already has the PDF, so it is saved, the PDF stays and the photo it replaced goes.
   await form.getByRole('button', { name: 'Guardar', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('Otra persona cambió o borró ese documento');
-  expect(seen.deletes).toEqual([]);
-  await group(page, 'Volvo FH 460').getByRole('button', { name: 'Ver foto' }).click();
-  await expect(page.getByRole('dialog', { name: /^Habilitación MTOP/ }).locator('img')).toBeVisible();
+  await expect(form).toBeHidden();
+  await expect(page.getByRole('status')).toContainText('Documento guardado.');
+  const pdf = seen.uploads[0] as string;
+  expect(new Set(seen.uploads)).toEqual(new Set([pdf]));
+  await expect.poll(() => seen.deletes).toHaveLength(1);
+  expect(seen.deletes[0]).not.toBe(pdf);
+  await group(page, 'MNO7890').getByRole('button', { name: 'Ver PDF' }).click();
+  await expect(page.getByRole('dialog', { name: /^SOA/ }).getByRole('link', { name: 'Abrir el PDF' })).toBeVisible();
 });

@@ -136,5 +136,8 @@ describe('the paper form', () => {
     const saved = row({ id: 'n1', scope: 'vehicle', vehicle: 'Volvo FH 460 · ABC1234', kind: 'Patente', object_path: 'n1/f1.pdf' });
     expect(samePaper(saved, { id: 'n1', scope: 'vehicle', vehicle: 'Volvo FH 460 · ABC1234', driver_id: null, kind: 'Patente', expires_on: null, notes: '', object_path: 'n1/f1.pdf' })).toBe(true);
     expect(samePaper(saved, { id: 'n1', scope: 'vehicle', vehicle: 'Volvo FH 460 · ABC1234', kind: 'Patente', object_path: null })).toBe(false);
+    // A change sends only what it changes: the rest is not checked.
+    expect(samePaper(saved, { kind: 'Patente', expires_on: null, notes: '', object_path: 'n1/f1.pdf' })).toBe(true);
+    expect(samePaper(saved, { kind: 'Patente', expires_on: '2027-01-01', notes: '', object_path: 'n1/f1.pdf' })).toBe(false);
   });
 });
