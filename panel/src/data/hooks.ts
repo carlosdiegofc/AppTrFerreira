@@ -129,7 +129,9 @@ export function useMaintenance() {
   const kms = useMemo(() => (trips.data ? truckKms(references, trips.data, catalog.data ?? []) : new Map<string, TruckKm>()), [references, trips.data, catalog.data]);
   // Without the trips the kilometres are not known: the screens say so instead of showing "no kilometres".
   const kmMissing = since !== null && trips.data === undefined;
-  return { services, kms, kmMissing, query, trips, catalog };
+  // A query that is off still reads when asked to: without a service done with its kilometres there is nothing to read.
+  const refetchTrips = () => (since === null ? Promise.resolve() : trips.refetch());
+  return { services, kms, kmMissing, query, trips, refetchTrips, catalog };
 }
 
 /** Everything that shows services reads them again after a change: Mantenimiento and Inicio. */
@@ -238,12 +240,19 @@ export function useSavePaper() {
   });
 }
 
-/** Deletes a paper for good, then its file (if that fails, it stays in the private folder, unused). */
+/**
+ * Deletes a paper for good, then its file (if that fails, it stays in the private folder, unused). A delete whose answer
+ * was cut, or tried again after one, finds the paper gone: it counts as deleted, and its file goes too.
+ */
 export function useDeletePaper() {
   const changed = useDocumentsChanged();
   return useMutation({
     mutationFn: async (paper: Paper) => {
-      await deleteDocument(paper);
+      try {
+        await deleteDocument(paper);
+      } catch (e) {
+        if ((await documentRow(paper.id).catch(() => undefined)) !== null) throw e;
+      }
       if (paper.file) await removeDocumentFile(paper.file.path).catch((err: unknown) => console.error(err));
     },
     onSettled: changed,

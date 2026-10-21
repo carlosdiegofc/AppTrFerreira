@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
+import { Link, useLocation, useNavigate, useNavigationType, useSearchParams } from 'react-router';
 import { Icon } from '../components/Icon';
 import { TripFormDialog } from '../components/TripFormDialog';
 import { CatalogNote, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote } from '../components/ui';
@@ -83,10 +83,10 @@ export function Viajes() {
   const instants = periodToIso(range.from, range.to);
   const tab = TABS.find((t) => t.value === params.get('estado')) ?? TABS[0]!;
   // The search box keeps its own text: the address follows it, so typing is never slowed down or undone by it. An
-  // address that comes from elsewhere (the side menu, a link) brings its own search.
+  // address that comes from elsewhere (the side menu, a link, going back or forward) brings its own search.
   const urlQ = params.get('buscar') ?? '';
   const [q, setQ] = useState(urlQ);
-  const fromHere = (location.state as { filters?: boolean } | null)?.filters === true;
+  const fromHere = useNavigationType() === 'REPLACE' && (location.state as { filters?: boolean } | null)?.filters === true;
   useEffect(() => {
     if (!fromHere) setQ(urlQ);
   }, [location.key, fromHere, urlQ]);

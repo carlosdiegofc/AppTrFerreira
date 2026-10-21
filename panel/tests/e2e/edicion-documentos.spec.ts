@@ -1,7 +1,7 @@
 // Saving papers in a real browser: a truck's paper with its photo (a real one, drawn by the browser), a driver's paper
-// with its PDF (a file that is not a PDF is refused), taking a file off, deleting a paper with its file, and two people
-// changing the same paper at once. Saving changes the test data, so this file runs after the read-only tests (project
-// "edicion" in playwright.config.ts), in this order.
+// with its PDF (a file that is not a PDF is refused), taking a file off, deleting a paper with its file, two people
+// changing the same paper at once, and saves and deletes whose answer is cut. Saving changes the test data, so this file
+// runs after the read-only tests (project "edicion" in playwright.config.ts), in this order.
 import { expect, type Page, test } from '@playwright/test';
 import { open, prepare, shot, signIn } from './helpers';
 
@@ -200,4 +200,25 @@ test('si se corta la respuesta al cambiar el archivo, el reintento lo da por gua
   expect(seen.deletes[0]).not.toBe(pdf);
   await group(page, 'MNO7890').getByRole('button', { name: 'Ver PDF' }).click();
   await expect(page.getByRole('dialog', { name: /^SOA/ }).getByRole('link', { name: 'Abrir el PDF' })).toBeVisible();
+});
+
+test('si se corta la respuesta al borrar un papel, lo da por borrado y su archivo también se borra', async ({ page }) => {
+  await signIn(page, 'dueno@ejemplo.uy');
+  await open(page, 'Documentación');
+  const seen = storage(page);
+  // The paper is deleted, but the answer is lost.
+  await page.route('**/rest/v1/trf_documents*', async (route) => {
+    if (route.request().method() !== 'DELETE') return route.fallback();
+    await route.fetch();
+    await route.abort('failed');
+  });
+  // Carla's paper, loaded above with its PDF.
+  await group(page, 'Carla Méndez').getByRole('button', { name: /Carné de salud/ }).click();
+  await page.getByRole('dialog', { name: 'Editar documento' }).getByRole('button', { name: 'Eliminar' }).click();
+  await page.getByRole('dialog', { name: '¿Eliminar este documento?' }).getByRole('button', { name: 'Eliminar' }).click();
+  // The panel looks for it: it is not there any more, so it was deleted, and its PDF goes too.
+  await expect(page.getByRole('status')).toContainText('Documento eliminado.');
+  await expect(group(page, 'Carla Méndez')).toHaveCount(0);
+  await expect.poll(() => seen.deletes).toHaveLength(1);
+  expect(seen.deletes[0]).toMatch(/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.pdf$/);
 });

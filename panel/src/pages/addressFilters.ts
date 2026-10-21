@@ -1,15 +1,15 @@
 // The filters of a list kept in the address (?camion=…&vista=…): going back, reloading or sharing the link keeps them.
 import { useEffect, useRef, useState } from 'react';
-import { useLocation, useSearchParams } from 'react-router';
+import { useLocation, useNavigationType, useSearchParams } from 'react-router';
 
 export function useAddressFilters() {
   const [params, setParams] = useSearchParams();
   // The search box keeps its own text and the address follows it; an address that comes from elsewhere (the side menu,
-  // a link) brings its own search.
+  // a link, going back or forward) brings its own search.
   const location = useLocation();
   const q = params.get('buscar') ?? '';
   const [typed, setTyped] = useState(q);
-  const fromHere = (location.state as { filters?: boolean } | null)?.filters === true;
+  const fromHere = useNavigationType() === 'REPLACE' && (location.state as { filters?: boolean } | null)?.filters === true;
   useEffect(() => {
     if (!fromHere) setTyped(q);
   }, [location.key, fromHere, q]);

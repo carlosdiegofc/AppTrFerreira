@@ -87,7 +87,7 @@ export function Inicio() {
   const totals = useMemo(() => (month.data ? monthTotals(month.data, catalog.data ?? []) : null), [month.data, catalog.data]);
   const running = todays.data?.filter((t) => t.active).length ?? 0;
   const refreshing = fleet.isFetching || todays.isFetching || documents.query.isFetching || maintenance.query.isFetching;
-  const refreshPapers = () => Promise.all([documents.query.refetch(), maintenance.query.refetch(), maintenance.trips.refetch()]);
+  const refreshPapers = () => Promise.all([documents.query.refetch(), maintenance.query.refetch(), maintenance.refetchTrips()]);
   const refresh = () => void Promise.all([fleet.refetch(), todays.refetch(), month.refetch(), refreshPapers()]);
   const firstName = user.name.split(' ')[0] ?? user.name;
 
@@ -134,7 +134,7 @@ export function Inicio() {
         <Card title="Para tener en cuenta">
           {papersError && papersLoaded && <StaleNote onRetry={() => void refreshPapers()} />}
           {maintenance.trips.error && papersLoaded && (
-            <StaleNote onRetry={() => void maintenance.trips.refetch()}>
+            <StaleNote onRetry={() => void maintenance.refetchTrips()}>
               {maintenance.kmMissing ? 'No se pudieron leer los viajes: los avisos por kilómetros no se ven ahora.' : 'No se pudieron actualizar los viajes: los avisos por kilómetros son de la última lectura.'}
             </StaleNote>
           )}

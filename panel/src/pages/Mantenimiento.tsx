@@ -93,7 +93,7 @@ export function Mantenimiento() {
   const now = useNow(60_000);
   const today = dayInZone(now);
   const { params, set, typed, search } = useAddressFilters();
-  const { services, kms, kmMissing, query, trips, catalog } = useMaintenance();
+  const { services, kms, kmMissing, query, trips, refetchTrips, catalog } = useMaintenance();
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Service | null>(null);
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null);
@@ -153,7 +153,7 @@ export function Mantenimiento() {
       {query.error && query.data !== undefined && <StaleNote onRetry={() => void query.refetch()} />}
       {catalog.error && <CatalogNote onRetry={() => void catalog.refetch()} />}
       {trips.error && (
-        <StaleNote onRetry={() => void trips.refetch()}>
+        <StaleNote onRetry={() => void refetchTrips()}>
           {kmMissing ? 'No se pudieron leer los viajes: los kilómetros de los camiones no se pueden estimar ahora.' : 'No se pudieron actualizar los viajes: los kilómetros son los de la última lectura.'}
         </StaleNote>
       )}
@@ -213,7 +213,7 @@ export function Mantenimiento() {
             </div>
             <div className="list-info">
               {loadedAt !== null && <span className="updated">actualizado {ago(loadedAt, now)}</span>}
-              <RefreshButton onClick={() => void Promise.all([query.refetch(), trips.refetch()])} busy={query.isFetching || trips.isFetching} />
+              <RefreshButton onClick={() => void Promise.all([query.refetch(), refetchTrips()])} busy={query.isFetching || trips.isFetching} />
             </div>
           </div>
 

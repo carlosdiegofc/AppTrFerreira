@@ -62,6 +62,48 @@ test('los services por hacer, por fecha y por kilómetros estimados', async ({ p
   await expect(page.locator('.filters').getByLabel('Camión')).toHaveValue('Ford Cargo 1722 · JKL3456');
 });
 
+test('sin un service hecho con sus kilómetros, actualizar no lee los viajes', async ({ page }) => {
+  // No service done has its odometer: there is nothing to count the kilometres from.
+  await page.route('**/rest/v1/trf_vehicle_maintenance*', async (route) => {
+    const response = await route.fetch();
+    const rows = (await response.json()) as { odometer_km: number | null }[];
+    await route.fulfill({ response, json: rows.map((r) => ({ ...r, odometer_km: null })) });
+  });
+  const kmReads: string[] = [];
+  page.on('request', (r) => {
+    if (new URL(r.url()).searchParams.get('select') === 'id,vehicle,started_at,distance_meters') kmReads.push(r.url());
+  });
+  await signIn(page, 'lectura@ejemplo.uy');
+  await expect(page.locator('.alert-line').first()).toBeVisible();
+  const reread = () => page.waitForResponse((r) => r.url().includes('/rest/v1/trf_vehicle_maintenance'));
+  let answer = reread();
+  await page.getByRole('button', { name: 'Actualizar' }).click();
+  await answer;
+  await open(page, 'Mantenimiento');
+  await expect(card(page, 'JKL3456').locator('.km-value')).toHaveText('Sin kilometraje');
+  answer = reread();
+  await page.getByRole('button', { name: 'Actualizar' }).click();
+  await answer;
+  await expect(page.getByRole('button', { name: 'Actualizar' })).toBeEnabled();
+  expect(kmReads).toEqual([]);
+});
+
+test('volver atrás trae de nuevo la búsqueda de la lista', async ({ page }) => {
+  await signIn(page, 'lectura@ejemplo.uy');
+  await open(page, 'Mantenimiento');
+  await page.getByLabel('Buscar').fill('frenos');
+  await expect(page).toHaveURL(/buscar=frenos/);
+  await expect(services(page).locator('strong')).toHaveText(['Frenos']);
+  // The side menu opens the section again without filters; going back brings the search back, in the box and the list.
+  await open(page, 'Mantenimiento');
+  await expect(page.getByLabel('Buscar')).toHaveValue('');
+  await expect(services(page)).toHaveCount(4);
+  await page.goBack();
+  await expect(page).toHaveURL(/buscar=frenos/);
+  await expect(page.getByLabel('Buscar')).toHaveValue('frenos');
+  await expect(services(page).locator('strong')).toHaveText(['Frenos']);
+});
+
 test('un service se abre con lo que tiene, y el kilometraje estimado de su camión', async ({ page }) => {
   await signIn(page, 'dueno@ejemplo.uy');
   await open(page, 'Mantenimiento');
