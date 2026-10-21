@@ -7,6 +7,7 @@ import {
   kmTripsAsCorrected,
   type MaintenanceRow,
   nextService,
+  nextServiceId,
   OTHER_KIND,
   sameService,
   serviceFormValues,
@@ -161,6 +162,17 @@ describe('the service form', () => {
       created_by_name: 'Socio Lectura',
     });
     expect(nextService({ vehicle: 'x', kind: 'y', done_on: null, odometer_km: 1, interval_km: 1 }, 'n2', '')).toBeNull();
+  });
+  it('the next one has the same id for everyone who marks the service done the same way', async () => {
+    const done = { id: '70000000-0000-4000-8000-000000000004', odometer_km: 412_480, interval_km: 10_000 };
+    const id = await nextServiceId(done);
+    expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(await nextServiceId({ ...done })).toBe(id);
+    expect(id).not.toBe(done.id);
+    // Other kilometres, or another service, make another next one.
+    expect(await nextServiceId({ ...done, odometer_km: 412_500 })).not.toBe(id);
+    expect(await nextServiceId({ ...done, interval_km: 15_000 })).not.toBe(id);
+    expect(await nextServiceId({ ...done, id: '70000000-0000-4000-8000-000000000001' })).not.toBe(id);
   });
   it('checks and sends only the fields on screen: what is hidden stays as it is', () => {
     const check = validateServiceForm({ ...blank, kindChoice: 'Frenos', odometerKm: '999' }, today);

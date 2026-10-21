@@ -151,12 +151,13 @@ export interface SavedService {
 /**
  * A service, new or changed. One that repeats every N km and was just done gets its next one, due N km after the
  * odometer of that day (next); when that fails, the service stays done and nextFailed says so. Both steps survive an
- * answer that was cut: a change that went through is found in the service as it was sent, and the next one by its id.
+ * answer that was cut: a change that went through is found in the service as it was sent, and the next one by its id,
+ * which is the same for everyone who marks the service done the same way.
  */
 export function useSaveService() {
   const changed = useServicesChanged();
   return useMutation({
-    mutationFn: async ({ service, row, next }: { service: Service | null; row: TablesInsert<'trf_vehicle_maintenance'> | TablesUpdate<'trf_vehicle_maintenance'>; next: ((saved: MaintenanceRow) => TablesInsert<'trf_vehicle_maintenance'> | null) | null }): Promise<SavedService> => {
+    mutationFn: async ({ service, row, next }: { service: Service | null; row: TablesInsert<'trf_vehicle_maintenance'> | TablesUpdate<'trf_vehicle_maintenance'>; next: ((saved: MaintenanceRow) => Promise<TablesInsert<'trf_vehicle_maintenance'> | null>) | null }): Promise<SavedService> => {
       let saved: MaintenanceRow;
       try {
         saved = await saveService(service, row);
@@ -166,7 +167,7 @@ export function useSaveService() {
         if (!current || !sameService(current, row)) throw e;
         saved = current;
       }
-      const nextRow = next ? next(saved) : null;
+      const nextRow = next ? await next(saved) : null;
       if (!nextRow?.id) return { saved, next: null, nextFailed: false };
       try {
         return { saved, next: await saveService(null, nextRow), nextFailed: false };

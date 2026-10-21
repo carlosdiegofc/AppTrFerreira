@@ -1,6 +1,7 @@
 // Saving services in a real browser: marking done one that repeats every N km schedules the next one, a new service
-// with a kind written by hand, deleting for good, and two people changing the same service at once. Saving changes the
-// test data, so this file runs after the read-only tests (project "edicion" in playwright.config.ts), in this order.
+// with a kind written by hand, deleting for good, and two people changing the same service at once or marking it done
+// at once. Saving changes the test data, so this file runs after the read-only tests (project "edicion" in
+// playwright.config.ts), in this order.
 import { expect, type Page, test } from '@playwright/test';
 import { open, prepare, shot, signIn } from './helpers';
 
@@ -147,5 +148,29 @@ test('si dos personas cambian el mismo service a la vez, la segunda no pisa a la
   await expect(b.getByRole('alert')).toContainText('Otra persona cambió o borró ese service');
   // B reads it again: A's change, and not B's.
   await expect(service(b, 'Cambio de filtros')).toContainText('Taller A');
+  await Promise.all([a.close(), b.close()]);
+});
+
+test('si dos personas marcan como hecho el mismo service a la vez, el próximo queda una sola vez', async ({ browser }) => {
+  const [a, b] = await Promise.all([browser.newPage(), browser.newPage()]);
+  for (const p of [a, b]) {
+    await prepare(p);
+    await signIn(p, 'dueno@ejemplo.uy');
+    await open(p, 'Mantenimiento');
+    // The Ford's oil change, scheduled by the tests above.
+    await service(p, 'A los 442.500 km').getByRole('button').click();
+    const form = p.getByRole('dialog', { name: 'Editar service' });
+    await form.getByRole('radio', { name: 'Sí, ya se hizo' }).click();
+    await form.getByLabel('Kilometraje ese día').fill('442.450');
+  }
+  // Both save the same: A first, then B, whose save finds the service already done that way.
+  for (const p of [a, b]) {
+    await p.getByRole('dialog', { name: 'Editar service' }).getByRole('button', { name: 'Guardar', exact: true }).click();
+    await expect(p.getByRole('status')).toContainText('Service marcado como hecho. El próximo quedó agendado a los 452.450 km.');
+  }
+  for (const p of [a, b]) {
+    await p.reload();
+    await expect(service(p, 'A los 452.450 km')).toHaveCount(1);
+  }
   await Promise.all([a.close(), b.close()]);
 });

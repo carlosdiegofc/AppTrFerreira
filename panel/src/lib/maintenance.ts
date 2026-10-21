@@ -276,6 +276,20 @@ export function validateServiceForm(v: ServiceFormValues, today: string): Servic
   return { ok: true, errors, payload };
 }
 
+/**
+ * The id of the next service of one just done, made from that service and its kilometres: whoever marks it done that way
+ * (two people at once, two tabs, a save tried again) schedules the same next one, and the database keeps it once.
+ */
+export async function nextServiceId(saved: Pick<MaintenanceRow, 'id' | 'odometer_km' | 'interval_km'>): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`trf-next-service:${saved.id}:${saved.odometer_km}:${saved.interval_km}`));
+  const b = new Uint8Array(digest, 0, 16);
+  // A UUID of version 8, the one for ids made this way.
+  b[6] = (b[6]! & 0x0f) | 0x80;
+  b[8] = (b[8]! & 0x3f) | 0x80;
+  const hex = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 /** The next service of one that repeats every N km and was just done: due N km after the odometer of that day. */
 export function nextService(saved: Pick<MaintenanceRow, 'vehicle' | 'kind' | 'done_on' | 'odometer_km' | 'interval_km'>, id: string, createdByName: string): TablesInsert<'trf_vehicle_maintenance'> | null {
   if (saved.done_on === null || saved.odometer_km === null || saved.interval_km === null) return null;

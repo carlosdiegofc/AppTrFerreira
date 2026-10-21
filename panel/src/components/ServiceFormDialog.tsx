@@ -7,7 +7,7 @@ import { ConflictError, describeWriteError } from '../data/api';
 import { useDeleteService, useSaveService } from '../data/hooks';
 import { dayInZone, formatDay } from '../lib/dates';
 import { number } from '../lib/format';
-import { type MaintenanceRow, nextService, OTHER_KIND, SERVICE_KINDS, SERVICE_LIMITS, type Service, type ServiceField, serviceFormChanged, type ServiceFormValues, serviceFormValues, sameService, type TruckKm, validateServiceForm } from '../lib/maintenance';
+import { type MaintenanceRow, nextService, nextServiceId, OTHER_KIND, SERVICE_KINDS, SERVICE_LIMITS, type Service, type ServiceField, serviceFormChanged, type ServiceFormValues, serviceFormValues, sameService, type TruckKm, validateServiceForm } from '../lib/maintenance';
 import { parseNumber } from '../lib/numbers';
 import { ConfirmDialog } from './ConfirmDialog';
 import { Icon } from './Icon';
@@ -36,10 +36,9 @@ export function ServiceFormDialog({ service: opened, vehicle, vehicles, services
   const { user } = usePanelUser();
   // The service as it was when the form opened: the save is checked against this version.
   const [service] = useState(opened);
-  // A new service and the next one of a service that repeats keep their ids while the dialog is open: a save tried
-  // again does not make a second one.
+  // A new service keeps its id while the dialog is open: a save tried again does not make a second one. The next one of
+  // a service that repeats takes its id from the service done (nextServiceId).
   const [newId] = useState(() => crypto.randomUUID());
-  const [nextId] = useState(() => crypto.randomUUID());
   const tried = useRef(false);
   const [initial] = useState(() => serviceFormValues(service, vehicle));
   const [values, setValues] = useState(initial);
@@ -101,10 +100,10 @@ export function ServiceFormDialog({ service: opened, vehicle, vehicles, services
     const justDone = p.done_on !== null && (service === null || service.doneOn === null);
     const next =
       justDone && p.interval_km !== null
-        ? (saved: MaintenanceRow) => {
+        ? async (saved: MaintenanceRow) => {
             const due = (saved.odometer_km ?? 0) + (saved.interval_km ?? 0);
             const there = services.some((s) => s.id !== saved.id && s.vehicle === p.vehicle && s.kind === saved.kind && s.doneOn === null && s.dueKm === due);
-            return there ? null : nextService(saved, nextId, user.name);
+            return there ? null : nextService(saved, await nextServiceId(saved), user.name);
           }
         : null;
     try {
