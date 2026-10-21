@@ -25,8 +25,24 @@ begin
   exception when insufficient_privilege then null;
   end;
   if (select count(*) from public.trf_panel_trips) <> 0 then raise exception 'chofer: no tendría que ver los datos del panel'; end if;
-  if (select count(*) from public.trf_documents) <> 3 then raise exception 'chofer: tendría que ver sus papeles y los de los camiones'; end if;
-  if (select count(*) from public.trf_vehicle_maintenance) <> 3 then raise exception 'chofer: tendría que ver los services'; end if;
+  if (select count(*) from public.trf_documents) <> 4 then raise exception 'chofer: tendría que ver sus papeles y los de los camiones'; end if;
+  if (select count(*) from public.trf_vehicle_maintenance) <> 6 then raise exception 'chofer: tendría que ver los services'; end if;
+  -- The files of the papers: hers and the trucks' (for a later app version), never another driver's. Uploading and
+  -- deleting them is the office's.
+  if (select count(*) from storage.objects where bucket_id = 'trf-documents') <> 2 then raise exception 'chofer: tendría que ver solo el archivo de su licencia y el del SOA'; end if;
+  begin
+    insert into storage.objects (bucket_id, name) values ('trf-documents', '50000000-0000-4000-8000-000000000001/60000000-0000-4000-8000-0000000000aa.jpg');
+    raise exception 'chofer: pudo subir el archivo de un documento';
+  exception when insufficient_privilege then null;
+  end;
+  delete from storage.objects where bucket_id = 'trf-documents';
+  get diagnostics n = row_count;
+  if n <> 0 then raise exception 'chofer: no tendría que poder borrar archivos de documentos'; end if;
+  begin
+    update public.trf_documents set object_path = '50000000-0000-4000-8000-000000000004/60000000-0000-4000-8000-000000000004.jpg' where id = '50000000-0000-4000-8000-000000000001';
+    raise exception 'chofer: pudo apuntar su documento al archivo de otro';
+  exception when check_violation then null;
+  end;
   if (select count(*) from public.trf_mobile_catalog) <> 1 then raise exception 'chofer: tendría que leer el catálogo'; end if;
   if public.trf_is_panel_admin() or public.trf_is_admin() then raise exception 'chofer: no es administrador'; end if;
   -- The app uploads GPS readings without id: the identity column numbers them.
@@ -74,7 +90,8 @@ begin
   if (select count(*) from public.trf_panel_trips) <> 3 then raise exception 'lectura: tendría que ver los 3 viajes del panel'; end if;
   if (select count(*) from public.trf_trip_documents) <> 2 or (select count(*) from public.trf_driver_fuel_receipts) <> 6 then raise exception 'lectura: tendría que ver los remitos y el combustible'; end if;
   if (select count(*) from public.trf_fuel_station_movements) <> 3 then raise exception 'lectura: tendría que ver los pagos y saldos de las estaciones'; end if;
-  if (select count(*) from public.trf_documents) <> 3 then raise exception 'lectura: tendría que ver todos los papeles'; end if;
+  if (select count(*) from public.trf_documents) <> 5 then raise exception 'lectura: tendría que ver todos los papeles'; end if;
+  if (select count(*) from storage.objects where bucket_id = 'trf-documents') <> 3 then raise exception 'lectura: tendría que ver los archivos de todos los papeles'; end if;
 end $$;
 
 -- The panel accounts complete the trips of the app, type trips by hand and send them to the trash (decision of
@@ -204,6 +221,72 @@ begin
   exception when insufficient_privilege then null;
   end;
 end $$;
+
+-- Mantenimiento y Documentación (decision of 20/10/2026): the panel accounts load, change and delete the services and
+-- papers of the whole fleet (for good, like the app) and upload and delete their files. The database notes who saved
+-- each one last.
+do $$
+declare
+  me constant uuid := '00000000-0000-4000-8000-000000000002';
+  doc constant uuid := '50000000-0000-4000-8000-000000000009';
+  file constant text := '50000000-0000-4000-8000-000000000009/60000000-0000-4000-8000-000000000009.pdf';
+  s public.trf_vehicle_maintenance;
+  d public.trf_documents;
+  n int;
+begin
+  -- A service every 10.000 km, due at 422.000.
+  insert into public.trf_vehicle_maintenance (vehicle, kind, due_km, interval_km, created_by_name)
+  values ('Ford Cargo 1722 · JKL3456', 'Cambio de filtros', 422000, 10000, 'Socio Lectura')
+  returning * into s;
+  if s.created_by is distinct from me or s.updated_by is distinct from me then raise exception 'lectura: el service nuevo tendría que quedar a su nombre'; end if;
+  begin
+    insert into public.trf_vehicle_maintenance (vehicle, kind, interval_km) values ('Ford Cargo 1722 · JKL3456', 'Cambio de aceite', 0);
+    raise exception 'lectura: pudo guardar un service cada 0 km';
+  exception when check_violation then null;
+  end;
+  begin
+    insert into public.trf_vehicle_maintenance (vehicle, kind, due_km) values ('Ford Cargo 1722 · JKL3456', 'Cambio de aceite', -1);
+    raise exception 'lectura: pudo guardar un service a los -1 km';
+  exception when check_violation then null;
+  end;
+  -- A service someone else loaded in the app: marking it done notes who; then it is deleted for good.
+  update public.trf_vehicle_maintenance set done_on = current_date, odometer_km = 300000 where id = '70000000-0000-4000-8000-000000000002' returning * into s;
+  if s.id is null or s.done_on is null or s.updated_by is distinct from me then raise exception 'lectura: tendría que poder marcar como hecho un service de otro, y quedar anotado'; end if;
+  delete from public.trf_vehicle_maintenance where id = s.id;
+  get diagnostics n = row_count;
+  if n <> 1 then raise exception 'lectura: tendría que poder borrar un service'; end if;
+
+  -- A driver's paper with its PDF: the file first, then the paper that points to it.
+  insert into storage.objects (bucket_id, name) values ('trf-documents', file);
+  insert into public.trf_documents (id, scope, driver_id, driver_name, kind, expires_on, object_path)
+  values (doc, 'driver', '00000000-0000-4000-8000-000000000012', 'Bruno Díaz', 'Licencia de conducir', current_date + 300, file)
+  returning * into d;
+  if d.created_by is distinct from me or d.updated_by is distinct from me then raise exception 'lectura: el documento nuevo tendría que quedar a su nombre'; end if;
+  begin
+    update public.trf_documents set object_path = '50000000-0000-4000-8000-000000000001/60000000-0000-4000-8000-000000000009.pdf' where id = doc;
+    raise exception 'lectura: un documento pudo apuntar a la carpeta de otro';
+  exception when check_violation then null;
+  end;
+  begin
+    update public.trf_documents set object_path = '50000000-0000-4000-8000-000000000009/60000000-0000-4000-8000-000000000009.exe' where id = doc;
+    raise exception 'lectura: un documento pudo llevar un archivo que no es foto ni PDF';
+  exception when check_violation then null;
+  end;
+  -- Someone else's paper (Ana's, loaded in the app): changing it notes who.
+  update public.trf_documents set expires_on = current_date + 20 where id = '50000000-0000-4000-8000-000000000001' returning * into d;
+  if d.updated_by is distinct from me then raise exception 'lectura: tendría que poder cambiar un documento de un chofer, y quedar anotado'; end if;
+  -- Deleting: the paper, then its file.
+  delete from public.trf_documents where id = doc;
+  delete from storage.objects where bucket_id = 'trf-documents' and name = file;
+  get diagnostics n = row_count;
+  if n <> 1 then raise exception 'lectura: tendría que poder borrar el archivo de un documento'; end if;
+  if (select count(*) from public.trf_documents) <> 5 or (select count(*) from storage.objects where bucket_id = 'trf-documents') <> 3 then raise exception 'lectura: tendrían que quedar los documentos y archivos de antes'; end if;
+  -- The other folders keep their rules: the photos of remitos and receipts are read, never deleted.
+  if (select count(*) from storage.objects where bucket_id <> 'trf-documents') <> 3 then raise exception 'lectura: tendría que ver las fotos de remitos y boletas'; end if;
+  delete from storage.objects where bucket_id <> 'trf-documents';
+  get diagnostics n = row_count;
+  if n <> 0 then raise exception 'lectura: no tendría que poder borrar fotos de remitos ni de boletas'; end if;
+end $$;
 rollback;
 
 -- The owner is a full administrator.
@@ -242,6 +325,8 @@ begin
   update public.trf_driver_fuel_receipts set liters = 251 where id = '40000000-0000-4000-8000-000000000003';
   if (select liters from public.trf_driver_fuel_receipts where id = '40000000-0000-4000-8000-000000000003') <> 251 then raise exception 'admin: tendría que conservar su permiso sobre las boletas'; end if;
   if (select count(*) from public.trf_fuel_station_movements) <> 0 then raise exception 'admin: no tendría que ver las cuentas de las estaciones sin estar en la lista del panel'; end if;
+  -- The papers and their files are the fleet's managers', the full administrators too (as with the papers, from before).
+  if (select count(*) from public.trf_documents) <> 5 or (select count(*) from storage.objects where bucket_id = 'trf-documents') <> 3 then raise exception 'admin: tendría que ver los documentos y sus archivos'; end if;
   begin
     insert into public.trf_fuel_station_movements (station_key, station_name, kind, happened_on, amount, currency, method) values ('id:est-ruta5', 'Ancap Ruta 5 km 32', 'payment', current_date, 100, 'UYU', 'efectivo');
     raise exception 'admin: pudo registrar un pago sin estar en la lista del panel';
@@ -271,6 +356,17 @@ begin
   begin
     insert into public.trf_panel_trips (source, departure_at, vehicle) values ('manual', now(), 'Volvo FH 460 · ABC1234');
     raise exception 'anónimo: pudo cargar un viaje';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform 1 from public.trf_documents;
+    raise exception 'anónimo: pudo leer los documentos';
+  exception when insufficient_privilege then null;
+  end;
+  if (select count(*) from storage.objects) <> 0 then raise exception 'anónimo: no tendría que ver ningún archivo'; end if;
+  begin
+    insert into storage.objects (bucket_id, name) values ('trf-documents', '50000000-0000-4000-8000-000000000001/60000000-0000-4000-8000-0000000000aa.jpg');
+    raise exception 'anónimo: pudo subir un archivo';
   exception when insufficient_privilege then null;
   end;
 end $$;

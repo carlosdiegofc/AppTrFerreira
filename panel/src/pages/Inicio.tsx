@@ -5,7 +5,7 @@ import { FleetMap } from '../components/FleetMap';
 import { Icon } from '../components/Icon';
 import { Card, Dot, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote, Stat } from '../components/ui';
 import type { TripRow } from '../data/api';
-import { useCatalog, useFleet, useNow, usePapers, useTrips } from '../data/hooks';
+import { useCatalog, useDocuments, useFleet, useMaintenance, useNow, useTrips } from '../data/hooks';
 import { addDays, ago, dayInZone, firstOfMonth, firstOfNextMonth, formatTime, greeting, longDate, startOfDay } from '../lib/dates';
 import { type CatalogTruck, canonical, fleetCounts, truckParts } from '../lib/fleet';
 import { count, km, percent } from '../lib/format';
@@ -44,16 +44,19 @@ function TripLine({ trip, catalog }: { trip: TripRow; catalog: readonly CatalogT
 
 function AlertLine({ alert }: { alert: Alert }) {
   const late = alert.state === 'late';
+  const paper = alert.type === 'paper';
   return (
-    <li className="alert-line">
-      <span className={`alert-icon tone-${late ? 'red' : 'amber'}`}>
-        <Icon name={alert.type === 'paper' ? 'doc' : 'wrench'} size={18} />
-      </span>
-      <span className="alert-main">
-        <strong>{[alert.kind, alert.owner].filter(Boolean).join(' · ')}</strong>
-        <span>{alert.detail}</span>
-      </span>
-      <Pill tone={late ? 'red' : 'amber'}>{late ? 'Vencido' : alert.type === 'paper' ? 'Por vencer' : 'Próximo'}</Pill>
+    <li>
+      <Link className="alert-line" to={paper ? '/documentacion' : '/mantenimiento'} title={paper ? 'Ver en Documentación' : 'Ver en Mantenimiento'}>
+        <span className={`alert-icon tone-${late ? 'red' : 'amber'}`}>
+          <Icon name={paper ? 'doc' : 'wrench'} size={18} />
+        </span>
+        <span className="alert-main">
+          <strong>{[alert.kind, alert.owner].filter(Boolean).join(' · ')}</strong>
+          <span>{alert.detail}</span>
+        </span>
+        <Pill tone={late ? 'red' : 'amber'}>{late ? 'Vencido' : paper ? 'Por vencer' : 'Próximo'}</Pill>
+      </Link>
     </li>
   );
 }
@@ -67,14 +70,25 @@ export function Inicio() {
   const catalog = useCatalog();
   const todays = useTrips(startOfDay(today), startOfDay(addDays(today, 1)), 60_000);
   const month = useTrips(startOfDay(firstOfMonth(today)), startOfDay(firstOfNextMonth(today)));
-  const papers = usePapers();
+  const documents = useDocuments();
+  const maintenance = useMaintenance();
 
   const counts = fleetCounts(fleet.units);
-  const pending = useMemo(() => (papers.data ? alerts(papers.data.papers, papers.data.services, today) : []), [papers.data, today]);
+  // The warnings by kilometres need the trips: until they arrive (or fail), the list is not complete.
+  const kmWaiting = maintenance.kmMissing && !maintenance.trips.error;
+  const papersLoaded = documents.query.data !== undefined && maintenance.query.data !== undefined && !kmWaiting;
+  const papersError = documents.query.error ?? maintenance.query.error;
+  const pending = useMemo(() => {
+    if (!papersLoaded) return [];
+    const papers = documents.papers.map((p) => ({ id: p.id, scope: p.scope, driver_name: p.driverName, vehicle: p.vehicle, kind: p.kind, expires_on: p.expiresOn }));
+    const services = maintenance.services.map((s) => ({ id: s.id, vehicle: s.vehicle, kind: s.kind, due_on: s.dueOn, done_on: s.doneOn, due_km: s.dueKm }));
+    return alerts(papers, services, today, (vehicle) => maintenance.kms.get(vehicle)?.estimate ?? null);
+  }, [papersLoaded, documents.papers, maintenance.services, maintenance.kms, today]);
   const totals = useMemo(() => (month.data ? monthTotals(month.data, catalog.data ?? []) : null), [month.data, catalog.data]);
   const running = todays.data?.filter((t) => t.active).length ?? 0;
-  const refreshing = fleet.isFetching || todays.isFetching || papers.isFetching;
-  const refresh = () => void Promise.all([fleet.refetch(), todays.refetch(), month.refetch(), papers.refetch()]);
+  const refreshing = fleet.isFetching || todays.isFetching || documents.query.isFetching || maintenance.query.isFetching;
+  const refreshPapers = () => Promise.all([documents.query.refetch(), maintenance.query.refetch(), maintenance.refetchTrips()]);
+  const refresh = () => void Promise.all([fleet.refetch(), todays.refetch(), month.refetch(), refreshPapers()]);
   const firstName = user.name.split(' ')[0] ?? user.name;
 
   return (
@@ -118,14 +132,19 @@ export function Inicio() {
         </Card>
 
         <Card title="Para tener en cuenta">
-          {papers.error && papers.data !== undefined && <StaleNote onRetry={() => void papers.refetch()} />}
-          {papers.error && papers.data === undefined ? (
-            <ErrorNote onRetry={() => void papers.refetch()} />
-          ) : papers.isLoading ? (
+          {papersError && papersLoaded && <StaleNote onRetry={() => void refreshPapers()} />}
+          {maintenance.trips.error && papersLoaded && (
+            <StaleNote onRetry={() => void maintenance.refetchTrips()}>
+              {maintenance.kmMissing ? 'No se pudieron leer los viajes: los avisos por kilómetros no se ven ahora.' : 'No se pudieron actualizar los viajes: los avisos por kilómetros son de la última lectura.'}
+            </StaleNote>
+          )}
+          {papersError && !papersLoaded ? (
+            <ErrorNote onRetry={() => void refreshPapers()} />
+          ) : !papersLoaded ? (
             <Skeleton />
           ) : pending.length === 0 ? (
             <Empty icon="check" title="Todo en orden">
-              No hay papeles vencidos ni por vencer en 30 días, ni services atrasados o en los próximos 15 días.
+              No hay papeles vencidos ni por vencer en 30 días, ni services atrasados o próximos (15 días o 1.000 km).
             </Empty>
           ) : (
             <ul className="alert-list">

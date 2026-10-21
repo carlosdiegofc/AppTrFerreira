@@ -1,10 +1,10 @@
-// The photo of a receipt typed in the panel, as the storage takes it (bucket trf-fuel-receipts: JPEG only, up to 10 MB):
-// a JPEG of at most 1600 px on its longer side, turned the way the camera held it, like the app sends them.
+// A photo picked in the panel (a fuel receipt, a paper), as the storage takes it (JPEG, up to 10 MB): a JPEG of at most
+// 1600 px on its longer side, turned the way the camera held it, like the app sends them.
 
 const MAX_SIDE = 1600;
 const QUALITY = 0.82;
 
-export async function receiptJpeg(file: Blob): Promise<Blob> {
+export async function photoJpeg(file: Blob): Promise<Blob> {
   const image = await createImageBitmap(file, { imageOrientation: 'from-image' });
   try {
     const scale = Math.min(1, MAX_SIDE / Math.max(image.width, image.height));

@@ -1,9 +1,10 @@
 // Every read and write the panel makes. Screens never build queries themselves; row security in the database decides
 // what each account gets back and what it may change.
 import type { Tables, TablesInsert, TablesUpdate } from '../lib/database.types';
+import { type DriverChoice, driverChoices, type FileType, type Paper, type PaperDocRow } from '../lib/documents';
 import { type ActiveTrip, type CatalogTruck, catalogTrucks, type FinishedTrip, lastTripByTruck, type LivePosition, text, truckLabel } from '../lib/fleet';
 import { type CatalogStation, catalogStations, type Movement, type MovementRow, type Receipt } from '../lib/fuel';
-import type { PaperRow, ServiceRow } from '../lib/papers';
+import { type KmTrip, kmTripsAsCorrected, type MaintenanceRow, type Service } from '../lib/maintenance';
 import type { PresenceRow } from '../lib/presence';
 import { supabase } from '../lib/supabase';
 import type { TripPayload } from '../lib/tripForm';
@@ -21,6 +22,9 @@ export class DataError extends Error {
 
 /** Someone saved the trip while it was being edited, or created its panel row first: reload it and look again. */
 export class ConflictError extends DataError {}
+
+/** The database certainly did not save: someone else saved first, or it said why. A cut answer is not a refusal. */
+export const refused = (e: unknown) => e instanceof ConflictError || (e instanceof DataError && Boolean(e.code));
 
 function rows<T>(result: { data: T | null; error: { message: string; code?: string } | null }): T {
   if (result.error) throw new DataError(result.error.message, result.error.code);
@@ -140,13 +144,118 @@ export async function fetchTrips(fromIso: string, toIso: string): Promise<TripRo
   return trips.filter((t) => !deleted.has(t.id));
 }
 
-/** Every paper with an expiry date and every service still to do with a date: a cap could hide an old one that is late. */
-export async function fetchPapers(): Promise<{ papers: PaperRow[]; services: ServiceRow[] }> {
-  const [papers, services] = await Promise.all([
-    all((from, to) => supabase.from('trf_documents').select('id,scope,driver_name,vehicle,kind,expires_on').not('expires_on', 'is', null).order('expires_on', { ascending: true }).order('id', { ascending: true }).range(from, to)),
-    all((from, to) => supabase.from('trf_vehicle_maintenance').select('id,vehicle,kind,due_on,done_on').is('done_on', null).not('due_on', 'is', null).order('due_on', { ascending: true }).order('id', { ascending: true }).range(from, to)),
+/**
+ * Every service of the fleet: the kilometres of each truck come from the ones done, the warnings from the ones to do,
+ * so a read cut short would hide some.
+ */
+export async function fetchServices(): Promise<MaintenanceRow[]> {
+  return all((from, to) => supabase.from('trf_vehicle_maintenance').select('*').order('created_at', { ascending: false }).order('id').range(from, to), 20_000, true);
+}
+
+/**
+ * The app's trips that started since an instant, with what the kilometres of each truck need, as the office left them:
+ * without the ones in the trash, and with the truck it corrected (the panel row of an app trip starts at its start).
+ */
+export async function fetchKmTrips(sinceIso: string): Promise<KmTrip[]> {
+  const [trips, panel] = await Promise.all([
+    all((from, to) => supabase.from('trf_driver_tracking_sessions').select('id,vehicle,started_at,distance_meters').gte('started_at', sinceIso).order('started_at').order('id').range(from, to), 50_000, true),
+    all((from, to) => supabase.from('trf_panel_trips').select('app_trip_id,vehicle,deleted_at').eq('source', 'app').gte('departure_at', sinceIso).order('id').range(from, to), 50_000, true),
   ]);
-  return { papers, services };
+  return kmTripsAsCorrected(trips, panel);
+}
+
+/** A service, new or changed; a change only applies if nobody saved it meanwhile (otherwise ConflictError). */
+export async function saveService(service: Pick<Service, 'id' | 'updatedAt'> | null, row: TablesInsert<'trf_vehicle_maintenance'> | TablesUpdate<'trf_vehicle_maintenance'>): Promise<MaintenanceRow> {
+  if (!service) {
+    const result = await supabase.from('trf_vehicle_maintenance').insert(row as TablesInsert<'trf_vehicle_maintenance'>).select();
+    // Saved before: a save tried again after its answer was cut.
+    if (result.error?.code === '23505' && row.id) {
+      const saved = rows(await supabase.from('trf_vehicle_maintenance').select('*').eq('id', row.id).limit(1))[0];
+      if (saved) return saved;
+    }
+    const saved = rows(result)[0];
+    if (!saved) throw new DataError('El alta no devolvió la fila');
+    return saved;
+  }
+  const saved = rows(await supabase.from('trf_vehicle_maintenance').update(row).eq('id', service.id).eq('updated_at', service.updatedAt).select())[0];
+  if (!saved) throw new ConflictError('Otra persona cambió el service');
+  return saved;
+}
+
+/** A service as it is now; null when it does not exist (or this account cannot see it). */
+export async function serviceRow(id: string): Promise<MaintenanceRow | null> {
+  return rows(await supabase.from('trf_vehicle_maintenance').select('*').eq('id', id).limit(1))[0] ?? null;
+}
+
+/** Deletes a service for good, like the app; only if nobody changed it meanwhile (otherwise ConflictError). */
+export async function deleteService(service: Pick<Service, 'id' | 'updatedAt'>): Promise<void> {
+  const gone = rows(await supabase.from('trf_vehicle_maintenance').delete().eq('id', service.id).eq('updated_at', service.updatedAt).select('id'));
+  if (gone.length === 0) throw new ConflictError('Otra persona cambió o borró el service');
+}
+
+/** Every paper of trucks and drivers. */
+export async function fetchDocuments(): Promise<PaperDocRow[]> {
+  return all((from, to) => supabase.from('trf_documents').select('*').order('created_at', { ascending: false }).order('id').range(from, to), 20_000, true);
+}
+
+/**
+ * The drivers a paper can be for, with the latest name each used: every phone that sent a position has its row in
+ * trf_driver_locations; the app open and the latest trips add the newer names.
+ */
+export async function fetchPaperDrivers(): Promise<DriverChoice[]> {
+  const [presence, trips, located, papers] = await Promise.all([
+    supabase.from('trf_driver_presence').select('driver_id,driver_name').order('seen_at', { ascending: false }).limit(500),
+    supabase.from('trf_driver_tracking_sessions').select('driver_id,driver_name').order('started_at', { ascending: false }).limit(1000),
+    supabase.from('trf_driver_locations').select('driver_id,driver_name').order('updated_at', { ascending: false }).limit(500),
+    supabase.from('trf_documents').select('driver_id,driver_name').eq('scope', 'driver').order('updated_at', { ascending: false }).limit(1000),
+  ]);
+  return driverChoices(rows(presence), rows(trips), rows(located), rows(papers));
+}
+
+/** A paper, new or changed; a change only applies if nobody saved it meanwhile (otherwise ConflictError). */
+export async function saveDocument(paper: Pick<Paper, 'id' | 'updatedAt'> | null, row: TablesInsert<'trf_documents'> | TablesUpdate<'trf_documents'>): Promise<PaperDocRow> {
+  if (!paper) {
+    const result = await supabase.from('trf_documents').insert(row as TablesInsert<'trf_documents'>).select();
+    if (result.error?.code === '23505' && row.id) {
+      const saved = rows(await supabase.from('trf_documents').select('*').eq('id', row.id).limit(1))[0];
+      if (saved) return saved;
+    }
+    const saved = rows(result)[0];
+    if (!saved) throw new DataError('El alta no devolvió la fila');
+    return saved;
+  }
+  const saved = rows(await supabase.from('trf_documents').update(row).eq('id', paper.id).eq('updated_at', paper.updatedAt).select())[0];
+  if (!saved) throw new ConflictError('Otra persona cambió el documento');
+  return saved;
+}
+
+/** A paper as it is now; null when it does not exist (or this account cannot see it). */
+export async function documentRow(id: string): Promise<PaperDocRow | null> {
+  return rows(await supabase.from('trf_documents').select('*').eq('id', id).limit(1))[0] ?? null;
+}
+
+/** Deletes a paper for good, like the app; only if nobody changed it meanwhile (otherwise ConflictError). */
+export async function deleteDocument(paper: Pick<Paper, 'id' | 'updatedAt'>): Promise<void> {
+  const gone = rows(await supabase.from('trf_documents').delete().eq('id', paper.id).eq('updated_at', paper.updatedAt).select('id'));
+  if (gone.length === 0) throw new ConflictError('Otra persona cambió o borró el documento');
+}
+
+/** The file of a paper: a JPEG photo or a PDF. One already uploaded (a save tried again) counts as uploaded. */
+export async function uploadDocumentFile(path: string, file: Blob, type: FileType): Promise<void> {
+  const contentType = type === 'pdf' ? 'application/pdf' : 'image/jpeg';
+  // The storage takes the type of the file itself, which a PDF may not bring.
+  const body = file.type === contentType ? file : new Blob([file], { type: contentType });
+  const result = await supabase.storage.from('trf-documents').upload(path, body, { contentType, upsert: false });
+  if (!result.error) return;
+  const e = result.error as { message: string; statusCode?: string; status?: number };
+  if (e.statusCode === '409' || e.status === 409 || /already exists|duplicate/i.test(e.message)) return;
+  throw new DataError(e.message, e.statusCode ?? (e.status === undefined ? undefined : String(e.status)));
+}
+
+/** Deletes the file of a paper. */
+export async function removeDocumentFile(path: string): Promise<void> {
+  const result = await supabase.storage.from('trf-documents').remove([path]);
+  if (result.error) throw new DataError(result.error.message);
 }
 
 export interface RoutePoint {
@@ -377,9 +486,9 @@ export async function saveMovement(movement: Movement | null, row: TablesInsert<
 /** Annuls a payment or an opening balance, or brings it back: nothing is deleted. */
 export const setMovementDeleted = (movement: Movement, deleted: boolean) => saveMovement(movement, { deleted_at: deleted ? new Date().toISOString() : null });
 
-export type PhotoBucket = 'trf-trip-documents' | 'trf-fuel-receipts';
+export type PhotoBucket = 'trf-trip-documents' | 'trf-fuel-receipts' | 'trf-documents';
 
-/** A link that opens a photo of the private buckets for ten minutes; the storage rules decide who can open it. */
+/** A link that opens a photo (or the PDF of a paper) of the private buckets for ten minutes; the storage rules decide who can open it. */
 export async function photoUrl(bucket: PhotoBucket, path: string): Promise<string> {
   const result = await supabase.storage.from(bucket).createSignedUrl(path, 600);
   if (result.error) throw new DataError(result.error.message);

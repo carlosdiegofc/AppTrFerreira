@@ -1,4 +1,4 @@
-// Generated from the production database (Supabase type generator) on 2026-10-19, after migration 0003. Regenerate after
+// Generated from the production database (Supabase type generator) on 2026-10-20, after migration 0004. Regenerate after
 // every migration.
 export type Json =
   | string
@@ -26,8 +26,10 @@ export type Database = {
           id: string
           kind: string
           notes: string
+          object_path: string | null
           scope: string
           updated_at: string
+          updated_by: string | null
           vehicle: string
         }
         Insert: {
@@ -39,8 +41,10 @@ export type Database = {
           id?: string
           kind: string
           notes?: string
+          object_path?: string | null
           scope: string
           updated_at?: string
+          updated_by?: string | null
           vehicle?: string
         }
         Update: {
@@ -52,8 +56,10 @@ export type Database = {
           id?: string
           kind?: string
           notes?: string
+          object_path?: string | null
           scope?: string
           updated_at?: string
+          updated_by?: string | null
           vehicle?: string
         }
         Relationships: []
@@ -675,12 +681,15 @@ export type Database = {
           created_by: string | null
           created_by_name: string
           done_on: string | null
+          due_km: number | null
           due_on: string | null
           id: string
+          interval_km: number | null
           kind: string
           notes: string
           odometer_km: number | null
           updated_at: string
+          updated_by: string | null
           vehicle: string
         }
         Insert: {
@@ -688,12 +697,15 @@ export type Database = {
           created_by?: string | null
           created_by_name?: string
           done_on?: string | null
+          due_km?: number | null
           due_on?: string | null
           id?: string
+          interval_km?: number | null
           kind: string
           notes?: string
           odometer_km?: number | null
           updated_at?: string
+          updated_by?: string | null
           vehicle: string
         }
         Update: {
@@ -701,12 +713,15 @@ export type Database = {
           created_by?: string | null
           created_by_name?: string
           done_on?: string | null
+          due_km?: number | null
           due_on?: string | null
           id?: string
+          interval_km?: number | null
           kind?: string
           notes?: string
           odometer_km?: number | null
           updated_at?: string
+          updated_by?: string | null
           vehicle?: string
         }
         Relationships: []

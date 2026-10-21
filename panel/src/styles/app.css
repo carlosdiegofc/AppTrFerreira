@@ -775,12 +775,19 @@ button {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 0;
+  padding: 10px 8px;
   border-bottom: 1px solid var(--line);
+  color: inherit;
+  text-decoration: none;
 }
 
-.alert-line:last-child {
+li:last-child > .alert-line {
   border-bottom: 0;
+}
+
+a.alert-line:hover {
+  background: var(--grey-bg);
+  border-radius: 10px;
 }
 
 .alert-icon {
@@ -2401,5 +2408,259 @@ button.fr-open {
   /* Without a balance column the actions take the whole last line. */
   .statement-plain .st-actions {
     grid-column: 1 / 3;
+  }
+}
+
+/* ---------- Mantenimiento ---------- */
+.km-section {
+  margin-bottom: 16px;
+}
+
+.km-section .note {
+  margin: 0;
+  padding: 0 18px 14px;
+}
+
+.km-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 4px 18px 14px;
+  list-style: none;
+}
+
+.km-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.km-card:hover {
+  background: var(--grey-bg);
+}
+
+.km-card.is-on {
+  border-color: var(--blue);
+  box-shadow: inset 0 0 0 1px var(--blue);
+}
+
+.km-card small {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.km-truck {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 6px;
+}
+
+.km-truck strong {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.km-value {
+  font-size: 20px;
+  font-weight: 720;
+  font-variant-numeric: tabular-nums;
+}
+
+.km-value.km-none {
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.km-card .km-todo {
+  margin-top: 6px;
+  color: var(--ink-soft);
+  font-weight: 620;
+}
+
+.service-list {
+  margin: 0;
+  padding: 4px 6px;
+  list-style: none;
+}
+
+.service-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.service-list li:last-child > .service-row {
+  border-bottom: 0;
+}
+
+.service-row:hover {
+  background: var(--grey-bg);
+  border-radius: 10px;
+}
+
+.sv-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--tone-bg);
+  color: var(--tone);
+}
+
+.sv-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sv-main strong {
+  font-size: 14.5px;
+  font-weight: 650;
+}
+
+.sv-main small {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.sv-main .sv-detail {
+  color: var(--ink-soft);
+}
+
+.sv-notes {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.form-choice {
+  margin-bottom: 12px;
+}
+
+/* ---------- Documentación ---------- */
+.paper-groups {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.paper-group .card-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card > .card-head + .paper-list {
+  margin-top: 6px;
+}
+
+.paper-list {
+  margin: 0;
+  padding: 4px 6px;
+  list-style: none;
+}
+
+.paper-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.paper-list li:last-child {
+  border-bottom: 0;
+}
+
+.pr-open {
+  display: grid;
+  flex: 1;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pr-open:hover {
+  background: var(--grey-bg);
+  border-radius: 10px;
+}
+
+.pr-file {
+  display: flex;
+  flex: none;
+  justify-content: flex-end;
+  width: 130px;
+  padding-right: 8px;
+}
+
+.file-chip {
+  display: grid;
+  place-items: center;
+  width: 120px;
+  height: 120px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--grey-bg);
+  color: var(--ink-soft);
+}
+
+.photo-pick > div > .btn + .btn {
+  margin-left: 8px;
+}
+
+.pdf-open {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 28px 12px;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+@media (max-width: 600px) {
+  .paper-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .pr-file {
+    justify-content: flex-start;
+    width: auto;
+    padding: 0 12px 10px 60px;
   }
 }

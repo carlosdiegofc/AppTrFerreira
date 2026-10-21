@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useLocation, useSearchParams } from 'react-router';
+import { Link, useLocation, useNavigationType, useSearchParams } from 'react-router';
 import { Icon } from '../components/Icon';
 import { MovementFormDialog } from '../components/MovementFormDialog';
 import { type Photo, PhotoDialog } from '../components/PhotoDialog';
@@ -136,11 +136,11 @@ export function Combustible() {
   const range = period.kind === 'all' ? null : period.kind === 'custom' ? { from: params.get('desde') ?? today, to: params.get('hasta') ?? today } : periodRange(period.kind, today);
   const badRange = range !== null && range.to < range.from;
   // The search box keeps its own text and the address follows it; an address that comes from elsewhere (the side menu,
-  // a link) brings its own search.
+  // a link, going back or forward) brings its own search.
   const location = useLocation();
   const q = params.get('buscar') ?? '';
   const [typed, setTyped] = useState(q);
-  const fromHere = (location.state as { filters?: boolean } | null)?.filters === true;
+  const fromHere = useNavigationType() === 'REPLACE' && (location.state as { filters?: boolean } | null)?.filters === true;
   useEffect(() => {
     if (!fromHere) setTyped(q);
   }, [location.key, fromHere, q]);
