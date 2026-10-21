@@ -11,6 +11,9 @@ import { count, km, kmh } from '../lib/format';
 import { type DriverPresence, driverPresence, PRESENCE_LABEL, type PresenceState } from '../lib/presence';
 import { drawable } from '../lib/route';
 import { STATE_TONE } from './states';
+import { PointEditor, TruckRoad, type RoadView } from '../components/RoadControls';
+import { useRoadPoints, useRoadWrite } from '../data/road';
+import { POINT_LABEL, type RoadPoint, type PointKind } from '../lib/road';
 
 type Filter = 'all' | 'moving' | 'halted' | 'idle';
 
@@ -100,6 +103,14 @@ export function Gps() {
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState<Filter>('all');
   const [fitToken, setFitToken] = useState(0);
+  const [view,setView] = useState<RoadView>('live');
+  const [kinds,setKinds] = useState<PointKind[]>(['toll','scale','radar']);
+  const [newKind,setNewKind] = useState<PointKind>('toll');
+  const [picking,setPicking] = useState(false);
+  const [focusPoint,setFocusPoint] = useState<RoadPoint | null>(null);
+  const [pointEditor,setPointEditor] = useState<{ point?:RoadPoint; kind:PointKind; location:{latitude:number;longitude:number} } | null>(null);
+  const road = useRoadPoints(), roadWrite = useRoadWrite();
+  const visiblePoints = useMemo(() => (road.data ?? []).filter(p => view === 'places' ? p.kind === 'place' : view === 'controls' && kinds.includes(p.kind)),[road.data,view,kinds]);
   const chofer = params.get('chofer');
   const selected = params.get('camion') ?? (chofer ? `driver:${chofer}` : null);
   const unit = fleet.units.find((u) => u.key === selected) ?? null;
@@ -136,6 +147,16 @@ export function Gps() {
       {fleet.error ? <ErrorNote onRetry={() => void fleet.refetch()}>No se pudo leer la flota.</ErrorNote> : null}
       <div className="gps">
         <aside className="card gps-side" aria-label="Camiones y choferes">
+          <nav className="road-nav" aria-label="Vistas del mapa">{([['live','Seguimiento'],['controls','Peajes, balanzas y radares'],['places','Mis puntos']] as const).map(([value,label]) => <button type="button" className={`chip${view === value ? ' is-on' : ''}`} key={value} aria-pressed={view === value} onClick={() => {setView(value);setPicking(false);}}>{label}</button>)}</nav>
+          {view !== 'live' && <section className="road-controls" aria-label="Puntos del mapa">
+            {road.error ? <ErrorNote onRetry={() => void road.refetch()}>No se pudieron actualizar los puntos. La base necesita la migración de control de ruta.</ErrorNote> : null}
+            {view === 'controls' && <div className="chips">{(['toll','scale','radar'] as const).map(kind => <button className={`chip${kinds.includes(kind) ? ' is-on' : ''}`} aria-pressed={kinds.includes(kind)} key={kind} onClick={() => setKinds(old => old.includes(kind) ? old.filter(k => k !== kind) : [...old,kind])}>{POINT_LABEL[kind]}</button>)}</div>}
+            <div className="road-actions">{view === 'controls' && <label>Tipo <select value={newKind} onChange={e => setNewKind(e.target.value as PointKind)}>{(['toll','scale','radar'] as const).map(k => <option key={k} value={k}>{POINT_LABEL[k]}</option>)}</select></label>}<button className="btn" disabled={!!road.error || !road.data} onClick={() => setPicking(!picking)}>{picking ? 'Cancelar selección' : 'Agregar en el mapa'}</button><button className="btn" disabled={!!road.error || !road.data} onClick={() => setPointEditor({kind:view === 'places' ? 'place' : newKind,location:{latitude:0,longitude:0}})}>Ingresar coordenadas</button></div>
+            {picking && <p role="status">Tocá la ubicación en el mapa para agregar el punto.</p>}
+            {!road.isLoading && !road.error && visiblePoints.length === 0 && <p>No hay puntos en esta vista.</p>}
+            {visiblePoints.map(p => <div className="road-point" key={p.id}><button className="btn btn-quiet" onClick={() => setFocusPoint(p)}>{POINT_LABEL[p.kind]} · {p.name}</button><p>{p.notes}</p><div className="road-actions"><button className="btn" onClick={() => setPointEditor({point:p,kind:p.kind,location:p})}>Editar</button><button className="btn" disabled={roadWrite.isPending} onClick={() => {if (window.confirm(`¿Archivar ${p.name}? Se conservan sus pasos y movimientos.`)) roadWrite.mutate({type:'point',row:{...p,archived:true},before:p.updated_at});}}>Archivar</button></div></div>)}
+            {roadWrite.error && <p role="alert">No se pudo archivar. Actualizá los puntos y volvé a intentar.</p>}
+          </section>}
           <div className="chips" role="group" aria-label="Filtrar camiones">
             {filters.map((f) => (
               <button key={f.value} type="button" className={`chip${filter === f.value ? ' is-on' : ''}`} aria-pressed={filter === f.value} onClick={() => setFilter(f.value)}>
@@ -154,6 +175,7 @@ export function Gps() {
             />
           )}
           {person && <PersonDetail person={person} now={now} onClose={() => choose(null)} />}
+          {unit && <TruckRoad key={unit.key} unit={unit} points={road.data ?? []} now={now}/>}
           {fleet.isLoading ? (
             <Skeleton lines={5} />
           ) : shown.length === 0 ? (
@@ -221,7 +243,7 @@ export function Gps() {
           </section>
         </aside>
         <div className="card gps-map">
-          <FleetMap units={fleet.units} people={people} selected={selected} onSelect={(key) => choose(key)} route={unit?.trip ? (route.data ?? null) : null} fitToken={fitToken} label="Mapa de la flota en vivo" className="map-live" />
+          <FleetMap units={fleet.units} people={people} selected={selected} onSelect={(key) => choose(key)} route={unit?.trip ? (route.data ?? null) : null} fitToken={fitToken} label="Mapa de la flota en vivo" className="map-live" roadPoints={visiblePoints} focusPoint={focusPoint} onPointSelect={setFocusPoint} onPickLocation={picking ? location => {setPicking(false);setPointEditor({kind:view === 'places' ? 'place' : newKind,location});} : undefined}/>
           <button
             type="button"
             className="btn map-fit"
@@ -234,6 +256,7 @@ export function Gps() {
           </button>
         </div>
       </div>
+      {pointEditor && <PointEditor {...pointEditor} close={() => setPointEditor(null)}/>}
     </div>
   );
 }

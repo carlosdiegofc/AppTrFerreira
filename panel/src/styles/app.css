@@ -3136,3 +3136,20 @@ button.fr-open {
     visibility: hidden;
   }
 }
+
+/* GPS route controls use the panel's existing colour and form tokens. */
+.road-nav { display: grid; gap: 6px; padding: 12px; border-bottom: 1px solid var(--line); }
+.road-nav .chip { text-align: left; white-space: normal; }
+.road-controls, .road-truck { padding: 16px; border-bottom: 1px solid var(--line); }
+.road-truck h3 { margin: 18px 0 8px; }
+.road-truck p, .road-controls p { font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.road-truck details { margin-top: 14px; }
+.road-truck summary { cursor: pointer; font-weight: 600; }
+.road-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.road-fields { display: grid; gap: 14px; border: 0; padding: 0; margin: 18px 0; min-width: 0; }
+.road-point { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.road-point .btn { white-space: normal; }
+.road-warning { border-left: 3px solid #d78b16; padding: 10px; background: var(--blue-bg); }
+.road-marker { background: var(--blue); border: 2px solid white; border-radius: 50%; }
+.road-marker span { display: block; width: max-content; max-width: 190px; margin-left: 25px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; font-size: 12px; }
+.road-scale { background: #9a6700; } .road-radar { background: #be3144; } .road-place { background: #168467; }
