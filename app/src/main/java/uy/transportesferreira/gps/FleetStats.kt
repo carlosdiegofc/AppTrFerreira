@@ -94,6 +94,20 @@ object FleetStats {
     }
     /** Trimmed text, or null when there is nothing written. */
     fun text(v:String?):String?=v?.trim()?.takeIf{it.isNotEmpty()}
+    private val isoDay=Regex("^\\d{4}-\\d{2}-\\d{2}$")
+    private val typedDay=Regex("^(\\d{2})/(\\d{2})/(\\d{4})$")
+    private val isoInstant=Regex("^\\d{4}-\\d{2}-\\d{2}T")
+    /** A day as the panel reads it (calendarDay): "2026-10-15", "15/10/2026" as typed, or an instant on its day in the zone. */
+    fun day(v:String?,zone:java.time.ZoneId):java.time.LocalDate?{
+        val s=text(v)?:return null
+        return try{
+            if(isoDay.matches(s))java.time.LocalDate.parse(s)
+            else typedDay.matchEntire(s)?.groupValues?.let{java.time.LocalDate.of(it[3].toInt(),it[2].toInt(),it[1].toInt())}
+                ?:if(isoInstant.containsMatchIn(s))instant(s)?.atZone(zone)?.toLocalDate() else null
+        }catch(_:Exception){null}
+    }
+    /** The day a fuel receipt counts on, as in the panel: the office's correction, else the day of the receipt, else when it arrived. */
+    fun fuelDay(fecha:String?,receiptDate:String?,recordedAt:String?,zone:java.time.ZoneId)=day(fecha,zone)?:day(receiptDate,zone)?:day(recordedAt,zone)
     /** The app stores "Sin camión asignado" when the driver did not pick a truck: that is not a truck. */
     fun truck(label:String?):String?=text(label)?.takeUnless{noTruck.containsMatchIn(it)}
 

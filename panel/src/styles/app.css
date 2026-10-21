@@ -29,6 +29,9 @@
   --marker-halted: #e69a1e;
   --marker-idle: #8f9bad;
   --login-bg: #0a1220;
+  /* Chart series (dataviz slots 1 and 2), checked with its validator on --card: colour blindness, contrast, lightness. */
+  --viz-1: #1663e8;
+  --viz-2: #eb6834;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -54,6 +57,8 @@
     --grey: #6c7a90;
     --grey-bg: #222c3e;
     --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 6px 20px rgb(0 0 0 / 25%);
+    --viz-1: #3987e5;
+    --viz-2: #d95926;
   }
 }
 
@@ -79,6 +84,8 @@
   --grey: #6c7a90;
   --grey-bg: #222c3e;
   --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 6px 20px rgb(0 0 0 / 25%);
+  --viz-1: #3987e5;
+  --viz-2: #d95926;
 }
 
 * {
@@ -2662,5 +2669,470 @@ button.fr-open {
     justify-content: flex-start;
     width: auto;
     padding: 0 12px 10px 60px;
+  }
+}
+
+/* ---------- Métricas ---------- */
+/* Charts drawn with HTML: thin marks from one baseline, a 2 px gap of the card's colour between touching marks, a
+   4 px round end, solid hairline gridlines, text in the text colours and never in the series colour. */
+.viz-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 1099px) {
+  .viz-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.viz-card {
+  margin-bottom: 16px;
+}
+
+.viz-grid > .viz-card {
+  margin-bottom: 0;
+}
+
+.viz-card .card-body > .note {
+  margin-bottom: 0;
+}
+
+.viz-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.viz-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.viz-key {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.viz-1 {
+  background: var(--viz-1);
+}
+
+.viz-2 {
+  background: var(--viz-2);
+}
+
+.viz-caption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.viz-average-key {
+  height: 14px;
+  border-left: 1px solid var(--ink-soft);
+}
+
+.viz-box {
+  position: relative;
+}
+
+.viz-tip {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 140px;
+  max-width: 240px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.35;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 8px));
+}
+
+.viz-tip strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.viz-tip-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.viz-tip-line b {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.viz-stroke {
+  flex: none;
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.bars:focus-visible,
+.cols:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 4px;
+}
+
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-radius: 8px;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: minmax(0, 200px) minmax(0, 1fr) 92px;
+  align-items: center;
+  gap: 12px;
+  min-height: 30px;
+  padding: 0 4px;
+  border-radius: 6px;
+}
+
+.bar-row.is-active {
+  background: var(--grey-bg);
+}
+
+.bar-name {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-track {
+  position: relative;
+  height: 14px;
+}
+
+.bar-fill {
+  display: flex;
+  gap: 2px;
+  height: 100%;
+}
+
+.bar-seg {
+  flex: 1 1 0;
+  min-width: 2px;
+}
+
+.bar-seg:last-child {
+  border-radius: 0 4px 4px 0;
+}
+
+.bar-average {
+  position: absolute;
+  top: -10px;
+  bottom: -10px;
+  border-left: 1px solid var(--ink-soft);
+}
+
+.bar-value {
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.cols-chart {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-rows: 180px auto;
+  column-gap: 8px;
+  /* Room for the label of a column at the right end. */
+  padding: 18px 14px 0 0;
+}
+
+.cols-axis {
+  position: relative;
+}
+
+.cols-axis span {
+  position: absolute;
+  right: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  transform: translateY(50%);
+}
+
+.cols-plot {
+  position: relative;
+}
+
+.cols-grid span {
+  position: absolute;
+  right: 0;
+  left: 0;
+  border-top: 1px solid var(--line);
+}
+
+.cols-grid span:first-child {
+  border-top-color: var(--field-line);
+}
+
+.cols {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  gap: 2px;
+  border-radius: 6px;
+}
+
+.col {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  border-radius: 4px;
+}
+
+.col.is-active {
+  background: var(--grey-bg);
+}
+
+.col-stack {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 2px;
+  width: min(100%, 24px);
+}
+
+.col-seg {
+  flex: 1 1 0;
+  min-height: 2px;
+}
+
+.col-seg:last-child {
+  border-radius: 4px 4px 0 0;
+}
+
+.col-value {
+  position: absolute;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateY(-4px);
+}
+
+.col-value.at-start {
+  left: 0;
+}
+
+.col-value.at-end {
+  right: 0;
+}
+
+.cols-x {
+  display: flex;
+  grid-column: 2;
+  gap: 2px;
+  padding-top: 6px;
+}
+
+.cols-x span {
+  flex: 1 1 0;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.cols-x.is-dense span:not(.is-major) {
+  visibility: hidden;
+}
+
+.viz-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 28px;
+}
+
+.viz-pair .viz-data {
+  grid-column: 1 / -1;
+}
+
+.viz-subtitle {
+  margin: 0 0 6px;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  font-weight: 650;
+}
+
+.viz-data {
+  margin-top: 14px;
+}
+
+.viz-data summary {
+  width: max-content;
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 620;
+  cursor: pointer;
+}
+
+.viz-data .statement-scroll {
+  margin-top: 8px;
+}
+
+.metrics-table,
+.viz-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.metrics-table {
+  min-width: 900px;
+  font-size: 13px;
+}
+
+.metrics-table th,
+.metrics-table td,
+.viz-data-table th,
+.viz-data-table td {
+  padding: 9px 10px;
+  border-top: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.metrics-table th,
+.viz-data-table th {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 620;
+  white-space: nowrap;
+}
+
+.metrics-table .num,
+.viz-data-table .num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* The name stays in view while the table scrolls sideways on a phone. */
+.metrics-table th:first-child,
+.metrics-table td:first-child {
+  position: sticky;
+  left: 0;
+  max-width: 210px;
+  overflow: hidden;
+  background: var(--card);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metrics-table tfoot td,
+.metrics-table tfoot td:first-child {
+  background: var(--grey-bg);
+  font-weight: 680;
+}
+
+.metrics-stats .stat-value {
+  font-size: 22px;
+}
+
+.metrics-stats .amount-lines span {
+  white-space: nowrap;
+}
+
+.stat-unit {
+  color: var(--ink-soft);
+  font-size: 14px;
+  font-weight: 620;
+}
+
+.metrics-table .is-unnamed td {
+  color: var(--muted);
+}
+
+.metrics-table .sort {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.metrics-table .sort.is-on {
+  color: var(--ink);
+}
+
+.metrics-table .sort:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.metrics-table-card {
+  margin-bottom: 16px;
+}
+
+.metrics-idle {
+  padding: 0 18px 16px;
+}
+
+.metrics-note {
+  margin: 0 2px 24px;
+}
+
+@media (max-width: 900px) {
+  .viz-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .bar-row {
+    grid-template-columns: minmax(0, 1fr) 76px;
+    row-gap: 4px;
+    padding: 4px;
+  }
+
+  .bar-name {
+    grid-column: 1 / -1;
+  }
+
+  .cols-x span:not(.is-major) {
+    visibility: hidden;
   }
 }

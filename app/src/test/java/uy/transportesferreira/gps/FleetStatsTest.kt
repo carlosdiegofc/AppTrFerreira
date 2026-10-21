@@ -69,6 +69,17 @@ class FleetStatsTest {
         assertEquals(listOf("Hugo Silva","Immer Sampayo",FleetStats.NO_DRIVER),s.rows.map{it.name})
         assertEquals(140.0,s.rows[0].gpsKm,.001);assertEquals(20.0,s.rows[1].liters,.001);assertEquals(205.0,s.total.gpsKm,.001);assertEquals(4,s.total.trips)
     }
+    /** Same rule as calendarDay and the receipts of panel/src/lib/fuel.ts: the office's date, else the receipt's, else when it arrived. */
+    @Test fun aReceiptCountsOnItsDay(){
+        val uy=java.time.ZoneId.of("America/Montevideo");val day={s:String->java.time.LocalDate.parse(s)}
+        assertEquals(day("2026-10-03"),FleetStats.fuelDay("2026-10-03","2026-09-25","2026-09-25T15:00:00Z",uy))
+        assertEquals(day("2026-10-03"),FleetStats.fuelDay("03/10/2026","2026-09-25",null,uy))
+        assertEquals(day("2026-09-25"),FleetStats.fuelDay(null,"2026-09-25","2026-10-02T12:00:00Z",uy))
+        assertEquals(day("2026-09-25"),FleetStats.fuelDay("no es una fecha","2026-09-25",null,uy))
+        // 01:00 UTC of the 1st of October is still the 30th of September in Uruguay.
+        assertEquals(day("2026-09-30"),FleetStats.fuelDay("",null,"2026-10-01T01:00:00.123456+00:00",uy))
+        assertNull(FleetStats.fuelDay(null,null,null,uy))
+    }
     @Test fun rowsAreSortedByNameWithTheUnnamedLast(){
         val s=FleetStats.summarize(listOf(trip(null,1.0),trip("mercedes 1618",1.0),trip("Ford Cargo",1.0),trip("Leyland",1.0)),emptyList())
         assertEquals(listOf("Ford Cargo","Leyland","mercedes 1618",FleetStats.NO_TRUCK),s.rows.map{it.name})

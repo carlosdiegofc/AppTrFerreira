@@ -130,7 +130,11 @@ class MobileData(private val c:Context){
     trips.add(FleetStats.Trip(FleetStats.canonical(text(p,"vehicle")?:text(s,"vehicle"),fleet),text(p,"driver_name")?:text(s,"driver_name"),(num(s,"distance_meters")?:0.0)/1000,s.optString("load_type")!="empty",num(p,"billable_km")?:0.0,num(p,"kg")?:num(details[id],"kg")?:0.0,num(p,"amount")?:0.0,text(p,"currency")=="USD",text(p,"deleted_at")!=null))}
    for(p in all("/rest/v1/trf_panel_trips?select=id,driver_name,vehicle,billable_km,kg,amount,currency,deleted_at&source=eq.manual&departure_at=gte.$from&departure_at=lt.$to&order=departure_at.desc,id.desc"))
     trips.add(FleetStats.Trip(FleetStats.canonical(text(p,"vehicle"),fleet),text(p,"driver_name"),0.0,null,num(p,"billable_km")?:0.0,num(p,"kg")?:0.0,num(p,"amount")?:0.0,text(p,"currency")=="USD",text(p,"deleted_at")!=null))
-   val fuel=all("/rest/v1/trf_driver_fuel_receipts?select=id,driver_name,vehicle,liters,total,panel_data&or=(archived.is.null,archived.is.false)&recorded_at=gte.$from&recorded_at=lt.$to&order=recorded_at.desc,id.desc").map{r->val d=json(r,"panel_data")
+   // A receipt counts on its day, as in Combustible and Métricas of the panel: the office's correction, else the day of
+   // the receipt. The month's receipts by their day, plus every receipt the office dated again, kept by the day each counts on.
+   val days=enc("(and(receipt_date.gte.${month.atDay(1)},receipt_date.lt.${month.plusMonths(1).atDay(1)}),panel_data->>fecha.not.is.null)")
+   val fuel=all("/rest/v1/trf_driver_fuel_receipts?select=id,driver_name,vehicle,liters,total,receipt_date,recorded_at,panel_data&archived=is.false&or=$days&order=receipt_date.desc,id.desc").mapNotNull{r->val d=json(r,"panel_data")
+    if(FleetStats.fuelDay(text(d,"fecha"),text(r,"receipt_date"),text(r,"recorded_at"),zone)?.let{java.time.YearMonth.from(it)}!=month)return@mapNotNull null
     FleetStats.Fuel(FleetStats.canonical(text(d,"vehicle")?:text(r,"vehicle"),fleet),text(r,"driver_name"),num(d,"litros")?:num(r,"liters")?:0.0,num(d,"monto")?:num(r,"total")?:0.0,text(d,"moneda")=="USD")}
    store.cache(key,JSONObject().put("trucks",pack(FleetStats.summarize(trips,fuel))).put("drivers",pack(FleetStats.summarize(trips,fuel,true))).put("fetched_at",System.currentTimeMillis()))
   }

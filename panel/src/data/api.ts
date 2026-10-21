@@ -5,6 +5,8 @@ import { type DriverChoice, driverChoices, type FileType, type Paper, type Paper
 import { type ActiveTrip, type CatalogTruck, catalogTrucks, type FinishedTrip, lastTripByTruck, type LivePosition, text, truckLabel } from '../lib/fleet';
 import { type CatalogStation, catalogStations, type Movement, type MovementRow, type Receipt } from '../lib/fuel';
 import { type KmTrip, kmTripsAsCorrected, type MaintenanceRow, type Service } from '../lib/maintenance';
+import type { BilledTrip } from '../lib/metrics';
+import { toNumber } from '../lib/numbers';
 import type { PresenceRow } from '../lib/presence';
 import { supabase } from '../lib/supabase';
 import type { TripPayload } from '../lib/tripForm';
@@ -313,6 +315,25 @@ export async function fetchTripList(fromIso: string, toIso: string): Promise<Tri
     }),
   );
   return { sessions, panelRows: [...parts.flatMap((p) => p.panel), ...manual], details: parts.flatMap((p) => p.details) };
+}
+
+/**
+ * The trips that started in [fromIso, toIso) with only what a month's billing needs: when each started, its amount and
+ * currency as the office left them, whether it carried cargo and whether it is in the trash. Like fetchTripList, without
+ * the rest of each trip, so a whole year stays light.
+ */
+export async function fetchBilledTrips(fromIso: string, toIso: string): Promise<BilledTrip[]> {
+  const [sessions, manual] = await Promise.all([
+    all((from, to) => supabase.from('trf_driver_tracking_sessions').select('id,started_at,load_type').gte('started_at', fromIso).lt('started_at', toIso).order('started_at').order('id').range(from, to), 50_000, true),
+    all((from, to) => supabase.from('trf_panel_trips').select('departure_at,amount,currency,deleted_at').eq('source', 'manual').gte('departure_at', fromIso).lt('departure_at', toIso).order('departure_at').order('id').range(from, to), 50_000, true),
+  ]);
+  const parts = await Promise.all(chunks([...new Set(sessions.map((s) => s.id))], 100).map(async (ids) => rows(await supabase.from('trf_panel_trips').select('app_trip_id,amount,currency,deleted_at').eq('source', 'app').in('app_trip_id', ids))));
+  const panel = new Map(parts.flat().flatMap((p) => (p.app_trip_id ? [[p.app_trip_id, p] as const] : [])));
+  const billed = (p: Pick<PanelTripRow, 'amount' | 'currency' | 'deleted_at'> | undefined) => ({ amount: toNumber(p?.amount), currency: p?.currency === 'USD' ? ('USD' as const) : ('UYU' as const), deleted: Boolean(p?.deleted_at) });
+  return [
+    ...sessions.map((s) => ({ source: 'app' as const, departureAt: s.started_at, loadType: s.load_type, ...billed(panel.get(s.id)) })),
+    ...manual.map((p) => ({ source: 'manual' as const, departureAt: p.departure_at, loadType: null, ...billed(p) })),
+  ];
 }
 
 export interface TripDetailData {

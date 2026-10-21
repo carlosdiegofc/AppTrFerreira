@@ -67,7 +67,10 @@ Va armándose al costado del panel actual y lo reemplaza sección por sección.
      - Los papeles de camiones y choferes, con su vencimiento (30 días antes) y su archivo: foto o PDF, en una carpeta privada. La app los va a mostrar en una versión próxima.
      - Desde el panel se cargan, se cambian y se borran services y papeles. Borrar los borra para siempre, como en la app, preguntando antes; la base anota quién guardó cada uno por última vez.
      - En la app 0.17.2 el autocompletado del teléfono ya no llena los formularios, y los services muestran sus kilómetros («a los 412.500 km», «cada 10.000 km»).
-5. [ ] Métricas: rendimiento por camión y por chofer, con gráficos. Queda para resolver con ella: el resumen del mes de la app y el panel actual cuentan cada boleta de combustible el día en que llegó a la base, y el panel nuevo, en su fecha (la corregida en el panel, si la hay). Si caen en meses distintos, el formulario de corrección lo avisa.
+5. [x] Métricas (aprobado el 21/10/2026): el rendimiento de cada camión y de cada chofer en un período, con las mismas cuentas que «Rendimiento» en la app. Sin cambios en la base. La app 0.17.3 se sube a Google Play cuando lo decidas:
+   - Viajes, kilómetros del GPS con carga y sin carga (medido), kilómetros facturables, kilos, lo facturado, y los litros y el gasto de las boletas (declarado), y el consumo en litros cada 100 km, con 300 km o más (estimado). La pantalla dice cuál es cuál (regla 5).
+   - Gráficos: kilómetros por camión y por día, consumo contra el promedio de la flota y lo facturado en los últimos 12 meses. La tabla se ordena, lleva a los viajes de cada camión o chofer y se exporta a Excel y PDF.
+   - Cada boleta cuenta en su fecha (la corregida en el panel, si la hay), también en «Rendimiento» de la app desde la 0.17.3. El panel actual sigue contándolas el día en que llegaron a la base, hasta que Métricas lo reemplace.
 6. [x] Publicarlo: el código pasa a `main` y el panel nuevo queda en `/nuevo/` de la dirección del panel actual (18/10/2026).
 7. [x] GPS en vivo más rápido (aprobado el 18/10/2026, adelanta parte de la etapa 6): posición cada 3 segundos y recorrido cada 5, con la app 0.17.0 mandando un punto cada 2 segundos. La 0.17.0 se sube a Google Play cuando lo decidas (18/10/2026).
 8. [x] «Chofer activo» (aprobado el 18/10/2026): GPS en vivo y la «Flota en vivo» de la app dicen qué choferes tienen la app abierta, con qué versión y, si no viajan, dónde está el teléfono. Migración [`0002_chofer_activo.sql`](../supabase/migrations/0002_chofer_activo.sql), una tabla nueva: aplicada en producción el 19/10/2026 a las 08:20 (Uruguay). El respaldo completo se tomó a la 01:22, se probó en una base local y se entregó; entre el respaldo y la migración no cambió ningún dato. Avisan los teléfonos con la app 0.17.0 o posterior (19/10/2026).
@@ -80,6 +83,9 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 21/10/2026: Métricas.
+  - Cada boleta de combustible cuenta en su fecha (la que corrigió la oficina, si la hay), como en Combustible. La app pasa a contar igual en «Rendimiento» con la 0.17.3; el panel actual queda como está hasta que Métricas lo reemplace.
+  - Va con todo lo propuesto: totales, tabla por camión y por chofer, los cuatro gráficos y exportar a Excel y PDF.
 - 20/10/2026: Mantenimiento y Documentación.
   - Borrar un service o un documento lo borra para siempre, como hace la app. Es la excepción a la papelera de la arquitectura: así lo decidió el dueño para estas dos secciones.
   - Los documentos llevan su archivo: una foto o un PDF, que se sube desde el panel a una carpeta privada. La app los muestra en una versión próxima.

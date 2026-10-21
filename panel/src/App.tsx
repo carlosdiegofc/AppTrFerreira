@@ -15,6 +15,7 @@ const Combustible = lazy(() => import('./pages/Combustible').then((m) => ({ defa
 const Estacion = lazy(() => import('./pages/Estacion').then((m) => ({ default: m.Estacion })));
 const Mantenimiento = lazy(() => import('./pages/Mantenimiento').then((m) => ({ default: m.Mantenimiento })));
 const Documentacion = lazy(() => import('./pages/Documentacion').then((m) => ({ default: m.Documentacion })));
+const Metricas = lazy(() => import('./pages/Metricas').then((m) => ({ default: m.Metricas })));
 
 const loading = (
   <div className="page">
@@ -36,6 +37,7 @@ export function App() {
           <Route path="combustible/estaciones/:key" element={<Suspense fallback={loading}><Estacion /></Suspense>} />
           <Route path="mantenimiento" element={<Suspense fallback={loading}><Mantenimiento /></Suspense>} />
           <Route path="documentacion" element={<Suspense fallback={loading}><Documentacion /></Suspense>} />
+          <Route path="metricas" element={<Suspense fallback={loading}><Metricas /></Suspense>} />
           {SECTIONS.filter((s) => !s.ready).map((s) => (
             <Route key={s.path} path={s.path} element={<Proximamente section={s} />} />
           ))}

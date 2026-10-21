@@ -5,7 +5,12 @@ Panel web nuevo (React + TypeScript), en construcción al lado del actual: [pane
 # Panel web (nuevo)
 La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
 
-# Transportes Ferreira GPS — v0.17.2
+# Transportes Ferreira GPS — v0.17.3
+
+## Nuevo en v0.17.3 (Rendimiento cuenta cada boleta en su fecha; versionCode 29)
+- **Rendimiento:** cada boleta de combustible cuenta en el mes de su fecha, o de la fecha que le corrigió el panel, igual que en Combustible y en Métricas del panel. Antes contaba en el mes en que llegó a la base, así que una boleta mandada tarde o con la fecha corregida podía caer en otro mes.
+- **Mi combustible y Combustible de la flota** ya ponían cada boleta en su fecha; ahora usan exactamente la misma regla que Rendimiento y el panel.
+- Lo que se envía al panel no cambia.
 
 ## Nuevo en v0.17.2 (formularios sin autocompletar y kilómetros en los services; versionCode 28)
 - **Formularios:** el autocompletado del teléfono ya no llena los campos de los formularios ni el buscador. Antes llenaba «Otro tipo» de un service o de un documento con el correo de la cuenta, y así quedaba guardado. El ingreso (correo y contraseña) lo sigue usando.
