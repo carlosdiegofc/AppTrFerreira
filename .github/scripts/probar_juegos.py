@@ -27,7 +27,8 @@ pids: set[str] = set()
 
 
 def adb(*args: str, check: bool = True, timeout: int = 60) -> subprocess.CompletedProcess:
-    result = subprocess.run(['adb', *args], capture_output=True, text=True, timeout=timeout)
+    # The phone's log can carry bytes that are not UTF-8.
+    result = subprocess.run(['adb', *args], capture_output=True, text=True, errors='replace', timeout=timeout)
     if check and result.returncode != 0:
         raise SystemExit(f'adb {" ".join(args)} falló: {result.stdout}{result.stderr}')
     return result
@@ -82,13 +83,20 @@ def fail(why: str) -> None:
     raise SystemExit(f'La prueba de los juegos falló: {why}.')
 
 
+def present(hit) -> bool:
+    """Whether found() found something: a view without children is a false Element, so its truth is not used."""
+    if hit is None or hit is False:
+        return False
+    return len(hit) > 0 if isinstance(hit, list) else True
+
+
 def wait(what: str, found, seconds: int = 30):
     end = time.time() + seconds
     while time.time() < end:
         alive = running()
         root = screen()
         hit = found(root) if root is not None else None
-        if hit:
+        if present(hit):
             return hit
         if not alive:
             fail(f'la app se cerró mientras se esperaba {what}')
@@ -188,8 +196,7 @@ try:
     tap_at(*square(node, 'e4'))
     # The phone thinks at least half a second, and answers: white moves again in move 2.
     wait('la respuesta del teléfono', lambda r: board(r, 'Jugada 2. Te toca mover.'), seconds=40)
-    if not [n for n in nodes(screen() or ET.Element('x'), desc='Deshacer') if n.get('enabled') == 'true']:
-        fail('después de jugar, «Deshacer» no se puede tocar')
+    wait('«Deshacer» habilitado después de jugar', lambda r: [n for n in nodes(r, desc='Deshacer') if n.get('enabled') == 'true'], seconds=10)
     shot('juegos-5-respuesta')
 
     step('Deshacer: vuelve la jugada propia con la respuesta del teléfono')
@@ -200,7 +207,7 @@ try:
     tap(wait('el botón de girar el tablero', lambda r: nodes(r, desc='Girar el tablero'))[0])
     time.sleep(1)
     shot('juegos-6-tablero-girado')
-    tap(nodes(screen(), desc='Girar el tablero')[0])
+    tap(wait('el botón de girar el tablero', lambda r: nodes(r, desc='Girar el tablero'))[0])
     adb('shell', 'settings', 'put', 'system', 'user_rotation', '1')
     wait('el tablero con la pantalla girada', lambda r: r.get('rotation') == '1' and board(r, 'Jugada 1.'))
     shot('juegos-6b-pantalla-girada')
