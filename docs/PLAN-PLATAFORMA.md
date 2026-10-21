@@ -75,6 +75,19 @@ Va armándose al costado del panel actual y lo reemplaza sección por sección.
 7. [x] GPS en vivo más rápido (aprobado el 18/10/2026, adelanta parte de la etapa 6): posición cada 3 segundos y recorrido cada 5, con la app 0.17.0 mandando un punto cada 2 segundos. La 0.17.0 se sube a Google Play cuando lo decidas (18/10/2026).
 8. [x] «Chofer activo» (aprobado el 18/10/2026): GPS en vivo y la «Flota en vivo» de la app dicen qué choferes tienen la app abierta, con qué versión y, si no viajan, dónde está el teléfono. Migración [`0002_chofer_activo.sql`](../supabase/migrations/0002_chofer_activo.sql), una tabla nueva: aplicada en producción el 19/10/2026 a las 08:20 (Uruguay). El respaldo completo se tomó a la 01:22, se probó en una base local y se entregó; entre el respaldo y la migración no cambió ningún dato. Avisan los teléfonos con la app 0.17.0 o posterior (19/10/2026).
 
+### App: juegos para las esperas
+Para pasar el rato mientras se espera la carga (aprobado el 21/10/2026). Se juega con el camión parado, y los juegos los ven todas las cuentas.
+1. [x] Ajedrez, en la app 0.18.0, que se sube a Google Play cuando lo decidas:
+   - Contra el teléfono, en tres niveles, o entre dos personas pasándose el teléfono. Tiene todas las reglas, deshacer y girar el tablero. Las piezas son dibujos propios de la app.
+   - Se abre sin viaje, con el viaje pausado o con el camión detenido según el GPS: una lectura de los últimos 2 minutos, a menos de 5 km/h. Si el camión arranca, la partida se guarda y se cierra.
+   - La partida queda solo en el teléfono: no va nada a la base ni al panel.
+2. [ ] Truco uruguayo contra el teléfono: con flor, a 30 (malas y buenas).
+3. [ ] Partidas en línea con los compañeros, con sus cuentas de la app:
+   - Se elige de cuántos jugar: 1 contra 1, 2 contra 2 o 3 contra 3.
+   - Por turnos. El servidor reparte y guarda las cartas, así nadie ve las de otro.
+   - Necesita una migración, con su respaldo antes, y actualizar la política de privacidad y el formulario de datos de Google Play.
+   - La misma regla del camión parado: si alguien arranca, la partida queda en pausa.
+
 Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - El rol anónimo tiene todos los permisos de tabla en 8 tablas de la app y del panel (`trf_driver_*`, `trf_trip_*`, `trf_mobile_catalog`, `trf_panel_trips`), y también los de la secuencia que numera los puntos GPS. Es lo que Supabase da por defecto y la seguridad por filas lo frena, pero hay que quitarlos: solo `trf_rates` necesita lectura anónima.
 - Conviven dos tipos de administrador: `trf_private.admin_emails` (administración completa, por correo) y `trf_panel_admins` (panel: lee toda la flota y también administra mantenimiento y documentos). Los datos que se completan en el panel (`trf_panel_trips`) los lee solo la segunda lista. Los dos pasan a ser roles por empresa.
@@ -83,6 +96,13 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 21/10/2026: juegos para las esperas en la app.
+  - Primero el ajedrez, después el truco uruguayo y después las partidas en línea con los compañeros.
+  - Se juega con el camión parado: sin viaje, con el viaje pausado o detenido según el GPS. Si el camión arranca, la partida se guarda y se cierra.
+  - Los juegos los ven todas las cuentas.
+  - Ajedrez: contra el teléfono, con tres niveles, o entre dos en el mismo teléfono.
+  - Truco: con flor y a 30 (malas y buenas).
+  - En línea: se elige de cuántos jugar (1 contra 1, 2 contra 2 o 3 contra 3).
 - 21/10/2026: Métricas.
   - Cada boleta de combustible cuenta en su fecha (la que corrigió la oficina, si la hay), como en Combustible. La app pasa a contar igual en «Rendimiento» con la 0.17.3; el panel actual queda como está hasta que Métricas lo reemplace.
   - Va con todo lo propuesto: totales, tabla por camión y por chofer, los cuatro gráficos y exportar a Excel y PDF.

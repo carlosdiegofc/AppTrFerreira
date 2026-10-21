@@ -5,7 +5,14 @@ Panel web nuevo (React + TypeScript), en construcción al lado del actual: [pane
 # Panel web (nuevo)
 La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
 
-# Transportes Ferreira GPS — v0.17.3
+# Transportes Ferreira GPS — v0.18.0
+
+## Nuevo en v0.18.0 (Juegos: ajedrez para las esperas; versionCode 30)
+- **Juegos:** para pasar el rato mientras se espera la carga. Están en el Inicio de los dos modos, en el viaje en curso y en la Flota en vivo de la cuenta de la empresa; los ven todas las cuentas.
+- **Ajedrez:** contra el teléfono, en nivel fácil, medio o difícil, con blancas, negras o al azar; o entre dos personas, pasándose el teléfono. Tiene todas las reglas: enroque, captura al paso, coronación (se elige la pieza), jaque, mate, ahogado y tablas por falta de material, por 50 jugadas y por triple repetición. Se puede deshacer y girar el tablero. Las piezas son dibujos propios de la app.
+- **Con el camión parado:** los juegos se abren sin viaje, con el viaje pausado o con el camión detenido según el GPS (una lectura de los últimos 2 minutos, a menos de 5 km/h). Mientras se juega, la app lo vuelve a mirar cada 5 segundos: si el camión arranca, la partida se guarda y se cierra, y vuelve la pantalla del viaje.
+- **La partida queda solo en el teléfono**, una por cuenta, y se sigue donde quedó. No se envía nada al panel ni a la base.
+- Vienen después el truco uruguayo y las partidas en línea con los compañeros ([docs/PLAN-PLATAFORMA.md](docs/PLAN-PLATAFORMA.md)).
 
 ## Nuevo en v0.17.3 (Rendimiento cuenta cada boleta en su fecha; versionCode 29)
 - **Rendimiento:** cada boleta de combustible cuenta en el mes de su fecha, o de la fecha que le corrigió el panel, igual que en Combustible y en Métricas del panel. Antes contaba en el mes en que llegó a la base, así que una boleta mandada tarde o con la fecha corregida podía caer en otro mes.
