@@ -73,6 +73,13 @@ jobs:
           path: app/build/outputs/apk/release/app-release.apk
           retention-days: 1
           if-no-files-found: error
+      # Los juegos se abren sin cuenta solo en la versión de prueba, que nunca va a Google Play.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: version-de-prueba-para-los-juegos
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 1
+          if-no-files-found: error
   probar:
     name: Probar la versión optimizada en un emulador
     needs: build
@@ -84,12 +91,17 @@ jobs:
         with:
           name: version-optimizada-para-probar
           path: apk-a-probar
+      - uses: actions/download-artifact@v4
+        with:
+          name: version-de-prueba-para-los-juegos
+          path: apk-de-prueba
       - name: Habilitar la aceleración del emulador
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      # Sin DNS (-dns-server 127.0.0.1): la prueba nunca llega a la base real.
+      # Sin DNS (-dns-server 127.0.0.1): la prueba nunca llega a la base real. Después de la versión optimizada, los juegos
+      # con la versión de prueba.
       - uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
@@ -98,11 +110,20 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -dns-server 127.0.0.1
-          script: python3 .github/scripts/probar_app_optimizada.py apk-a-probar/app-release.apk prueba-version-optimizada
+          script: |
+            python3 .github/scripts/probar_app_optimizada.py apk-a-probar/app-release.apk prueba-version-optimizada
+            python3 .github/scripts/probar_juegos.py apk-de-prueba/app-debug.apk prueba-juegos
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: prueba-version-optimizada
           path: prueba-version-optimizada
+          retention-days: 14
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prueba-juegos
+          path: prueba-juegos
           retention-days: 14
           if-no-files-found: ignore

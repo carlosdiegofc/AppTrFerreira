@@ -119,6 +119,10 @@ class MainActivity:AppCompatActivity(){
  private var startAsk=false;private var startAskAt=0L
  private var fleetView=false;private var detailFrom="list";private var sheet:android.app.Dialog?=null
  private var perfMonth:YearMonth=YearMonth.now();private var perfDrivers=false;private var perfFailed=false;private var perfLoading:YearMonth?=null
+ // Games (decision of 21/10/2026): chess on the phone, against it or between two people, with the truck stopped.
+ private var match:ChessMatch?=null;private var board:ChessBoard?=null;private var chessSel=-1;private var chessJob=0;private var thinking=false
+ private var chessTop:TextView?=null;private var chessBottom:TextView?=null;private var chessStatus:TextView?=null;private var undoButton:Btn?=null
+ private var gamesCheckAt=0L;private var gamesAllowed=true;private var newVsPhone=true;private var newLevel=ChessAi.Level.EASY;private var newSide=0
  private val serviceKinds=listOf("Cambio de aceite","Cambio de filtros","Revisión de frenos","Alineación y balanceo","Cubiertas","Revisión general")
  private var activeMap:android.webkit.WebView?=null;private var liveMap:TripMap.Live?=null;private var trackOffset=0L
  private val trucks=listOf("Ford Cargo 1722","Mercedes-Benz 1618","Leyland","Mercedes-Benz 1630")
@@ -152,17 +156,20 @@ class MainActivity:AppCompatActivity(){
   editForm=JSONObject(b?.getString("editForm")?:"{}");editId=b?.getString("editId");maintTruck=b?.getString("maintTruck")?:"";maintFilter=b?.getInt("maintFilter")?:0
   if(b!=null){fleetView=b.getBoolean("fleetView");tripFilter=b.getInt("tripFilter");historyQuery=b.getString("historyQuery")?:"";historyLimit=b.getInt("historyLimit",50);fuelMonth=b.getBoolean("fuelMonth",true);detailFrom=b.getString("detailFrom")?:"list";perfMonth=b.getString("perfMonth")?.let{try{YearMonth.parse(it)}catch(_:Exception){null}}?:YearMonth.now();perfDrivers=b.getBoolean("perfDrivers")}
   onBackPressedDispatcher.addCallback(this,back)
+  // The emulator test of the games (CI) opens them without an account, also after turning the screen: only on a debug
+  // build, which never goes to Google Play. Nothing of the games goes out.
+  if(api.session()==null&&gamesTest()){when(b?.getString("screen")){"chessnew"->newChess();"chess"->chess();else->games()};return}
   if(api.session()==null)login() else {name=driverName();when(b?.getString("screen")){"fuel"->fuel();"document"->document();"prepare"->prepare();"newtrip"->newTrip();"maintenance"->maintenance();"maintform"->maintForm();"documents"->documents();"docform"->paperForm();"privacy"->privacy();"mode"->askMode()
-   "triphistory"->history("trips",true);"fuelhistory"->history("fuel",true);"tripdetail"->historyTrip?.let{detail(it,true)}?:homeOrTrip();"settings"->settings();"performance"->performance(true);"owner"->ownerDashboard();else->homeOrTrip()};Sync.schedule(this);refreshCatalog()}
+   "triphistory"->history("trips",true);"fuelhistory"->history("fuel",true);"tripdetail"->historyTrip?.let{detail(it,true)}?:homeOrTrip();"settings"->settings();"performance"->performance(true);"owner"->ownerDashboard();"games"->games();"chessnew"->newChess();"chess"->chess();else->homeOrTrip()};Sync.schedule(this);refreshCatalog()}
  }
  @Suppress("DEPRECATION") private fun transparentBars(){window.statusBarColor=Color.TRANSPARENT;window.navigationBarColor=Color.TRANSPARENT}
  override fun onSaveInstanceState(b:Bundle){super.onSaveInstanceState(b);b.putString("camera",camera?.path);b.putString("photo",photo?.path);b.putString("screen",screen);b.putString("truck",truck);b.putBoolean("empty",empty);b.putString("tripForm",tripForm.toString());b.putString("fuelForm",fuelForm.toString());b.putString("docForm",docForm.toString());b.putString("draftDocs",draftDocs.toString());b.putString("fuelTrip",fuelTrip?.toString());b.putString("docTrip",docTrip?.toString());b.putString("historyTrip",historyTrip?.toString());b.putString("photoMode",photoMode);b.putString("docReturn",docReturn);b.putString("editForm",editForm.toString());b.putString("editId",editId);b.putString("maintTruck",maintTruck);b.putInt("maintFilter",maintFilter)
   b.putBoolean("fleetView",fleetView);b.putInt("tripFilter",tripFilter);b.putString("historyQuery",historyQuery);b.putInt("historyLimit",historyLimit);b.putBoolean("fuelMonth",fuelMonth);b.putString("detailFrom",detailFrom);b.putString("perfMonth",perfMonth.toString());b.putBoolean("perfDrivers",perfDrivers)}
  override fun onStart(){super.onStart();Presence.opened();presenceAt=null;handler.post(tick)}
- override fun onDestroy(){photoJob++;sheet?.dismiss();sheet=null;activeMap?.destroy();activeMap=null;super.onDestroy()}
+ override fun onDestroy(){photoJob++;chessJob++;sheet?.dismiss();sheet=null;activeMap?.destroy();activeMap=null;super.onDestroy()}
  override fun onStop(){handler.removeCallbacks(tick);Presence.closed();super.onStop()}
  // Screens where back stays inside the app; on the rest the system back gesture leaves it.
- private val innerScreens=setOf("fuel","document","prepare","newtrip","trip","triphistory","fuelhistory","settings","privacy","tripdetail","maintenance","documents","maintform","docform","performance")
+ private val innerScreens=setOf("fuel","document","prepare","newtrip","trip","triphistory","fuelhistory","settings","privacy","tripdetail","maintenance","documents","maintform","docform","performance","games","chessnew","chess")
  private val back=object:OnBackPressedCallback(false){override fun handleOnBackPressed(){when(screen){
   "fuel"->homeOrTrip()
   "document"->backFromDocument()
@@ -176,6 +183,8 @@ class MainActivity:AppCompatActivity(){
   "maintform"->maintenance()
   "docform"->documents()
   "mode"->homeOrTrip()
+  "games"->homeOrTrip()
+  "chessnew","chess"->games()
   // Only enabled while the question before starting a trip is up: back answers "no".
   "simplehome"->simpleHome()
  }}}
@@ -321,6 +330,8 @@ class MainActivity:AppCompatActivity(){
  private fun page(key:String,header:Boolean=true){
   activeMap?.destroy();activeMap=null;liveMap=null;screen=key;back.isEnabled=key in innerScreens;fleetStats=null;fleetCard=null;fleetNote=null;peopleCard=null
   distance=null;speed=null;limit=null;status=null;statusBox=null;elapsed=null;sync=null;gps=null;count=null;pauseLabel=null;pauseIcon=null
+  // Leaving the board drops the phone's move on its way.
+  board=null;chessTop=null;chessBottom=null;chessStatus=null;undoButton=null;if(key!="chess"){chessJob++;thinking=false}
   shell=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(appBg)}
   head=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(barBg);visibility=if(header)View.VISIBLE else View.GONE}
   shell.addView(head,LinearLayout.LayoutParams(-1,-2));topTarget=head
@@ -481,6 +492,7 @@ class MainActivity:AppCompatActivity(){
    row(card(),R.drawable.ic_check_circle,"Último viaje guardado",listOfNotNull(date(t.optString("started_at")),km(t.optDouble("distance_meters",0.0)),durationText(t.optString("started_at"),t.optString("ended_at"))).joinToString(" · "),tint=green)}
   // Fuel can be loaded in simple mode too (decision of 19/10/2026): here, out of a trip.
   button(root,"Cargar combustible",Kind.LINE,R.drawable.ic_fuel){fuelChoice()}
+  button(root,"Juegos",Kind.LINE,R.drawable.ic_chess){games()}
   // The owner who drives gets the owner menu here; changing the mode is inside that menu.
   if(ownerDriver())button(root,"Menú del dueño",Kind.PRIMARY,R.drawable.ic_menu){ownerMenu()} else button(root,"Cambiar de modo",Kind.LINE,R.drawable.ic_list){askMode()}
   sync=note(store.message(),top=12).apply{gravity=Gravity.CENTER}
@@ -533,6 +545,8 @@ class MainActivity:AppCompatActivity(){
   gps=note("",top=10).apply{gravity=Gravity.CENTER}
   // During the trip it asks whether the load belongs to the trip or not.
   button(root,"Cargar combustible",Kind.LINE,R.drawable.ic_fuel){fuelChoice()}
+  // For the wait at a plant with the trip going: they open only with the truck stopped.
+  button(root,"Juegos",Kind.LINE,R.drawable.ic_chess){games()}
   if(!(getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName))row(card(),R.drawable.ic_battery,"Evitar cortes del GPS","Permitir que la app siga en segundo plano",tint=amber){batteryExemption()}
   sync=note(store.message(),top=6).apply{gravity=Gravity.CENTER}
   simpleDock()
@@ -581,6 +595,7 @@ class MainActivity:AppCompatActivity(){
    Shortcut(R.drawable.ic_receipt,0xFF7A4FD0.toInt(),"Remitos y fotos",null){if(active())openDocument(store.current(),"trip","arrival") else {toast("Elegí el viaje al que querés agregar el remito");openHistory("trips",false)}},
    Shortcut(R.drawable.ic_doc,0xFF0E8A8A.toInt(),"Documentos",null){documents(true)},
    Shortcut(R.drawable.ic_wrench,0xFF56647B.toInt(),"Mantenimiento",null){maintenance(true)},
+   Shortcut(R.drawable.ic_chess,0xFFBE3A6E.toInt(),"Juegos","Para las esperas, con el camión parado"){games()},
    Shortcut(R.drawable.ic_person,0xFF8590A2.toInt(),"Mi cuenta","Modo de uso, GPS y sesión"){settings()}))
   sync=note(store.message(),top=18).apply{gravity=Gravity.CENTER}
   navBar("home")
@@ -731,6 +746,7 @@ class MainActivity:AppCompatActivity(){
   val (pi,pl)=actionBox(trio,R.drawable.ic_pause,"Pausar",2){try{service(if(store.current()?.optBoolean("paused")==true)GpsService.RESUME else GpsService.PAUSE)}catch(_:Exception){toast("Revisá el permiso de ubicación")}}
   pauseIcon=pi;pauseLabel=pl
   if(!(getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName))row(card(),R.drawable.ic_battery,"Evitar cortes del GPS","Permitir que la app siga en segundo plano",tint=amber){batteryExemption()}
+  row(card(),R.drawable.ic_chess,"Juegos","Para la espera, con el camión parado"){games()}
   count=note("",top=16);sync=note(store.message(),top=4)
   link(root,"Revisar ubicación GPS",top=4){requestStart()}
   dock.visibility=View.VISIBLE
@@ -752,6 +768,7 @@ class MainActivity:AppCompatActivity(){
  }
  private fun refresh(){if(!::store.isInitialized)return;sync?.text=store.message();presence()
   if(screen=="owner"&&!fleetLoading){val now=System.currentTimeMillis();if(now-fleetLoadedAt>FLEET_MS)loadFleet() else if(!liveLoading&&now-liveLoadedAt>LIVE_MS)loadLive()}
+  if(screen=="games"||screen=="chessnew"||screen=="chess")gamesCheck()
   if(screen!="trip"&&screen!="simpletrip")return;val t=store.current()?:return
   if(!t.optBoolean("active")){home();toast("Viaje finalizado. Los datos pendientes se enviarán con conexión.");return}
   val paused=t.optBoolean("paused")
@@ -1004,6 +1021,138 @@ class MainActivity:AppCompatActivity(){
   ViewCompat.setOnApplyWindowInsetsListener(layout){v,i->val insets=i.getInsets(WindowInsetsCompat.Type.systemBars());v.setPadding(insets.left+dp(12),insets.top+dp(12),insets.right+dp(12),insets.bottom+dp(12));i}
  }
 
+ // ---------- Games: for the waits, with the truck stopped (decision of 21/10/2026). Nothing of them leaves the phone ----------
+ private fun gamesTest()=(applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)!=0&&intent?.getBooleanExtra("trf_test_games",false)==true
+ private fun chessKey()="chess-${uid()}"
+ private fun savedMatch()=ChessMatch.load(prefs().getString(chessKey(),null))
+ private fun saveMatch(m:ChessMatch)=prefs().edit().putString(chessKey(),m.save()).apply()
+ /** Whether the truck is stopped: from the trip in progress and its latest GPS reading. */
+ private fun parkedState():Parked.State{val t=store.current();val p=t?.optJSONObject("last_point")
+  return Parked.state(t?.optBoolean("active")==true,t?.optBoolean("paused")==true,instant(p?.optString("recorded_at"))?.toEpochMilli(),p?.takeUnless{it.isNull("speed_kmh")}?.optDouble("speed_kmh"),System.currentTimeMillis())}
+ private fun parkedText(s:Parked.State)=if(s==Parked.State.MOVING)"El camión está en movimiento. Los juegos son para cuando está parado." else "El GPS no muestra el camión parado. Para jugar durante el viaje, pausalo."
+ /** Every few seconds on a game screen: when the truck moves, the game (saved after every move) closes. */
+ private fun gamesCheck(){
+  val now=SystemClock.elapsedRealtime();if(now-gamesCheckAt<Parked.CHECK_MS)return;gamesCheckAt=now
+  val s=parkedState()
+  if(screen=="games"){if(s.allowed!=gamesAllowed)games();return}
+  if(s.allowed)return
+  val playing=screen=="chess";match?.takeIf{playing}?.let{saveMatch(it)}
+  homeOrTrip();toast(if(playing)"La partida quedó guardada. Seguila con el camión parado." else parkedText(s))
+ }
+ private fun games(){
+  page("games");bar("Juegos",back={homeOrTrip()})
+  val s=parkedState();gamesAllowed=s.allowed;gamesCheckAt=SystemClock.elapsedRealtime()
+  if(!s.allowed){
+   val w=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;background=bg(amberBg,16);setPadding(dp(16),dp(14),dp(16),dp(14))}
+   w.addView(iconView(R.drawable.ic_warning,amber,26))
+   val wc=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),0,0,0)}
+   wc.addView(tv("Primero, el camión parado",16f,ink,1));wc.addView(tv(parkedText(s),14f,inkSoft).apply{setPadding(0,dp(2),0,0)})
+   w.addView(wc,LinearLayout.LayoutParams(0,-2,1f));root.addView(w,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(14)})
+  }
+  val saved=savedMatch()?.takeIf{it.playing}
+  menuList(listOf(Shortcut(R.drawable.ic_chess,0xFFBE3A6E.toInt(),"Ajedrez",if(saved!=null)"Seguí tu partida · jugada ${saved.game.position.fullmove}" else "Contra el teléfono o entre dos"){openChess()}))
+  note("Para las esperas: los juegos se abren sin viaje, con el viaje pausado o con el camión detenido. Si el camión arranca, la partida se guarda y se cierra. Las partidas quedan solo en este teléfono.",top=14)
+ }
+ private fun openChess(){val s=parkedState();if(!s.allowed){toast(parkedText(s));return};if(savedMatch()?.playing==true)chess() else newChess()}
+ /** A new game, with the options chosen the last time. */
+ private fun newChess(){
+  val p=prefs().getString("chess-setup-${uid()}",null)?.split('|')
+  newVsPhone=p?.getOrNull(0)!="two";newLevel=ChessAi.Level.entries.firstOrNull{it.name==p?.getOrNull(1)}?:ChessAi.Level.EASY;newSide=p?.getOrNull(2)?.toIntOrNull()?.coerceIn(0,2)?:0
+  chessNew()
+ }
+ private fun chessNew(){
+  val s=parkedState();if(!s.allowed){toast(parkedText(s));games();return}
+  page("chessnew");bar("Partida nueva",back={games()});gamesCheckAt=SystemClock.elapsedRealtime()
+  caption(root,"Rival",top=16)
+  radio(root,"Contra el teléfono",newVsPhone){newVsPhone=true;chessNew()}
+  radio(root,"Entre dos, en este teléfono",!newVsPhone){newVsPhone=false;chessNew()}
+  if(newVsPhone){
+   caption(root,"Nivel",top=22);segmented(root,listOf("Fácil","Medio","Difícil"),newLevel.ordinal,top=8){newLevel=ChessAi.Level.entries[it];chessNew()}
+   note(when(newLevel){ChessAi.Level.EASY->"Fácil: a veces se distrae y deja piezas sin cuidar.";ChessAi.Level.MEDIUM->"Medio: cuida sus piezas y aprovecha las que dejás sueltas.";ChessAi.Level.HARD->"Difícil: piensa unos segundos cada jugada."},top=8)
+   caption(root,"Tus piezas",top=22);segmented(root,listOf("Blancas","Negras","Al azar"),newSide,top=8){newSide=it;chessNew()}
+  }else note("Se juega pasando el teléfono. Con el botón de girar, cada uno ve el tablero desde su lado.",top=14)
+  dock.visibility=View.VISIBLE
+  button(dock,"Empezar",Kind.PRIMARY,R.drawable.ic_play,top=0){startChess()}
+ }
+ private fun startChess(){
+  prefs().edit().putString("chess-setup-${uid()}","${if(newVsPhone)"phone" else "two"}|${newLevel.name}|$newSide").apply()
+  val white=!newVsPhone||when(newSide){0->true;1->false;else->kotlin.random.Random.nextBoolean()}
+  saveMatch(ChessMatch(newVsPhone,newLevel,white,Chess.Game()));chessSel=-1;chess()
+ }
+ private fun levelName(l:ChessAi.Level)=when(l){ChessAi.Level.EASY->"fácil";ChessAi.Level.MEDIUM->"medio";ChessAi.Level.HARD->"difícil"}
+ private fun sideDot(white:Boolean)=GradientDrawable().apply{shape=GradientDrawable.OVAL;setColor(if(white)Color.WHITE else 0xFF2B303A.toInt());setStroke(dp(1),0xFF1B1F27.toInt());setSize(dp(14),dp(14))}
+ private fun chess(){
+  val s=parkedState();if(!s.allowed){toast(parkedText(s));homeOrTrip();return}
+  val m=savedMatch()?:return newChess()
+  page("chess");chessJob++;thinking=false;match=m;gamesCheckAt=SystemClock.elapsedRealtime()
+  bar("Ajedrez",back={games()},trailing=barButton(R.drawable.ic_flip,"Girar el tablero"){m.flipped=!m.flipped;saveMatch(m);chessViews()})
+  fun player(top:Int)=tv("",15f,ink,1).apply{gravity=Gravity.CENTER_VERTICAL;compoundDrawablePadding=dp(9);minHeight=dp(34);root.addView(this,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(top)})}
+  chessTop=player(8)
+  val b=ChessBoard(this,dark);board=b;b.onSquare={tapSquare(it)}
+  root.addView(b,LinearLayout.LayoutParams(-2,-2).apply{gravity=Gravity.CENTER_HORIZONTAL;topMargin=dp(4)})
+  chessBottom=player(4)
+  chessStatus=text(root,"",17f,ink,1,10).apply{gravity=Gravity.CENTER}
+  dock.visibility=View.VISIBLE
+  val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL};dock.addView(r,LinearLayout.LayoutParams(-1,-2))
+  undoButton=button(r,"Deshacer",Kind.LINE,R.drawable.ic_undo,top=0){undoChess()}.also{it.view.layoutParams=LinearLayout.LayoutParams(0,dp(54),1f)}
+  button(r,"Partida nueva",Kind.LINE,R.drawable.ic_plus,top=0){askNewChess()}.view.layoutParams=LinearLayout.LayoutParams(0,dp(54),1f).apply{marginStart=dp(10)}
+  chessViews();phoneTurn()
+ }
+ /** The board, the players and the line under them, after a move, an undo or a turn of the board. */
+ private fun chessViews(){
+  val m=match?:return;val b=board?:return;val g=m.game;val p=g.position
+  b.position=p;b.lastMove=g.lastMove;b.flipped=m.flipped;b.selected=chessSel
+  b.targets=if(chessSel>=0)p.legal.filter{it.from==chessSel}.map{it.to}.toSet() else emptySet()
+  fun who(white:Boolean)=if(m.vsPhone)(if(white==m.humanWhite)"Vos" else "Teléfono · nivel ${levelName(m.level)}") else if(white)"Blancas" else "Negras"
+  // Each name goes on its side of the board; the one who moves, in dark.
+  for((v,white) in listOf(chessTop to m.flipped,chessBottom to !m.flipped))v?.apply{text=who(white);setTextColor(if(m.playing&&p.whiteToMove==white)ink else muted);setCompoundDrawablesRelativeWithIntrinsicBounds(sideDot(white),null,null,null)}
+  val line=chessLine(m);chessStatus?.apply{text=line;setTextColor(if(m.playing&&p.inCheck)red else ink)}
+  undoButton?.enable(m.canUndo&&!thinking)
+  b.isEnabled=m.playing&&!m.phoneToMove;b.contentDescription="Tablero de ajedrez. Jugada ${p.fullmove}. $line"
+ }
+ private fun chessLine(m:ChessMatch):String{val g=m.game;val p=g.position
+  return when(g.outcome){
+   Chess.Outcome.PLAYING->when{
+    m.phoneToMove->"El teléfono está pensando…"
+    m.vsPhone->if(p.inCheck)"Jaque. Te toca mover." else "Te toca mover."
+    else->(if(p.whiteToMove)"Mueven las blancas" else "Mueven las negras")+if(p.inCheck)" · Jaque" else ""}
+   Chess.Outcome.WHITE_MATES,Chess.Outcome.BLACK_MATES->{val whiteWon=g.outcome==Chess.Outcome.WHITE_MATES
+    if(!m.vsPhone)"Jaque mate. Ganan las ${if(whiteWon)"blancas" else "negras"}." else if(whiteWon==m.humanWhite)"¡Jaque mate! Ganaste." else "Jaque mate. Ganó el teléfono."}
+   Chess.Outcome.STALEMATE->"Tablas: el rey quedó ahogado."
+   Chess.Outcome.MATERIAL->"Tablas: no queda material para dar mate."
+   Chess.Outcome.FIFTY_MOVES->"Tablas: 50 jugadas sin capturas ni movimientos de peón."
+   Chess.Outcome.REPETITION->"Tablas: la misma posición se repitió tres veces."
+  }
+ }
+ /** A tap picks a piece of the side to move, plays it where it can go, or lets it go. */
+ private fun tapSquare(sq:Int){
+  val m=match?:return;if(!m.playing||m.phoneToMove||thinking)return
+  val p=m.game.position
+  if(chessSel>=0){val moves=p.legal.filter{it.from==chessSel&&it.to==sq}
+   if(moves.size>1){askPromotion(moves);return};if(moves.size==1){playChess(moves[0]);return}}
+  val piece=p[sq];chessSel=if(piece!=0&&(piece>0)==p.whiteToMove&&sq!=chessSel)sq else -1
+  chessViews()
+ }
+ private fun askPromotion(moves:List<Chess.Move>){
+  val kinds=listOf(Chess.QUEEN to "Dama",Chess.ROOK to "Torre",Chess.BISHOP to "Alfil",Chess.KNIGHT to "Caballo")
+  AlertDialog.Builder(this).setTitle("¿En qué se convierte el peón?").setItems(kinds.map{it.second}.toTypedArray()){_,i->moves.firstOrNull{it.promo==kinds[i].first}?.let{playChess(it)}}.setNegativeButton("Cancelar",null).show()
+ }
+ private fun playChess(move:Chess.Move){val m=match?:return;if(screen!="chess"||!m.game.play(move))return;chessSel=-1;saveMatch(m);chessViews();phoneTurn()}
+ /** The phone's answer, worked out on another thread; dropped if the board closed or the game changed meanwhile. */
+ private fun phoneTurn(){
+  val m=match?:return;if(!m.phoneToMove||thinking||screen!="chess")return
+  thinking=true;val job=chessJob;val position=m.game.position;val level=m.level;val started=SystemClock.elapsedRealtime()
+  chessViews()
+  thread{val move=try{ChessAi.choose(position,level)}catch(_:Exception){position.moves().randomOrNull()}
+   // An answer that comes at once looks like no thought at all.
+   handler.postDelayed({if(job==chessJob&&match===m){thinking=false;if(move!=null&&m.game.play(move))saveMatch(m);chessViews()}},(450-(SystemClock.elapsedRealtime()-started)).coerceAtLeast(0))}
+ }
+ private fun undoChess(){val m=match?:return;if(thinking||!m.undo())return;chessSel=-1;saveMatch(m);chessViews()}
+ private fun askNewChess(){val m=match
+  if(m==null||!m.playing||!m.canUndo){newChess();return}
+  AlertDialog.Builder(this).setTitle("¿Empezar otra partida?").setMessage("La partida en curso se va a perder.").setNegativeButton("Seguir jugando",null).setPositiveButton("Empezar otra"){_,_->newChess()}.show()
+ }
+
  // ---------- Account ----------
  private fun settings(){
   page("settings");bar("Mi cuenta")
@@ -1100,7 +1249,8 @@ class MainActivity:AppCompatActivity(){
   val pc=card();peopleCard=pc;peopleInto(pc,f)
   note("Activo es con la app abierta en los últimos 10 minutos. El punto azul del mapa es el teléfono del chofer activo que no está de viaje. Las versiones anteriores a la 0.17.0 no avisan.",top=8)
   if(!hub)tileGrid(listOf(Tile(R.drawable.ic_list,"Viajes de la flota",null){openHistory("trips",true)},Tile(R.drawable.ic_history,"Combustible de la flota",null){openHistory("fuel",true)},
-   Tile(R.drawable.ic_speed,"Rendimiento",null){openPerformance()},Tile(R.drawable.ic_wrench,"Mantenimiento",null){maintenance(true)},Tile(R.drawable.ic_doc,"Documentos",null){documents(true)}))
+   Tile(R.drawable.ic_speed,"Rendimiento",null){openPerformance()},Tile(R.drawable.ic_wrench,"Mantenimiento",null){maintenance(true)},Tile(R.drawable.ic_doc,"Documentos",null){documents(true)},
+   Tile(R.drawable.ic_chess,"Juegos",null){games()}))
   sync=note(store.message(),top=16).apply{gravity=Gravity.CENTER}
   if(!hub)navBar("owner")
   if(!fleetLoading&&System.currentTimeMillis()-fleetLoadedAt>FLEET_MS)loadFleet()
