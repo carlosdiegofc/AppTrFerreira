@@ -3153,3 +3153,4 @@ button.fr-open {
 .road-marker { background: var(--blue); border: 2px solid white; border-radius: 50%; }
 .road-marker span { display: block; width: max-content; max-width: 190px; margin-left: 25px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; font-size: 12px; }
 .road-scale { background: #9a6700; } .road-radar { background: #be3144; } .road-place { background: #168467; }
+.road-fields { padding: 18px; margin: 0; overflow-y: auto; min-height: 0; }

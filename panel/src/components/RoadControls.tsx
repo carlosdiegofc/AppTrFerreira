@@ -24,7 +24,7 @@ function Editor({ title, fields, save, close }: { title: string; fields: Field[]
       e.preventDefault(); const values = Object.fromEntries(new FormData(e.currentTarget).entries()) as Record<string,string>;
       setBusy(true); setError('');
       try { await save(values); close(); } catch (err) { setUncertain((err instanceof DataError && !refused(err)) || err instanceof TypeError); setError(err instanceof Error ? err.message : 'No se pudo guardar. Volvé a intentar.'); } finally { setBusy(false); }
-    }}><h2>{title}</h2><fieldset disabled={busy} className="road-fields">
+    }}><header><h2>{title}</h2></header><fieldset disabled={busy} className="road-fields">
       {fields.map(f => <label className="field" key={f.name}>{f.label}<input readOnly={uncertain} name={f.name} type={f.type ?? 'text'} defaultValue={f.value} min={f.min} max={f.max} step={f.step} required={!f.optional} maxLength={f.type ? undefined : 500}/></label>)}
     </fieldset>{error && <p role="alert">{error}</p>}<footer className="road-actions"><button className="btn" type="button" disabled={busy} onClick={cancel}>Cancelar</button><button className="btn btn-primary" disabled={busy}>{busy ? 'Guardando…' : 'Guardar'}</button></footer></form>
   </dialog>{discard && <ConfirmDialog title="Descartar cambios" confirmLabel="Descartar" onCancel={() => setDiscard(false)} onConfirm={close}>Los cambios sin guardar se pierden. Si se cortó una respuesta, revisá el registro antes de volver a cargarlo.</ConfirmDialog>}</>;
@@ -50,7 +50,7 @@ export function PointEditor({ point, kind, location, close }: { point?: RoadPoin
 export function TruckRoad({ unit, points, now }: { unit: FleetUnit; points: readonly RoadPoint[]; now: number }) {
   const label = unitTitle(unit), key = roadVehicleKey(label);
   const account = useRoadAccount(key), observations = useTankObservations(key), mutation = useRoadWrite();
-  const [editor,setEditor] = useState<{ title:string; fields:Field[]; build:(v:Record<string,string>) => RoadWrite } | null>(null);
+  const [editor,setEditor] = useState<{ title:string; fields:Field[]; build:(v:Record<string,string>) => RoadWrite | Promise<RoadWrite>; pending?:RoadWrite } | null>(null);
   const maps = externalMaps(unit.lat,unit.lng);
   const a = account.data;
   const estimate = a?.tank && observations.data && !observations.error ? fuelEstimate(a.tank,observations.data.trips,observations.data.receipts) : null;
@@ -70,11 +70,14 @@ export function TruckRoad({ unit, points, now }: { unit: FleetUnit; points: read
       {name:'liters',label:'Litros que tiene ahora (medidos)',type:'number',step:'any',min:0,max:5000,value:''},
       {name:'consumption',label:'Consumo de referencia (L / 100 km)',type:'number',step:'any',min:0.1,max:200,value:ref?.consumption ?? ''},
       {name:'warning',label:'Avisar por debajo de (L)',type:'number',step:'any',min:0,max:5000,value:ref?.warning_l ?? 50},
-    ],build:v => {
+    ],build:async v => {
+      const fresh = await observations.refetch();
+      if (fresh.error || !fresh.data || fresh.data.receipts.some(r => r.liters === null)) throw new Error('No se pudo leer una referencia completa. Revisá las cargas.');
+      const baseline = fresh.data;
       const capacity = Number(v.capacity),liters = Number(v.liters),warning = Number(v.warning);
       if (liters > capacity || warning > capacity) throw new Error('Los litros y el aviso no pueden superar la capacidad.');
       const time = new Date().toISOString();
-      return {type:'tank',before:ref?.updated_at ?? null,row:{vehicle_key:key,vehicle_name:label,capacity_l:capacity,liters,warning_l:warning,consumption:Number(v.consumption),trip_meters:Object.fromEntries(o.trips.map(t => [t.id,t.distance_meters])),receipt_liters:Object.fromEntries(o.receipts.map(r => [r.id,r.liters!])),measured_at:time,updated_at:ref?.updated_at ?? time}};
+      return {type:'tank',before:ref?.updated_at ?? null,row:{vehicle_key:key,vehicle_name:label,capacity_l:capacity,liters,warning_l:warning,consumption:Number(v.consumption),trip_meters:Object.fromEntries(baseline.trips.map(t => [t.id,t.distance_meters])),receipt_liters:Object.fromEntries(baseline.receipts.map(r => [r.id,r.liters!])),measured_at:time,updated_at:ref?.updated_at ?? time}};
     } });
   };
   return <section className="road-truck" aria-label="Control del camión">
@@ -88,7 +91,8 @@ export function TruckRoad({ unit, points, now }: { unit: FleetUnit; points: read
         const rate = applicableRate(a.rates,p.id,key,new Date(now).toISOString());
         return <div className="road-point" key={p.id}><span>{p.name} · {rate ? money(rate.amount,'UYU') : 'Sin tarifa'}</span><button className="btn" onClick={() => {
           const id = crypto.randomUUID(),time = new Date().toISOString();
-          setEditor({title:`Tarifa · ${p.name}`,fields:[{name:'amount',label:'Precio UYU (vigente desde que se guarda)',type:'number',step:'0.01',min:0,max:9999999,value:rate?.amount ?? ''}],build:v => ({type:'rate',row:{id,point_id:p.id,vehicle_key:key,amount:Number(v.amount),valid_from:time,created_at:time}})});
+          const localTime = new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,16);
+          setEditor({title:`Tarifa · ${p.name}`,fields:[{name:'amount',label:'Precio UYU',type:'number',step:'0.01',min:0,max:9999999,value:rate?.amount ?? ''},{name:'from',label:'Vigente desde (hora local)',type:'datetime-local',value:localTime}],build:v => ({type:'rate',row:{id,point_id:p.id,vehicle_key:key,amount:Number(v.amount),valid_from:new Date(v.from!).toISOString(),created_at:time}})});
         }}>Cambiar precio</button></div>;
       })}</details>
       <h3>Combustible estimado</h3>
@@ -99,7 +103,7 @@ export function TruckRoad({ unit, points, now }: { unit: FleetUnit; points: read
       <details><summary>Últimos 30 pasos registrados</summary>{a.events.length === 0 && <p>Todavía no hay pasos registrados.</p>}{a.events.map(e => <p key={e.id}>{e.point_name} · {new Date(e.happened_at).toLocaleString('es-UY')} · {e.speed_kmh === null ? 'Sin velocidad' : `${Math.round(e.speed_kmh)} km/h (máxima GPS)`}{e.speed_limit !== null && e.speed_kmh !== null && e.speed_kmh > e.speed_limit ? ' · Revisar velocidad' : ''}{e.kind === 'toll' && e.amount === null ? ' · Sin tarifa, no descontado' : ''}</p>)}</details>
       <p className="muted">Los avisos sonoros del teléfono requieren una próxima actualización móvil. A baja velocidad, el GPS no certifica una infracción.</p>
     </>}
-    {editor && <Editor title={editor.title} fields={editor.fields} close={() => setEditor(null)} save={async v => { await mutation.mutateAsync(editor.build(v)); }}/>} 
+    {editor && <Editor title={editor.title} fields={editor.fields} close={() => setEditor(null)} save={async v => { const write = editor.pending ?? await editor.build(v); editor.pending = write; try { await mutation.mutateAsync(write); } catch (error) { if (refused(error)) delete editor.pending; throw error; } }}/>} 
   </section>;
 }
 

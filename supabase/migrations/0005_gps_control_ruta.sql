@@ -138,9 +138,7 @@ declare
   p public.trf_road_points; v trf_private.road_visits; dist double precision; k text;
   price numeric; event uuid; opposite boolean;
 begin
-  if new.trip_id is null or new.accuracy_m is null or new.accuracy_m < 0 or new.accuracy_m > 30
-     or new.latitude not between -90 and 90 or new.longitude not between -180 and 180
-     or (new.latitude = 0 and new.longitude = 0) or new.recorded_at > now() + interval '5 minutes' then return new; end if;
+  if new.trip_id is null or new.recorded_at > now() + interval '5 minutes' then return new; end if;
   -- Invoked only by the history trigger; authenticated uploads must own the trip (or be panel admins).
   if auth.uid() is not null and auth.uid() <> new.driver_id and not public.trf_is_panel_admin() then return new; end if;
   if not exists(select 1 from public.trf_driver_tracking_sessions s where s.id=new.trip_id and s.driver_id=new.driver_id and s.vehicle=new.vehicle
@@ -148,6 +146,13 @@ begin
   k := trf_private.road_vehicle_key(new.vehicle);
   -- Serialize samples of this trip, including concurrent upload batches.
   perform pg_advisory_xact_lock(hashtextextended(new.trip_id::text, 0));
+  if new.accuracy_m is null or new.accuracy_m < 0 or new.accuracy_m > 30
+     or new.latitude not between -90 and 90 or new.longitude not between -180 and 180
+     or (new.latitude = 0 and new.longitude = 0) then
+    update trf_private.road_visits set entered_at=null,samples=0,last_at=new.recorded_at
+      where trip_id=new.trip_id and last_at < new.recorded_at;
+    return new;
+  end if;
   for p in select * from public.trf_road_points where not archived and kind <> 'place' and created_at <= new.recorded_at and
     ((abs(latitude-new.latitude)<0.03 and abs(longitude-new.longitude)<0.04) or id in (select point_id from trf_private.road_visits where trip_id=new.trip_id and entered_at is not null)) loop
     dist := trf_private.road_distance(p.latitude,p.longitude,new.latitude,new.longitude);
