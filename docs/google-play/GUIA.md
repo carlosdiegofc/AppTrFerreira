@@ -232,6 +232,14 @@ La app de Google Play es una app nueva para Android (nombre de paquete `com.tran
 
 Cada versión nueva lleva un número de versión más alto, y GitHub Actions arma su `.aab` solo. En Play Console: *Prueba interna › Crear versión* › subí el `.aab` nuevo › **Lanzar**. Los teléfonos se actualizan desde Google Play sin hacer nada más.
 
+Versión `0.17.3` (código de versión 29). «Rendimiento» cuenta cada boleta de combustible en el mes de su fecha (o de la que le corrigió el panel), como el panel. No cambia permisos, datos recopilados ni la política de privacidad. Si alguna de las versiones anteriores, de la 0.17.0 a la 0.17.2, no llegó a subirse, se sube directamente esta, que las incluye, siguiendo los pasos de la 0.17.0 de acá abajo (Seguridad de los datos y la prueba en el teléfono). Notas de la versión si ya está subida la 0.17.2:
+
+```text
+<es-419>
+• Rendimiento: cada boleta de combustible cuenta en el mes de su fecha.
+</es-419>
+```
+
 Versión `0.17.2` (código de versión 28). El autocompletado del teléfono ya no llena los campos de los formularios (llenaba «Otro tipo» con el correo de la cuenta), y los services muestran los kilómetros que les cargó el panel («a los 412.500 km», «cada 10.000 km»). No cambia permisos, datos recopilados ni la política de privacidad. Si la 0.17.0 o la 0.17.1 no llegaron a subirse, se sube directamente esta, que las incluye, siguiendo los pasos de la 0.17.0 de acá abajo (Seguridad de los datos y la prueba en el teléfono). Notas de la versión si ya está subida la 0.17.1:
 
 ```text

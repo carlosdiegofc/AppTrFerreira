@@ -940,10 +940,8 @@ class MainActivity:AppCompatActivity(){
  private fun panelData(r:JSONObject):JSONObject=r.optJSONObject("panel_data")?:try{JSONObject(r.optString("panel_data"))}catch(_:Exception){JSONObject()}
  /** The office's value when it has one, else the phone's; numbers typed the Uruguayan way ("30.000", "1.234,5") count, as in Rendimiento. */
  private fun amount(a:JSONObject,k:String,b:JSONObject,l:String):Double?=(if(a.isNull(k))null else FleetStats.number(a.opt(k)))?:(if(b.isNull(l))null else FleetStats.number(b.opt(l)))
- private fun fuelDay(r:JSONObject):LocalDate?{
-  val s=panelData(r).optString("fecha").takeIf{it.isNotBlank()&&it!="null"}?:r.optString("receipt_date")
-  return try{LocalDate.parse(s.take(10))}catch(_:Exception){try{LocalDate.parse(s,DateTimeFormatter.ofPattern("dd/MM/yyyy"))}catch(_:Exception){zoned(r.optString("recorded_at"))?.toLocalDate()}}
- }
+ /** The day a receipt counts on, the same rule as Rendimiento and the panel (FleetStats.fuelDay). */
+ private fun fuelDay(r:JSONObject):LocalDate?=FleetStats.fuelDay(panelData(r).optString("fecha").takeIf{it!="null"},r.optString("receipt_date"),r.optString("recorded_at"),java.time.ZoneId.systemDefault())
 
  // ---------- Trip detail ----------
  private fun detail(t:JSONObject,refresh:Boolean=false){
@@ -1289,7 +1287,7 @@ class MainActivity:AppCompatActivity(){
     val idle=mobile.trucks().map{it.label}.filter{label->s.rows.none{sameUnit(it.name,label)}}
     if(idle.isNotEmpty()){section("Sin movimientos en el mes");val ic=card();idle.forEach{label->val (m,p)=truckParts(label);row(ic,R.drawable.ic_truck_outline,m.ifBlank{p},if(m.isNotBlank()&&p.isNotBlank())"Matrícula $p" else null,tint=grey)}}
    }
-   note("Kilómetros del GPS de la app. El consumo usa los litros cargados en el mes y se calcula con ${whole(FleetStats.MIN_KM_FOR_RATIO)} km o más. Kilos, kilómetros facturables e importes son los que se completan en el panel web.",top=14)
+   note("Kilómetros del GPS de la app. Cada boleta cuenta en su fecha, o en la que le corrigió el panel. El consumo usa los litros cargados en el mes y se calcula con ${whole(FleetStats.MIN_KM_FOR_RATIO)} km o más. Kilos, kilómetros facturables e importes son los que se completan en el panel web.",top=14)
    note("Actualizado ${ago(data.fetchedAt)}.",top=6)
   }
   if((refresh||data==null)&&!perfFailed)loadPerformance(month)

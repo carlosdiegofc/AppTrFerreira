@@ -151,9 +151,9 @@ test('las secciones que faltan dicen qué van a hacer y la sesión se cierra', a
   await signIn(page, 'dueno@ejemplo.uy');
   await expect(stat(page, 'En ruta')).toBeVisible();
   await expect(page.getByRole('navigation').getByRole('link')).toHaveCount(12);
-  await open(page, 'Métricas');
+  await open(page, 'Gastos y finanzas');
   await expect(page.getByRole('heading', { name: 'Próximamente' })).toBeVisible();
-  await expect(page.getByText('Mientras tanto, está en la app: Menú del dueño › Rendimiento.')).toBeVisible();
+  await expect(page.getByText('Gastos, facturas y cobros, la ganancia de cada viaje y un simulador de fletes.')).toBeVisible();
   await shot(page, 'proximamente');
 
   const menu = page.getByRole('button', { name: 'Abrir el menú' });

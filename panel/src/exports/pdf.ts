@@ -9,10 +9,10 @@ import type { Fuel, RouteStats, Trip } from '../lib/trips';
 import { COMPANY, generated, type ListInfo, NAVY, save } from './common';
 
 // The standard PDF fonts cover the Spanish letters (á, ñ, ¿) but not arrows or emoji: the texts avoid them.
-const INK: [number, number, number] = [17, 28, 46];
+export const INK: [number, number, number] = [17, 28, 46];
 const SOFT: [number, number, number] = [79, 93, 115];
 
-function header(doc: jsPDF, title: string, subtitle: string) {
+export function header(doc: jsPDF, title: string, subtitle: string) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(...NAVY);
@@ -26,7 +26,7 @@ function header(doc: jsPDF, title: string, subtitle: string) {
   doc.text(subtitle, 14, 28);
 }
 
-function footer(doc: jsPDF) {
+export function footer(doc: jsPDF) {
   const pages = doc.getNumberOfPages();
   for (let i = 1; i <= pages; i++) {
     doc.setPage(i);

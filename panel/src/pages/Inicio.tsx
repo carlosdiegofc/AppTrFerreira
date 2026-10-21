@@ -191,7 +191,9 @@ export function Inicio() {
                 <div><dt>Con carga</dt><dd>{totals.loadedShare === null ? '—' : percent(totals.loadedShare)}</dd></div>
                 <div><dt>Camiones con viajes</dt><dd>{count(totals.trucks)}</dd></div>
               </dl>
-              <p className="note">Viajes registrados con la app, sin los eliminados en el panel. El rendimiento por camión y por chofer llega con Métricas.</p>
+              <p className="note">
+                Viajes registrados con la app, sin los eliminados en el panel. El rendimiento por camión y por chofer está en <Link to="/metricas">Métricas</Link>.
+              </p>
             </>
           )}
         </Card>

@@ -16,6 +16,7 @@ import {
   deleteDocument,
   deleteService,
   documentRow,
+  fetchBilledTrips,
   fetchCatalog,
   fetchCatalogLists,
   fetchDocuments,
@@ -312,13 +313,17 @@ export function useTripList(fromIso: string | null, toIso: string | null) {
 }
 
 /**
- * Everything that shows trips reads them again after a change: the list, the trip's page, Inicio, and the kilometres
- * of the trucks (a trip in the trash does not count).
+ * Everything that shows trips reads them again after a change: the list, the trip's page, Inicio, the kilometres of
+ * the trucks (a trip in the trash does not count) and the billing of the last months in Métricas.
  */
 function useTripsChanged() {
   const client = useQueryClient();
-  return () => Promise.all(['tripList', 'trip', 'trips', 'kmTrips'].map((key) => client.invalidateQueries({ queryKey: [key] })));
+  return () => Promise.all(['tripList', 'trip', 'trips', 'kmTrips', 'billedTrips'].map((key) => client.invalidateQueries({ queryKey: [key] })));
 }
+
+/** What the trips of the last months billed, for Métricas; read again every 5 minutes while the page is open. */
+export const useBilledTrips = (fromIso: string, toIso: string) =>
+  useQuery({ queryKey: ['billedTrips', fromIso, toIso], queryFn: () => fetchBilledTrips(fromIso, toIso), refetchInterval: 5 * 60_000, staleTime: 60_000 });
 
 /** Saves the office's data of a trip (a new one when trip is null); on a conflict the screens read the trip again. */
 export function useSaveTrip() {
