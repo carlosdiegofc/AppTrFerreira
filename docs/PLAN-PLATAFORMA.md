@@ -138,5 +138,6 @@ Más adelante: proveedor de mapas, método de lectura de boletas, modelo de IA y
 - [x] Código de las tres vistas y puntos editables, enlaces a mapas externos, cuenta de telepeaje individual y tarifas históricas.
 - [x] Referencia de combustible, consumo editable, estimación y aviso visual de nivel bajo.
 - [x] Migración aditiva con pasos GPS estimados y controles de acceso; pruebas fuera de producción.
-- [ ] Validación final de navegador y publicación con respaldo previo. Detalles: [GPS-CONTROL-RUTA.md](GPS-CONTROL-RUTA.md).
+- [x] Validación de navegador en computadora y celular (CI con datos inventados).
+- [ ] Publicación con respaldo previo. Detalles: [GPS-CONTROL-RUTA.md](GPS-CONTROL-RUTA.md).
 - [ ] Etapa Android posterior: notificaciones y sonido al chofer.

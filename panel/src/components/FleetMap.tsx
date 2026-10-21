@@ -81,7 +81,20 @@ const located = (u: FleetUnit): u is FleetUnit & { lat: number; lng: number } =>
  */
 const calm = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-export function FleetMap({ units, people = NO_PEOPLE, selected = null, onSelect, route = null, fitToken = 0, label, className = '', roadPoints, focusPoint, onPointSelect, onPickLocation }: Props) {
+export function FleetMap({
+  units,
+  people = NO_PEOPLE,
+  selected = null,
+  onSelect,
+  route = null,
+  fitToken = 0,
+  label,
+  className = '',
+  roadPoints,
+  focusPoint,
+  onPointSelect,
+  onPickLocation,
+}: Props) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const markers = useRef(new Map<string, Shown>());
@@ -128,7 +141,13 @@ export function FleetMap({ units, people = NO_PEOPLE, selected = null, onSelect,
   useEffect(() => {
     if (!box.current) return;
     const still = calm();
-    const m = L.map(box.current, { zoomControl: true, attributionControl: true, zoomAnimation: !still, fadeAnimation: !still, markerZoomAnimation: !still }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+    const m = L.map(box.current, {
+      zoomControl: true,
+      attributionControl: true,
+      zoomAnimation: !still,
+      fadeAnimation: !still,
+      markerZoomAnimation: !still,
+    }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
     L.tileLayer(TILE_URL, { maxZoom: 18, attribution: TILE_ATTRIBUTION }).addTo(m);
     routeLayer.current = L.layerGroup().addTo(m);
     map.current = m;
@@ -190,7 +209,12 @@ export function FleetMap({ units, people = NO_PEOPLE, selected = null, onSelect,
         current.marker.setZIndexOffset(u.key === selected ? 1000 : 0);
         continue;
       }
-      const marker = L.marker(to, { icon: L.divIcon({ html: u.element(), className: 'fm-wrap', iconSize: undefined }), title, keyboard: true, riseOnHover: true })
+      const marker = L.marker(to, {
+        icon: L.divIcon({ html: u.element(), className: 'fm-wrap', iconSize: undefined }),
+        title,
+        keyboard: true,
+        riseOnHover: true,
+      })
         .on('click', () => select.current?.(u.key))
         .addTo(m);
       markers.current.set(u.key, { marker, look, drawn: to, target: to, glide: null });
@@ -254,21 +278,34 @@ export function FleetMap({ units, people = NO_PEOPLE, selected = null, onSelect,
   });
 
   useEffect(() => {
-    const m = map.current; if (!m) return;
+    const m = map.current;
+    if (!m) return;
     const layer = L.layerGroup().addTo(m);
     for (const p of roadPoints ?? []) {
       const title = `${POINT_LABEL[p.kind]} · ${p.name}`;
-      const text = document.createElement('span'); text.textContent = title;
-      const marker = L.marker([p.latitude,p.longitude], { title, icon:L.divIcon({ className:`road-marker road-${p.kind}`, html:text, iconSize:[26,26] }) }).addTo(layer);
+      const text = document.createElement('span');
+      text.textContent = title;
+      const marker = L.marker([p.latitude, p.longitude], {
+        title,
+        icon: L.divIcon({ className: `road-marker road-${p.kind}`, html: text, iconSize: [26, 26] }),
+      }).addTo(layer);
       marker.on('click', () => onPointSelect?.(p));
     }
-    return () => { layer.remove(); };
-  }, [roadPoints,onPointSelect]);
-  useEffect(() => { if (focusPoint) map.current?.setView([focusPoint.latitude,focusPoint.longitude],15,{animate:!calm()}); }, [focusPoint]);
+    return () => {
+      layer.remove();
+    };
+  }, [roadPoints, onPointSelect]);
   useEffect(() => {
-    const m = map.current; if (!m || !onPickLocation) return;
-    const pick = (e: L.LeafletMouseEvent) => onPickLocation({latitude:e.latlng.lat,longitude:e.latlng.lng});
-    m.on('click',pick); return () => { m.off('click',pick); };
+    if (focusPoint) map.current?.setView([focusPoint.latitude, focusPoint.longitude], 15, { animate: !calm() });
+  }, [focusPoint]);
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !onPickLocation) return;
+    const pick = (e: L.LeafletMouseEvent) => onPickLocation({ latitude: e.latlng.lat, longitude: e.latlng.lng });
+    m.on('click', pick);
+    return () => {
+      m.off('click', pick);
+    };
   }, [onPickLocation]);
   return <div ref={box} className={`fleet-map ${className}`} role="region" aria-label={label} />;
 }

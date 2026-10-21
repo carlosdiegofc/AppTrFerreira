@@ -212,4 +212,3 @@ revoke all on function trf_private.audit_road() from public, anon, authenticated
 create trigger road_points_audit after insert or update on public.trf_road_points for each row execute function trf_private.audit_road();
 create trigger road_tank_audit after insert or update on public.trf_tank_references for each row execute function trf_private.audit_road();
 notify pgrst, 'reload schema';
-
