@@ -29,3 +29,6 @@ Android source is app/ at repository root. The nested 0.10.1 folder is historica
 - The app and website use independent deployments. Build an APK from the desired branch; changing main is not required to test this version.
 
 Validation: workflow runs assembleDebug, JVM unit tests, bundleRelease and assembleRelease (since 0.17.0 the release build is optimized and obfuscated by R8; signed with the Play upload key from the repository secrets, or a throwaway key when they are missing), and installs the release APK on an API 34 emulator without DNS for a smoke test: sign-in screen, privacy policy, rotation, an offline sign-in and reopening, with no crash or missing class in the log. Physical GPS, camera, battery restrictions and display remain device acceptance tests.
+
+## Control de ruta del panel (migración 0005)
+Nuevas tablas `trf_road_points`, `trf_toll_rates`, `trf_road_events`, `trf_toll_movements` y `trf_tank_references`. Solo las cuentas del panel las leen/administran. El historial GPS existente alimenta un observador privado que estima pasos y descuentos; la app no escribe estas tablas ni cambia su contrato de envío. Eventos y cobros son inmutables y llevan tarifa aplicada. El saldo y el tanque son estimaciones. Reglas, limitaciones y despliegue en [GPS-CONTROL-RUTA.md](GPS-CONTROL-RUTA.md).
