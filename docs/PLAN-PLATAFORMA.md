@@ -81,7 +81,10 @@ Para pasar el rato mientras se espera la carga (aprobado el 21/10/2026). Se jueg
    - Contra el teléfono, en tres niveles, o entre dos personas pasándose el teléfono. Tiene todas las reglas, deshacer y girar el tablero. Las piezas son dibujos propios de la app.
    - Se abre sin viaje, con el viaje pausado o con el camión detenido según el GPS: una lectura de los últimos 2 minutos, a menos de 5 km/h. Si el camión arranca, la partida se guarda y se cierra.
    - La partida queda solo en el teléfono: no va nada a la base ni al panel.
-2. [ ] Truco uruguayo contra el teléfono: con flor, a 30 (malas y buenas).
+2. [x] Truco uruguayo contra el teléfono, en la app 0.19.0, que se sube a Google Play cuando lo decidas:
+   - Con flor y contraflor, a 30: 15 malas y 15 buenas, con el tanteador en fósforos. Las reglas del 22/10/2026 están en las decisiones.
+   - El teléfono canta el envido por sus tantos y el truco por lo que estima ganar, y a veces miente. Las cartas son dibujos propios de la app.
+   - Como el ajedrez: se juega con el camión parado y la partida queda solo en el teléfono.
 3. [ ] Partidas en línea con los compañeros, con sus cuentas de la app:
    - Se elige de cuántos jugar: 1 contra 1, 2 contra 2 o 3 contra 3.
    - Por turnos. El servidor reparte y guarda las cartas, así nadie ve las de otro.
@@ -96,6 +99,10 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 22/10/2026: reglas del truco.
+  - La sota de la muestra vale 27 en el envido y en la flor, como el caballo.
+  - La falta envido vale lo que le falta al que va ganando para llegar a 30.
+  - Con contraflor: la flor vale 3; contra otra flor se canta contraflor (6), contraflor al resto o «con flor me achico», que le da 4 al otro. Gana la flor más alta.
 - 21/10/2026: juegos para las esperas en la app.
   - Primero el ajedrez, después el truco uruguayo y después las partidas en línea con los compañeros.
   - Se juega con el camión parado: sin viaje, con el viaje pausado o detenido según el GPS. Si el camión arranca, la partida se guarda y se cierra.

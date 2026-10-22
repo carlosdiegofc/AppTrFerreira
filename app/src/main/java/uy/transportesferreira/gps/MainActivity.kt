@@ -123,6 +123,8 @@ class MainActivity:AppCompatActivity(){
  private var match:ChessMatch?=null;private var board:ChessBoard?=null;private var chessSel=-1;private var chessJob=0;private var thinking=false
  private var chessTop:TextView?=null;private var chessBottom:TextView?=null;private var chessStatus:TextView?=null;private var undoButton:Btn?=null
  private var gamesCheckAt=0L;private var gamesAllowed=true;private var newVsPhone=true;private var newLevel=ChessAi.Level.EASY;private var newSide=0
+ // Truco against the phone (decisions of 21 and 22/10/2026): the person is player 0. trucoPick is the card chosen to play.
+ private var trucoMatch:Truco.Match?=null;private var trucoUi:TrucoViews?=null;private var trucoPick:Truco.Card?=null;private var trucoJob=0;private var trucoThinking=false
  private val serviceKinds=listOf("Cambio de aceite","Cambio de filtros","Revisión de frenos","Alineación y balanceo","Cubiertas","Revisión general")
  private var activeMap:android.webkit.WebView?=null;private var liveMap:TripMap.Live?=null;private var trackOffset=0L
  private val trucks=listOf("Ford Cargo 1722","Mercedes-Benz 1618","Leyland","Mercedes-Benz 1630")
@@ -161,19 +163,20 @@ class MainActivity:AppCompatActivity(){
   onBackPressedDispatcher.addCallback(this,back)
   // The emulator test of the games (CI) opens them without an account, also after turning the screen: only on a debug
   // build, which never goes to Google Play. Nothing of the games goes out.
-  if(api.session()==null&&gamesTest()){when(b?.getString("screen")){"chessnew"->chessOptions();"chess"->chess();else->games()};return}
+  if(api.session()==null&&gamesTest()){intent?.getStringExtra("trf_test_truco")?.takeIf{b==null&&Truco.Match.load(it)!=null}?.let{prefs().edit().putString(trucoKey(),it).apply()}
+   when(b?.getString("screen")){"chessnew"->chessOptions();"chess"->chess();"truco"->truco();else->games()};return}
   if(api.session()==null)login() else {name=driverName();when(b?.getString("screen")){"fuel"->fuel();"document"->document();"prepare"->prepare();"newtrip"->newTrip();"maintenance"->maintenance();"maintform"->maintForm();"documents"->documents();"docform"->paperForm();"privacy"->privacy();"mode"->askMode()
-   "triphistory"->history("trips",true);"fuelhistory"->history("fuel",true);"tripdetail"->historyTrip?.let{detail(it,true)}?:homeOrTrip();"settings"->settings();"performance"->performance(true);"owner"->ownerDashboard();"games"->games();"chessnew"->chessOptions();"chess"->chess();else->homeOrTrip()};Sync.schedule(this);refreshCatalog()}
+   "triphistory"->history("trips",true);"fuelhistory"->history("fuel",true);"tripdetail"->historyTrip?.let{detail(it,true)}?:homeOrTrip();"settings"->settings();"performance"->performance(true);"owner"->ownerDashboard();"games"->games();"chessnew"->chessOptions();"chess"->chess();"truco"->truco();else->homeOrTrip()};Sync.schedule(this);refreshCatalog()}
  }
  @Suppress("DEPRECATION") private fun transparentBars(){window.statusBarColor=Color.TRANSPARENT;window.navigationBarColor=Color.TRANSPARENT}
  override fun onSaveInstanceState(b:Bundle){super.onSaveInstanceState(b);b.putString("camera",camera?.path);b.putString("photo",photo?.path);b.putString("screen",screen);b.putString("truck",truck);b.putBoolean("empty",empty);b.putString("tripForm",tripForm.toString());b.putString("fuelForm",fuelForm.toString());b.putString("docForm",docForm.toString());b.putString("draftDocs",draftDocs.toString());b.putString("fuelTrip",fuelTrip?.toString());b.putString("docTrip",docTrip?.toString());b.putString("historyTrip",historyTrip?.toString());b.putString("photoMode",photoMode);b.putString("docReturn",docReturn);b.putString("editForm",editForm.toString());b.putString("editId",editId);b.putString("maintTruck",maintTruck);b.putInt("maintFilter",maintFilter)
   b.putBoolean("fleetView",fleetView);b.putInt("tripFilter",tripFilter);b.putString("historyQuery",historyQuery);b.putInt("historyLimit",historyLimit);b.putBoolean("fuelMonth",fuelMonth);b.putString("detailFrom",detailFrom);b.putString("perfMonth",perfMonth.toString());b.putBoolean("perfDrivers",perfDrivers)
   if(screen=="chessnew")b.putString("chessPick","$newVsPhone|${newLevel.name}|$newSide")}
  override fun onStart(){super.onStart();Presence.opened();presenceAt=null;handler.post(tick)}
- override fun onDestroy(){photoJob++;chessJob++;sheet?.dismiss();sheet=null;activeMap?.destroy();activeMap=null;super.onDestroy()}
+ override fun onDestroy(){photoJob++;chessJob++;trucoJob++;sheet?.dismiss();sheet=null;activeMap?.destroy();activeMap=null;super.onDestroy()}
  override fun onStop(){handler.removeCallbacks(tick);Presence.closed();super.onStop()}
  // Screens where back stays inside the app; on the rest the system back gesture leaves it.
- private val innerScreens=setOf("fuel","document","prepare","newtrip","trip","triphistory","fuelhistory","settings","privacy","tripdetail","maintenance","documents","maintform","docform","performance","games","chessnew","chess")
+ private val innerScreens=setOf("fuel","document","prepare","newtrip","trip","triphistory","fuelhistory","settings","privacy","tripdetail","maintenance","documents","maintform","docform","performance","games","chessnew","chess","truco")
  private val back=object:OnBackPressedCallback(false){override fun handleOnBackPressed(){when(screen){
   "fuel"->homeOrTrip()
   "document"->backFromDocument()
@@ -188,7 +191,7 @@ class MainActivity:AppCompatActivity(){
   "docform"->documents()
   "mode"->homeOrTrip()
   "games"->homeOrTrip()
-  "chessnew","chess"->games()
+  "chessnew","chess","truco"->games()
   // Only enabled while the question before starting a trip is up: back answers "no".
   "simplehome"->simpleHome()
  }}}
@@ -236,12 +239,17 @@ class MainActivity:AppCompatActivity(){
   r.addView(col,LinearLayout.LayoutParams(0,-2,1f));if(trailing!=null)r.addView(trailing)
   p.addView(r,LinearLayout.LayoutParams(-1,-2))
  }
- private fun button(p:LinearLayout,s:String,kind:Kind=Kind.PRIMARY,icon:Int?=null,top:Int=12,action:()->Unit):Btn{
+ /** How a button of a kind looks: its background with the touch ripple, its text colour, and whether it is solid. */
+ private fun buttonLook(kind:Kind):Triple<Drawable,Int,Boolean>{
   val solid=kind==Kind.PRIMARY||kind==Kind.DANGER||kind==Kind.GO
   val fill=when(kind){Kind.PRIMARY->blue;Kind.DANGER->red;Kind.GO->0xFF178A4C.toInt();Kind.SOFT->blueSoft;else->cardBg}
   val fg=when(kind){Kind.PRIMARY,Kind.DANGER,Kind.GO->Color.WHITE;Kind.LINE_DANGER->red;else->blue}
   val shape=when(kind){Kind.LINE->outline(fill,tone(0xFFC9D8F6,0xFF35507E),14);Kind.LINE_DANGER->outline(fill,tone(0xFFF3C5C7,0xFF6A2C30),14);else->bg(fill,14)}
-  val v=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;background=ripple(shape,if(solid)0x40FFFFFF else press);isClickable=true;isFocusable=true;contentDescription=s;setPadding(dp(16),0,dp(16),0);if(solid)elevation=dpf(2f)}
+  return Triple(ripple(shape,if(solid)0x40FFFFFF else press),fg,solid)
+ }
+ private fun button(p:LinearLayout,s:String,kind:Kind=Kind.PRIMARY,icon:Int?=null,top:Int=12,action:()->Unit):Btn{
+  val (look,fg,solid)=buttonLook(kind)
+  val v=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;background=look;isClickable=true;isFocusable=true;contentDescription=s;setPadding(dp(16),0,dp(16),0);if(solid)elevation=dpf(2f)}
   if(icon!=null)v.addView(iconView(icon,fg,20).apply{(layoutParams as LinearLayout.LayoutParams).marginEnd=dp(10)})
   val label=tv(s,16f,fg,1).apply{maxLines=1;ellipsize=TextUtils.TruncateAt.END};v.addView(label)
   v.setOnClickListener{action()};p.addView(v,LinearLayout.LayoutParams(-1,dp(54)).apply{topMargin=dp(top)});return Btn(v,label)
@@ -336,6 +344,7 @@ class MainActivity:AppCompatActivity(){
   distance=null;speed=null;limit=null;status=null;statusBox=null;elapsed=null;sync=null;gps=null;count=null;pauseLabel=null;pauseIcon=null
   // Leaving the board drops the phone's move on its way.
   board=null;chessTop=null;chessBottom=null;chessStatus=null;undoButton=null;if(key!="chess"){chessJob++;thinking=false}
+  trucoUi=null;if(key!="truco"){trucoJob++;trucoThinking=false}
   shell=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(appBg)}
   head=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(barBg);visibility=if(header)View.VISIBLE else View.GONE}
   shell.addView(head,LinearLayout.LayoutParams(-1,-2));topTarget=head
@@ -773,7 +782,7 @@ class MainActivity:AppCompatActivity(){
  }
  private fun refresh(){if(!::store.isInitialized)return;sync?.text=store.message();presence()
   if(screen=="owner"&&!fleetLoading){val now=System.currentTimeMillis();if(now-fleetLoadedAt>FLEET_MS)loadFleet() else if(!liveLoading&&now-liveLoadedAt>LIVE_MS)loadLive()}
-  if(screen=="games"||screen=="chessnew"||screen=="chess")gamesCheck()
+  if(screen=="games"||screen=="chessnew"||screen=="chess"||screen=="truco")gamesCheck()
   if(screen!="trip"&&screen!="simpletrip")return;val t=store.current()?:return
   if(!t.optBoolean("active")){home();toast("Viaje finalizado. Los datos pendientes se enviarán con conexión.");return}
   val paused=t.optBoolean("paused")
@@ -1041,7 +1050,7 @@ class MainActivity:AppCompatActivity(){
   val s=parkedState()
   if(screen=="games"){if(s.allowed!=gamesAllowed)games();return}
   if(s.allowed)return
-  val playing=screen=="chess";match?.takeIf{playing}?.let{saveMatch(it)}
+  val playing=screen=="chess"||screen=="truco";match?.takeIf{screen=="chess"}?.let{saveMatch(it)};trucoMatch?.takeIf{screen=="truco"}?.let{saveTruco(it)}
   homeOrTrip();toast(if(playing)"La partida quedó guardada. Seguila con el camión parado." else parkedText(s))
  }
  private fun games(){
@@ -1054,8 +1063,9 @@ class MainActivity:AppCompatActivity(){
    wc.addView(tv("Primero, el camión parado",16f,ink,1));wc.addView(tv(parkedText(s),14f,inkSoft).apply{setPadding(0,dp(2),0,0)})
    w.addView(wc,LinearLayout.LayoutParams(0,-2,1f));root.addView(w,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(14)})
   }
-  val saved=savedMatch()?.takeIf{it.playing}
-  menuList(listOf(Shortcut(R.drawable.ic_chess,0xFFBE3A6E.toInt(),"Ajedrez",if(saved!=null)"Seguí tu partida · jugada ${saved.game.position.fullmove}" else "Contra el teléfono o entre dos"){openChess()}))
+  val saved=savedMatch()?.takeIf{it.playing};val cards=savedTruco()?.takeIf{it.winner<0}
+  menuList(listOf(Shortcut(R.drawable.ic_chess,0xFFBE3A6E.toInt(),"Ajedrez",if(saved!=null)"Seguí tu partida · jugada ${saved.game.position.fullmove}" else "Contra el teléfono o entre dos"){openChess()},
+   Shortcut(R.drawable.ic_cards,0xFF178A6A.toInt(),"Truco",if(cards!=null)"Seguí tu partida · ${cards.score[0]} a ${cards.score[1]}" else "Contra el teléfono, con flor y a 30"){openTruco()}))
   note("Para las esperas: los juegos se abren sin viaje, con el viaje pausado o con el camión detenido. Si el camión arranca, la partida se guarda y se cierra. Las partidas quedan solo en este teléfono.",top=14)
  }
  private fun openChess(){val s=parkedState();if(!s.allowed){toast(parkedText(s));return};if(savedMatch()?.playing==true)chess() else newChess()}
@@ -1172,6 +1182,189 @@ class MainActivity:AppCompatActivity(){
   if(m==null||!m.playing||!m.canUndo){newChess();return}
   AlertDialog.Builder(this).setTitle("¿Empezar otra partida?").setMessage("La partida en curso se va a perder.").setNegativeButton("Seguir jugando",null).setPositiveButton("Empezar otra"){_,_->newChess()}.show()
  }
+
+ // ---------- Truco: against the phone, with flor and contraflor, to 30 (decisions of 21 and 22/10/2026) ----------
+ /** The views of the table that change with each action. Lists by player: 0 the person, 1 the phone. */
+ private class TrucoViews(val names:List<TextView>,val scores:List<TextView>,val tallies:List<TrucoTally>,val said:List<TextView>,val backs:List<TrucoCard>,
+  val muestra:TrucoCard,val table:List<List<TrucoCard>>,val rounds:List<TextView>,val status:TextView,val news:TextView,val hint:TextView,val hand:List<TrucoCard>,val calls:LinearLayout)
+ private fun trucoKey()="truco-${uid()}"
+ private fun savedTruco()=Truco.Match.load(prefs().getString(trucoKey(),null))
+ private fun saveTruco(m:Truco.Match)=prefs().edit().putString(trucoKey(),m.save()).apply()
+ /** The game in progress, or a new one when there is none or the last one ended. */
+ private fun openTruco(){val s=parkedState();if(!s.allowed){toast(parkedText(s));return};if(savedTruco()?.winner==-1)truco() else newTruco()}
+ private fun newTruco(){saveTruco(Truco.Match().also{it.deal()});truco()}
+ private fun truco(){
+  val s=parkedState();if(!s.allowed){toast(parkedText(s));homeOrTrip();return}
+  val m=savedTruco()?:return newTruco()
+  page("truco");trucoJob++;trucoThinking=false;trucoMatch=m;trucoPick=null;gamesCheckAt=SystemClock.elapsedRealtime()
+  bar("Truco",back={games()},trailing=barButton(R.drawable.ic_plus,"Partida nueva"){askNewTruco()})
+  // The cards as big as the screen leaves, so a hand is played without scrolling: upright, the table above the hand and
+  // the calls at the bottom; turned, the table and the hand side by side, with the score and the calls at the right.
+  val w=resources.displayMetrics.widthPixels;val h=resources.displayMetrics.heightPixels
+  val turned=resources.configuration.orientation==Configuration.ORIENTATION_LANDSCAPE
+  // What does not grow with the cards takes about 555 dp upright (bars, dock, score, labels, texts) and 195 turned in
+  // height, and 430 turned in width (the right column, margins); the rules link may stay below, to scroll to.
+  val small:Int;val big:Int
+  if(turned){small=minOf(((h-dp(195))/3.9f).toInt(),((w-dp(430))/8.2f).toInt(),dp(64)).coerceAtLeast(dp(36));big=minOf((small*1.4f).toInt(),dp(96))}
+  else{big=minOf((w-dp(48))/3,dp(96),((h-dp(555))/3.68f).toInt()).coerceAtLeast(dp(56));small=maxOf((big*0.56f).toInt(),dp(36))}
+  fun row(p:LinearLayout,top:Int)=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;p.addView(this,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(top)})}
+  // What a player sang or answered last, until they play a card.
+  fun bubble(p:LinearLayout)=pill("",amber,amberBg).apply{visibility=View.INVISIBLE;(layoutParams as LinearLayout.LayoutParams).marginStart=dp(10);p.addView(this)}
+  // Each one's points in words and in matches, the way they are kept at the table.
+  // In the narrow column of the turned screen, the name goes above the points.
+  fun scoreBoard(p:LinearLayout,top:Int,stacked:Boolean=false):Pair<List<TextView>,List<TrucoTally>>{
+   val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;setPadding(dp(14),dp(9),dp(14),dp(10))};card(p,top=top).addView(r)
+   val scores=ArrayList<TextView>();val tallies=ArrayList<TrucoTally>()
+   for(i in 0..1){val col=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};r.addView(col,LinearLayout.LayoutParams(0,-2,1f).apply{if(i==1)marginStart=dp(18)})
+    val words=LinearLayout(this).apply{orientation=if(stacked)LinearLayout.VERTICAL else LinearLayout.HORIZONTAL;gravity=if(stacked)Gravity.START else Gravity.BOTTOM};col.addView(words)
+    words.addView(tv(if(i==0)"Vos" else "Teléfono",13f,muted,1).apply{if(!stacked)setPadding(0,0,dp(8),dp(1))});scores.add(tv("",16f,ink,2).also{words.addView(it)})
+    tallies.add(TrucoTally(this,ink,fieldLine).also{col.addView(it,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(6)})})}
+   return scores to tallies
+  }
+  fun phoneRow(p:LinearLayout,top:Int):Triple<TextView,TextView,List<TrucoCard>>{
+   val r=row(p,top);val name=tv("",15f,ink,1);r.addView(name);val said=bubble(r);r.addView(View(this),LinearLayout.LayoutParams(0,1,1f))
+   val backs=(0..2).map{i->TrucoCard(this,dark).also{r.addView(it,LinearLayout.LayoutParams(maxOf((small*0.6f).toInt(),dp(26)),-2).apply{if(i>0)marginStart=dp(5)})}}
+   return Triple(name,said,backs)
+  }
+  // The muestra, and each round with the phone's card above the person's and who won it below.
+  fun table(p:LinearLayout,top:Int):Triple<TrucoCard,List<List<TrucoCard>>,List<TextView>>{
+   val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;setPadding(dp(10),dp(10),dp(10),dp(8))};card(p,top=top).addView(r,LinearLayout.LayoutParams(-1,-2))
+   // The label wraps its text, so that a column is as wide as «Muestra» when the cards are narrower.
+   fun column(label:String,start:Int)=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER_HORIZONTAL;addView(tv(label,12.5f,muted,1),LinearLayout.LayoutParams(-2,-2));r.addView(this,LinearLayout.LayoutParams(-2,-2).apply{marginStart=start})}
+   val muestra=TrucoCard(this,dark).also{column("Muestra",0).addView(it,LinearLayout.LayoutParams(small,-2).apply{topMargin=dp(4)})}
+   val slots=List(2){ArrayList<TrucoCard>()};val won=ArrayList<TextView>()
+   for(i in 0..2){val col=column(listOf("1ª","2ª","3ª")[i],dp(if(i==0)18 else 8))
+    for(pl in listOf(1,0))TrucoCard(this,dark).also{col.addView(it,LinearLayout.LayoutParams(small,-2).apply{topMargin=dp(4)});slots[pl].add(it)}
+    won.add(tv("",12f,muted,1).apply{gravity=Gravity.CENTER;maxLines=1;ellipsize=TextUtils.TruncateAt.END;col.addView(this,LinearLayout.LayoutParams(small,-2).apply{topMargin=dp(3)})})}
+   return Triple(muestra,slots,won)
+  }
+  fun mine(p:LinearLayout,top:Int):Triple<TextView,TextView,TextView>{
+   val r=row(p,top);val name=tv("",15f,ink,1);r.addView(name);val said=bubble(r)
+   return Triple(name,said,text(p,"",13.5f,muted,0,2))
+  }
+  fun hand(p:LinearLayout,top:Int):List<TrucoCard>{
+   // Room above the cards for the chosen one, which rises; the row keeps its height when no card is left.
+   val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_HORIZONTAL;clipToPadding=false;clipChildren=false;setPadding(0,dp(12),0,0);minimumHeight=Math.round(big*1.5f)+dp(12)}
+   p.addView(r,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(top)})
+   return (0..2).map{i->TrucoCard(this,dark).also{c->r.addView(c,LinearLayout.LayoutParams(big,-2).apply{if(i>0)marginStart=dp(10)});c.setOnClickListener{tapTruco(i)}}}
+  }
+  fun status(p:LinearLayout,top:Int)=text(p,"",16.5f,ink,1,top).apply{gravity=Gravity.CENTER}
+  fun news(p:LinearLayout)=text(p,"",13.5f,muted,0,4).apply{gravity=Gravity.CENTER;minLines=2;maxLines=2;ellipsize=TextUtils.TruncateAt.END}
+  val calls=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;minimumHeight=dp(104)}
+  trucoUi=if(turned){
+   val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL};root.addView(r,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(6)})
+   val main=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};r.addView(main,LinearLayout.LayoutParams(0,-2,1f))
+   val side=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(16),0,0,0)};r.addView(side,LinearLayout.LayoutParams(dp(290),-2))
+   val (phoneName,phoneSaid,backs)=phoneRow(main,0)
+   val tr=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL};main.addView(tr,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(2)})
+   val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};tr.addView(box,LinearLayout.LayoutParams(-2,-2))
+   val (muestra,slots,won)=table(box,6)
+   val me=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(16),0,0,0)};tr.addView(me,LinearLayout.LayoutParams(0,-2,1f))
+   val (myName,mySaid,hint)=mine(me,8);val cards=hand(me,0)
+   val (scores,tallies)=scoreBoard(side,0,stacked=true);val st=status(side,12);val nw=news(side)
+   side.addView(calls,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(10)});link(side,"Reglas de esta mesa",top=4){trucoRules()}
+   TrucoViews(listOf(myName,phoneName),scores,tallies,listOf(mySaid,phoneSaid),backs,muestra,slots,won,st,nw,hint,cards,calls)
+  }else{
+   val (scores,tallies)=scoreBoard(root,6)
+   val (phoneName,phoneSaid,backs)=phoneRow(root,12)
+   val (muestra,slots,won)=table(root,8)
+   val st=status(root,12);val nw=news(root)
+   val (myName,mySaid,hint)=mine(root,8);val cards=hand(root,0)
+   link(root,"Reglas de esta mesa",top=8){trucoRules()}
+   dock.visibility=View.VISIBLE;dock.addView(calls,LinearLayout.LayoutParams(-1,-2))
+   TrucoViews(listOf(myName,phoneName),scores,tallies,listOf(mySaid,phoneSaid),backs,muestra,slots,won,st,nw,hint,cards,calls)
+  }
+  trucoViews();phoneTruco()
+ }
+ /** The table after each action: the score, what each one said, the cards and the rounds, what to do, and the calls. */
+ private fun trucoViews(){
+  val m=trucoMatch?:return;val v=trucoUi?:return;val h=m.hand;val mu=h.muestra
+  for(p in 0..1){
+   v.scores[p].text=TrucoTalk.score(m.score[p]);v.tallies[p].points=m.score[p]
+   v.tallies[p].contentDescription="${if(p==0)"Vos" else "El teléfono"}: ${m.score[p]} de 30, ${TrucoTalk.score(m.score[p])}"
+   v.names[p].text=(if(p==0)"Vos" else "Teléfono")+if(h.mano==p)" · mano" else ""
+   val said=TrucoTalk.lastSaid(h,p);v.said[p].text=said?:"";v.said[p].visibility=if(said!=null)View.VISIBLE else View.INVISIBLE
+  }
+  // The phone's cards face down; face up once the hand is over.
+  v.backs.forEachIndexed{i,c->val card=h.cards[1].getOrNull(i)
+   c.visibility=if(card!=null)View.VISIBLE else View.INVISIBLE;c.card=card;c.faceUp=h.over;c.pieza=h.over&&card!=null&&mu.isPieza(card)
+   c.contentDescription=card?.let{if(h.over)"El teléfono tenía el "+TrucoTalk.cardName(it) else "Carta del teléfono"}}
+  v.muestra.card=mu.card;v.muestra.contentDescription="Muestra: ${TrucoTalk.cardName(mu.card)}"
+  for(r in 0..2){val round=h.rounds.getOrNull(r);val won=h.roundWinners.getOrNull(r)
+   for(p in 0..1){val c=v.table[p][r];val card=round?.get(p);c.card=card;c.pieza=card!=null&&mu.isPieza(card)
+    c.contentDescription=card?.let{"${listOf("Primera","Segunda","Tercera")[r]} ronda, ${if(p==0)"vos" else "el teléfono"}: ${TrucoTalk.cardName(it)}"}}
+   v.rounds[r].text=when(won){null->"";-1->"Parda";0->"Vos";else->"Teléfono"};v.rounds[r].setTextColor(when(won){0->green;1->red;else->muted})
+  }
+  v.status.text=TrucoTalk.status(m);v.status.setTextColor(if(h.actor==1)inkSoft else ink)
+  v.news.text=TrucoTalk.news(h).takeLast(2).joinToString("\n")
+  val playable=h.actions(0).filterIsInstance<Truco.Action.Play>().map{it.card}
+  // Cards dimmed while a call waits for the person's answer.
+  val answering=h.actor==0&&playable.isEmpty()
+  v.hint.text=if(trucoPick!=null)"Tocá otra vez la carta para jugarla." else TrucoTalk.tantos(mu,h.dealt[0])
+  // The cards left are always the first places (the list closes up), so hiding the rest keeps them in the middle.
+  v.hand.forEachIndexed{i,c->val card=h.cards[0].getOrNull(i)
+   c.visibility=if(card!=null)View.VISIBLE else View.GONE;c.card=card;c.pieza=card!=null&&mu.isPieza(card)
+   c.picked=card!=null&&card==trucoPick;c.translationY=if(c.picked)-dpf(10f) else 0f;c.alpha=if(answering)0.55f else 1f
+   c.isClickable=card!=null&&card in playable
+   c.contentDescription=card?.let{TrucoTalk.cardName(it)+(if(c.pieza)", pieza" else "")+when{it !in playable->"";c.picked->". Tocá otra vez para jugarla.";else->". Tocá para elegirla."}}}
+  trucoCalls(v.calls,m)
+ }
+ /** What the person can sing or answer, three to a row; when the hand is over, the next hand or a new game. */
+ private fun trucoCalls(c:LinearLayout,m:Truco.Match){
+  c.removeAllViews();val h=m.hand
+  if(m.winner>=0){button(c,"Partida nueva",Kind.PRIMARY,R.drawable.ic_plus,top=0){newTruco()};return}
+  if(h.over){button(c,"Siguiente mano",Kind.PRIMARY,R.drawable.ic_play,top=0){nextTruco()};return}
+  val options=h.actions(0).filter{it !is Truco.Action.Play}.sortedBy{callOrder(it)}
+  options.chunked(3).forEachIndexed{i,group->
+   val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL};c.addView(r,LinearLayout.LayoutParams(-1,-2).apply{if(i>0)topMargin=dp(8)})
+   group.forEachIndexed{j,a->callButton(r,a,j==0)}
+   // A short row keeps its buttons a third wide.
+   repeat(3-group.size){r.addView(View(this),LinearLayout.LayoutParams(0,1,1f).apply{marginStart=dp(8)})}
+  }
+ }
+ private fun callOrder(a:Truco.Action)=when(a){
+  is Truco.Action.Sing->when(a.call){Truco.Call.FLOR->0;Truco.Call.CONTRAFLOR->3;Truco.Call.CONTRAFLOR_AL_RESTO->4;Truco.Call.RETRUCO,Truco.Call.VALE_CUATRO->6
+   Truco.Call.ENVIDO->7;Truco.Call.REAL_ENVIDO->8;Truco.Call.FALTA_ENVIDO->9;Truco.Call.TRUCO->10}
+  Truco.Action.Quiero->1;Truco.Action.NoQuiero->2;Truco.Action.Achico->5;Truco.Action.Mazo->11;is Truco.Action.Play->12
+ }
+ private fun callButton(p:LinearLayout,a:Truco.Action,first:Boolean){
+  val label=when(a){is Truco.Action.Sing->a.call.text;Truco.Action.Quiero->"Quiero";Truco.Action.NoQuiero->"No quiero";Truco.Action.Achico->"Me achico";Truco.Action.Mazo->"Ir al mazo";is Truco.Action.Play->TrucoTalk.cardName(a.card)}
+  val kind=when(a){Truco.Action.Quiero->Kind.PRIMARY;Truco.Action.Mazo->Kind.LINE_DANGER;Truco.Action.NoQuiero,Truco.Action.Achico->Kind.LINE;else->if(a==Truco.Action.Sing(Truco.Call.FLOR))Kind.GO else Kind.SOFT}
+  val (look,fg,solid)=buttonLook(kind)
+  val v=tv(label,14.5f,fg,1).apply{gravity=Gravity.CENTER;maxLines=2;background=look;isClickable=true;isFocusable=true;contentDescription=label;setPadding(dp(6),0,dp(6),0);if(solid)elevation=dpf(2f)
+   setOnClickListener{if(a==Truco.Action.Mazo)askMazo() else trucoAct(a)}}
+  p.addView(v,LinearLayout.LayoutParams(0,dp(48),1f).apply{if(!first)marginStart=dp(8)})
+ }
+ /** A tap chooses one of the person's cards; a second tap plays it. */
+ private fun tapTruco(i:Int){
+  val m=trucoMatch?:return;val card=m.hand.cards[0].getOrNull(i)?:return
+  if(trucoThinking||Truco.Action.Play(card) !in m.hand.actions(0))return
+  if(trucoPick==card)trucoAct(Truco.Action.Play(card)) else {trucoPick=card;trucoViews()}
+ }
+ private fun trucoAct(a:Truco.Action){
+  val m=trucoMatch?:return
+  if(screen!="truco"||trucoThinking||!m.hand.act(0,a))return
+  trucoPick=null;saveTruco(m);trucoViews();phoneTruco()
+ }
+ /** The phone acts after a moment, so the person sees each step; dropped if the table closed or the game changed. */
+ private fun phoneTruco(){
+  val m=trucoMatch?:return;val h=m.hand
+  if(h.over||h.actor!=1||trucoThinking||screen!="truco")return
+  trucoThinking=true;val job=trucoJob
+  handler.postDelayed({if(job==trucoJob&&trucoMatch===m&&m.hand===h){trucoThinking=false
+   val a=try{TrucoAi.act(h,1)}catch(_:Exception){null}
+   if(a==null||!h.act(1,a))h.actions(1).firstOrNull()?.let{h.act(1,it)}
+   saveTruco(m);trucoViews();phoneTruco()}},850)
+ }
+ private fun nextTruco(){val m=trucoMatch?:return;if(trucoThinking||!m.next())return;trucoPick=null;saveTruco(m);trucoViews();phoneTruco()}
+ private fun askMazo(){val n=trucoMatch?.hand?.stake?:return
+  AlertDialog.Builder(this).setTitle("¿Te vas al mazo?").setMessage("El teléfono se lleva ${if(n==1)"1 punto" else "$n puntos"} de esta mano.").setNegativeButton("Seguir jugando",null).setPositiveButton("Irme al mazo"){_,_->trucoAct(Truco.Action.Mazo)}.show()
+ }
+ private fun askNewTruco(){val m=trucoMatch
+  if(m==null||m.winner>=0||m.score.all{it==0}&&m.hand.log.isEmpty()){newTruco();return}
+  AlertDialog.Builder(this).setTitle("¿Empezar otra partida?").setMessage("La partida en curso se va a perder.").setNegativeButton("Seguir jugando",null).setPositiveButton("Empezar otra"){_,_->newTruco()}.show()
+ }
+ private fun trucoRules(){AlertDialog.Builder(this).setTitle("Reglas de esta mesa").setMessage(TrucoTalk.RULES).setPositiveButton("Entendido",null).show()}
 
  // ---------- Account ----------
  private fun settings(){
