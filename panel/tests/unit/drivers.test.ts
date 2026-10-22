@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   accountNames,
   belongsTo,
+  canComeBack,
   type Driver,
   driverFormValues,
   driverSummaries,
@@ -156,8 +157,14 @@ describe('choferes: fichas y cuentas de la app', () => {
     expect(validateDriver({ ...v, leftOn: '' }, '2026-10-15', new Set()).errors).toEqual({ leftOn: 'Elegí el día en que dejó de trabajar.' });
     expect(validateDriver({ ...v, leftOn: '2026-10-16' }, '2026-10-15', new Set()).errors).toEqual({ leftOn: 'No puede ser posterior a hoy.' });
     expect(validateDriver({ ...v, leftOn: '2024-02-01' }, '2026-10-15', new Set()).errors).toEqual({ leftOn: 'No puede ser anterior a la fecha de ingreso.' });
-    // Back to work: the day is cleared.
-    expect(validateDriver({ ...v, active: true }, '2026-10-15', new Set()).row).toMatchObject({ active: true, left_on: null });
+    // Back to work: the day is cleared, in the month they left or the next one (no month without work in between).
+    expect(validateDriver({ ...v, active: true }, '2026-10-15', new Set(), '2026-09-30').row).toMatchObject({ active: true, left_on: null });
+    expect(validateDriver({ ...v, active: true }, '2026-11-01', new Set(), '2026-09-30').errors).toEqual({ active: 'Dejó de trabajar hace más de un mes: si vuelve, creá una ficha nueva.' });
+    expect(canComeBack('2026-09-30', '2026-09-30')).toBe(true);
+    expect(canComeBack('2026-09-30', '2026-10-31')).toBe(true);
+    expect(canComeBack('2026-09-30', '2026-11-01')).toBe(false);
+    expect(canComeBack('2026-12-15', '2027-01-20')).toBe(true);
+    expect(canComeBack('2026-12-15', '2027-02-01')).toBe(false);
   });
 
   it('valida la ficha: nombre, largos, fecha de ingreso, medio de pago y una ficha por cuenta', () => {

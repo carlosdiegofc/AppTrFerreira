@@ -54,6 +54,12 @@ test('Choferes lista las fichas con su mes, sus papeles y su sueldo, y los de la
   await expect(months.nth(0)).not.toContainText('Falta');
   await expect(months.nth(1)).toContainText('Agosto de 2026');
   await expect(months.nth(1)).toContainText('Falta $ 30.000');
+  // More than a month later he cannot be marked as working again: his salary would count the months without work.
+  await page.getByRole('button', { name: 'Editar ficha' }).click();
+  const card = page.getByRole('dialog', { name: 'Ficha de Ramón Sosa' });
+  await expect(card.getByLabel('Ya no trabaja en la empresa (la ficha queda guardada, con sus pagos)')).toBeDisabled();
+  await expect(card).toContainText('Dejó de trabajar el 31/08/2026. Si vuelve, creá una ficha nueva');
+  await card.getByRole('button', { name: 'Cancelar' }).click();
 });
 
 test('la ficha muestra los datos, la libreta, el mes y el sueldo mes a mes con cada pago', async ({ page }) => {

@@ -5,6 +5,7 @@ import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } fr
 import { ConflictError, DataError, describeWriteError } from '../data/api';
 import { useSaveDriver, useSavePayment, useSaveSalary, useSetPaymentDeleted, useSetSalaryDeleted } from '../data/hooks';
 import {
+  canComeBack,
   conceptLabel,
   type Driver,
   type DriverFormValues,
@@ -24,6 +25,7 @@ import {
   validatePayment,
   validateSalary,
 } from '../lib/drivers';
+import { formatDay } from '../lib/dates';
 import { decimal } from '../lib/format';
 import { type Currency, PAYMENT_METHODS } from '../lib/fuel';
 import { parseNumber } from '../lib/numbers';
@@ -82,7 +84,7 @@ function useForm<V extends object>(initial: V, busy: boolean, onClose: () => voi
       </p>
     </div>
   );
-  return { dialog, form, id, values, set, check, formError, setFormError, leaving, setLeaving, dirty, requestClose, props, field };
+  return { dialog, form, id, values, errors, set, check, formError, setFormError, leaving, setLeaving, dirty, requestClose, props, field };
 }
 
 function Shell({
@@ -212,7 +214,7 @@ export function DriverFormDialog({
 
   const submit = async () => {
     f.setFormError(null);
-    const { row, errors } = validateDriver(v, today, linkedElsewhere);
+    const { row, errors } = validateDriver(v, today, linkedElsewhere, base?.leftOn ?? null);
     if (!f.check(errors) || !row) return;
     if (base && !f.dirty) return onClose();
     const sent = base ? row : { ...row, id: newId };
@@ -233,6 +235,9 @@ export function DriverFormDialog({
   };
 
   const choices = [...appDrivers].sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  // Who left more than a month ago cannot be marked as working again here: a new card keeps the months without work out.
+  const away = base?.leftOn ?? null;
+  const locked = away !== null && !canComeBack(away, today);
   return (
     <Shell f={f} title={base ? `Ficha de ${base.name}` : 'Nueva ficha'} busy={save.isPending} onClose={onClose} onSubmit={() => void submit()}>
       <div className="form-grid">
@@ -292,6 +297,8 @@ export function DriverFormDialog({
           <input
             type="checkbox"
             checked={!v.active}
+            disabled={locked}
+            aria-describedby={`${f.id}-active-note`}
             onChange={(e) => {
               f.set('active', !e.target.checked);
               if (e.target.checked && !v.leftOn) f.set('leftOn', today);
@@ -299,6 +306,16 @@ export function DriverFormDialog({
           />
           Ya no trabaja en la empresa (la ficha queda guardada, con sus pagos)
         </label>
+      )}
+      {base && away && (
+        <p className={f.errors.active ? 'field-error' : 'hint'} id={`${f.id}-active-note`}>
+          {f.errors.active ??
+            (locked
+              ? `Dejó de trabajar el ${formatDay(away)}. Si vuelve, creá una ficha nueva: así su sueldo no cuenta los meses en que no trabajó. Antes, quitale a esta ficha la cuenta de la app, para vincularla a la nueva.`
+              : v.active
+                ? 'Vuelve a contar como que trabaja: su sueldo sigue sin cortes desde el mes en que se fue.'
+                : 'Si lo marcaste por error, desmarcalo: se puede hasta el mes siguiente al que se fue.')}
+        </p>
       )}
       {base &&
         !v.active &&

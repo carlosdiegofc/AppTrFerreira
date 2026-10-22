@@ -115,6 +115,13 @@ begin
     new.created_by := old.created_by;
     if tg_table_name <> 'trf_drivers' then
       new.driver_id := old.driver_id;
+    -- Quien dejó de trabajar vuelve a figurar como que trabaja solo hasta el mes siguiente al que se fue: después, su
+    -- sueldo contaría los meses en que no trabajó, y quien vuelve va en una ficha nueva. El SQL del dueño (sin sesión)
+    -- puede hacerlo igual.
+    elsif auth.uid() is not null and old.left_on is not null and new.left_on is null
+      and date_trunc('month', now() at time zone 'America/Montevideo') > date_trunc('month', old.left_on::timestamp) + interval '1 month' then
+      raise exception 'Dejó de trabajar hace más de un mes: si vuelve a trabajar, va en una ficha nueva'
+        using errcode = '23514';
     end if;
   end if;
   return new;

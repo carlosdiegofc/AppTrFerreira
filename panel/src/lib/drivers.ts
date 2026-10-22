@@ -3,7 +3,7 @@
 // the viáticos and the rest show apart. Pesos and dollars are never converted or added together, as in Combustible.
 // Pure functions: no network, no React.
 import type { Tables, TablesInsert } from './database.types';
-import { firstOfMonth } from './dates';
+import { firstOfMonth, firstOfNextMonth } from './dates';
 import { text } from './fleet';
 import { type Currency, PAYMENT_METHODS, type PaymentMethod } from './fuel';
 import { fold, parseNumber, toNumber } from './numbers';
@@ -420,8 +420,25 @@ export function driverFormValues(d: Driver | null, preset?: { userId: string; na
 
 const tooLong = (v: string, max: number) => (v.length > max ? `Hasta ${max} caracteres.` : null);
 
-/** The row to save, or what is wrong with each field. An account can have one card: linkedElsewhere are the others'. */
-export function validateDriver(v: DriverFormValues, today: string, linkedElsewhere: ReadonlySet<string>): { row: TablesInsert<'trf_drivers'> | null; errors: Partial<Record<DriverField, string>> } {
+/**
+ * Whether who stopped working can be marked as working again: in the month they left or the next one, when no whole month
+ * without work is left in between. Later, the card would count salary for the months they did not work: whoever comes
+ * back gets a new card. The database keeps the same rule.
+ */
+export function canComeBack(leftOn: string, today: string): boolean {
+  return firstOfMonth(today) <= firstOfNextMonth(leftOn);
+}
+
+/**
+ * The row to save, or what is wrong with each field. An account can have one card: linkedElsewhere are the others'.
+ * leftBefore is the day the card says the driver stopped working, if it does.
+ */
+export function validateDriver(
+  v: DriverFormValues,
+  today: string,
+  linkedElsewhere: ReadonlySet<string>,
+  leftBefore: string | null = null,
+): { row: TablesInsert<'trf_drivers'> | null; errors: Partial<Record<DriverField, string>> } {
   const errors: Partial<Record<DriverField, string>> = {};
   const name = v.name.trim().replace(/\s+/g, ' ');
   if (!name) errors.name = 'Escribí el nombre.';
@@ -444,6 +461,8 @@ export function validateDriver(v: DriverFormValues, today: string, linkedElsewhe
     if (!/^\d{4}-\d{2}-\d{2}$/.test(v.leftOn) || v.leftOn < '1950-01-01') errors.leftOn = 'Elegí el día en que dejó de trabajar.';
     else if (v.leftOn > today) errors.leftOn = 'No puede ser posterior a hoy.';
     else if (v.hiredOn && !errors.hiredOn && v.leftOn < v.hiredOn) errors.leftOn = 'No puede ser anterior a la fecha de ingreso.';
+  } else if (leftBefore && !canComeBack(leftBefore, today)) {
+    errors.active = 'Dejó de trabajar hace más de un mes: si vuelve, creá una ficha nueva.';
   }
   if (v.payMethod && !PAYMENT_METHODS.some((p) => p.value === v.payMethod)) errors.payMethod = 'Elegí un medio de la lista.';
   if (v.userId && linkedElsewhere.has(v.userId)) errors.userId = 'Esa cuenta de la app ya tiene su ficha.';

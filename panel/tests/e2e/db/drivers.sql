@@ -75,7 +75,7 @@ begin
   exception when check_violation then null;
   end;
   -- Who stopped working has the day, and only who stopped working; never before the day they started.
-  update public.trf_drivers set active = false, left_on = '2026-10-10' where id = '90000000-0000-4000-8000-000000000001';
+  update public.trf_drivers set active = false, left_on = current_date where id = '90000000-0000-4000-8000-000000000001';
   begin
     update public.trf_drivers set active = false, left_on = null where id = '90000000-0000-4000-8000-000000000001';
     raise exception 'dueño: aceptó una baja sin el día';
@@ -91,7 +91,15 @@ begin
     raise exception 'dueño: aceptó una baja antes del ingreso';
   exception when check_violation then null;
   end;
+  -- Back to work in the month they left (a mistake undone, or a quick return)...
   update public.trf_drivers set active = true, left_on = null where id = '90000000-0000-4000-8000-000000000001';
+  -- ...but not once a whole month without work is in between: the card would count salary for it.
+  update public.trf_drivers set active = false, left_on = current_date - 70 where id = '90000000-0000-4000-8000-000000000001';
+  begin
+    update public.trf_drivers set active = true, left_on = null where id = '90000000-0000-4000-8000-000000000001';
+    raise exception 'dueño: volvió a figurar como que trabaja dos meses después de irse';
+  exception when check_violation then null;
+  end;
 end $$;
 reset role;
 
