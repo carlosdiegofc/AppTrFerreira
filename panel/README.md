@@ -43,3 +43,6 @@ El workflow *Publicar panel web* (Actions → Run workflow, desde `main`) public
 
 ## Pruebas de punta a punta
 Corren en un navegador real contra PostgREST y una base local creada con todas las migraciones de [`supabase/migrations`](../supabase/migrations) y datos inventados (`tests/e2e/db/seed.sql`). Nunca tocan producción. Detalle en [tests/e2e/README.md](tests/e2e/README.md). GitHub las corre en cada cambio del panel o de la base (workflow *Probar panel nuevo y base*) y guarda las capturas de pantalla.
+
+## GPS: control de ruta (migración 0005)
+Tres vistas del mismo mapa, puntos editables, peajes por camión con tarifas históricas y combustible estimado. Guía de uso, limitaciones y orden de publicación: [GPS-CONTROL-RUTA.md](../docs/GPS-CONTROL-RUTA.md). Los avisos sonoros del teléfono se implementan en la etapa Android posterior.
