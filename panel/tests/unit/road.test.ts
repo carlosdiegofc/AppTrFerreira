@@ -3,7 +3,9 @@ import {
   applicableRate,
   externalMaps,
   fuelEstimate,
+  pointTitle,
   roadVehicleKey,
+  sortedPoints,
   tollBalance,
   validatePoint,
   type TankReference,
@@ -80,5 +82,35 @@ describe('control de ruta', () => {
     expect(validatePoint(p)).toBeNull();
     expect(validatePoint({ ...p, warning_m: 60 })).not.toBeNull();
     expect(validatePoint({ ...p, speed_limit: -1 })).not.toBeNull();
+  });
+
+  it('names a point once: «Peaje Pando», not «Peaje · Peaje Pando»', () => {
+    expect(pointTitle({ kind: 'toll', name: 'Peaje Pando' })).toBe('Peaje Pando');
+    expect(pointTitle({ kind: 'scale', name: 'balanza Ruta 1' })).toBe('balanza Ruta 1');
+    expect(pointTitle({ kind: 'toll', name: 'Peaje' })).toBe('Peaje');
+    expect(pointTitle({ kind: 'toll', name: 'Queguay' })).toBe('Peaje · Queguay');
+    expect(pointTitle({ kind: 'toll', name: 'Peajes del este' })).toBe('Peaje · Peajes del este');
+    expect(pointTitle({ kind: 'radar', name: 'Ruta 5 km 30' })).toBe('Radar · Ruta 5 km 30');
+    expect(pointTitle({ kind: 'place', name: 'Junco' })).toBe('Mi punto · Junco');
+  });
+
+  it('lists tolls, scales, radars and own points, each by name', () => {
+    const points = [
+      { kind: 'place', name: 'Depósito' },
+      { kind: 'scale', name: 'Balanza Ruta 11' },
+      { kind: 'radar', name: 'Radar Ruta 5' },
+      { kind: 'toll', name: 'Peaje Solís' },
+      { kind: 'scale', name: 'Balanza Ruta 2' },
+      { kind: 'toll', name: 'peaje Cufré' },
+    ] as const;
+    expect(sortedPoints(points).map((p) => p.name)).toEqual([
+      'peaje Cufré',
+      'Peaje Solís',
+      'Balanza Ruta 2',
+      'Balanza Ruta 11',
+      'Radar Ruta 5',
+      'Depósito',
+    ]);
+    expect(points[0].name).toBe('Depósito');
   });
 });

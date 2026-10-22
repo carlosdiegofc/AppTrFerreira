@@ -13,7 +13,7 @@ import { drawable } from '../lib/route';
 import { STATE_TONE } from './states';
 import { PointEditor, TruckRoad, type RoadView } from '../components/RoadControls';
 import { useRoadPoints, useRoadWrite } from '../data/road';
-import { POINT_LABEL, type RoadPoint, type PointKind } from '../lib/road';
+import { POINT_LABEL, pointTitle, type RoadPoint, type PointKind, sortedPoints } from '../lib/road';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
 type Filter = 'all' | 'moving' | 'halted' | 'idle';
@@ -178,7 +178,7 @@ export function Gps() {
   const road = useRoadPoints(),
     roadWrite = useRoadWrite();
   const visiblePoints = useMemo(
-    () => (road.data ?? []).filter((p) => (view === 'places' ? p.kind === 'place' : view === 'controls' && kinds.includes(p.kind))),
+    () => sortedPoints((road.data ?? []).filter((p) => (view === 'places' ? p.kind === 'place' : view === 'controls' && kinds.includes(p.kind)))),
     [road.data, view, kinds],
   );
   const chofer = params.get('chofer');
@@ -301,7 +301,7 @@ export function Gps() {
               {visiblePoints.map((p) => (
                 <div className="road-point" key={p.id}>
                   <button className="btn btn-quiet" onClick={() => setFocusPoint(p)}>
-                    {POINT_LABEL[p.kind]} · {p.name}
+                    {pointTitle(p)}
                   </button>
                   <p>{p.notes}</p>
                   <div className="road-actions">

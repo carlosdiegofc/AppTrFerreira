@@ -3,7 +3,8 @@
 // on top, with Google's logo and credits. Trucks, routes and points are drawn above either base. A button opens the map
 // over the whole screen and Esc or the same button closes it.
 import L from 'leaflet';
-import googleLogo from '../assets/google_on_non_white.png';
+// Google's own file, unchanged (Google Maps attribution assets): the outlined logo, the one for maps and pictures.
+import googleLogo from '../assets/google-maps-logo.svg';
 import { GOOGLE_MAPS_KEY, TILE_ATTRIBUTION, TILE_URL } from '../config';
 import { keptSession, maxZoomAt, readSession, readViewport, SESSION_REQUEST, sessionUrl, type TileSession, tileUrl, viewportUrl } from '../lib/googleTiles';
 
@@ -40,6 +41,14 @@ function asText(s: string): string {
   const el = document.createElement('span');
   el.textContent = s;
   return el.innerHTML;
+}
+
+const TERMS = 'https://www.google.com/help/terms_maps.html';
+
+/** The credits line of the satellite view: Google Maps, the data credits it gives for what is on screen, and its terms. */
+function googleCredit(copyright: string): string {
+  const data = copyright ? ` · ${asText(copyright)}` : '';
+  return `Google Maps${data} · <a href="${TERMS}" target="_blank" rel="noopener noreferrer">Términos</a>`;
 }
 
 let asking: Promise<TileSession> | null = null;
@@ -96,7 +105,7 @@ export function mapView(m: L.Map, options: MapViewOptions = {}): () => void {
     onAdd() {
       const img = L.DomUtil.create('img', 'map-google-logo') as HTMLImageElement;
       img.src = googleLogo;
-      img.alt = 'Google';
+      img.alt = 'Google Maps';
       return img;
     },
   }))({ position: 'bottomleft' });
@@ -118,7 +127,7 @@ export function mapView(m: L.Map, options: MapViewOptions = {}): () => void {
       const r = await fetch(viewportUrl(key, tiles.session, m.getZoom(), { north: b.getNorth(), south: b.getSouth(), east: b.getEast(), west: b.getWest() }));
       const v = r.ok ? readViewport(await r.json()) : null;
       if (!v || ask !== asked || satellite !== layer || base !== 'satellite') return;
-      setCredit(asText(v.copyright));
+      setCredit(googleCredit(v.copyright));
       const c = m.getCenter();
       const deepest = Math.min(maxZoomAt(v.maxZoomRects, c.lat, c.lng, SATELLITE_DEPTH), 21);
       if (layer.options.maxNativeZoom !== deepest) {
@@ -173,6 +182,7 @@ export function mapView(m: L.Map, options: MapViewOptions = {}): () => void {
     streets.remove();
     satellite.addTo(m);
     logo.addTo(m);
+    if (!credit) setCredit(googleCredit(''));
     m.on('moveend', moved);
     mark();
     void look();

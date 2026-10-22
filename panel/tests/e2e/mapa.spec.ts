@@ -63,10 +63,17 @@ test('el GPS y el viaje se ven en satélite de Google con las rutas encima, con 
   await expect(map).toHaveClass(/is-satellite/);
   await expect(map.locator('img.leaflet-tile[src^="https://tile.googleapis.com/v1/2dtiles/"]').first()).toBeAttached();
   await expect(map.locator('img.leaflet-tile[src^="https://tile.openstreetmap.org/"]')).toHaveCount(0);
-  // Google's credits as text, and its logo.
-  await expect(map.locator('.leaflet-control-attribution')).toContainText('Imágenes ©2026 Prueba <b>sin HTML</b>');
-  await expect(map.locator('.leaflet-control-attribution b')).toHaveCount(0);
-  await expect(map.locator('img.map-google-logo')).toBeVisible();
+  // Google's credits as text, with its name and its terms, and its logo.
+  const credits = map.locator('.leaflet-control-attribution');
+  await expect(credits).toContainText('Google Maps · Imágenes ©2026 Prueba <b>sin HTML</b> · Términos');
+  await expect(credits.locator('b')).toHaveCount(0);
+  await expect(credits.getByRole('link', { name: 'Términos' })).toHaveAttribute('href', 'https://www.google.com/help/terms_maps.html');
+  await expect(map.getByRole('img', { name: 'Google Maps' })).toBeVisible();
+  const logo = await map.locator('img.map-google-logo').boundingBox();
+  expect(logo && logo.height >= 16 && logo.height <= 19).toBe(true);
+  // The credits never cover the logo, not even on a phone: they keep 10 px clear to its right.
+  const line = await credits.boundingBox();
+  expect(logo && line && logo.x + logo.width + 10 <= line.x).toBe(true);
   // Satellite with the roads and their names, in Spanish, from Uruguay, with the key of the build.
   const session = asked.filter((a) => a.url.includes('/v1/createSession'));
   expect(session).toHaveLength(1);
@@ -94,6 +101,33 @@ test('el GPS y el viaje se ven en satélite de Google con las rutas encima, con 
   await expect(trip.locator('img.leaflet-tile[src^="https://tile.openstreetmap.org/"]').first()).toBeAttached();
   await expect(trip.locator('img.map-google-logo')).toHaveCount(0);
   await expect(trip.locator('.leaflet-control-attribution')).not.toContainText('Prueba');
+  await expect(trip.locator('.leaflet-control-attribution')).not.toContainText('Google Maps');
+});
+
+test('los peajes y las balanzas de la 0006: en orden en la lista, de lejos solo el punto y de cerca con su nombre', async ({ page }) => {
+  await signIn(page, 'dueno@ejemplo.uy');
+  await open(page, 'GPS en vivo');
+  await page.getByRole('button', { name: 'Peajes, balanzas y radares', exact: true }).click();
+  const list = page.locator('.road-controls .road-point');
+  // 17 tolls, then 24 scales, each by name and named once.
+  await expect(list).toHaveCount(41);
+  await expect(list.nth(0).getByRole('button').first()).toHaveText('Peaje Barra de Santa Lucía');
+  await expect(list.nth(16).getByRole('button').first()).toHaveText('Peaje Solís');
+  await expect(list.nth(17).getByRole('button').first()).toHaveText('Balanza Arrayanes');
+  await expect(list.nth(0)).toContainText('Ruta 1 km 23,5, San José. Concesión: Consorcio Cruz del Sur.');
+  await expect(list.nth(0)).toContainText('Tarifa pendiente.');
+  // The whole country: only the dots, so the names do not cover the map.
+  const map = page.locator('.gps-map .fleet-map');
+  await expect(map.locator('.road-marker')).toHaveCount(41);
+  await page.locator('.gps-map').getByRole('button', { name: 'Ver todos' }).click();
+  await expect(map).toHaveClass(/points-far/);
+  await expect(map.locator('.road-marker span').first()).toBeHidden();
+  await expect(map.locator('.road-marker[title="Peaje Barra de Santa Lucía"]')).toHaveCount(1);
+  // A point of the list: the map goes there and shows the names.
+  await list.nth(0).getByRole('button').first().click();
+  await expect(map).not.toHaveClass(/points-far/);
+  await expect(map.locator('.road-marker span', { hasText: 'Peaje Barra de Santa Lucía' })).toBeVisible();
+  await shot(page, 'gps-peajes-balanzas');
 });
 
 test('si Google no da la vista satelital, lo dice y sigue el mapa de calles', async ({ page }) => {

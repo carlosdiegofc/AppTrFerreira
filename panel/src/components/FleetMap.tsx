@@ -10,7 +10,7 @@ import type { RoutePoint } from '../data/api';
 import { type FleetUnit, STATE_LABEL, unitTitle } from '../lib/fleet';
 import { type Glide, glideAt, type Point, startGlide, tailStart } from '../lib/glide';
 import { drawable, routeLines } from '../lib/route';
-import { POINT_LABEL, type RoadPoint } from '../lib/road';
+import { pointTitle, type RoadPoint } from '../lib/road';
 
 /** A driver with the app open and no trip, where the phone is («chofer activo»). */
 export interface PersonMark {
@@ -21,6 +21,8 @@ export interface PersonMark {
 }
 
 const NO_PEOPLE: readonly PersonMark[] = [];
+/** Points show their names from this zoom on; from farther, only their dots (the name shows on hover). */
+const POINT_NAMES_FROM = 10;
 
 interface Props {
   units: readonly FleetUnit[];
@@ -291,7 +293,7 @@ export function FleetMap({
     if (!m) return;
     const layer = L.layerGroup().addTo(m);
     for (const p of roadPoints ?? []) {
-      const title = `${POINT_LABEL[p.kind]} · ${p.name}`;
+      const title = pointTitle(p);
       const text = document.createElement('span');
       text.textContent = title;
       const marker = L.marker([p.latitude, p.longitude], {
@@ -300,7 +302,12 @@ export function FleetMap({
       }).addTo(layer);
       marker.on('click', () => onPointSelect?.(p));
     }
+    // From far away the names of every toll and scale of the country would cover the map and each other.
+    const names = () => m.getContainer().classList.toggle('points-far', m.getZoom() < POINT_NAMES_FROM);
+    names();
+    m.on('zoomend', names);
     return () => {
+      m.off('zoomend', names);
       layer.remove();
     };
   }, [roadPoints, onPointSelect]);

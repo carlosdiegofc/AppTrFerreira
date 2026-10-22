@@ -985,13 +985,18 @@ a.trip-line:hover {
   outline-offset: -2px;
 }
 
-/* Google's logo, as its terms ask, apart from everything else on the map. */
+/* Google's logo as its terms ask: 16 to 19 px high, with 10 px clear on the sides and above and 5 px below. */
 .map-google-logo {
   display: block;
   height: 18px;
   width: auto;
-  margin: 0 0 6px 8px !important;
+  margin: 10px 10px 5px !important;
   pointer-events: none;
+}
+
+/* Google's credits never cover its logo: on a narrow map they wrap to its right. */
+.is-satellite .leaflet-bottom.leaflet-right {
+  max-width: calc(100% - 110px);
 }
 
 .map-notice {
@@ -3244,4 +3249,5 @@ button.fr-open {
 .road-marker { background: var(--blue); border: 2px solid white; border-radius: 50%; }
 .road-marker span { display: block; width: max-content; max-width: 190px; margin-left: 25px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; font-size: 12px; }
 .road-scale { background: #9a6700; } .road-radar { background: #be3144; } .road-place { background: #168467; }
+.points-far .road-marker span { display: none; }
 .road-fields { padding: 18px; margin: 0; overflow-y: auto; min-height: 0; }

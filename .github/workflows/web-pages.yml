@@ -25,6 +25,9 @@ jobs:
           cache-dependency-path: panel/package-lock.json
       - name: Panel nuevo
         working-directory: panel
+        # La clave de Google Maps de la vista satelital (README del panel); sin ella los mapas quedan solo con calles.
+        env:
+          VITE_GOOGLE_MAPS_KEY: ${{ secrets.GOOGLE_MAPS_KEY }}
         run: |
           npm ci
           npm run build
