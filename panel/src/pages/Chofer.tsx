@@ -26,7 +26,7 @@ import {
   seniority,
   yearMonths,
 } from '../lib/drivers';
-import { count, decimal, money, number } from '../lib/format';
+import { andList, count, decimal, money, number } from '../lib/format';
 import { PAYMENT_METHODS } from '../lib/fuel';
 import { litersPer100, summarize } from '../lib/metrics';
 import { driverPresence, PRESENCE_LABEL } from '../lib/presence';
@@ -187,6 +187,14 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
   const dash = presenceFailed || (accountsFailed && driver.userId !== null);
   const unread = [accountsFailed ? 'la lista de cuentas de la app' : null, presenceFailed ? 'si tiene la app abierta o está de viaje' : null].filter(Boolean).join(' ni ');
   const unreadNote = `No se pudo leer ${unread}${dash ? ': se ve con «—»' : ''}${accountsFailed ? `${dash ? ', y' : ':'} al editar la ficha no se puede elegir ${driver.userId ? 'otra' : 'una'} cuenta` : ''}.`;
+  // A read that answered before and then failed to refresh keeps what it read, and says so.
+  const stale = [
+    { query: app, what: 'la lista de cuentas de la app' },
+    ...(driver.userId ? [{ query: presence, what: 'el aviso de app abierta' }, { query: fleet, what: 'los viajes en curso' }] : []),
+    { query: tripList.query, what: 'los viajes del mes' },
+    { query: fuel.query, what: 'las boletas de combustible' },
+    { query: docs.query, what: 'los papeles' },
+  ].filter((r) => r.query.data !== undefined && r.query.error);
   // Everything the page shows, read again together.
   const reads = [query, app, presence, fleet, docs.query, fuel.query, tripList.query];
   const refresh = () => reads.forEach((r) => void r.refetch());
@@ -223,6 +231,11 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
         >
           {unreadNote}
         </ErrorNote>
+      )}
+      {stale.length > 0 && (
+        <StaleNote onRetry={() => stale.forEach((r) => void r.query.refetch())}>
+          No se pudo actualizar: {andList(stale.map((r) => r.what))}. Se ve lo último que se leyó.
+        </StaleNote>
       )}
       {notice && (
         <p className={`notice notice-${notice.tone}`} role={notice.tone === 'ok' ? 'status' : 'alert'}>

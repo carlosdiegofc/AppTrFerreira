@@ -136,6 +136,29 @@ test('si no se pueden leer los papeles, lo dice y no los da por al día', async 
   await expect(account).toHaveText('Ana Pereira');
 });
 
+test('si una lectura deja de responder después de leerse, avisa que se ve lo último que se leyó', async ({ page }) => {
+  await signIn(page, 'dueno@ejemplo.uy');
+  await open(page, 'Choferes');
+  const list = page.getByRole('list', { name: 'Choferes' });
+  const ana = list.getByRole('listitem').filter({ hasText: 'Ana Pereira' });
+  await expect(ana).toContainText('Libreta por vencer');
+
+  // The papers stop answering: «Actualizar» keeps what was read, and says so.
+  await page.route('**/rest/v1/trf_documents*', (route) => route.fulfill({ status: 500, json: { message: 'Falla de prueba' } }));
+  await page.getByRole('button', { name: 'Actualizar' }).click();
+  const note = page.getByRole('alert').filter({ hasText: 'No se pudo actualizar' });
+  await expect(note).toHaveText(/No se pudo actualizar: los choferes de la app y los papeles\. Se ve lo último que se leyó\./);
+  await expect(ana).toContainText('Libreta por vencer');
+
+  // The card says it too, and «Reintentar» reads them again once they answer.
+  await list.getByRole('link', { name: 'Ana Pereira' }).click();
+  const cardNote = page.getByRole('alert').filter({ hasText: 'No se pudo actualizar' });
+  await expect(cardNote).toHaveText(/No se pudo actualizar: la lista de cuentas de la app y los papeles\. Se ve lo último que se leyó\./);
+  await page.unroute('**/rest/v1/trf_documents*');
+  await cardNote.getByRole('button', { name: 'Reintentar' }).click();
+  await expect(cardNote).toHaveCount(0);
+});
+
 test('una ficha que no existe lo dice', async ({ page }) => {
   await signIn(page, 'dueno@ejemplo.uy');
   await open(page, 'Choferes');

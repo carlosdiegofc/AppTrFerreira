@@ -9,7 +9,7 @@ import { TOO_MANY } from '../data/api';
 import { useDocuments, useDrivers, useFleetData, useNow, usePaperDrivers, usePresence, useTripList } from '../data/hooks';
 import { ago, dayInZone, firstOfMonth, firstOfNextMonth, startOfDay } from '../lib/dates';
 import { type DriverSummary, driverSummaries, monthLabel, monthStatus, pendingThisMonth } from '../lib/drivers';
-import { count, money, number } from '../lib/format';
+import { andList, count, money, number } from '../lib/format';
 import { driverPresence } from '../lib/presence';
 import { amountParts } from './fuelText';
 import { presenceDetail } from './presenceText';
@@ -38,9 +38,6 @@ interface Known {
   papers: boolean;
   presence: boolean;
 }
-
-/** «a», «a y b», «a, b y c». */
-const andList = (items: string[]) => (items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} y ${items[items.length - 1]}`);
 
 const inView = (s: DriverSummary, view: View) => (view === 'sin-ficha' ? s.driver === null : view === 'baja' ? s.driver?.active === false : s.driver?.active === true);
 
@@ -133,6 +130,8 @@ export function Choferes() {
     { query: fleet, what: 'quién está de viaje' },
   ];
   const failed = reads.filter((r) => r.query.data === undefined && r.query.error);
+  // One that answered before and then failed to refresh keeps what it read, and says so.
+  const stale = reads.filter((r) => r.query.data !== undefined && r.query.error);
   // «Actualizar» reads everything the list shows again.
   const everything = [query, ...reads.map((r) => r.query)];
   const ready = query.data !== undefined && reads.every((r) => r.query.data !== undefined || r.query.error);
@@ -158,6 +157,11 @@ export function Choferes() {
         <ErrorNote onRetry={() => failed.forEach((r) => void r.query.refetch())}>
           No se pudieron leer {andList(failed.map((r) => r.what))}: lo que depende de eso se ve con «—».
         </ErrorNote>
+      )}
+      {ready && stale.length > 0 && (
+        <StaleNote onRetry={() => stale.forEach((r) => void r.query.refetch())}>
+          No se pudo actualizar: {andList(stale.map((r) => r.what))}. Se ve lo último que se leyó.
+        </StaleNote>
       )}
       {ready && (
         <div className="stats stats-money">
