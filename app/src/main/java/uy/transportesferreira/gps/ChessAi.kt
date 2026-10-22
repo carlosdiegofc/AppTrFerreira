@@ -43,7 +43,7 @@ object ChessAi {
     }
 
     /** Captures first, the most valuable piece taken by the least valuable one; promotions too. */
-    private fun ordered(p:Chess.Position,moves:List<Chess.Move>,first:Chess.Move?=null)=moves.sortedByDescending{m->
+    private fun ordered(p:Chess.Position,children:List<Pair<Chess.Move,Chess.Position>>,first:Chess.Move?=null)=children.sortedByDescending{(m,_)->
         when{
             m==first->1_000_000
             m.promo!=0->900_000+m.promo
@@ -53,7 +53,7 @@ object ChessAi {
     }
 
     /** A look at the position after a move without the replies: only whether it is mate. For the side to move. */
-    private fun glance(p:Chess.Position)=if(p.moves().isEmpty())(if(p.inCheck)-MATE+1 else 0) else evaluate(p)
+    private fun glance(p:Chess.Position)=if(p.legal.isEmpty())(if(p.inCheck)-MATE+1 else 0) else evaluate(p)
 
     private class Stop:RuntimeException()
 
@@ -63,13 +63,15 @@ object ChessAi {
 
         fun negamax(p:Chess.Position,depth:Int,alpha:Int,beta:Int,ply:Int):Int{
             tick()
-            if(p.halfmove>=100||p.insufficientMaterial())return 0
+            if(p.insufficientMaterial())return 0
             if(depth<=0)return quiesce(p,alpha,beta,ply)
-            val moves=p.moves()
-            if(moves.isEmpty())return if(p.inCheck)-MATE+ply else 0
+            val children=p.children()
+            // A mate counts before the fifty-move draw, as in Game.outcome.
+            if(children.isEmpty())return if(p.inCheck)-MATE+ply else 0
+            if(p.halfmove>=100)return 0
             var a=alpha;var best=-MATE*2
-            for(m in ordered(p,moves)){
-                val s=-negamax(p.after(m),depth-1,-beta,-a,ply+1)
+            for((_,child) in ordered(p,children)){
+                val s=-negamax(child,depth-1,-beta,-a,ply+1)
                 if(s>best)best=s
                 if(s>a)a=s
                 if(a>=beta)break
@@ -81,12 +83,12 @@ object ChessAi {
         fun quiesce(p:Chess.Position,alpha:Int,beta:Int,ply:Int):Int{
             tick()
             val check=p.inCheck
-            val moves=if(check)p.moves() else p.moves(true)
-            if(check&&moves.isEmpty())return -MATE+ply
+            val children=if(check)p.children() else p.children(true)
+            if(check&&children.isEmpty())return -MATE+ply
             var a=alpha
             if(!check){val stand=evaluate(p);if(stand>=beta)return stand;if(stand>a)a=stand}
-            for(m in ordered(p,moves)){
-                val s=-quiesce(p.after(m),-beta,-a,ply+1)
+            for((_,child) in ordered(p,children)){
+                val s=-quiesce(child,-beta,-a,ply+1)
                 if(s>=beta)return s
                 if(s>a)a=s
             }
@@ -95,32 +97,49 @@ object ChessAi {
     }
 
     /**
-     * The move the phone plays, or null when the game is over. Easy and medium score every move and pick at random among
-     * those within their slack of the best one; a careless move of easy takes a guarded piece or leaves one hanging if
-     * the move looks good. Hard deepens the search while time is left and keeps the best move of the last depth it
-     * finished.
+     * The move the phone plays, or null when the game is over. seen counts the positions the game has already been in
+     * (Game.seen): a move back to one of them counts as a draw, so the phone does not walk a won game into a repetition,
+     * and looks for one when it is losing. Easy and medium score every move and pick at random among those within their
+     * slack of the best one; a careless move of easy takes a guarded piece or leaves one hanging if the move looks good.
+     * Hard deepens the search while time is left and keeps the best move of the last depth it finished.
      */
-    fun choose(p:Chess.Position,level:Level,random:Random=Random.Default):Chess.Move?{
-        val moves=p.moves();if(moves.isEmpty())return null
-        if(moves.size==1)return moves[0]
+    fun choose(p:Chess.Position,level:Level,random:Random=Random.Default,seen:Map<String,Int> =emptyMap()):Chess.Move?{
+        val children=p.children();if(children.isEmpty())return null
+        if(children.size==1)return children[0].first
         val search=Search(System.currentTimeMillis()+level.millis)
+        // Back to a position of the game, unless the move ends it.
+        fun repeats(child:Chess.Position)=(seen[child.key]?:0)>=1&&child.legal.isNotEmpty()
         if(level!=Level.HARD){
             val careless=random.nextInt(100)<level.careless
+            val order=ordered(p,children)
             val scored=ArrayList<Pair<Chess.Move,Int>>()
-            try{for(m in ordered(p,moves)){val next=p.after(m);scored.add(m to -(if(careless)glance(next) else search.negamax(next,level.depth-1,-MATE*2,MATE*2,1)))}}catch(_:Stop){}
-            if(scored.isEmpty())return moves[random.nextInt(moves.size)]
+            try{
+                for((m,child) in order){
+                    val s=when{
+                        repeats(child)->0
+                        careless->-glance(child)
+                        // Only the moves near the best one matter: the search of one that cannot reach them is cut short.
+                        else->{val floor=if(scored.isEmpty())-MATE*2 else scored.maxOf{it.second}-level.slack-1;-search.negamax(child,level.depth-1,-MATE*2,-floor,1)}
+                    }
+                    scored.add(m to s)
+                }
+            }catch(_:Stop){
+                // Out of time: the moves not looked at yet get a quick look, so the choice is not only among the first ones,
+                // the captures.
+                for((m,child) in order.drop(scored.size))scored.add(m to if(repeats(child))0 else -glance(child))
+            }
             val best=scored.maxOf{it.second}
             // A mate is never given away on purpose.
             val slack=if(best>MATE/2)0 else level.slack
             val near=scored.filter{it.second>=best-slack}
             return near[random.nextInt(near.size)].first
         }
-        var chosen=ordered(p,moves).first()
+        var chosen=ordered(p,children).first().first
         for(depth in 1..level.depth){
             try{
                 var best=-MATE*2;var bestMove=chosen;var a=-MATE*2
-                for(m in ordered(p,moves,chosen)){
-                    val s=-search.negamax(p.after(m),depth-1,-MATE*2,-a,1)
+                for((m,child) in ordered(p,children,chosen)){
+                    val s=if(repeats(child))0 else -search.negamax(child,depth-1,-MATE*2,-a,1)
                     if(s>best){best=s;bestMove=m}
                     if(s>a)a=s
                 }

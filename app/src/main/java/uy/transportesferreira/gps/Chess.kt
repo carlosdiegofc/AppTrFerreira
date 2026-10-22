@@ -118,8 +118,10 @@ object Chess {
             return Position(b,!whiteToMove,c,nextEp,if(reset)0 else halfmove+1,if(whiteToMove)fullmove else fullmove+1)
         }
 
-        /** The legal moves: the pseudo moves that do not leave the mover's king attacked. */
-        fun moves(capturesOnly:Boolean=false):List<Move> =pseudoMoves(capturesOnly).filter{m->after(m).let{n->val k=n.king(whiteToMove);k<0||!n.attacked(k,!whiteToMove)}}
+        /** The legal moves with the position after each one: the pseudo moves that do not leave the mover's king attacked. */
+        fun children(capturesOnly:Boolean=false):List<Pair<Move,Position>> =
+            pseudoMoves(capturesOnly).mapNotNull{m->after(m).takeIf{n->val k=n.king(whiteToMove);k<0||!n.attacked(k,!whiteToMove)}?.let{m to it}}
+        fun moves(capturesOnly:Boolean=false):List<Move> =children(capturesOnly).map{it.first}
         /** The legal moves, worked out once: a position does not change. */
         val legal:List<Move> get()=legalOnce?:moves().also{legalOnce=it}
         private var legalOnce:List<Move>?=null
@@ -133,9 +135,12 @@ object Chess {
             return minors<=1||(knights==0&&bishopColours.size==1)
         }
 
-        /** What makes two positions the same for repetition: pieces, who moves, castling, and an en passant capture that can be made. */
+        /**
+         * What makes two positions the same for repetition: pieces, who moves, castling, and an en passant capture that can
+         * be made (a pinned pawn cannot, so its square does not count).
+         */
         val key:String get()=keyOnce?:run{
-            val epKey=if(ep>=0&&pseudoMoves(true).any{kotlin.math.abs(board[it.from])==PAWN&&it.to==ep})ep else -1
+            val epKey=if(ep>=0&&moves(true).any{kotlin.math.abs(board[it.from])==PAWN&&it.to==ep})ep else -1
             (board.joinToString(",")+"|$whiteToMove|$castling|$epKey").also{keyOnce=it}
         }
         private var keyOnce:String?=null
@@ -183,29 +188,39 @@ object Chess {
         fun play(m:Move):Boolean{
             if(outcome!=Outcome.PLAYING)return false
             val legal=position.legal;val move=legal.firstOrNull{it==m}?:legal.firstOrNull{it.from==m.from&&it.to==m.to&&m.promo==0&&it.promo==QUEEN}?:return false
-            played.add(move);positions.add(position.after(move));return true
+            push(move);return true
         }
+        private fun push(move:Move){played.add(move);positions.add(position.after(move))}
         fun undo():Boolean{if(played.isEmpty())return false;played.removeAt(played.size-1);positions.removeAt(positions.size-1);return true}
+        /** How the game stands, worked out once for each position it reaches. */
         val outcome:Outcome get(){
             val p=position
+            if(outcomeOf!==p){outcomeOnce=judge(p);outcomeOf=p}
+            return outcomeOnce
+        }
+        private var outcomeOf:Position?=null;private var outcomeOnce=Outcome.PLAYING
+        private fun judge(p:Position):Outcome{
             if(p.legal.isEmpty())return if(p.inCheck)(if(p.whiteToMove)Outcome.BLACK_MATES else Outcome.WHITE_MATES) else Outcome.STALEMATE
             if(p.insufficientMaterial())return Outcome.MATERIAL
             if(p.halfmove>=100)return Outcome.FIFTY_MOVES
             val k=p.key;if(positions.count{it.key==k}>=3)return Outcome.REPETITION
             return Outcome.PLAYING
         }
+        /** How many times the game has been in each position: the phone avoids repeating them (ChessAi.choose). */
+        fun seen():Map<String,Int> =positions.groupingBy{it.key}.eachCount()
         /** The game as text, to keep it on the phone: the starting position and the moves. */
         fun save()=start.fen+";"+played.joinToString(" "){it.uci}
         companion object{
+            /** A saved game, every move checked against the legal ones (a save only has moves played before the end). */
             fun load(text:String):Game?{
                 val cut=text.indexOf(';');if(cut<0)return null
                 val g=Game(Position.fromFen(text.substring(0,cut))?:return null)
-                for(t in text.substring(cut+1).split(' ').filter{it.isNotBlank()}){val m=Move.parse(t)?:return null;if(!g.play(m))return null}
+                for(t in text.substring(cut+1).split(' ').filter{it.isNotBlank()}){val m=Move.parse(t)?:return null;if(m !in g.position.legal)return null;g.push(m)}
                 return g
             }
         }
     }
 
     /** Counts the move sequences of a depth: the standard check of a move generator. */
-    fun perft(p:Position,depth:Int):Long=if(depth==0)1 else p.moves().let{ms->if(depth==1)ms.size.toLong() else ms.sumOf{perft(p.after(it),depth-1)}}
+    fun perft(p:Position,depth:Int):Long=if(depth==0)1 else p.children().let{cs->if(depth==1)cs.size.toLong() else cs.sumOf{perft(it.second,depth-1)}}
 }

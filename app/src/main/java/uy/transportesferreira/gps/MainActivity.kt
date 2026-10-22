@@ -154,17 +154,21 @@ class MainActivity:AppCompatActivity(){
   fuelTrip=b?.getString("fuelTrip")?.let{JSONObject(it)};docTrip=b?.getString("docTrip")?.let{JSONObject(it)};historyTrip=b?.getString("historyTrip")?.let{JSONObject(it)};photoMode=b?.getString("photoMode")?:"fuel";docReturn=b?.getString("docReturn")?:"prepare"
   camera=b?.getString("camera")?.let{File(it)};photo=b?.getString("photo")?.let{File(it)}?.takeIf{it.exists()};truck=b?.getString("truck")?:prefs().getString("truck","")?:"";empty=b?.getBoolean("empty")?:false
   editForm=JSONObject(b?.getString("editForm")?:"{}");editId=b?.getString("editId");maintTruck=b?.getString("maintTruck")?:"";maintFilter=b?.getInt("maintFilter")?:0
-  if(b!=null){fleetView=b.getBoolean("fleetView");tripFilter=b.getInt("tripFilter");historyQuery=b.getString("historyQuery")?:"";historyLimit=b.getInt("historyLimit",50);fuelMonth=b.getBoolean("fuelMonth",true);detailFrom=b.getString("detailFrom")?:"list";perfMonth=b.getString("perfMonth")?.let{try{YearMonth.parse(it)}catch(_:Exception){null}}?:YearMonth.now();perfDrivers=b.getBoolean("perfDrivers")}
+  if(b!=null){fleetView=b.getBoolean("fleetView");tripFilter=b.getInt("tripFilter");historyQuery=b.getString("historyQuery")?:"";historyLimit=b.getInt("historyLimit",50);fuelMonth=b.getBoolean("fuelMonth",true);detailFrom=b.getString("detailFrom")?:"list";perfMonth=b.getString("perfMonth")?.let{try{YearMonth.parse(it)}catch(_:Exception){null}}?:YearMonth.now();perfDrivers=b.getBoolean("perfDrivers")
+   b.getString("chessPick")?.split('|')?.let{c->newVsPhone=c.getOrNull(0)!="false";newLevel=ChessAi.Level.entries.firstOrNull{it.name==c.getOrNull(1)}?:ChessAi.Level.EASY;newSide=c.getOrNull(2)?.toIntOrNull()?.coerceIn(0,2)?:0}}
+  // A new game's options as they were being picked, or else as they were picked the last time.
+  val chessOptions={if(b?.containsKey("chessPick")==true)chessNew() else newChess()}
   onBackPressedDispatcher.addCallback(this,back)
   // The emulator test of the games (CI) opens them without an account, also after turning the screen: only on a debug
   // build, which never goes to Google Play. Nothing of the games goes out.
-  if(api.session()==null&&gamesTest()){when(b?.getString("screen")){"chessnew"->newChess();"chess"->chess();else->games()};return}
+  if(api.session()==null&&gamesTest()){when(b?.getString("screen")){"chessnew"->chessOptions();"chess"->chess();else->games()};return}
   if(api.session()==null)login() else {name=driverName();when(b?.getString("screen")){"fuel"->fuel();"document"->document();"prepare"->prepare();"newtrip"->newTrip();"maintenance"->maintenance();"maintform"->maintForm();"documents"->documents();"docform"->paperForm();"privacy"->privacy();"mode"->askMode()
-   "triphistory"->history("trips",true);"fuelhistory"->history("fuel",true);"tripdetail"->historyTrip?.let{detail(it,true)}?:homeOrTrip();"settings"->settings();"performance"->performance(true);"owner"->ownerDashboard();"games"->games();"chessnew"->newChess();"chess"->chess();else->homeOrTrip()};Sync.schedule(this);refreshCatalog()}
+   "triphistory"->history("trips",true);"fuelhistory"->history("fuel",true);"tripdetail"->historyTrip?.let{detail(it,true)}?:homeOrTrip();"settings"->settings();"performance"->performance(true);"owner"->ownerDashboard();"games"->games();"chessnew"->chessOptions();"chess"->chess();else->homeOrTrip()};Sync.schedule(this);refreshCatalog()}
  }
  @Suppress("DEPRECATION") private fun transparentBars(){window.statusBarColor=Color.TRANSPARENT;window.navigationBarColor=Color.TRANSPARENT}
  override fun onSaveInstanceState(b:Bundle){super.onSaveInstanceState(b);b.putString("camera",camera?.path);b.putString("photo",photo?.path);b.putString("screen",screen);b.putString("truck",truck);b.putBoolean("empty",empty);b.putString("tripForm",tripForm.toString());b.putString("fuelForm",fuelForm.toString());b.putString("docForm",docForm.toString());b.putString("draftDocs",draftDocs.toString());b.putString("fuelTrip",fuelTrip?.toString());b.putString("docTrip",docTrip?.toString());b.putString("historyTrip",historyTrip?.toString());b.putString("photoMode",photoMode);b.putString("docReturn",docReturn);b.putString("editForm",editForm.toString());b.putString("editId",editId);b.putString("maintTruck",maintTruck);b.putInt("maintFilter",maintFilter)
-  b.putBoolean("fleetView",fleetView);b.putInt("tripFilter",tripFilter);b.putString("historyQuery",historyQuery);b.putInt("historyLimit",historyLimit);b.putBoolean("fuelMonth",fuelMonth);b.putString("detailFrom",detailFrom);b.putString("perfMonth",perfMonth.toString());b.putBoolean("perfDrivers",perfDrivers)}
+  b.putBoolean("fleetView",fleetView);b.putInt("tripFilter",tripFilter);b.putString("historyQuery",historyQuery);b.putInt("historyLimit",historyLimit);b.putBoolean("fuelMonth",fuelMonth);b.putString("detailFrom",detailFrom);b.putString("perfMonth",perfMonth.toString());b.putBoolean("perfDrivers",perfDrivers)
+  if(screen=="chessnew")b.putString("chessPick","$newVsPhone|${newLevel.name}|$newSide")}
  override fun onStart(){super.onStart();Presence.opened();presenceAt=null;handler.post(tick)}
  override fun onDestroy(){photoJob++;chessJob++;sheet?.dismiss();sheet=null;activeMap?.destroy();activeMap=null;super.onDestroy()}
  override fun onStop(){handler.removeCallbacks(tick);Presence.closed();super.onStop()}
@@ -414,7 +418,8 @@ class MainActivity:AppCompatActivity(){
   box.addView(e,LinearLayout.LayoutParams(0,-1,1f));p.addView(box,LinearLayout.LayoutParams(-1,dp(56)).apply{topMargin=dp(top)});return e
  }
  private fun driverName():String{val u=api.session()?.optJSONObject("user")?:return "Chofer";val m=u.optJSONObject("user_metadata");val known=mapOf("immer@trferreira.com" to "Immer Sampayo","luis@trferreira.com" to "Luis Ferreira","hugo@trferreira.com" to "Hugo Silva","transportesferreirauy@gmail.com" to "Transportes Ferreira");return m?.optString("full_name")?.takeIf{it.isNotBlank()}?:m?.optString("name")?.takeIf{it.isNotBlank()}?:known[u.optString("email").lowercase()]?:u.optString("email").substringBefore("@").replaceFirstChar{it.uppercase()}}
- private fun homeOrTrip(){when(UiMode.start(panelFirst(),mode(),active())){"owner"->ownerDashboard();"mode"->askMode();"simpletrip"->simpleTrip();"simplehome"->simpleHome();"trip"->trip();else->home()}}
+ // Without an account (the emulator test of the games) every way out goes to the sign-in.
+ private fun homeOrTrip(){if(api.session()==null){login();return};when(UiMode.start(panelFirst(),mode(),active())){"owner"->ownerDashboard();"mode"->askMode();"simpletrip"->simpleTrip();"simplehome"->simpleHome();"trip"->trip();else->home()}}
 
  // ---------- Mode of use: asked after signing in, kept per driver ----------
  private fun askMode(){modePick=mode()?:UiMode.SIMPLE;modeChoice()}
@@ -1156,9 +1161,9 @@ class MainActivity:AppCompatActivity(){
  /** The phone's answer, worked out on another thread; dropped if the board closed or the game changed meanwhile. */
  private fun phoneTurn(){
   val m=match?:return;if(!m.phoneToMove||thinking||screen!="chess")return
-  thinking=true;val job=chessJob;val position=m.game.position;val level=m.level;val started=SystemClock.elapsedRealtime()
+  thinking=true;val job=chessJob;val position=m.game.position;val level=m.level;val seen=m.game.seen();val started=SystemClock.elapsedRealtime()
   chessViews()
-  thread{val move=try{ChessAi.choose(position,level)}catch(_:Exception){position.moves().randomOrNull()}
+  thread{val move=try{ChessAi.choose(position,level,seen=seen)}catch(_:Exception){position.moves().randomOrNull()}
    // An answer that comes at once looks like no thought at all.
    handler.postDelayed({if(job==chessJob&&match===m){thinking=false;if(move!=null&&m.game.play(move))saveMatch(m);chessViews()}},(450-(SystemClock.elapsedRealtime()-started)).coerceAtLeast(0))}
  }

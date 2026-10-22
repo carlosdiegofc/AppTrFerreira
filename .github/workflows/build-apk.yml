@@ -7,6 +7,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.name }}
     env:
       HAS_UPLOAD_KEY: ${{ secrets.ANDROID_UPLOAD_KEYSTORE != '' }}
     steps:
@@ -73,13 +75,6 @@ jobs:
           path: app/build/outputs/apk/release/app-release.apk
           retention-days: 1
           if-no-files-found: error
-      # Los juegos se abren sin cuenta solo en la versión de prueba, que nunca va a Google Play.
-      - uses: actions/upload-artifact@v4
-        with:
-          name: version-de-prueba-para-los-juegos
-          path: app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 1
-          if-no-files-found: error
   probar:
     name: Probar la versión optimizada en un emulador
     needs: build
@@ -91,9 +86,10 @@ jobs:
         with:
           name: version-optimizada-para-probar
           path: apk-a-probar
+      # Los juegos se abren sin cuenta solo en la versión de prueba, que nunca va a Google Play.
       - uses: actions/download-artifact@v4
         with:
-          name: version-de-prueba-para-los-juegos
+          name: Transportes-Ferreira-GPS-v${{ needs.build.outputs.version }}
           path: apk-de-prueba
       - name: Habilitar la aceleración del emulador
         run: |

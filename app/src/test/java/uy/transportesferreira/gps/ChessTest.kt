@@ -87,6 +87,27 @@ class ChessTest {
         }
         assertNull(ChessAi.choose(game("f2f3","e7e5","g2g4","d8h4").position,ChessAi.Level.EASY))
     }
+    @Test fun aMateOnTheHundredthHalfMoveIsStillAMate(){
+        // The mate is the hundredth half-move without a capture or a pawn move: it counts as a mate, not as a draw.
+        val p=fen("6k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 99 80")
+        for(level in ChessAi.Level.entries)assertEquals(level.name,"d1d8",ChessAi.choose(p,level,Random(7))?.uci)
+        val g=Chess.Game(p);assertTrue(g.play(Chess.Move.parse("d1d8")!!));assertEquals(Chess.Outcome.WHITE_MATES,g.outcome)
+    }
+    @Test fun thePhoneDoesNotWalkAWonGameBackIntoARepetition(){
+        // The queen takes the loose rook, unless the position after it was already in the game: then it counts as a draw.
+        val p=fen("6k1/8/8/3r4/8/8/8/3Q2K1 w - - 0 1")
+        val seen=mapOf(p.after(Chess.Move.parse("d1d5")!!).key to 1)
+        for(level in listOf(ChessAi.Level.MEDIUM,ChessAi.Level.HARD)){
+            assertEquals(level.name,"d1d5",ChessAi.choose(p,level,Random(5))?.uci)
+            assertNotEquals(level.name,"d1d5",ChessAi.choose(p,level,Random(5),seen)?.uci)
+        }
+        assertEquals(mapOf(Chess.Position.start().key to 2),game("g1f3","g8f6","f3g1","f6g8").seen().filterValues{it>1})
+    }
+    @Test fun aPinnedPawnLeavesNoEnPassantSquare(){
+        // After e2-e4 the pawn on d4 could take on e3, but the rook on h4 pins it to its king: the same position as without it.
+        assertEquals(fen("8/8/8/8/k2pP2R/8/8/4K3 b - e3 0 1").key,fen("8/8/8/8/k2pP2R/8/8/4K3 b - - 0 1").key)
+        assertNotEquals(fen("8/8/8/8/k2pP3/8/8/4K2R b - e3 0 1").key,fen("8/8/8/8/k2pP3/8/8/4K2R b - - 0 1").key)
+    }
     @Test fun thePiecesAreShapesThatRead(){
         val s=ChessArt.steps("M10,20 H30 V40 C30,45 25,50 20,50 Z")
         assertEquals("MLLCZ",s.joinToString(""){it.op.toString()})
