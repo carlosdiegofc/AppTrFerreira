@@ -181,4 +181,4 @@ Más adelante: proveedor de mapas, método de lectura de boletas, modelo de IA y
 - [ ] La clave de Google Maps: la crea el dueño en Google Cloud, con una cuenta de facturación.
 - [x] Los 15 peajes de las rutas nacionales, los 2 de los puentes a Argentina y los 24 puestos de balanza del MTOP, con la ubicación del Geoportal del MTOP comparada con OpenStreetMap y revisada en la foto satelital (migración 0006, solo agrega; detalle en [GPS-CONTROL-RUTA.md](GPS-CONTROL-RUTA.md)). Los 3 peajes ya cargados estaban en el lugar justo y no se tocan.
 - [x] El logo oficial de Google Maps y su enlace a los términos en los créditos de la vista satelital, como piden las condiciones de la Map Tiles API.
-- [ ] Publicación: respaldo completo de estructura y datos entregado al dueño, 0006 aplicada en producción y panel publicado.
+- [x] Publicación el 22/10/2026: respaldo completo de estructura y datos (04:02 UTC), probado restaurándolo y entregado al dueño fuera del repositorio; 0006 aplicada en producción, con 14 peajes y 24 balanzas nuevos, y los 3 peajes y los puntos propios sin cambios; panel publicado (despliegue #12, commit 2f5e1ba).
