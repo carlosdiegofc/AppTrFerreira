@@ -1,0 +1,7 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="100" android:viewportHeight="100">
+    <!-- The knight of the app's chess pieces (ChessArt), with its eye left open. -->
+    <path android:fillColor="#FF000000" android:fillType="evenOdd" android:pathData="M33,75 C32,66 37,60 43,55 C38,53 33,55 28,57 C22,59 15,56 15,50 C15,45 21,39 27,33 C33,27 39,21 45,18 L47,8 L54,16 C68,20 79,34 79,51 C79,62 76,70 74,75 Z M32.8,32 A3.2,3.2 0 1 0 39.2,32 A3.2,3.2 0 1 0 32.8,32 Z"/>
+    <path android:fillColor="#FF000000" android:pathData="M24,80 H76 A4,4 0 0 1 80,84 V87 A4,4 0 0 1 76,91 H24 A4,4 0 0 1 20,87 V84 A4,4 0 0 1 24,80 Z"/>
+</vector>

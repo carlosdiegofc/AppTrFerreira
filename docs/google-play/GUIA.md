@@ -185,6 +185,7 @@ Para el chofer:
 • Remitos de salida y de llegada con foto.
 • Historial de viajes y de cargas de combustible.
 • Vencimientos de licencia, carné de salud y papeles del camión.
+• Ajedrez para las esperas, con el camión parado.
 • Funciona sin conexión: todo se guarda en el teléfono y se envía cuando vuelve la señal.
 
 Para la administración:
@@ -231,6 +232,14 @@ La app de Google Play es una app nueva para Android (nombre de paquete `com.tran
 ## 7. Actualizaciones
 
 Cada versión nueva lleva un número de versión más alto, y GitHub Actions arma su `.aab` solo. En Play Console: *Prueba interna › Crear versión* › subí el `.aab` nuevo › **Lanzar**. Los teléfonos se actualizan desde Google Play sin hacer nada más.
+
+Versión `0.18.0` (código de versión 30). Suma **Juegos**: ajedrez para las esperas, contra el teléfono o entre dos, que se abre solo con el camión parado. La partida queda solo en el teléfono, así que no cambian los permisos, los datos recopilados ni la política de privacidad. La clasificación de contenido tampoco cambia: el ajedrez no tiene violencia ni apuestas, y no hace que los usuarios interactúen entre sí. Si alguna de las versiones anteriores, de la 0.17.0 a la 0.17.3, no llegó a subirse, se sube directamente esta, que las incluye, siguiendo los pasos de la 0.17.0 de acá abajo (Seguridad de los datos y la prueba en el teléfono). Antes de lanzarla, probala en un teléfono: **Juegos › Ajedrez**, unas jugadas contra el teléfono, **Deshacer** y salir y volver a entrar (la partida sigue donde quedó). Con un viaje en curso y el camión andando, Juegos tiene que pedir que primero pare el camión. Notas de la versión si ya está subida la 0.17.3:
+
+```text
+<es-419>
+• Juegos: ajedrez para las esperas, contra el teléfono o entre dos. Se abre con el camión parado.
+</es-419>
+```
 
 Versión `0.17.3` (código de versión 29). «Rendimiento» cuenta cada boleta de combustible en el mes de su fecha (o de la que le corrigió el panel), como el panel. No cambia permisos, datos recopilados ni la política de privacidad. Si alguna de las versiones anteriores, de la 0.17.0 a la 0.17.2, no llegó a subirse, se sube directamente esta, que las incluye, siguiendo los pasos de la 0.17.0 de acá abajo (Seguridad de los datos y la prueba en el teléfono). Notas de la versión si ya está subida la 0.17.2:
 
