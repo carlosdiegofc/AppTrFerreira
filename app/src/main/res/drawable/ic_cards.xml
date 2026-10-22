@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="100" android:viewportHeight="100">
+    <!-- Two truco cards: one behind, outlined, and the one in front with the coin of oro of the app's cards (TrucoArt) cut out. -->
+    <group android:rotation="-16" android:pivotX="40" android:pivotY="50">
+        <path android:strokeColor="#FF000000" android:strokeWidth="6" android:fillColor="#00000000"
+            android:pathData="M25,17 H55 A6,6 0 0 1 61,23 V77 A6,6 0 0 1 55,83 H25 A6,6 0 0 1 19,77 V23 A6,6 0 0 1 25,17 Z"/>
+    </group>
+    <group android:rotation="10" android:pivotX="58" android:pivotY="52">
+        <path android:fillColor="#FF000000" android:fillType="evenOdd"
+            android:pathData="M43,16 H73 A7,7 0 0 1 80,23 V81 A7,7 0 0 1 73,88 H43 A7,7 0 0 1 36,81 V23 A7,7 0 0 1 43,16 Z M45,52 A13,13 0 1 0 71,52 A13,13 0 1 0 45,52 Z M52,52 A6,6 0 1 0 64,52 A6,6 0 1 0 52,52 Z"/>
+    </group>
+</vector>

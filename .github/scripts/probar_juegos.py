@@ -3,10 +3,11 @@
 
 Installs the debug APK, the only one that opens the games without an account (MainActivity.gamesTest), and plays chess
 the way a driver does it with the screen: a game against the phone (a move, the phone's answer, undo, turning the board
-and the screen), and two games between two people on the phone: one that crowns a pawn and one that ends in mate. It
-fails if the app closes by itself or if a screen does not show what it must. The rule of the truck stopped is tested in
-GamesTest: without a trip, here, the games always open. Nothing of the games goes out of the phone, and the emulator
-starts without DNS anyway.
+and the screen), and two games between two people on the phone: one that crowns a pawn and one that ends in mate. Then
+truco against the phone, from deals saved for the test (trf_test_truco): an envido and a whole hand, the table with the
+screen turned, the next hand, flor against flor, and going to the deck. It fails if the app closes by itself or if a
+screen does not show what it must. The rule of the truck stopped is tested in GamesTest: without a trip, here, the games
+always open. Nothing of the games goes out of the phone, and the emulator starts without DNS anyway.
 
 Usage: probar_juegos.py <debug apk> <output folder>. Screenshots and the phone's log are left in the folder.
 """
@@ -20,6 +21,11 @@ from pathlib import Path
 PKG = 'com.transportesferreira.app'
 MAIN = PKG + '/uy.transportesferreira.gps.MainActivity'
 BOARD = 'Tablero de ajedrez.'
+# Truco deals as the app saves them (Truco.Match.save): no points yet, the phone dealt, so the person is mano; the
+# person's three cards, the phone's three and the muestra. In the first the person has 33 of envido and the phone 25; in
+# the second both have flor, the phone the better one (38 to 32).
+TRUCO_ENVIDO = '1|0|0|1|7E 6E 1B 5C 12C 4B 3O|'
+TRUCO_FLOR = '1|0|0|1|3B 4B 5B 5E 6E 7E 3O|'
 
 apk, out = Path(sys.argv[1]), Path(sys.argv[2])
 out.mkdir(parents=True, exist_ok=True)
@@ -171,6 +177,45 @@ def move(uci: str, then: str, flipped: bool = False) -> None:
     wait(f'«{then}» después de {uci}', lambda r: board(r, then))
 
 
+def clickable(root: ET.Element, text: str) -> list[ET.Element]:
+    """The buttons with that text: what each player said last shows in a label with the same words."""
+    return [n for n in nodes(root, text=text) if n.get('clickable') == 'true']
+
+
+def open_truco(state: str) -> None:
+    """Starts the app again with a truco deal of the test saved, and opens the truco from the games list."""
+    adb('shell', 'am', 'force-stop', PKG)
+    adb('shell', 'am', 'start', '-W', '-n', MAIN, '--ez', 'trf_test_games', 'true', '--es', 'trf_test_truco', f"'{state}'", timeout=120)
+    tap(wait('el truco en la lista de juegos', lambda r: nodes(r, text='Truco'), seconds=60)[0])
+
+
+def truco_card(root: ET.Element, ending: str, name: str = '') -> list[ET.Element]:
+    return [n for n in nodes(root, desc_part=ending) if (n.get('content-desc') or '').startswith(name)]
+
+
+def play_card(name: str = '') -> None:
+    """Taps one of the person's cards that can be played (the first, or the one named) twice: to choose it and to play it."""
+    tap(wait(f'la carta para jugar {name}', lambda r: truco_card(r, 'Tocá para elegirla.', name))[0])
+    tap(wait(f'la carta elegida {name}', lambda r: truco_card(r, 'Tocá otra vez para jugarla.', name))[0])
+
+
+def finish_hand() -> ET.Element:
+    """Plays the rest of the hand: sings a flor it has, wants what the phone sings (against its flor, gives in) and plays
+    the first card it can, until the hand or the game is over."""
+    end = time.time() + 240
+    while time.time() < end:
+        root = wait('la mesa del truco', lambda r: nodes(r, desc_part='Muestra: ') and r)
+        if nodes(root, desc='Siguiente mano') or nodes(root, part='la partida'):
+            return root
+        answer = clickable(root, 'Quiero') or clickable(root, 'Flor') or clickable(root, 'Me achico')
+        if answer:
+            tap(answer[0])
+        elif truco_card(root, 'Tocá para elegirla.'):
+            play_card()
+        time.sleep(1.5)
+    fail('la mano de truco no terminó')
+
+
 def check_log() -> None:
     log = adb('logcat', '-d', '-b', 'all', '-v', 'threadtime', check=False, timeout=120).stdout
     (out / 'logcat.txt').write_text(log)
@@ -208,7 +253,8 @@ try:
 
     step('Abrir los juegos: sin viaje se pueden usar')
     adb('shell', 'am', 'start', '-W', '-n', MAIN, '--ez', 'trf_test_games', 'true', timeout=120)
-    wait('la lista de juegos con el ajedrez', lambda r: nodes(r, text='Ajedrez') and nodes(r, text='Contra el teléfono o entre dos'), seconds=60)
+    wait('la lista de juegos con el ajedrez y el truco', lambda r: nodes(r, text='Ajedrez') and nodes(r, text='Contra el teléfono o entre dos')
+         and nodes(r, text='Truco') and nodes(r, text='Contra el teléfono, con flor y a 30'), seconds=60)
     root = screen()
     if root is not None and nodes(root, text='Primero, el camión parado'):
         fail('sin viaje, la lista de juegos dice que el camión tiene que estar parado')
@@ -280,6 +326,66 @@ try:
     wait('la lista de juegos', lambda r: nodes(r, text='Ajedrez') and nodes(r, text='Contra el teléfono o entre dos'))
     if not running():
         fail('la app se cerró al volver a la lista')
+
+    step('Truco: la mesa, el envido y una mano entera contra el teléfono')
+    open_truco(TRUCO_ENVIDO)
+    wait('la mesa con la mano repartida', lambda r: nodes(r, text='Te toca jugar.') and nodes(r, text='Tenés 33 de envido.')
+         and nodes(r, desc='Muestra: 3 de oro') and nodes(r, text='Vos · mano'))
+    shot('truco-1-mesa')
+    tap(wait('el botón Envido', lambda r: clickable(r, 'Envido'))[0])
+    # With 25 the phone does not want it, or loses it: the envido is the person's.
+    wait('la respuesta del teléfono al envido', lambda r: nodes(r, part='Te llevás el envido'), seconds=30)
+    shot('truco-2-envido')
+    play_card('1 de basto')
+    wait('el 1 de basto en la primera ronda', lambda r: nodes(r, desc='Primera ronda, vos: 1 de basto'))
+    finish_hand()
+    shot('truco-3-mano-terminada')
+
+    step('Truco: la mesa con la pantalla girada')
+    rotate('1', 'la mesa con la pantalla girada', lambda r: nodes(r, desc='Siguiente mano') and nodes(r, desc='Muestra: 3 de oro'))
+    shot('truco-4-girada')
+    rotate('0', 'la mesa con la pantalla derecha', lambda r: nodes(r, desc='Siguiente mano'))
+
+    step('Truco: la mano siguiente la da el otro, así que el teléfono es mano')
+    tap(wait('el botón Siguiente mano', lambda r: nodes(r, desc='Siguiente mano'))[0])
+    wait('la mano siguiente', lambda r: nodes(r, text='Teléfono · mano'))
+    finish_hand()
+    shot('truco-5-segunda-mano')
+
+    step('Truco: flor contra flor, y el teléfono canta contraflor al resto')
+    open_truco(TRUCO_FLOR)
+    wait('la flor para cantar', lambda r: nodes(r, text='Tenés flor: cantala.') and clickable(r, 'Flor'))
+    shot('truco-6-flor')
+    tap(clickable(screen(), 'Flor')[0])
+    wait('la contraflor al resto del teléfono', lambda r: nodes(r, text='El teléfono cantó contraflor al resto, que vale 30 puntos. ¿Querés?')
+         and clickable(r, 'No quiero'), seconds=30)
+    shot('truco-7-contraflor')
+    tap(clickable(screen(), 'No quiero')[0])
+    wait('la flor para el teléfono', lambda r: nodes(r, part='El teléfono se lleva la flor: 4 puntos.'))
+
+    step('Truco: irse al mazo pide confirmación')
+    tap(wait('el botón Ir al mazo', lambda r: clickable(r, 'Ir al mazo'))[0])
+    tap(wait('la confirmación del mazo', lambda r: nodes(r, text='IRME AL MAZO') or nodes(r, text='Irme al mazo'))[0])
+    wait('la mano terminada en el mazo', lambda r: nodes(r, desc='Siguiente mano') and nodes(r, part='El teléfono ganó la mano: 1 punto.'))
+    shot('truco-8-mazo')
+    root = screen()
+    if root is not None and nodes(root, text='Reglas de esta mesa'):
+        tap(nodes(root, text='Reglas de esta mesa')[0])
+        tap(wait('las reglas de la mesa', lambda r: nodes(r, text='ENTENDIDO') or nodes(r, text='Entendido'))[0])
+
+    step('Truco en modo oscuro')
+    adb('shell', 'cmd', 'uimode', 'night', 'yes', check=False)
+    time.sleep(2)
+    wait('la mesa en modo oscuro', lambda r: nodes(r, desc='Siguiente mano'))
+    time.sleep(1)
+    shot('truco-9-oscuro')
+    adb('shell', 'cmd', 'uimode', 'night', 'no', check=False)
+    time.sleep(2)
+
+    step('Volver a la lista: la partida de truco queda para seguir')
+    adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
+    wait('la partida de truco para seguir', lambda r: nodes(r, text='Seguí tu partida · 0 a 5'))
+    shot('truco-10-lista')
 
     step('Revisar el registro del teléfono')
     check_log()
