@@ -265,13 +265,24 @@ export function seniority(hiredOn: string, today: string): string | null {
   return [y, m].filter(Boolean).join(' y ');
 }
 
+const NOBODY: ReadonlySet<string> = new Set();
+
 /**
  * Whether a trip, a paper or a receipt is the driver's: by the app account when both have it, by the name otherwise
  * (trips typed in the panel, or a driver without the app). The names the account used in the app count too (aliases),
- * so a trip typed with one of them stays the driver's after the card's name is corrected.
+ * so a trip typed with one of them stays the driver's after the card's name is corrected. claimed are the accounts
+ * linked to a card: a card without an account takes an account's rows by the name only while no card has that account
+ * (a former card of someone who came back with a new one keeps its own); null while the cards are not known.
  */
-export function belongsTo(driver: Pick<Driver, 'userId' | 'name'> & { aliases?: readonly string[] }, row: { driverId: string | null; driverName: string | null }): boolean {
-  if (driver.userId && row.driverId) return driver.userId === row.driverId;
+export function belongsTo(
+  driver: Pick<Driver, 'userId' | 'name'> & { aliases?: readonly string[] },
+  row: { driverId: string | null; driverName: string | null },
+  claimed: ReadonlySet<string> | null = NOBODY,
+): boolean {
+  if (row.driverId) {
+    if (driver.userId) return driver.userId === row.driverId;
+    if (claimed === null || claimed.has(row.driverId)) return false;
+  }
   const name = sameName(row.driverName);
   return name !== '' && [driver.name, ...(driver.aliases ?? [])].some((n) => sameName(n) === name);
 }
@@ -332,10 +343,11 @@ export function latestLicense<T extends { kind: string; expiresOn: string | null
 /** Every card and every app driver without one, each with its summary; the ones with a card first, by name. */
 export function driverSummaries(input: SummaryInput, today: string): DriverSummary[] {
   const month = firstOfMonth(today);
+  const claimed = new Set(input.drivers.flatMap((d) => (d.userId ? [d.userId] : [])));
   const summary = (driver: Driver | null, userId: string | null, name: string): DriverSummary => {
     const who = { userId, name, aliases: accountNames(input.trips, userId) };
-    const mine = input.trips.filter((t) => !t.deleted && belongsTo(who, t));
-    const papers = input.papers.filter((p) => p.scope === 'driver' && belongsTo(who, { driverId: p.driverId, driverName: p.driverName }));
+    const mine = input.trips.filter((t) => !t.deleted && belongsTo(who, t, claimed));
+    const papers = input.papers.filter((p) => p.scope === 'driver' && belongsTo(who, { driverId: p.driverId, driverName: p.driverName }, claimed));
     const license = latestLicense(papers);
     // A licence that was renewed does not count as expired: only the latest one does.
     const states = papers.filter((p) => !isLicense(p) || p === license).map((p) => paperState(p.expiresOn, today));

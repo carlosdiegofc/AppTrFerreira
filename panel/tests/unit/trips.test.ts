@@ -134,6 +134,9 @@ describe('the list', () => {
     expect(filterTrips(list, { card: { userId: 'luis', name: 'Luis Ferreira' } }).map((t) => t.key)).toEqual(['app:a1', 'app:a2', 'web:m1']);
     // A card without the app: by its name.
     expect(filterTrips(list, { card: { userId: null, name: 'Luis Ferreira' } }).map((t) => t.key)).toEqual(['app:a1', 'web:m1', 'app:a3']);
+    // ...but not the trips of an account another card has; until the cards are read, only the ones typed by hand.
+    expect(filterTrips(list, { card: { userId: null, name: 'Luis Ferreira', claimed: new Set(['luis']) } }).map((t) => t.key)).toEqual(['web:m1', 'app:a3']);
+    expect(filterTrips(list, { card: { userId: null, name: 'Luis Ferreira', claimed: null } }).map((t) => t.key)).toEqual(['web:m1']);
     expect(filterTrips(list, { driver: 'Luis Ferreira' })).toHaveLength(2);
   });
 

@@ -439,8 +439,8 @@ export function useSetMovementDeleted() {
 }
 
 /** Every driver's card with its salaries and payments (only the panel accounts read them). */
-export function useDrivers() {
-  const query = useQuery({ queryKey: ['drivers'], queryFn: fetchDrivers, staleTime: 30_000 });
+export function useDrivers(enabled = true) {
+  const query = useQuery({ queryKey: ['drivers'], queryFn: fetchDrivers, staleTime: 30_000, enabled });
   const drivers = useMemo(() => (query.data?.drivers ?? []).map(driverFromRow).sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })), [query.data]);
   const salaries = useMemo(() => (query.data?.salaries ?? []).map(salaryFromRow), [query.data]);
   const payments = useMemo(() => (query.data?.payments ?? []).map(paymentFromRow), [query.data]);

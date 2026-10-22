@@ -145,7 +145,9 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
   const present = useMemo(() => (presence.data && driver.userId ? (driverPresence(presence.data, onTrip, now).find((p) => p.driverId === driver.userId) ?? null) : null), [presence.data, onTrip, now, driver.userId]);
   // The names the account used in the app count for the trips typed by hand, as in the list and in Viajes.
   const who = { userId: driver.userId, name: driver.name, aliases: accountNames(trips, driver.userId) };
-  const mine = (row: { driverId: string | null; driverName: string | null }) => belongsTo(who, row);
+  // The accounts other cards have: their rows are those cards', even with this card's name.
+  const claimed = useMemo(() => new Set(drivers.flatMap((d) => (d.userId ? [d.userId] : []))), [drivers]);
+  const mine = (row: { driverId: string | null; driverName: string | null }) => belongsTo(who, row, claimed);
   const work = summarize(
     trips.filter((t) => mine(t)),
     receipts.filter((r) => r.date !== null && r.date >= month && r.date < firstOfNextMonth(today) && mine({ driverId: r.driverId, driverName: r.driverName })),

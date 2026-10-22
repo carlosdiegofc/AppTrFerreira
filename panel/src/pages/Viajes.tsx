@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useNavigationType, useSearchParams } fr
 import { Icon } from '../components/Icon';
 import { TripFormDialog } from '../components/TripFormDialog';
 import { CatalogNote, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote } from '../components/ui';
-import { useNow, useTripList } from '../data/hooks';
+import { useDrivers, useNow, useTripList } from '../data/hooks';
 import type { ListFormat } from '../exports/trips';
 import { ago, dayInZone, formatDay, formatDayTime } from '../lib/dates';
 import { accountNames } from '../lib/drivers';
@@ -99,8 +99,15 @@ export function Viajes() {
   const cardAccount = params.get('cuenta') ?? '';
 
   const { trips, query, catalog } = useTripList(instants?.fromIso ?? null, instants?.toIso ?? null);
+  // A card without an account takes an account's trips by its name only while no card has that account: the cards are
+  // read for it, and until they are, only the trips typed with its name count.
+  const cards = useDrivers(cardName !== '' && !cardAccount);
+  const claimed = useMemo(() => (cards.query.data ? new Set(cards.drivers.flatMap((d) => (d.userId ? [d.userId] : []))) : null), [cards.query.data, cards.drivers]);
   // The names the account used in the app count for the trips typed by hand, as in the card.
-  const card = useMemo(() => (cardName ? { userId: cardAccount || null, name: cardName, aliases: accountNames(trips, cardAccount || null) } : null), [cardName, cardAccount, trips]);
+  const card = useMemo(
+    () => (cardName ? { userId: cardAccount || null, name: cardName, aliases: accountNames(trips, cardAccount || null), claimed: cardAccount ? undefined : claimed } : null),
+    [cardName, cardAccount, trips, claimed],
+  );
   const counts = useMemo(() => countByStatus(trips), [trips]);
   const bin = tab.status === 'bin';
   const inTab = bin ? counts.deleted : counts.all;
@@ -270,6 +277,9 @@ export function Viajes() {
 
       {/* Only a first read that failed takes the list: after that, a failed refresh keeps the last list with a note. */}
       {instants !== null && query.error && query.data !== undefined && <StaleNote onRetry={() => void query.refetch()} />}
+      {card && !card.userId && cards.query.error && cards.query.data === undefined && (
+        <ErrorNote onRetry={() => void cards.query.refetch()}>No se pudieron leer las fichas: por ahora se ven solo los viajes cargados a mano con este nombre.</ErrorNote>
+      )}
       {catalog.error && <CatalogNote onRetry={() => void catalog.refetch()} />}
       {instants === null ? (
         <ErrorNote>Revisá las fechas: «hasta» no puede ser antes de «desde».</ErrorNote>

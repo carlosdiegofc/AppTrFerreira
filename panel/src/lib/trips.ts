@@ -197,7 +197,7 @@ export interface TripFilter {
   vehicle?: string;
   driver?: string;
   /** A driver's card: the trips of its app account under any name, and the ones typed in the panel with its name. */
-  card?: { userId: string | null; name: string; aliases?: readonly string[] } | null;
+  card?: { userId: string | null; name: string; aliases?: readonly string[]; claimed?: ReadonlySet<string> | null } | null;
   /** The trash: only deleted trips. */
   bin?: boolean;
 }
@@ -209,7 +209,7 @@ export function filterTrips(list: readonly Trip[], { q = '', status = 'all', veh
     if (!bin && status !== 'all' && t.status.code !== status) return false;
     if (vehicle && (t.vehicle ?? '') !== vehicle) return false;
     if (driver && (t.driverName ?? '') !== driver) return false;
-    if (card && !belongsTo(card, t)) return false;
+    if (card && !belongsTo(card, t, card.claimed)) return false;
     if (!needle) return true;
     return [t.orderNumber, t.client, t.product, t.originName, t.destinationName, t.driverName, t.vehicle, t.notes].some((v) => v !== null && fold(v).includes(needle));
   });

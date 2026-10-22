@@ -145,6 +145,14 @@ describe('choferes: fichas y cuentas de la app', () => {
     expect(accountNames(rows, null)).toEqual([]);
     expect(belongsTo({ ...ana, name: 'Ana María Pereira' }, { driverId: null, driverName: 'ana pereira' })).toBe(false);
     expect(belongsTo({ ...ana, name: 'Ana María Pereira', aliases: accountNames(rows, 'u-ana') }, { driverId: null, driverName: 'ana pereira' })).toBe(true);
+    // A card without an account takes an account's rows by the name only while no card has that account: the former card
+    // of someone who came back with a new card keeps only what was typed with its name.
+    const former = { userId: null, name: 'Ana Pereira' };
+    expect(belongsTo(former, { driverId: 'u-ana', driverName: 'Ana Pereira' }, new Set(['u-ana']))).toBe(false);
+    expect(belongsTo(former, { driverId: 'u-ana', driverName: 'Ana Pereira' }, new Set(['u-otra']))).toBe(true);
+    expect(belongsTo(former, { driverId: 'u-ana', driverName: 'Ana Pereira' }, null)).toBe(false);
+    expect(belongsTo(former, { driverId: null, driverName: 'Ana Pereira' }, null)).toBe(true);
+    expect(belongsTo(ana, { driverId: 'u-ana', driverName: 'Otra' }, new Set(['u-ana']))).toBe(true);
   });
 
   it('lista los choferes de la app que todavía no tienen ficha', () => {
@@ -241,6 +249,27 @@ describe('choferes: la lista', () => {
     active: leftOn === null,
     leftOn,
     updatedAt: '',
+  });
+
+  it('la ficha vieja de quien volvió con una ficha nueva no se queda con lo de su cuenta', () => {
+    const [current, former] = driverSummaries(
+      {
+        drivers: [card('d-nueva', 'u-ana', 'Ana Pereira'), card('d-vieja', null, 'Ana Pereira', '2026-05-31')],
+        appDrivers: [{ id: 'u-ana', name: 'Ana Pereira' }],
+        presence: [],
+        trips: [
+          { driverId: 'u-ana', driverName: 'Ana Pereira', gpsKm: 150, deleted: false },
+          { driverId: null, driverName: 'Ana Pereira', gpsKm: 50, deleted: false },
+        ],
+        papers: [{ scope: 'driver', driverId: 'u-ana', driverName: 'Ana Pereira', kind: 'Carné de salud', expiresOn: '2026-10-01' }],
+        salaries: [],
+        payments: [],
+      },
+      '2026-10-15',
+    );
+    expect(current).toMatchObject({ key: 'ficha:d-nueva', trips: 2, km: 200, papers: { late: 1 } });
+    // A trip typed by hand with the name counts for both: nothing tells them apart.
+    expect(former).toMatchObject({ key: 'ficha:d-vieja', trips: 1, km: 50, papers: { late: 0 } });
   });
 
   it('resume cada ficha y cada chofer de la app sin ficha: viajes del mes, papeles, libreta y sueldo', () => {
