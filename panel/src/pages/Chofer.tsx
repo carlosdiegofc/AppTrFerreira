@@ -180,6 +180,13 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
   };
 
   const since = driver.hiredOn ? seniority(driver.hiredOn, driver.leftOn ?? today) : null;
+  // A read that failed says so: the app's accounts (the name of the card's own, and the ones the form offers) and, with
+  // an account, whether it has the app open or is on a trip. What depends on them shows «—».
+  const accountsFailed = app.data === undefined && !!app.error;
+  const presenceFailed = driver.userId !== null && !presenceRead && !!(presence.error || fleet.error);
+  const dash = presenceFailed || (accountsFailed && driver.userId !== null);
+  const unread = [accountsFailed ? 'la lista de cuentas de la app' : null, presenceFailed ? 'si tiene la app abierta o está de viaje' : null].filter(Boolean).join(' ni ');
+  const unreadNote = `No se pudo leer ${unread}${dash ? ': se ve con «—»' : ''}${accountsFailed ? `${dash ? ', y' : ':'} al editar la ficha no se puede elegir ${driver.userId ? 'otra' : 'una'} cuenta` : ''}.`;
   // Everything the page shows, read again together.
   const reads = [query, app, presence, fleet, docs.query, fuel.query, tripList.query];
   const refresh = () => reads.forEach((r) => void r.refetch());
@@ -204,14 +211,17 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
         }
       />
       {query.error && <StaleNote onRetry={() => void query.refetch()} />}
-      {driver.userId && !presenceRead && (presence.error || fleet.error) && (
+      {(accountsFailed || presenceFailed) && (
         <ErrorNote
           onRetry={() => {
-            void presence.refetch();
-            void fleet.refetch();
+            if (accountsFailed) void app.refetch();
+            if (presenceFailed) {
+              void presence.refetch();
+              void fleet.refetch();
+            }
           }}
         >
-          No se pudo leer si tiene la app abierta o está de viaje: se ve con «—».
+          {unreadNote}
         </ErrorNote>
       )}
       {notice && (
@@ -261,7 +271,7 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
             </div>
             <div>
               <dt>Cuenta de la app</dt>
-              <dd>{driver.userId ? (appName ?? 'Vinculada') : <span className="muted">Sin cuenta: se le encuentra por el nombre</span>}</dd>
+              <dd>{driver.userId ? (appName ?? (app.data === undefined ? '—' : 'Vinculada')) : <span className="muted">Sin cuenta: se le encuentra por el nombre</span>}</dd>
             </div>
           </dl>
           {driver.notes && <p className="note driver-notes">{driver.notes}</p>}
@@ -402,7 +412,7 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
       </Card>
 
       {editing?.kind === 'card' && (
-        <DriverFormDialog driver={driver} appDrivers={appDrivers} linkedElsewhere={linked} today={today} onClose={() => setEditing(null)} onDone={done} onConflict={conflict} />
+        <DriverFormDialog driver={driver} appDrivers={appDrivers} accountsFailed={accountsFailed} linkedElsewhere={linked} today={today} onClose={() => setEditing(null)} onDone={done} onConflict={conflict} />
       )}
       {editing?.kind === 'salary' && (
         <SalaryFormDialog driver={driver} salary={editing.salary} salaries={salaries} current={current} today={today} onClose={() => setEditing(null)} onDone={done} onConflict={conflict} />

@@ -547,7 +547,14 @@ export function validatePayment(v: PaymentFormValues, today: string): { row: Omi
   return { row: { paid_on: v.paidOn, period, amount: a.value, currency: v.currency, concept: v.concept, method: v.method, notes }, errors };
 }
 
-/** Whether the row that came back is the one sent: a save tried again may bring back an earlier attempt with other data. */
+/**
+ * Whether the row that came back is the one sent: a save tried again may bring back an earlier attempt with other data.
+ * An annulment is the same whenever it was made: each try sends its own instant.
+ */
 export function savedAsSent(saved: Readonly<Record<string, unknown>>, sent: Readonly<Record<string, unknown>>): boolean {
-  return Object.entries(sent).every(([k, v]) => k === 'id' || (typeof v === 'number' ? Number(saved[k]) === v : (saved[k] ?? null) === (v ?? null)));
+  return Object.entries(sent).every(([k, v]) => {
+    if (k === 'id') return true;
+    if (k === 'deleted_at') return (saved[k] == null) === (v == null);
+    return typeof v === 'number' ? Number(saved[k]) === v : (saved[k] ?? null) === (v ?? null);
+  });
 }

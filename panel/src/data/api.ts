@@ -2,7 +2,7 @@
 // what each account gets back and what it may change.
 import type { Tables, TablesInsert, TablesUpdate } from '../lib/database.types';
 import { type DriverChoice, driverChoices, type FileType, type Paper, type PaperDocRow } from '../lib/documents';
-import type { Driver, DriverRow, Payment, PaymentRow, Salary, SalaryRow } from '../lib/drivers';
+import { type Driver, type DriverRow, type Payment, type PaymentRow, type Salary, type SalaryRow, savedAsSent } from '../lib/drivers';
 import { type ActiveTrip, type CatalogTruck, catalogTrucks, type FinishedTrip, lastTripByTruck, type LivePosition, text, truckLabel } from '../lib/fleet';
 import { type CatalogStation, catalogStations, type Movement, type MovementRow, type Receipt } from '../lib/fuel';
 import { type KmTrip, kmTripsAsCorrected, type MaintenanceRow, type Service } from '../lib/maintenance';
@@ -528,17 +528,18 @@ type Answer<R> = { data: R[] | null; error: { message: string; code?: string } |
 
 /**
  * A new row, or a change that only applies if nobody saved it meanwhile. A new one comes with its id: if it was saved
- * before (a save tried again after its answer was cut), that one comes back, so nothing is saved twice.
+ * before (a save tried again after its answer was cut), that one comes back, so nothing is saved twice. A change tried
+ * again after its answer was cut finds the row already changed: if it has what is sent, it counts as saved.
  */
-async function saveOnce<R>(
+async function saveOnce<R extends Readonly<Record<string, unknown>>>(
   current: { id: string; updatedAt: string } | null,
-  id: string | undefined,
+  sent: Readonly<Record<string, unknown>> & { id?: string },
   ops: { insert: () => PromiseLike<Answer<R>>; find: (id: string) => PromiseLike<Answer<R>>; update: (id: string, updatedAt: string) => PromiseLike<Answer<R>> },
 ): Promise<R> {
   if (!current) {
     const result = await ops.insert();
-    if (result.error?.code === '23505' && id) {
-      const saved = rows(await ops.find(id))[0];
+    if (result.error?.code === '23505' && sent.id) {
+      const saved = rows(await ops.find(sent.id))[0];
       if (saved) return saved;
     }
     const saved = rows(result)[0];
@@ -546,26 +547,28 @@ async function saveOnce<R>(
     return saved;
   }
   const saved = rows(await ops.update(current.id, current.updatedAt))[0];
-  if (!saved) throw new ConflictError('Otra persona lo cambió');
-  return saved;
+  if (saved) return saved;
+  const now = rows(await ops.find(current.id))[0];
+  if (now && savedAsSent(now, sent)) return now;
+  throw new ConflictError('Otra persona lo cambió');
 }
 
 export const saveDriver = (driver: Pick<Driver, 'id' | 'updatedAt'> | null, row: TablesInsert<'trf_drivers'> | TablesUpdate<'trf_drivers'>) =>
-  saveOnce<DriverRow>(driver, row.id, {
+  saveOnce<DriverRow>(driver, row, {
     insert: () => supabase.from('trf_drivers').insert(row as TablesInsert<'trf_drivers'>).select(),
     find: (id) => supabase.from('trf_drivers').select('*').eq('id', id).limit(1),
     update: (id, at) => supabase.from('trf_drivers').update(row).eq('id', id).eq('updated_at', at).select(),
   });
 
 export const saveSalary = (salary: Pick<Salary, 'id' | 'updatedAt'> | null, row: TablesInsert<'trf_driver_salaries'> | TablesUpdate<'trf_driver_salaries'>) =>
-  saveOnce<SalaryRow>(salary, row.id, {
+  saveOnce<SalaryRow>(salary, row, {
     insert: () => supabase.from('trf_driver_salaries').insert(row as TablesInsert<'trf_driver_salaries'>).select(),
     find: (id) => supabase.from('trf_driver_salaries').select('*').eq('id', id).limit(1),
     update: (id, at) => supabase.from('trf_driver_salaries').update(row).eq('id', id).eq('updated_at', at).select(),
   });
 
 export const savePayment = (payment: Pick<Payment, 'id' | 'updatedAt'> | null, row: TablesInsert<'trf_driver_payments'> | TablesUpdate<'trf_driver_payments'>) =>
-  saveOnce<PaymentRow>(payment, row.id, {
+  saveOnce<PaymentRow>(payment, row, {
     insert: () => supabase.from('trf_driver_payments').insert(row as TablesInsert<'trf_driver_payments'>).select(),
     find: (id) => supabase.from('trf_driver_payments').select('*').eq('id', id).limit(1),
     update: (id, at) => supabase.from('trf_driver_payments').update(row).eq('id', id).eq('updated_at', at).select(),

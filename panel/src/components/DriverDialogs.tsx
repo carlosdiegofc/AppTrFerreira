@@ -183,6 +183,7 @@ export function DriverFormDialog({
   driver,
   preset,
   appDrivers,
+  accountsFailed = false,
   linkedElsewhere,
   today,
   onClose,
@@ -196,6 +197,8 @@ export function DriverFormDialog({
   preset?: { userId: string; name: string };
   /** The app accounts that can be linked: the ones without a card, and the card's own. */
   appDrivers: readonly { id: string; name: string }[];
+  /** The list of app accounts could not be read: the form says so instead of offering none. */
+  accountsFailed?: boolean;
   linkedElsewhere: ReadonlySet<string>;
   onCreated?: (id: string) => void;
 }) {
@@ -250,7 +253,7 @@ export function DriverFormDialog({
               </option>
             ))}
           </select>,
-          'Con la cuenta se ven sus viajes, sus papeles y cuándo usó la app.',
+          accountsFailed ? 'No se pudo leer la lista de cuentas de la app: cerrá, tocá «Reintentar» y volvé a abrir para elegir una.' : 'Con la cuenta se ven sus viajes, sus papeles y cuándo usó la app.',
         )}
         {f.field('phone', 'Teléfono', <input {...f.props('phone')} type="tel" value={v.phone} maxLength={DRIVER_LIMITS.phone} autoComplete="off" onChange={(e) => f.set('phone', e.target.value)} />)}
         {f.field('documentId', 'Cédula', <input {...f.props('documentId')} type="text" value={v.documentId} maxLength={DRIVER_LIMITS.documentId} autoComplete="off" onChange={(e) => f.set('documentId', e.target.value)} />)}

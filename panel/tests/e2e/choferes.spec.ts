@@ -120,6 +120,20 @@ test('si no se pueden leer los papeles, lo dice y no los da por al día', async 
   const data = page.locator('.card', { has: page.getByRole('heading', { name: 'Datos' }) });
   await expect(data).toContainText('Categoría E');
   await expect(data).not.toContainText('sin cargar en Documentación');
+
+  // The list of app accounts also reads the papers: the card says it, and so does the form, instead of offering none.
+  const accounts = page.getByRole('alert').filter({ hasText: 'cuentas de la app' });
+  await expect(accounts).toHaveText(/No se pudo leer la lista de cuentas de la app: se ve con «—», y al editar la ficha no se puede elegir otra cuenta\./);
+  const account = data.locator('dl > div').filter({ has: page.locator('dt', { hasText: 'Cuenta de la app' }) }).locator('dd');
+  await expect(account).toHaveText('—');
+  await page.getByRole('button', { name: 'Editar ficha' }).click();
+  const form = page.getByRole('dialog', { name: 'Ficha de Ana Pereira' });
+  await expect(form).toContainText('No se pudo leer la lista de cuentas de la app');
+  await form.getByRole('button', { name: 'Cancelar' }).click();
+  await page.unroute('**/rest/v1/trf_documents*');
+  await accounts.getByRole('button', { name: 'Reintentar' }).click();
+  await expect(accounts).toHaveCount(0);
+  await expect(account).toHaveText('Ana Pereira');
 });
 
 test('una ficha que no existe lo dice', async ({ page }) => {

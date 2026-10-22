@@ -1,10 +1,22 @@
 // Saving in Choferes in a real browser: a card for an app driver, its salary, a payment that is corrected and annulled,
-// a card marked as no longer working, and two people changing the same card at once. Saving changes the test data, so
-// this file runs after the read-only tests (project "edicion" in playwright.config.ts), in this order.
-import { expect, test } from '@playwright/test';
+// a card marked as no longer working, two people changing the same card at once, and changes whose answer is cut.
+// Saving changes the test data, so this file runs after the read-only tests (project "edicion" in playwright.config.ts),
+// in this order.
+import { expect, type Page, test } from '@playwright/test';
 import { BASE, open, prepare, shot, signIn } from './helpers';
 
 test.beforeEach(async ({ page }) => prepare(page));
+
+/** The first change to a table reaches the database, but its answer never comes back. */
+async function cutFirstChange(page: Page, table: string) {
+  let cut = true;
+  await page.route(`**/rest/v1/${table}*`, async (route) => {
+    if (route.request().method() !== 'PATCH' || !cut) return route.fallback();
+    cut = false;
+    await route.fetch();
+    await route.abort('failed');
+  });
+}
 
 test('se crea la ficha de un chofer de la app, con su sueldo y sus pagos, que se corrigen y se anulan', async ({ page }) => {
   await signIn(page, 'dueno@ejemplo.uy');
@@ -168,4 +180,37 @@ test('si la ficha se vuelve a leer con el formulario abierto, guardar no pisa lo
   await expect(b.getByRole('alert')).toContainText('Otra persona lo cambió mientras lo tenías abierto');
   await expect(b.locator('.card', { has: b.getByRole('heading', { name: 'Datos' }) })).toContainText('4.444.444-4');
   await Promise.all([a.close(), b.close()]);
+});
+
+test('si se corta la respuesta al cambiar una ficha o al anular un pago, el reintento lo da por hecho', async ({ page }) => {
+  await signIn(page, 'dueno@ejemplo.uy');
+  await open(page, 'Choferes');
+  await page.getByRole('list', { name: 'Choferes' }).getByRole('link', { name: 'Carla Méndez' }).click();
+  await cutFirstChange(page, 'trf_drivers');
+  await cutFirstChange(page, 'trf_driver_payments');
+
+  // The change went through, but its answer was lost: trying again finds the card as it was sent.
+  await page.getByRole('button', { name: 'Editar ficha' }).click();
+  const card = page.getByRole('dialog', { name: 'Ficha de Carla Méndez' });
+  await card.getByLabel('Teléfono').fill('097 000 111');
+  await card.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(card.getByRole('alert')).toContainText('Sin conexión con el servidor');
+  await card.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(card).toBeHidden();
+  await expect(page.getByRole('status')).toContainText('Ficha guardada.');
+  await expect(page.locator('.card', { has: page.getByRole('heading', { name: 'Datos' }) })).toContainText('097 000 111');
+
+  // The same with an annulment, although each try sends its own instant.
+  const october = page.getByRole('table', { name: 'Sueldo por mes' }).getByRole('row').filter({ hasText: 'Octubre de 2026' });
+  await october.getByRole('button', { name: /Corregir viático del 15\/10\/2026/ }).click();
+  const fix = page.getByRole('dialog', { name: 'Corregir pago' });
+  const confirm = page.getByRole('dialog', { name: '¿Anular este pago?' });
+  await fix.getByRole('button', { name: 'Anular pago' }).click();
+  await confirm.getByRole('button', { name: 'Anular pago' }).click();
+  await expect(fix.getByRole('alert')).toContainText('Sin conexión con el servidor');
+  await fix.getByRole('button', { name: 'Anular pago' }).click();
+  await confirm.getByRole('button', { name: 'Anular pago' }).click();
+  await expect(fix).toBeHidden();
+  await expect(page.getByRole('status')).toContainText('Pago anulado: ya no cuenta en el mes.');
+  await expect(october).not.toContainText('Viático');
 });

@@ -14,6 +14,7 @@ import {
   pendingThisMonth,
   type Salary,
   salaryFor,
+  savedAsSent,
   seniority,
   validateDriver,
   validatePayment,
@@ -202,6 +203,18 @@ describe('choferes: los formularios del sueldo y de los pagos', () => {
     const bad = validatePayment({ ...v, paidOn: '2026-10-16', period: '2026-13', amount: '1,234' }, '2026-10-15');
     expect(bad.row).toBeNull();
     expect(bad.errors).toEqual({ paidOn: 'La fecha no puede ser posterior a hoy.', period: 'Elegí el mes al que corresponde.', amount: 'Hasta dos decimales.' });
+  });
+
+  it('un guardado que se repite reconoce lo que mandó: el importe como número, y una anulación sea cuando sea', () => {
+    const saved = { id: 'p', paid_on: '2026-10-14', amount: 15000, currency: 'UYU', notes: '', deleted_at: '2026-10-15T15:00:00.123+00:00' };
+    expect(savedAsSent(saved, { id: 'otro', paid_on: '2026-10-14', amount: 15000, notes: '' })).toBe(true);
+    expect(savedAsSent(saved, { amount: 20000 })).toBe(false);
+    expect(savedAsSent(saved, { notes: null })).toBe(false);
+    // Each try of an annulment sends its own instant: what counts is that it is annulled.
+    expect(savedAsSent(saved, { deleted_at: '2026-10-15T15:00:05.000Z' })).toBe(true);
+    expect(savedAsSent(saved, { deleted_at: null })).toBe(false);
+    expect(savedAsSent({ ...saved, deleted_at: null }, { deleted_at: null })).toBe(true);
+    expect(savedAsSent({ ...saved, deleted_at: null }, { deleted_at: '2026-10-15T15:00:05.000Z' })).toBe(false);
   });
 });
 

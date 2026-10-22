@@ -241,6 +241,7 @@ export function Choferes() {
           driver={null}
           preset={creating.preset}
           appDrivers={appDrivers.filter((a) => !linked.has(a.id))}
+          accountsFailed={app.data === undefined && !!app.error}
           linkedElsewhere={linked}
           today={today}
           onClose={() => setCreating(null)}
