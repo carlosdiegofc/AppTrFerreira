@@ -5,11 +5,12 @@
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useEffect, useRef } from 'react';
-import { DEFAULT_CENTER, DEFAULT_ZOOM, ROUTE_REFRESH_MS, TILE_ATTRIBUTION, TILE_URL } from '../config';
+import { DEFAULT_CENTER, DEFAULT_ZOOM, ROUTE_REFRESH_MS } from '../config';
 import type { RoutePoint } from '../data/api';
 import { type Glide, glideAt, grownTail, type Point, sameLines, startGlide } from '../lib/glide';
 import { routeLines } from '../lib/route';
 import type { LatLng } from '../lib/trips';
+import { mapView } from './mapView';
 
 interface Props {
   route: readonly RoutePoint[] | null;
@@ -46,7 +47,8 @@ export function TripMap({ route, start, end, declared, live, label }: Props) {
     if (!box.current) return;
     const still = calm();
     const m = L.map(box.current, { zoomControl: true, attributionControl: true, zoomAnimation: !still, fadeAnimation: !still, markerZoomAnimation: !still }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-    L.tileLayer(TILE_URL, { maxZoom: 18, attribution: TILE_ATTRIBUTION }).addTo(m);
+    // The street map or Google's satellite, and the full screen.
+    const undoView = mapView(m);
     layer.current = L.layerGroup().addTo(m);
     map.current = m;
     const resize = new ResizeObserver(() => m.invalidateSize());
@@ -55,6 +57,7 @@ export function TripMap({ route, start, end, declared, live, label }: Props) {
       cancelAnimationFrame(frame.current);
       frame.current = 0;
       resize.disconnect();
+      undoView();
       m.remove();
       map.current = null;
       framed.current = 'none';

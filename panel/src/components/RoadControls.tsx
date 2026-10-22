@@ -7,6 +7,7 @@ import { type FleetUnit, unitTitle } from '../lib/fleet';
 import { money, decimal } from '../lib/format';
 import {
   POINT_LABEL,
+  pointTitle,
   type RoadPoint,
   type PointKind,
   externalMaps,
@@ -311,7 +312,7 @@ export function TruckRoad({ unit, points, now }: { unit: FleetUnit; points: read
       )}
       {nearby.map(({ point, meters }) => (
         <p className="road-warning" key={point.id} role="status">
-          {POINT_LABEL[point.kind]}: {point.name}, a {Math.round(meters)} m en línea recta
+          {pointTitle(point)}, a {Math.round(meters)} m en línea recta
           {point.speed_limit !== null ? ` · límite ${point.speed_limit} km/h` : ''}
         </p>
       ))}

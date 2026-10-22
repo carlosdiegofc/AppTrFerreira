@@ -3,13 +3,14 @@
 // the map neither flickers nor jumps every few seconds; the route of the selected truck reaches the marker.
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { useEffect, useRef } from 'react';
+import { type RefObject, useEffect, useRef } from 'react';
 import { DEFAULT_CENTER, DEFAULT_ZOOM, LIVE_REFRESH_MS, TILE_ATTRIBUTION, TILE_URL } from '../config';
+import { mapView } from './mapView';
 import type { RoutePoint } from '../data/api';
 import { type FleetUnit, STATE_LABEL, unitTitle } from '../lib/fleet';
 import { type Glide, glideAt, type Point, startGlide, tailStart } from '../lib/glide';
 import { drawable, routeLines } from '../lib/route';
-import { POINT_LABEL, type RoadPoint } from '../lib/road';
+import { pointTitle, type RoadPoint } from '../lib/road';
 
 /** A driver with the app open and no trip, where the phone is («chofer activo»). */
 export interface PersonMark {
@@ -20,6 +21,8 @@ export interface PersonMark {
 }
 
 const NO_PEOPLE: readonly PersonMark[] = [];
+/** Points show their names from this zoom on; from farther, only their dots (the name shows on hover). */
+const POINT_NAMES_FROM = 10;
 
 interface Props {
   units: readonly FleetUnit[];
@@ -36,6 +39,10 @@ interface Props {
   focusPoint?: RoadPoint | null;
   onPointSelect?: (point: RoadPoint) => void;
   onPickLocation?: (location: { latitude: number; longitude: number }) => void;
+  /** The satellite view and the full screen (GPS en vivo); the map of Inicio stays the plain street map. */
+  tools?: boolean;
+  /** What goes over the whole screen with the map: the box that holds it with its own buttons. */
+  fullTarget?: RefObject<HTMLElement | null>;
 }
 
 /** A marker on the map: where it is drawn now, where it is going, and the glide between the two. */
@@ -94,6 +101,8 @@ export function FleetMap({
   focusPoint,
   onPointSelect,
   onPickLocation,
+  tools = false,
+  fullTarget,
 }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
@@ -148,7 +157,8 @@ export function FleetMap({
       fadeAnimation: !still,
       markerZoomAnimation: !still,
     }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-    L.tileLayer(TILE_URL, { maxZoom: 18, attribution: TILE_ATTRIBUTION }).addTo(m);
+    const undoView = tools ? mapView(m, { full: () => fullTarget?.current ?? null }) : null;
+    if (!tools) L.tileLayer(TILE_URL, { maxZoom: 18, attribution: TILE_ATTRIBUTION }).addTo(m);
     routeLayer.current = L.layerGroup().addTo(m);
     map.current = m;
     const resize = new ResizeObserver(() => m.invalidateSize());
@@ -159,6 +169,7 @@ export function FleetMap({
       frame.current = 0;
       resize.disconnect();
       known.clear();
+      undoView?.();
       m.remove();
       map.current = null;
     };
@@ -282,7 +293,7 @@ export function FleetMap({
     if (!m) return;
     const layer = L.layerGroup().addTo(m);
     for (const p of roadPoints ?? []) {
-      const title = `${POINT_LABEL[p.kind]} · ${p.name}`;
+      const title = pointTitle(p);
       const text = document.createElement('span');
       text.textContent = title;
       const marker = L.marker([p.latitude, p.longitude], {
@@ -291,7 +302,12 @@ export function FleetMap({
       }).addTo(layer);
       marker.on('click', () => onPointSelect?.(p));
     }
+    // From far away the names of every toll and scale of the country would cover the map and each other.
+    const names = () => m.getContainer().classList.toggle('points-far', m.getZoom() < POINT_NAMES_FROM);
+    names();
+    m.on('zoomend', names);
     return () => {
+      m.off('zoomend', names);
       layer.remove();
     };
   }, [roadPoints, onPointSelect]);

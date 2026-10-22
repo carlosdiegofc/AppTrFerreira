@@ -935,6 +935,102 @@ a.trip-line:hover {
   }
 }
 
+/* Satellite (decision of 22/10/2026): Google's pictures as they are, without the darkening of the street map at night. */
+:root .fleet-map.is-satellite .leaflet-tile-pane {
+  filter: none;
+}
+
+/* The base switch, Mapa or Satélite, above the credits. */
+.map-switch {
+  display: flex;
+  overflow: hidden;
+}
+
+.map-switch button {
+  border: 0;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+
+.map-switch button + button {
+  border-left: 1px solid var(--line);
+}
+
+.map-switch button[aria-pressed='true'] {
+  background: var(--blue);
+  color: #fff;
+}
+
+.map-full-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.map-switch button:focus-visible,
+.map-full-button:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}
+
+/* Google's logo as its terms ask: 16 to 19 px high, with 10 px clear on the sides and above and 5 px below. */
+.map-google-logo {
+  display: block;
+  height: 18px;
+  width: auto;
+  margin: 10px 10px 5px !important;
+  pointer-events: none;
+}
+
+/* Google's credits never cover its logo: on a narrow map they wrap to its right. */
+.is-satellite .leaflet-bottom.leaflet-right {
+  max-width: calc(100% - 110px);
+}
+
+.map-notice {
+  position: absolute;
+  left: 50%;
+  bottom: 34px;
+  z-index: 1000;
+  transform: translateX(-50%);
+  max-width: min(92%, 440px);
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+}
+
+/* Full screen: the map (or its card, with its buttons) over the whole page, above the side menu. */
+.map-full {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2500;
+  width: auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+}
+
+body.map-full-open {
+  overflow: hidden;
+}
+
 .fm-wrap {
   background: none;
   border: 0;
@@ -3153,4 +3249,5 @@ button.fr-open {
 .road-marker { background: var(--blue); border: 2px solid white; border-radius: 50%; }
 .road-marker span { display: block; width: max-content; max-width: 190px; margin-left: 25px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; font-size: 12px; }
 .road-scale { background: #9a6700; } .road-radar { background: #be3144; } .road-place { background: #168467; }
+.points-far .road-marker span { display: none; }
 .road-fields { padding: 18px; margin: 0; overflow-y: auto; min-height: 0; }

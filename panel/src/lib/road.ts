@@ -4,6 +4,19 @@ import { validPosition } from './route';
 
 export type PointKind = 'toll' | 'scale' | 'radar' | 'place';
 export const POINT_LABEL: Record<PointKind, string> = { toll: 'Peaje', scale: 'Balanza', radar: 'Radar', place: 'Mi punto' };
+/** A point on screen: what it is, then its name, unless the name already says it («Peaje Pando», «Radar · Ruta 5 km 30»). */
+export function pointTitle(p: Pick<RoadPoint, 'kind' | 'name'>): string {
+  const label = POINT_LABEL[p.kind];
+  const [name, start] = [p.name.trim().toLocaleLowerCase('es'), label.toLocaleLowerCase('es')];
+  return name === start || name.startsWith(`${start} `) ? p.name : `${label} · ${p.name}`;
+}
+const KIND_ORDER: readonly PointKind[] = ['toll', 'scale', 'radar', 'place'];
+/** The list's order: tolls, scales, radars and own points, each by name («Ruta 2» before «Ruta 11»). */
+export function sortedPoints<T extends Pick<RoadPoint, 'kind' | 'name'>>(points: readonly T[]): T[] {
+  return [...points].sort(
+    (a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) || a.name.localeCompare(b.name, 'es', { sensitivity: 'base', numeric: true }),
+  );
+}
 export interface RoadPoint {
   id: string;
   name: string;

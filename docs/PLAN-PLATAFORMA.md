@@ -99,6 +99,12 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 22/10/2026: mapa del GPS.
+  - La vista satelital viene de Google Maps, por su Map Tiles API: entra en el mismo mapa, así que no cambia nada de lo que ya muestra.
+  - Va en los mapas de GPS en vivo y de cada viaje del panel.
+  - Las balanzas que se cargan son las de control del MTOP en las rutas nacionales.
+  - Las ubicaciones salen del Geoportal del MTOP y de OpenStreetMap, revisadas en la foto satelital: las condiciones de Google no permiten copiar sus lugares a otra base.
+  - Los 3 peajes ya cargados se corrigen si no coinciden con la ubicación verificada.
 - 22/10/2026: reglas del truco.
   - La sota de la muestra vale 27 en el envido y en la flor, como el caballo.
   - La falta envido vale lo que le falta al que va ganando para llegar a 30.
@@ -168,3 +174,11 @@ Más adelante: proveedor de mapas, método de lectura de boletas, modelo de IA y
 - [x] Validación de navegador en computadora y celular (CI con datos inventados).
 - [x] Publicación el 21/10/2026 con respaldo manual completo de estructura y datos, verificado y entregado localmente antes de aplicar 0005. Migración aplicada y despliegue #11 exitoso (commit aef848d); 157 pruebas unitarias y 94 de navegador aprobadas, además de SQL/RLS. Detalles: [GPS-CONTROL-RUTA.md](GPS-CONTROL-RUTA.md).
 - [ ] Etapa Android posterior: notificaciones y sonido al chofer.
+
+### GPS: mapa satelital, pantalla completa, peajes y balanzas (aprobado el 22/10/2026)
+- [x] Pantalla completa en el mapa de GPS en vivo (con «Ver todos») y en el de cada viaje; Esc o el mismo botón la cierran. El mapa de Inicio queda igual.
+- [x] Vista satelital de Google Maps (Map Tiles API) en esos dos mapas: las fotos con las rutas, calles y nombres encima, debajo de los camiones, los recorridos y los puntos, con el logo y los créditos de Google. Aparece cuando el panel tiene la clave de Google Maps (secreto `GOOGLE_MAPS_KEY`); los pasos para crearla están en [panel/README.md](../panel/README.md).
+- [ ] La clave de Google Maps: la crea el dueño en Google Cloud, con una cuenta de facturación.
+- [x] Los 15 peajes de las rutas nacionales, los 2 de los puentes a Argentina y los 24 puestos de balanza del MTOP, con la ubicación del Geoportal del MTOP comparada con OpenStreetMap y revisada en la foto satelital (migración 0006, solo agrega; detalle en [GPS-CONTROL-RUTA.md](GPS-CONTROL-RUTA.md)). Los 3 peajes ya cargados estaban en el lugar justo y no se tocan.
+- [x] El logo oficial de Google Maps y su enlace a los términos en los créditos de la vista satelital, como piden las condiciones de la Map Tiles API.
+- [ ] Publicación: respaldo completo de estructura y datos entregado al dueño, 0006 aplicada en producción y panel publicado.

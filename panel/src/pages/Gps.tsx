@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { FleetMap, type PersonMark } from '../components/FleetMap';
 import { Icon } from '../components/Icon';
@@ -13,7 +13,7 @@ import { drawable } from '../lib/route';
 import { STATE_TONE } from './states';
 import { PointEditor, TruckRoad, type RoadView } from '../components/RoadControls';
 import { useRoadPoints, useRoadWrite } from '../data/road';
-import { POINT_LABEL, type RoadPoint, type PointKind } from '../lib/road';
+import { POINT_LABEL, pointTitle, type RoadPoint, type PointKind, sortedPoints } from '../lib/road';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
 type Filter = 'all' | 'moving' | 'halted' | 'idle';
@@ -163,6 +163,8 @@ export function Gps() {
   const [filter, setFilter] = useState<Filter>('all');
   const [fitToken, setFitToken] = useState(0);
   const [view, setView] = useState<RoadView>('live');
+  // The map's card goes over the whole screen with it, «Ver todos» included.
+  const mapCard = useRef<HTMLDivElement>(null);
   const [kinds, setKinds] = useState<PointKind[]>(['toll', 'scale', 'radar']);
   const [newKind, setNewKind] = useState<PointKind>('toll');
   const [picking, setPicking] = useState(false);
@@ -176,7 +178,7 @@ export function Gps() {
   const road = useRoadPoints(),
     roadWrite = useRoadWrite();
   const visiblePoints = useMemo(
-    () => (road.data ?? []).filter((p) => (view === 'places' ? p.kind === 'place' : view === 'controls' && kinds.includes(p.kind))),
+    () => sortedPoints((road.data ?? []).filter((p) => (view === 'places' ? p.kind === 'place' : view === 'controls' && kinds.includes(p.kind)))),
     [road.data, view, kinds],
   );
   const chofer = params.get('chofer');
@@ -299,7 +301,7 @@ export function Gps() {
               {visiblePoints.map((p) => (
                 <div className="road-point" key={p.id}>
                   <button className="btn btn-quiet" onClick={() => setFocusPoint(p)}>
-                    {POINT_LABEL[p.kind]} · {p.name}
+                    {pointTitle(p)}
                   </button>
                   <p>{p.notes}</p>
                   <div className="road-actions">
@@ -427,8 +429,10 @@ export function Gps() {
             </p>
           </section>
         </aside>
-        <div className="card gps-map">
+        <div ref={mapCard} className="card gps-map">
           <FleetMap
+            tools
+            fullTarget={mapCard}
             units={fleet.units}
             people={people}
             selected={selected}

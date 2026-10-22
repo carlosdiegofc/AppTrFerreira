@@ -5,8 +5,8 @@ import { expect, type Page, test } from '@playwright/test';
 /** The browser clock is fixed at the seed's base instant: 15/10/2026 at noon in Uruguay. */
 export const BASE = process.env.PANEL_E2E_BASE ?? '2026-10-15T15:00:00Z';
 const SHOTS = 'tests/e2e/shots';
-// 1×1 grey PNG: map tiles are never fetched from OpenStreetMap during the tests.
-const TILE = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN89+7dfwAJ6QPbJ1DSWgAAAABJRU5ErkJggg==', 'base64');
+// 1×1 grey PNG: map tiles are never fetched from OpenStreetMap (nor from Google) during the tests.
+export const TILE = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN89+7dfwAJ6QPbJ1DSWgAAAABJRU5ErkJggg==', 'base64');
 
 mkdirSync(SHOTS, { recursive: true });
 
@@ -14,6 +14,8 @@ mkdirSync(SHOTS, { recursive: true });
 export async function prepare(page: Page) {
   await page.clock.setFixedTime(new Date(BASE));
   await page.route('https://tile.openstreetmap.org/**', (route) => route.fulfill({ contentType: 'image/png', body: TILE }));
+  // The satellite view: mapa.spec.ts answers for Google; anywhere else nothing goes out.
+  await page.route('https://tile.googleapis.com/**', (route) => route.abort());
 }
 
 export async function signIn(page: Page, email: string, password = 'clave-de-prueba') {
