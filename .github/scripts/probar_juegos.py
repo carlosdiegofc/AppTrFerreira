@@ -90,18 +90,46 @@ def present(hit) -> bool:
     return len(hit) > 0 if isinstance(hit, list) else True
 
 
-def wait(what: str, found, seconds: int = 30):
+last_rotation = '?'
+
+
+def poll(what: str, found, seconds: int):
+    """What found(screen) gives within those seconds, or None; fails if the app closes meanwhile."""
+    global last_rotation
     end = time.time() + seconds
     while time.time() < end:
         alive = running()
         root = screen()
+        if root is not None:
+            last_rotation = root.get('rotation', '?')
         hit = found(root) if root is not None else None
         if present(hit):
             return hit
         if not alive:
             fail(f'la app se cerró mientras se esperaba {what}')
         time.sleep(1)
-    fail(f'no apareció {what}')
+    return None
+
+
+def wait(what: str, found, seconds: int = 30):
+    hit = poll(what, found, seconds)
+    if hit is None:
+        fail(f'no apareció {what}')
+    return hit
+
+
+def rotate(rotation: str, what: str, found):
+    """Turns the screen like the test of the optimized build; if it did not turn, asks the window manager again."""
+    adb('shell', 'settings', 'put', 'system', 'accelerometer_rotation', '0')
+    adb('shell', 'settings', 'put', 'system', 'user_rotation', rotation)
+    turned = lambda r: r.get('rotation') == rotation and found(r)
+    hit = poll(what, turned, 15)
+    if hit is None:
+        adb('shell', 'wm', 'user-rotation', 'lock', rotation, check=False)
+        hit = poll(what, turned, 30)
+    if hit is None:
+        fail(f'no apareció {what} (la pantalla quedó en la rotación {last_rotation})')
+    return hit
 
 
 def bounds(node: ET.Element) -> tuple[int, int, int, int]:
@@ -208,11 +236,9 @@ try:
     time.sleep(1)
     shot('juegos-6-tablero-girado')
     tap(wait('el botón de girar el tablero', lambda r: nodes(r, desc='Girar el tablero'))[0])
-    adb('shell', 'settings', 'put', 'system', 'user_rotation', '1')
-    wait('el tablero con la pantalla girada', lambda r: r.get('rotation') == '1' and board(r, 'Jugada 1.'))
+    rotate('1', 'el tablero con la pantalla girada', lambda r: board(r, 'Jugada 1.'))
     shot('juegos-6b-pantalla-girada')
-    adb('shell', 'settings', 'put', 'system', 'user_rotation', '0')
-    wait('el tablero con la pantalla derecha', lambda r: r.get('rotation') == '0' and board(r, 'Jugada 1. Te toca mover.'))
+    rotate('0', 'el tablero con la pantalla derecha', lambda r: board(r, 'Jugada 1. Te toca mover.'))
 
     step('Entre dos: un peón llega al final y se elige la pieza')
     new_game(two=True)
