@@ -1,0 +1,38 @@
+name: Datos de peajes y balanzas
+# Temporal: junta dónde están los peajes y las balanzas del MTOP (Geoportal del MTOP, OpenStreetMap y una foto
+# satelital de cada lugar para revisarlo) y lo deja 20 minutos en la rama tmp/datos-mapa. Se borra antes de unir la rama.
+on:
+  push:
+    branches: [claude/apptrferreira-g1agmt]
+    paths: ['.github/workflows/datos-mapa.yml', '.github/scripts/datos_mapa.py']
+permissions:
+  contents: write
+concurrency:
+  group: datos-mapa
+  cancel-in-progress: true
+jobs:
+  datos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      REMOTE: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install --quiet pillow
+      - name: Juntar los datos
+        continue-on-error: true
+        run: python3 .github/scripts/datos_mapa.py datos
+      - name: Dejar los datos en tmp/datos-mapa
+        shell: bash
+        run: |
+          cd datos
+          ls -la
+          git init -q -b tmp
+          git add .
+          git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com commit -q -m "Datos $GITHUB_SHA"
+          git push -q --force "$REMOTE" tmp:refs/heads/tmp/datos-mapa
+      - name: Esperar 20 minutos
+        run: sleep 1200
+      - name: Borrar la rama temporal
+        if: always()
+        run: git push -q "$REMOTE" --delete tmp/datos-mapa || true
