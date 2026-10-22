@@ -43,10 +43,15 @@ test('Choferes lista las fichas con su mes, sus papeles y su sueldo, y los de la
   await list.getByRole('link', { name: 'Ramón Sosa' }).click();
   await expect(page.locator('.card', { has: page.getByRole('heading', { name: 'Datos' }) })).toContainText('31/08/2026');
   await expect(page.getByText('Dejó de trabajar el 31/08/2026: los meses siguientes no llevan sueldo.')).toBeVisible();
+  // His settlement, for September, shows without a salary in that month.
   const months = page.getByRole('table', { name: 'Sueldo por mes' }).getByRole('row').filter({ hasText: / de 20\d\d/ });
-  await expect(months).toHaveCount(2);
-  await expect(months.first()).toContainText('Agosto de 2026');
-  await expect(months.first()).toContainText('Falta $ 30.000');
+  await expect(months).toHaveCount(3);
+  await expect(months.nth(0)).toContainText('Setiembre de 2026');
+  await expect(months.nth(0)).toContainText('Después del egreso');
+  await expect(months.nth(0)).toContainText('Liquidación');
+  await expect(months.nth(0)).not.toContainText('Falta');
+  await expect(months.nth(1)).toContainText('Agosto de 2026');
+  await expect(months.nth(1)).toContainText('Falta $ 30.000');
 });
 
 test('la ficha muestra los datos, la libreta, el mes y el sueldo mes a mes con cada pago', async ({ page }) => {

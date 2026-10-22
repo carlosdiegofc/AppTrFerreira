@@ -166,12 +166,19 @@ export interface MonthLine {
   others: { label: string; currency: Currency; amount: number }[];
   /** The month's payments that are not annulled, in the order they were made. */
   payments: Payment[];
+  /** After the month the driver stopped working: it has no salary, only the payments made for it (a settlement). */
+  afterLeaving: boolean;
 }
 
-/** Each month (as given) with its salary, what was paid against it and what is left. */
-export function monthLines(salaries: readonly Salary[], payments: readonly Payment[], months: readonly string[]): MonthLine[] {
+/**
+ * Each month (as given) with its salary, what was paid against it and what is left. For a driver who stopped working
+ * (leftOn), the months after that one have no salary.
+ */
+export function monthLines(salaries: readonly Salary[], payments: readonly Payment[], months: readonly string[], leftOn: string | null = null): MonthLine[] {
+  const lastMonth = leftOn ? firstOfMonth(leftOn) : null;
   return months.map((month) => {
-    const salary = salaryFor(salaries, month);
+    const afterLeaving = lastMonth !== null && month > lastMonth;
+    const salary = afterLeaving ? null : salaryFor(salaries, month);
     const currency = salary?.currency ?? 'UYU';
     const mine = payments
       .filter((p) => !p.deleted && p.period === month)
@@ -191,14 +198,15 @@ export function monthLines(salaries: readonly Salary[], payments: readonly Payme
       others.set(key, o);
     }
     paid = cents(paid);
-    return { month, salary, paid, currency, pending: salary ? cents(salary.amount - paid) : null, others: [...others.values()], payments: mine };
+    return { month, salary, paid, currency, pending: salary ? cents(salary.amount - paid) : null, others: [...others.values()], payments: mine, afterLeaving };
   });
 }
 
 export type MonthTone = 'ok' | 'warn' | 'blue' | 'muted';
 
 /** What the list and the month say of a month: what is left, up to date, paid above, or that there is no salary. */
-export function monthStatus(line: Pick<MonthLine, 'salary' | 'paid' | 'pending' | 'currency' | 'payments'>, money: (n: number, c: Currency) => string): { tone: MonthTone; text: string } {
+export function monthStatus(line: Pick<MonthLine, 'salary' | 'paid' | 'pending' | 'currency' | 'payments'> & { afterLeaving?: boolean }, money: (n: number, c: Currency) => string): { tone: MonthTone; text: string } {
+  if (line.afterLeaving) return { tone: 'muted', text: 'Después del egreso' };
   if (line.pending === null) return line.payments.length > 0 ? { tone: 'muted', text: 'Sin sueldo cargado' } : { tone: 'muted', text: 'Sin sueldo ni pagos' };
   if (line.pending > 0) return { tone: 'warn', text: `Falta ${money(line.pending, line.currency)}` };
   if (line.pending === 0) return { tone: 'ok', text: 'Al día' };
@@ -337,6 +345,7 @@ export function driverSummaries(input: SummaryInput, today: string): DriverSumma
               input.salaries.filter((x) => x.driverId === driver.id),
               input.payments.filter((x) => x.driverId === driver.id),
               [month],
+              driver.leftOn,
             )[0] ?? null)
           : null,
     };

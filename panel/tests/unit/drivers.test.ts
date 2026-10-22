@@ -89,6 +89,14 @@ describe('choferes: el sueldo de cada mes', () => {
     expect(monthStatus({ ...jul!, payments: [payment('2026-07-01', 1)] }, money)).toEqual({ tone: 'muted', text: 'Sin sueldo cargado' });
   });
 
+  it('después del mes en que dejó de trabajar no hay sueldo, solo los pagos de ese mes (la liquidación)', () => {
+    const [aug, jul, jun] = monthLines([salary('2026-01-01', 30000)], [payment('2026-08-01', 12000, { concept: 'sueldo' })], ['2026-08-01', '2026-07-01', '2026-06-01'], '2026-06-10');
+    expect(aug).toMatchObject({ salary: null, pending: null, paid: 12000, afterLeaving: true });
+    expect(monthStatus(aug!, money)).toEqual({ tone: 'muted', text: 'Después del egreso' });
+    expect(jul).toMatchObject({ salary: null, afterLeaving: true });
+    expect(jun).toMatchObject({ pending: 30000, afterLeaving: false });
+  });
+
   it('un sueldo en dólares descuenta solo lo pagado en dólares', () => {
     const [line] = monthLines([salary('2026-01-01', 1500, { currency: 'USD' })], [payment('2026-10-01', 500, { currency: 'USD' }), payment('2026-10-01', 20000)], ['2026-10-01']);
     expect(line).toMatchObject({ paid: 500, pending: 1000, currency: 'USD' });

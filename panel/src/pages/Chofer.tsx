@@ -130,8 +130,10 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
   // Who stopped working has no salary after that month.
   const history = { salaries, payments, leftOn: driver.leftOn };
   const years = moneyYears(history, today);
-  const [year, setYear] = useState(() => Number(today.slice(0, 4)));
-  const lines = monthLines(salaries, payments, yearMonths(year, today, history));
+  // The newest year with something, and a valid one when the history changes (a driver who left in an earlier year).
+  const [chosenYear, setYear] = useState<number | null>(null);
+  const year = chosenYear !== null && years.includes(chosenYear) ? chosenYear : (years[0] ?? Number(today.slice(0, 4)));
+  const lines = monthLines(salaries, payments, yearMonths(year, today, history), driver.leftOn);
   const current = salaryFor(salaries, month);
   const later = salaries.filter((s) => !s.deleted && s.startsOn > month).sort((a, b) => a.startsOn.localeCompare(b.startsOn));
 
@@ -150,7 +152,9 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
   );
   const license = latestLicense(myPapers);
   const linked = new Set(drivers.filter((d) => d.id !== driver.id).map((d) => d.userId).filter((id): id is string => id !== null));
-  const appDrivers = (app.data ?? []).filter((a) => !linked.has(a.id));
+  const roster = (app.data ?? []).filter((a) => !linked.has(a.id));
+  // The card's own account stays a choice even when the list of app accounts does not bring it.
+  const appDrivers = driver.userId && !roster.some((a) => a.id === driver.userId) ? [...roster, { id: driver.userId, name: driver.name }] : roster;
   const appName = driver.userId ? (app.data?.find((a) => a.id === driver.userId)?.name ?? null) : null;
   // The month's trips as this card counts them: the account's under any name, and the ones typed with its name.
   const tripsLink = `/viajes?periodo=mes&nombre=${encodeURIComponent(driver.name)}${driver.userId ? `&cuenta=${encodeURIComponent(driver.userId)}` : ''}`;

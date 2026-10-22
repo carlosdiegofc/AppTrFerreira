@@ -172,4 +172,6 @@ insert into public.trf_driver_payments (driver_id, paid_on, period, amount, curr
   ('70000000-0000-4000-8000-000000000001', date_trunc('month', (select today from t0))::date, (date_trunc('month', (select today from t0)) - interval '1 month')::date, 30000, 'UYU', 'sueldo', 'transferencia', 'Transferencia BROU'),
   ('70000000-0000-4000-8000-000000000001', (select today from t0) - 5, date_trunc('month', (select today from t0))::date, 10000, 'UYU', 'adelanto', 'efectivo', ''),
   ('70000000-0000-4000-8000-000000000001', (select today from t0) - 3, date_trunc('month', (select today from t0))::date, 3500, 'UYU', 'viatico', 'efectivo', 'Viaje a Salto'),
+  -- Ramón's settlement, for the month after he left.
+  ('70000000-0000-4000-8000-000000000004', (select today from t0) - 30, (date_trunc('month', (select today from t0)) - interval '1 month')::date, 12000, 'UYU', 'sueldo', 'efectivo', 'Liquidación'),
   ('70000000-0000-4000-8000-000000000002', (select today from t0) - 2, date_trunc('month', (select today from t0))::date, 100, 'USD', 'adelanto', 'efectivo', '');
