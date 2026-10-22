@@ -54,6 +54,8 @@ export interface Driver {
   bankAccount: string;
   notes: string;
   active: boolean;
+  /** The day the driver stopped working (only for a card that is not active): the salary stops with that month. */
+  leftOn: string | null;
   updatedAt: string;
 }
 
@@ -71,6 +73,7 @@ export function driverFromRow(r: DriverRow): Driver {
     bankAccount: text(r.bank_account) ?? '',
     notes: text(r.notes) ?? '',
     active: r.active,
+    leftOn: r.active ? null : r.left_on,
     updatedAt: r.updated_at,
   };
 }
@@ -205,14 +208,19 @@ export function monthStatus(line: Pick<MonthLine, 'salary' | 'paid' | 'pending' 
 export interface MoneyHistory {
   salaries: readonly Salary[];
   payments: readonly Payment[];
+  /** The day the driver stopped working: no salary after that month. */
+  leftOn?: string | null;
 }
 
-/** The span of months worth showing: from the first salary or payment up to today's month, or later if a payment is for a later month. */
-function span({ salaries, payments }: MoneyHistory, today: string): { first: string; last: string } {
-  const now = firstOfMonth(today);
+/**
+ * The span of months worth showing: from the first salary or payment up to today's month (the month the driver
+ * stopped working, for one who did), or later if a payment is for a later month.
+ */
+function span({ salaries, payments, leftOn }: MoneyHistory, today: string): { first: string; last: string } {
+  const end = firstOfMonth(leftOn ?? today);
   const months = [...salaries.filter((s) => !s.deleted).map((s) => s.startsOn), ...payments.filter((p) => !p.deleted).map((p) => p.period)];
-  const first = months.reduce((min, m) => (m < min ? m : min), now);
-  const last = payments.filter((p) => !p.deleted).reduce((max, p) => (p.period > max ? p.period : max), now);
+  const first = months.reduce((min, m) => (m < min ? m : min), end);
+  const last = payments.filter((p) => !p.deleted).reduce((max, p) => (p.period > max ? p.period : max), end);
   return { first, last };
 }
 
@@ -298,6 +306,11 @@ export interface SummaryInput {
 
 const LICENSE = fold('Licencia de conducir');
 
+/** The driving licence among a driver's papers: the one that expires last, so a renewed one wins over the old one. */
+export function latestLicense<T extends { kind: string; expiresOn: string | null }>(papers: readonly T[]): T | null {
+  return papers.filter((p) => fold(p.kind) === LICENSE).sort((a, b) => (b.expiresOn ?? '').localeCompare(a.expiresOn ?? ''))[0] ?? null;
+}
+
 /** Every card and every app driver without one, each with its summary; the ones with a card first, by name. */
 export function driverSummaries(input: SummaryInput, today: string): DriverSummary[] {
   const month = firstOfMonth(today);
@@ -306,7 +319,7 @@ export function driverSummaries(input: SummaryInput, today: string): DriverSumma
     const mine = input.trips.filter((t) => !t.deleted && belongsTo(who, t));
     const papers = input.papers.filter((p) => p.scope === 'driver' && belongsTo(who, { driverId: p.driverId, driverName: p.driverName }));
     const states = papers.map((p) => paperState(p.expiresOn, today));
-    const license = papers.filter((p) => fold(p.kind) === LICENSE).sort((a, b) => (b.expiresOn ?? '').localeCompare(a.expiresOn ?? ''))[0];
+    const license = latestLicense(papers);
     return {
       key: driver ? `ficha:${driver.id}` : `app:${userId}`,
       driver,
@@ -317,13 +330,15 @@ export function driverSummaries(input: SummaryInput, today: string): DriverSumma
       km: mine.reduce((sum, t) => sum + (t.gpsKm ?? 0), 0),
       papers: { late: states.filter((s) => s === 'late').length, soon: states.filter((s) => s === 'soon').length },
       license: license ? { expiresOn: license.expiresOn, state: paperState(license.expiresOn, today) } : null,
-      month: driver
-        ? (monthLines(
-            input.salaries.filter((x) => x.driverId === driver.id),
-            input.payments.filter((x) => x.driverId === driver.id),
-            [month],
-          )[0] ?? null)
-        : null,
+      // A driver who stopped working before this month has no salary in it.
+      month:
+        driver && (!driver.leftOn || firstOfMonth(driver.leftOn) >= month)
+          ? (monthLines(
+              input.salaries.filter((x) => x.driverId === driver.id),
+              input.payments.filter((x) => x.driverId === driver.id),
+              [month],
+            )[0] ?? null)
+          : null,
     };
   };
   return [
@@ -334,11 +349,11 @@ export function driverSummaries(input: SummaryInput, today: string): DriverSumma
   ];
 }
 
-/** What is left to pay this month, by currency, of the active drivers with a salary. */
+/** What is left to pay this month, by currency, of the drivers with a salary in it (also one who stopped working this month). */
 export function pendingThisMonth(list: readonly DriverSummary[]): Record<Currency, number> {
   const out: Record<Currency, number> = { UYU: 0, USD: 0 };
   for (const s of list) {
-    if (!s.driver?.active || !s.month || s.month.pending === null || s.month.pending <= 0) continue;
+    if (!s.driver || !s.month || s.month.pending === null || s.month.pending <= 0) continue;
     out[s.month.currency] = cents(out[s.month.currency] + s.month.pending);
   }
   return out;
@@ -358,13 +373,15 @@ export interface DriverFormValues {
   bankAccount: string;
   notes: string;
   active: boolean;
+  /** The day the driver stopped working, while «Ya no trabaja» is checked. */
+  leftOn: string;
 }
 
 export type DriverField = keyof DriverFormValues;
 
 /** What the form starts with: the card as it is, or a new one (for an app driver, with the account and its name). */
 export function driverFormValues(d: Driver | null, preset?: { userId: string; name: string }): DriverFormValues {
-  if (!d) return { name: preset?.name ?? '', userId: preset?.userId ?? '', phone: '', documentId: '', hiredOn: '', licenseCategory: '', payMethod: '', bank: '', bankAccount: '', notes: '', active: true };
+  if (!d) return { name: preset?.name ?? '', userId: preset?.userId ?? '', phone: '', documentId: '', hiredOn: '', licenseCategory: '', payMethod: '', bank: '', bankAccount: '', notes: '', active: true, leftOn: '' };
   return {
     name: d.name,
     userId: d.userId ?? '',
@@ -377,6 +394,7 @@ export function driverFormValues(d: Driver | null, preset?: { userId: string; na
     bankAccount: d.bankAccount,
     notes: d.notes,
     active: d.active,
+    leftOn: d.leftOn ?? '',
   };
 }
 
@@ -402,6 +420,11 @@ export function validateDriver(v: DriverFormValues, today: string, linkedElsewhe
   }
   if (v.hiredOn && (!/^\d{4}-\d{2}-\d{2}$/.test(v.hiredOn) || v.hiredOn < '1950-01-01')) errors.hiredOn = 'Fecha no válida.';
   else if (v.hiredOn > today) errors.hiredOn = 'La fecha de ingreso no puede ser posterior a hoy.';
+  if (!v.active) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v.leftOn) || v.leftOn < '1950-01-01') errors.leftOn = 'Elegí el día en que dejó de trabajar.';
+    else if (v.leftOn > today) errors.leftOn = 'No puede ser posterior a hoy.';
+    else if (v.hiredOn && !errors.hiredOn && v.leftOn < v.hiredOn) errors.leftOn = 'No puede ser anterior a la fecha de ingreso.';
+  }
   if (v.payMethod && !PAYMENT_METHODS.some((p) => p.value === v.payMethod)) errors.payMethod = 'Elegí un medio de la lista.';
   if (v.userId && linkedElsewhere.has(v.userId)) errors.userId = 'Esa cuenta de la app ya tiene su ficha.';
   if (Object.keys(errors).length > 0) return { row: null, errors };
@@ -418,6 +441,7 @@ export function validateDriver(v: DriverFormValues, today: string, linkedElsewhe
       bank_account: v.bankAccount.trim(),
       notes: v.notes.trim(),
       active: v.active,
+      left_on: v.active ? null : v.leftOn,
     },
     errors,
   };

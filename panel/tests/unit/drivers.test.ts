@@ -102,6 +102,10 @@ describe('choferes: el sueldo de cada mes', () => {
     expect(yearMonths(2025, '2026-10-15', history)).toEqual(['2025-12-01', '2025-11-01']);
     expect(moneyYears({ salaries: [], payments: [] }, '2026-10-15')).toEqual([2026]);
     expect(yearMonths(2026, '2026-10-15', { salaries: [], payments: [] })).toEqual(['2026-10-01']);
+    // Who stopped working: up to that month, or to a payment made for a later month (the last settlement).
+    expect(yearMonths(2026, '2026-10-15', { salaries: history.salaries, payments: [], leftOn: '2026-06-10' })).toEqual(['2026-06-01', '2026-05-01', '2026-04-01', '2026-03-01', '2026-02-01', '2026-01-01']);
+    expect(yearMonths(2026, '2026-10-15', { ...history, leftOn: '2026-06-10' })[0]).toBe('2026-11-01');
+    expect(moneyYears({ salaries: [], payments: [], leftOn: '2025-12-31' }, '2026-10-15')).toEqual([2025]);
     expect(monthLabel('2026-09-01')).toBe('setiembre de 2026');
     expect(monthLabel('2026-10-01', true)).toBe('Octubre de 2026');
   });
@@ -128,6 +132,16 @@ describe('choferes: fichas y cuentas de la app', () => {
 
   it('lista los choferes de la app que todavía no tienen ficha', () => {
     expect(withoutCard([{ userId: 'u-ana' }, { userId: null }], [{ id: 'u-ana', name: 'Ana' }, { id: 'u-bruno', name: 'Bruno' }])).toEqual([{ id: 'u-bruno', name: 'Bruno' }]);
+  });
+
+  it('quien ya no trabaja lleva el día en que dejó de trabajar, entre el ingreso y hoy', () => {
+    const v = { ...driverFormValues(null), name: 'Ramón Sosa', hiredOn: '2024-03-01', active: false, leftOn: '2026-09-30' };
+    expect(validateDriver(v, '2026-10-15', new Set()).row).toMatchObject({ active: false, left_on: '2026-09-30' });
+    expect(validateDriver({ ...v, leftOn: '' }, '2026-10-15', new Set()).errors).toEqual({ leftOn: 'Elegí el día en que dejó de trabajar.' });
+    expect(validateDriver({ ...v, leftOn: '2026-10-16' }, '2026-10-15', new Set()).errors).toEqual({ leftOn: 'No puede ser posterior a hoy.' });
+    expect(validateDriver({ ...v, leftOn: '2024-02-01' }, '2026-10-15', new Set()).errors).toEqual({ leftOn: 'No puede ser anterior a la fecha de ingreso.' });
+    // Back to work: the day is cleared.
+    expect(validateDriver({ ...v, active: true }, '2026-10-15', new Set()).row).toMatchObject({ active: true, left_on: null });
   });
 
   it('valida la ficha: nombre, largos, fecha de ingreso, medio de pago y una ficha por cuenta', () => {
@@ -177,7 +191,7 @@ describe('choferes: los formularios del sueldo y de los pagos', () => {
 });
 
 describe('choferes: la lista', () => {
-  const card = (id: string, userId: string | null, name: string, active = true): Driver => ({
+  const card = (id: string, userId: string | null, name: string, leftOn: string | null = null): Driver => ({
     id,
     userId,
     name,
@@ -189,14 +203,15 @@ describe('choferes: la lista', () => {
     bank: '',
     bankAccount: '',
     notes: '',
-    active,
+    active: leftOn === null,
+    leftOn,
     updatedAt: '',
   });
 
   it('resume cada ficha y cada chofer de la app sin ficha: viajes del mes, papeles, libreta y sueldo', () => {
     const list = driverSummaries(
       {
-        drivers: [card('d-ana', 'u-ana', 'Ana Pereira'), card('d-edu', null, 'Eduardo Núñez'), card('d-old', null, 'Viejo', false)],
+        drivers: [card('d-ana', 'u-ana', 'Ana Pereira'), card('d-edu', null, 'Eduardo Núñez'), card('d-old', null, 'Viejo', '2026-05-31'), card('d-oct', null, 'Se fue en octubre', '2026-10-05')],
         appDrivers: [
           { id: 'u-ana', name: 'Ana Pereira' },
           { id: 'u-diego', name: 'Diego Silva' },
@@ -210,23 +225,28 @@ describe('choferes: la lista', () => {
           { driverId: null, driverName: 'Eduardo Nuñez', gpsKm: 20, deleted: false },
         ],
         papers: [
+          // The old licence expired; the renewed one is the one that counts.
+          { scope: 'driver', driverId: 'u-ana', driverName: 'Ana Pereira', kind: 'Licencia de conducir', expiresOn: '2024-10-30' },
           { scope: 'driver', driverId: 'u-ana', driverName: 'Ana Pereira', kind: 'Licencia de conducir', expiresOn: '2026-10-30' },
           { scope: 'driver', driverId: 'u-ana', driverName: 'Ana Pereira', kind: 'Carné de salud', expiresOn: '2026-10-01' },
           { scope: 'vehicle', driverId: 'u-ana', driverName: 'Ana Pereira', kind: 'SOA / Seguro', expiresOn: '2026-01-01' },
         ],
-        salaries: [salary('2026-08-01', 45000, { driverId: 'd-ana' })],
+        salaries: [salary('2026-08-01', 45000, { driverId: 'd-ana' }), salary('2026-01-01', 30000, { driverId: 'd-old' }), salary('2026-01-01', 20000, { driverId: 'd-oct' })],
         payments: [payment('2026-10-01', 10000, { driverId: 'd-ana' }), payment('2026-10-01', 7000, { driverId: 'd-edu' })],
       },
       '2026-10-15',
     );
-    expect(list.map((s) => s.key)).toEqual(['ficha:d-ana', 'ficha:d-edu', 'ficha:d-old', 'app:u-carla', 'app:u-diego']);
-    const [ana, edu, , carla] = list;
-    expect(ana).toMatchObject({ trips: 2, km: 200, papers: { late: 1, soon: 1 }, license: { expiresOn: '2026-10-30', state: 'soon' } });
+    expect(list.map((s) => s.key)).toEqual(['ficha:d-ana', 'ficha:d-edu', 'ficha:d-old', 'ficha:d-oct', 'app:u-carla', 'app:u-diego']);
+    const [ana, edu, old, oct, carla] = list;
+    expect(ana).toMatchObject({ trips: 2, km: 200, papers: { late: 2, soon: 1 }, license: { expiresOn: '2026-10-30', state: 'soon' } });
     expect(ana?.presence?.state).toBe('trip');
     expect(ana?.month).toMatchObject({ month: '2026-10-01', paid: 10000, pending: 35000 });
     expect(edu).toMatchObject({ trips: 1, km: 20, presence: null, license: null });
     expect(edu?.month).toMatchObject({ salary: null, pending: null });
     expect(carla).toMatchObject({ driver: null, userId: 'u-carla', name: 'Carla Méndez', month: null });
-    expect(pendingThisMonth(list)).toEqual({ UYU: 35000, USD: 0 });
+    // Who left before this month has no salary in it; who left this month still has it to pay.
+    expect(old?.month).toBeNull();
+    expect(oct?.month).toMatchObject({ pending: 20000 });
+    expect(pendingThisMonth(list)).toEqual({ UYU: 55000, USD: 0 });
   });
 });

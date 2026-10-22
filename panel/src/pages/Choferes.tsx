@@ -133,6 +133,8 @@ export function Choferes() {
     { query: fleet, what: 'quién está de viaje' },
   ];
   const failed = reads.filter((r) => r.query.data === undefined && r.query.error);
+  // «Actualizar» reads everything the list shows again.
+  const everything = [query, ...reads.map((r) => r.query)];
   const ready = query.data !== undefined && reads.every((r) => r.query.data !== undefined || r.query.error);
   const known: Known = { app: app.data !== undefined, trips: tripList.query.data !== undefined, papers: docs.query.data !== undefined, presence: presence.data !== undefined && fleet.data !== undefined };
 
@@ -193,7 +195,7 @@ export function Choferes() {
         </div>
         <div className="list-info">
           {query.dataUpdatedAt > 0 && <span className="updated">actualizado {ago(query.dataUpdatedAt, now)}</span>}
-          <RefreshButton onClick={() => void query.refetch()} busy={query.isFetching} />
+          <RefreshButton onClick={() => everything.forEach((q) => void q.refetch())} busy={everything.some((q) => q.isFetching)} />
         </div>
       </div>
 

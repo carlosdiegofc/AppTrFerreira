@@ -2,7 +2,7 @@
 // a card marked as no longer working, and two people changing the same card at once. Saving changes the test data, so
 // this file runs after the read-only tests (project "edicion" in playwright.config.ts), in this order.
 import { expect, test } from '@playwright/test';
-import { open, prepare, shot, signIn } from './helpers';
+import { BASE, open, prepare, shot, signIn } from './helpers';
 
 test.beforeEach(async ({ page }) => prepare(page));
 
@@ -103,9 +103,16 @@ test('una ficha se marca como que ya no trabaja, y queda con sus pagos', async (
   await page.getByRole('button', { name: 'Editar ficha' }).click();
   const card = page.getByRole('dialog', { name: 'Ficha de Bruno Díaz' });
   await card.getByLabel('Ya no trabaja en la empresa (la ficha queda guardada, con sus pagos)').check();
+  // The day starts as today and cannot be later.
+  await expect(card.getByLabel('Dejó de trabajar el')).toHaveValue('2026-10-15');
+  await card.getByLabel('Dejó de trabajar el').fill('2026-10-20');
+  await card.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(card).toContainText('No puede ser posterior a hoy.');
+  await card.getByLabel('Dejó de trabajar el').fill('2026-10-10');
   await card.getByRole('button', { name: 'Guardar', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('Ficha guardada.');
-  await expect(page.getByText('Ya no trabaja en la empresa: su ficha y sus pagos quedan guardados.')).toBeVisible();
+  await expect(page.getByText('Ya no trabaja en la empresa desde el 10/10/2026: su ficha y sus pagos quedan guardados.')).toBeVisible();
+  await expect(page.locator('.card', { has: page.getByRole('heading', { name: 'Datos' }) })).toContainText('Egreso');
   await expect(page.getByRole('table', { name: 'Sueldo por mes' })).toContainText('Adelanto en dólares US$ 100');
   await open(page, 'Choferes');
   await page.getByRole('group', { name: 'Vista' }).getByRole('button', { name: /Ya no trabajan/ }).click();
@@ -132,5 +139,33 @@ test('si dos personas cambian la misma ficha a la vez, la segunda no pisa a la p
   await expect(b.getByRole('alert')).toContainText('Otra persona lo cambió mientras lo tenías abierto');
   // B sees A's phone, not its own.
   await expect(b.locator('.card', { has: b.getByRole('heading', { name: 'Datos' }) })).toContainText('091 000 111');
+  await Promise.all([a.close(), b.close()]);
+});
+
+test('si la ficha se vuelve a leer con el formulario abierto, guardar no pisa lo que cambió otra persona', async ({ browser }) => {
+  const [a, b] = await Promise.all([browser.newPage(), browser.newPage()]);
+  for (const p of [a, b]) {
+    await prepare(p);
+    await signIn(p, 'dueno@ejemplo.uy');
+    await open(p, 'Choferes');
+    await p.getByRole('list', { name: 'Choferes' }).getByRole('link', { name: 'Eduardo Núñez' }).click();
+  }
+  await b.getByRole('button', { name: 'Editar ficha' }).click();
+  await a.getByRole('button', { name: 'Editar ficha' }).click();
+  const formA = a.getByRole('dialog', { name: 'Ficha de Eduardo Núñez' });
+  await formA.getByLabel('Cédula').fill('4.444.444-4');
+  await formA.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(a.getByRole('status')).toContainText('Ficha guardada.');
+
+  // A minute later B comes back to the window: its page reads the cards again, with A's change, while its form is open.
+  await b.clock.setFixedTime(new Date(Date.parse(BASE) + 60_000));
+  const reread = b.waitForResponse((r) => r.url().includes('/rest/v1/trf_drivers'));
+  await b.evaluate(() => document.dispatchEvent(new Event('visibilitychange', { bubbles: true })));
+  await reread;
+  const formB = b.getByRole('dialog', { name: 'Ficha de Eduardo Núñez' });
+  await formB.getByLabel('Teléfono').fill('092 777 666');
+  await formB.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(b.getByRole('alert')).toContainText('Otra persona lo cambió mientras lo tenías abierto');
+  await expect(b.locator('.card', { has: b.getByRole('heading', { name: 'Datos' }) })).toContainText('4.444.444-4');
   await Promise.all([a.close(), b.close()]);
 });

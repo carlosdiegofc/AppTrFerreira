@@ -2,7 +2,7 @@
 -- Solo agrega: tres tablas nuevas con sus controles, su historial privado de cambios y sus permisos. No cambia datos ni
 -- permisos existentes. Fichas, sueldos y pagos los ven y los cargan solo las cuentas del panel: los choferes no los ven,
 -- ni siquiera los suyos. Nada se borra: un sueldo o un pago anulado queda con deleted_at, y la ficha de quien ya no
--- trabaja queda inactiva.
+-- trabaja queda inactiva, con el día en que dejó de trabajar.
 
 -- La ficha. La cuenta de la app (la misma de sus viajes, sus papeles y su posición) es opcional: un chofer nuevo puede
 -- tener ficha antes de usar la app. Una ficha por cuenta.
@@ -22,6 +22,8 @@ create table public.trf_drivers (
   bank_account text not null default '',
   notes text not null default '',
   active boolean not null default true,
+  -- El día en que dejó de trabajar: desde el mes siguiente no se le cuenta sueldo. Lo tiene toda ficha inactiva, y solo ella.
+  left_on date,
   created_at timestamptz not null default now(),
   created_by uuid default auth.uid(),
   updated_at timestamptz not null default now(),
@@ -31,7 +33,9 @@ create table public.trf_drivers (
     and length(license_category) <= 20 and length(bank) <= 80 and length(bank_account) <= 60 and length(notes) <= 1000
   ),
   constraint trf_drivers_pay_method check (pay_method in ('', 'efectivo', 'transferencia', 'cheque', 'otro')),
-  constraint trf_drivers_hired_on check (hired_on is null or hired_on >= date '1950-01-01')
+  constraint trf_drivers_hired_on check (hired_on is null or hired_on >= date '1950-01-01'),
+  constraint trf_drivers_left_on check (left_on is null or (left_on >= date '1950-01-01' and (hired_on is null or left_on >= hired_on))),
+  constraint trf_drivers_active_left_on check (active = (left_on is null))
 );
 
 -- El sueldo del mes: desde qué mes rige cada monto. Uno nuevo no borra el anterior, que sigue valiendo para sus meses.

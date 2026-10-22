@@ -78,7 +78,7 @@ Va armándose al costado del panel actual y lo reemplaza sección por sección.
    - La lista separa a los choferes con ficha, a los de la app que todavía no la tienen (se les crea desde ahí) y a los que ya no trabajan. De cada uno muestra los viajes y los kilómetros del mes, los papeles vencidos o por vencer y cómo va el sueldo del mes.
    - La ficha: teléfono, cédula, fecha de ingreso con la antigüedad, categoría de la libreta (su vencimiento sigue en Documentación), la actividad del mes con el enlace a sus viajes, sus papeles y los datos para pagarle: forma de pago, banco y cuenta.
    - El sueldo, mes a mes: el sueldo del mes, lo pagado y lo que falta. Los adelantos y los pagos de sueldo se restan; el aguinaldo, la licencia, los viáticos y otros pagos se muestran aparte. Pesos y dólares no se mezclan. Un sueldo nuevo rige desde el mes que se elige, y los meses anteriores quedan con el de antes.
-   - Nada se borra: un sueldo o un pago mal cargado se corrige o se anula, y quien ya no trabaja queda con su ficha y sus pagos. La base guarda quién cargó o cambió cada cosa y cómo estaba antes.
+   - Nada se borra: un sueldo o un pago mal cargado se corrige o se anula, y quien ya no trabaja queda con su ficha y sus pagos, con el día en que dejó de trabajar: su sueldo termina ese mes. La base guarda quién cargó o cambió cada cosa y cómo estaba antes.
    - Lo ven y lo cargan solo las cuentas del panel (dueño y administración). Los choferes no ven las fichas ni los sueldos, ni siquiera el suyo.
    - [ ] Publicación: respaldo completo antes, 0008 en producción y panel publicado.
 

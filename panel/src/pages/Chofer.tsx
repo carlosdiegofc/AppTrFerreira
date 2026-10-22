@@ -12,6 +12,7 @@ import {
   belongsTo,
   conceptLabel,
   type Driver,
+  latestLicense,
   type MonthLine,
   monthLabel,
   monthLines,
@@ -126,7 +127,8 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null);
   const salaries = useMemo(() => allSalaries.filter((s) => s.driverId === driver.id), [allSalaries, driver.id]);
   const payments = useMemo(() => allPayments.filter((p) => p.driverId === driver.id), [allPayments, driver.id]);
-  const history = { salaries, payments };
+  // Who stopped working has no salary after that month.
+  const history = { salaries, payments, leftOn: driver.leftOn };
   const years = moneyYears(history, today);
   const [year, setYear] = useState(() => Number(today.slice(0, 4)));
   const lines = monthLines(salaries, payments, yearMonths(year, today, history));
@@ -146,7 +148,7 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
     papers.filter((p) => p.scope === 'driver' && mine({ driverId: p.driverId, driverName: p.driverName })),
     today,
   );
-  const license = myPapers.find((p) => p.kind.toLowerCase().startsWith('licencia'));
+  const license = latestLicense(myPapers);
   const linked = new Set(drivers.filter((d) => d.id !== driver.id).map((d) => d.userId).filter((id): id is string => id !== null));
   const appDrivers = (app.data ?? []).filter((a) => !linked.has(a.id));
   const appName = driver.userId ? (app.data?.find((a) => a.id === driver.userId)?.name ?? null) : null;
@@ -167,7 +169,10 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
     setEditing(e);
   };
 
-  const since = driver.hiredOn ? seniority(driver.hiredOn, today) : null;
+  const since = driver.hiredOn ? seniority(driver.hiredOn, driver.leftOn ?? today) : null;
+  // Everything the page shows, read again together.
+  const reads = [query, app, presence, fleet, docs.query, fuel.query, tripList.query];
+  const refresh = () => reads.forEach((r) => void r.refetch());
   const pay = [methodLabel(driver.payMethod), driver.bank, driver.bankAccount && `cuenta ${driver.bankAccount}`].filter(Boolean).join(' · ');
 
   return (
@@ -175,10 +180,10 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
       <Back />
       <PageHead
         title={driver.name}
-        subtitle={[driver.active ? null : 'Ya no trabaja en la empresa', driver.userId ? (present && presenceRead ? presenceLine(present, now) : 'Usa la app') : 'Sin cuenta de la app'].filter(Boolean).join(' · ')}
+        subtitle={[driver.active ? null : driver.leftOn ? `Dejó de trabajar el ${formatDay(driver.leftOn)}` : 'Ya no trabaja en la empresa', driver.userId ? (present && presenceRead ? presenceLine(present, now) : 'Usa la app') : 'Sin cuenta de la app'].filter(Boolean).join(' · ')}
         actions={
           <>
-            <RefreshButton onClick={() => void query.refetch()} busy={query.isFetching} />
+            <RefreshButton onClick={refresh} busy={reads.some((r) => r.isFetching)} />
             <button type="button" className="btn" onClick={() => open({ kind: 'card' })}>
               <Icon name="edit" size={18} /> Editar ficha
             </button>
@@ -210,6 +215,12 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
               <dt>Ingreso</dt>
               <dd>{driver.hiredOn ? `${formatDay(driver.hiredOn)}${since ? ` · ${since}` : ''}` : <span className="muted">Sin cargar</span>}</dd>
             </div>
+            {driver.leftOn && (
+              <div>
+                <dt>Egreso</dt>
+                <dd>{formatDay(driver.leftOn)}</dd>
+              </div>
+            )}
             <div>
               <dt>Libreta</dt>
               <dd>
@@ -350,6 +361,7 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
             </p>
           )}
           <p className="note">Los adelantos y el sueldo pagado se restan del sueldo del mes al que corresponden; el aguinaldo, la licencia y los viáticos se muestran aparte. Pesos y dólares no se mezclan.</p>
+          {driver.leftOn && <p className="note">Dejó de trabajar el {formatDay(driver.leftOn)}: los meses siguientes no llevan sueldo.</p>}
           {years.length > 1 && (
             <div className="chips" role="group" aria-label="Año">
               {years.map((y) => (
@@ -380,7 +392,7 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
       )}
       {!driver.active && (
         <p className="note">
-          Ya no trabaja en la empresa: su ficha y sus pagos quedan guardados.{' '}
+          Ya no trabaja en la empresa{driver.leftOn ? ` desde el ${formatDay(driver.leftOn)}` : ''}: su ficha y sus pagos quedan guardados.{' '}
           <button type="button" className="link-button" onClick={() => navigate('/choferes?vista=baja')}>
             Ver los que ya no trabajan
           </button>

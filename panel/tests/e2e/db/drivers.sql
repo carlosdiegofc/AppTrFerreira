@@ -74,6 +74,24 @@ begin
     raise exception 'dueño: aceptó una ficha sin nombre';
   exception when check_violation then null;
   end;
+  -- Who stopped working has the day, and only who stopped working; never before the day they started.
+  update public.trf_drivers set active = false, left_on = '2026-10-10' where id = '90000000-0000-4000-8000-000000000001';
+  begin
+    update public.trf_drivers set active = false, left_on = null where id = '90000000-0000-4000-8000-000000000001';
+    raise exception 'dueño: aceptó una baja sin el día';
+  exception when check_violation then null;
+  end;
+  begin
+    update public.trf_drivers set active = true where id = '90000000-0000-4000-8000-000000000001';
+    raise exception 'dueño: aceptó una ficha activa con día de baja';
+  exception when check_violation then null;
+  end;
+  begin
+    update public.trf_drivers set left_on = '2025-02-28' where id = '90000000-0000-4000-8000-000000000001';
+    raise exception 'dueño: aceptó una baja antes del ingreso';
+  exception when check_violation then null;
+  end;
+  update public.trf_drivers set active = true, left_on = null where id = '90000000-0000-4000-8000-000000000001';
 end $$;
 reset role;
 

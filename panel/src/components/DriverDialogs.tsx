@@ -201,7 +201,9 @@ export function DriverFormDialog({
 }) {
   const save = useSaveDriver();
   const [newId] = useState(() => crypto.randomUUID());
-  const [initial] = useState(() => driverFormValues(driver, preset));
+  // The card as it was when the form opened: a read meanwhile must not hand a newer version to the stale values.
+  const [base] = useState(driver);
+  const [initial] = useState(() => driverFormValues(base, preset));
   const f = useForm<DriverFormValues>(initial, save.isPending, onClose);
   const v = f.values;
 
@@ -209,17 +211,17 @@ export function DriverFormDialog({
     f.setFormError(null);
     const { row, errors } = validateDriver(v, today, linkedElsewhere);
     if (!f.check(errors) || !row) return;
-    if (driver && !f.dirty) return onClose();
-    const sent = driver ? row : { ...row, id: newId };
+    if (base && !f.dirty) return onClose();
+    const sent = base ? row : { ...row, id: newId };
     try {
-      const saved = await save.mutateAsync({ driver, row: sent });
-      if (!driver && !savedAsSent(saved, sent)) {
+      const saved = await save.mutateAsync({ driver: base, row: sent });
+      if (!base && !savedAsSent(saved, sent)) {
         onDone('Esa ficha ya se había guardado en el intento anterior, con lo que tenía entonces: revisala y, si hace falta, corregila.');
         onCreated?.(saved.id);
         return;
       }
-      onDone(driver ? 'Ficha guardada.' : `Ficha de ${row.name} creada.`);
-      if (!driver) onCreated?.(saved.id);
+      onDone(base ? 'Ficha guardada.' : `Ficha de ${row.name} creada.`);
+      if (!base) onCreated?.(saved.id);
     } catch (err) {
       if (err instanceof ConflictError) return onConflict();
       console.error(err);
@@ -229,7 +231,7 @@ export function DriverFormDialog({
 
   const choices = [...appDrivers].sort((a, b) => a.name.localeCompare(b.name, 'es'));
   return (
-    <Shell f={f} title={driver ? `Ficha de ${driver.name}` : 'Nueva ficha'} busy={save.isPending} onClose={onClose} onSubmit={() => void submit()}>
+    <Shell f={f} title={base ? `Ficha de ${base.name}` : 'Nueva ficha'} busy={save.isPending} onClose={onClose} onSubmit={() => void submit()}>
       <div className="form-grid">
         {f.field('name', 'Nombre y apellido', <input {...f.props('name')} type="text" value={v.name} maxLength={DRIVER_LIMITS.name} autoComplete="off" onChange={(e) => f.set('name', e.target.value)} />)}
         {f.field(
@@ -277,12 +279,27 @@ export function DriverFormDialog({
         {f.field('bankAccount', 'Número de cuenta', <input {...f.props('bankAccount')} type="text" value={v.bankAccount} maxLength={DRIVER_LIMITS.bankAccount} autoComplete="off" onChange={(e) => f.set('bankAccount', e.target.value)} />)}
       </div>
       {f.field('notes', 'Notas', <textarea {...f.props('notes')} rows={2} value={v.notes} maxLength={DRIVER_LIMITS.notes} onChange={(e) => f.set('notes', e.target.value)} />, undefined, true)}
-      {driver && (
+      {base && (
         <label className="check-row">
-          <input type="checkbox" checked={!v.active} onChange={(e) => f.set('active', !e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={!v.active}
+            onChange={(e) => {
+              f.set('active', !e.target.checked);
+              if (e.target.checked && !v.leftOn) f.set('leftOn', today);
+            }}
+          />
           Ya no trabaja en la empresa (la ficha queda guardada, con sus pagos)
         </label>
       )}
+      {base &&
+        !v.active &&
+        f.field(
+          'leftOn',
+          'Dejó de trabajar el',
+          <input {...f.props('leftOn')} type="date" value={v.leftOn} min={v.hiredOn || undefined} max={today} onChange={(e) => f.set('leftOn', e.target.value)} />,
+          'Desde el mes siguiente no se le cuenta sueldo.',
+        )}
     </Shell>
   );
 }
@@ -311,7 +328,8 @@ export function SalaryFormDialog({
   const annul = useSetSalaryDeleted();
   const busy = save.isPending || annul.isPending;
   const [newId] = useState(() => crypto.randomUUID());
-  const [initial] = useState(() => salaryFormValues(salary, today, current));
+  const [base] = useState(salary);
+  const [initial] = useState(() => salaryFormValues(base, today, current));
   const f = useForm<SalaryFormValues>(initial, busy, onClose);
   const [annulling, setAnnulling] = useState(false);
   const v = f.values;
@@ -324,23 +342,23 @@ export function SalaryFormDialog({
 
   const submit = async () => {
     f.setFormError(null);
-    const { row, errors } = validateSalary(v, salaries, salary?.id ?? null);
+    const { row, errors } = validateSalary(v, salaries, base?.id ?? null);
     if (!f.check(errors) || !row) return;
-    if (salary && !f.dirty) return onClose();
-    const sent = salary ? row : { ...row, id: newId, driver_id: driver.id };
+    if (base && !f.dirty) return onClose();
+    const sent = base ? row : { ...row, id: newId, driver_id: driver.id };
     try {
-      const saved = await save.mutateAsync({ salary, row: sent });
-      if (!salary && !savedAsSent(saved, sent)) return onDone('Ese sueldo ya se había guardado en el intento anterior, con lo que tenía entonces: revisalo y, si hace falta, corregilo.');
-      onDone(salary ? 'Sueldo corregido.' : `Sueldo guardado desde ${monthLabel(row.starts_on)}.`);
+      const saved = await save.mutateAsync({ salary: base, row: sent });
+      if (!base && !savedAsSent(saved, sent)) return onDone('Ese sueldo ya se había guardado en el intento anterior, con lo que tenía entonces: revisalo y, si hace falta, corregilo.');
+      onDone(base ? 'Sueldo corregido.' : `Sueldo guardado desde ${monthLabel(row.starts_on)}.`);
     } catch (err) {
       fail(err);
     }
   };
 
   const doAnnul = async () => {
-    if (!salary) return;
+    if (!base) return;
     try {
-      await annul.mutateAsync({ salary, deleted: true });
+      await annul.mutateAsync({ salary: base, deleted: true });
       onDone('Sueldo anulado: desde ese mes vale el anterior, si hay.');
     } catch (err) {
       setAnnulling(false);
@@ -352,12 +370,12 @@ export function SalaryFormDialog({
     <>
       <Shell
         f={f}
-        title={salary ? 'Corregir sueldo' : `Sueldo de ${driver.name}`}
+        title={base ? 'Corregir sueldo' : `Sueldo de ${driver.name}`}
         intro="Lo que gana por mes, desde el mes que elijas. Un sueldo nuevo no cambia los meses anteriores: cada mes usa el que regía entonces."
         busy={busy}
         onClose={onClose}
         onSubmit={() => void submit()}
-        annul={salary ? { label: 'Anular sueldo', onClick: () => setAnnulling(true) } : undefined}
+        annul={base ? { label: 'Anular sueldo', onClick: () => setAnnulling(true) } : undefined}
       >
         <div className="form-grid">
           {f.field('amount', 'Sueldo por mes', <input {...f.props('amount')} type="text" inputMode="decimal" value={v.amount} autoComplete="off" onChange={(e) => f.set('amount', e.target.value)} />, amountNote(v.amount))}
@@ -366,9 +384,9 @@ export function SalaryFormDialog({
         </div>
         {f.field('notes', 'Nota', <textarea {...f.props('notes')} rows={2} value={v.notes} maxLength={DRIVER_LIMITS.moneyNotes} onChange={(e) => f.set('notes', e.target.value)} />, 'Opcional: un aumento, el convenio…', true)}
       </Shell>
-      {annulling && salary && (
+      {annulling && base && (
         <ConfirmDialog title="¿Anular este sueldo?" confirmLabel="Anular sueldo" danger busy={annul.isPending} onConfirm={() => void doAnnul()} onCancel={() => setAnnulling(false)}>
-          <p>Desde {monthLabel(salary.startsOn)} vuelve a valer el sueldo anterior, si hay. No se borra: queda anotado quién lo hizo y cuándo.</p>
+          <p>Desde {monthLabel(base.startsOn)} vuelve a valer el sueldo anterior, si hay. No se borra: queda anotado quién lo hizo y cuándo.</p>
         </ConfirmDialog>
       )}
     </>
@@ -396,7 +414,8 @@ export function PaymentFormDialog({
   const annul = useSetPaymentDeleted();
   const busy = save.isPending || annul.isPending;
   const [newId] = useState(() => crypto.randomUUID());
-  const [initial] = useState(() => paymentFormValues(payment, today, driver, salary));
+  const [base] = useState(payment);
+  const [initial] = useState(() => paymentFormValues(base, today, driver, salary));
   const f = useForm<PaymentFormValues>(initial, busy, onClose);
   const [annulling, setAnnulling] = useState(false);
   const v = f.values;
@@ -411,21 +430,21 @@ export function PaymentFormDialog({
     f.setFormError(null);
     const { row, errors } = validatePayment(v, today);
     if (!f.check(errors) || !row) return;
-    if (payment && !f.dirty) return onClose();
-    const sent = payment ? row : { ...row, id: newId, driver_id: driver.id };
+    if (base && !f.dirty) return onClose();
+    const sent = base ? row : { ...row, id: newId, driver_id: driver.id };
     try {
-      const saved = await save.mutateAsync({ payment, row: sent });
-      if (!payment && !savedAsSent(saved, sent)) return onDone('Ese pago ya se había registrado en el intento anterior, con lo que tenía entonces: revisalo y, si hace falta, corregilo.');
-      onDone(payment ? 'Pago corregido.' : `${conceptLabel(row.concept as Payment['concept'])} registrado para ${monthLabel(row.period)}.`);
+      const saved = await save.mutateAsync({ payment: base, row: sent });
+      if (!base && !savedAsSent(saved, sent)) return onDone('Ese pago ya se había registrado en el intento anterior, con lo que tenía entonces: revisalo y, si hace falta, corregilo.');
+      onDone(base ? 'Pago corregido.' : `${conceptLabel(row.concept as Payment['concept'])} registrado para ${monthLabel(row.period)}.`);
     } catch (err) {
       fail(err);
     }
   };
 
   const doAnnul = async () => {
-    if (!payment) return;
+    if (!base) return;
     try {
-      await annul.mutateAsync({ payment, deleted: true });
+      await annul.mutateAsync({ payment: base, deleted: true });
       onDone('Pago anulado: ya no cuenta en el mes.');
     } catch (err) {
       setAnnulling(false);
@@ -438,11 +457,11 @@ export function PaymentFormDialog({
     <>
       <Shell
         f={f}
-        title={payment ? 'Corregir pago' : `Pago a ${driver.name}`}
+        title={base ? 'Corregir pago' : `Pago a ${driver.name}`}
         busy={busy}
         onClose={onClose}
         onSubmit={() => void submit()}
-        annul={payment ? { label: 'Anular pago', onClick: () => setAnnulling(true) } : undefined}
+        annul={base ? { label: 'Anular pago', onClick: () => setAnnulling(true) } : undefined}
       >
         <div className="form-grid">
           {f.field(
@@ -475,9 +494,9 @@ export function PaymentFormDialog({
         </div>
         {f.field('notes', 'Nota', <textarea {...f.props('notes')} rows={2} value={v.notes} maxLength={DRIVER_LIMITS.moneyNotes} onChange={(e) => f.set('notes', e.target.value)} />, 'Opcional: número de transferencia, de recibo…', true)}
       </Shell>
-      {annulling && payment && (
+      {annulling && base && (
         <ConfirmDialog title="¿Anular este pago?" confirmLabel="Anular pago" danger busy={annul.isPending} onConfirm={() => void doAnnul()} onCancel={() => setAnnulling(false)}>
-          <p>Deja de contar en {monthLabel(payment.period)}. No se borra: queda anotado quién lo hizo y cuándo.</p>
+          <p>Deja de contar en {monthLabel(base.period)}. No se borra: queda anotado quién lo hizo y cuándo.</p>
         </ConfirmDialog>
       )}
     </>

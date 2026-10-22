@@ -454,6 +454,7 @@ export type Database = {
           document_id: string
           hired_on: string | null
           id: string
+          left_on: string | null
           license_category: string
           name: string
           notes: string
@@ -472,6 +473,7 @@ export type Database = {
           document_id?: string
           hired_on?: string | null
           id?: string
+          left_on?: string | null
           license_category?: string
           name: string
           notes?: string
@@ -490,6 +492,7 @@ export type Database = {
           document_id?: string
           hired_on?: string | null
           id?: string
+          left_on?: string | null
           license_category?: string
           name?: string
           notes?: string
