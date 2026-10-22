@@ -265,6 +265,16 @@ try:
         move(uci, then)
     shot('juegos-10-mate')
 
+    step('Modo oscuro: el tablero con sus colores de noche, y de vuelta')
+    adb('shell', 'cmd', 'uimode', 'night', 'yes', check=False)
+    time.sleep(2)
+    wait('el tablero en modo oscuro', lambda r: board(r, 'Jaque mate. Ganan las negras.'))
+    time.sleep(1)
+    shot('juegos-11-oscuro')
+    adb('shell', 'cmd', 'uimode', 'night', 'no', check=False)
+    time.sleep(2)
+    wait('el tablero en modo claro', lambda r: board(r, 'Jaque mate. Ganan las negras.'))
+
     step('Volver a la lista: la partida terminada no queda para seguir')
     adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
     wait('la lista de juegos', lambda r: nodes(r, text='Ajedrez') and nodes(r, text='Contra el teléfono o entre dos'))

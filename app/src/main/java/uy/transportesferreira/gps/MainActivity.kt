@@ -1086,16 +1086,30 @@ class MainActivity:AppCompatActivity(){
   val m=savedMatch()?:return newChess()
   page("chess");chessJob++;thinking=false;match=m;gamesCheckAt=SystemClock.elapsedRealtime()
   bar("Ajedrez",back={games()},trailing=barButton(R.drawable.ic_flip,"Girar el tablero"){m.flipped=!m.flipped;saveMatch(m);chessViews()})
-  fun player(top:Int)=tv("",15f,ink,1).apply{gravity=Gravity.CENTER_VERTICAL;compoundDrawablePadding=dp(9);minHeight=dp(34);root.addView(this,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(top)})}
-  chessTop=player(8)
+  fun player(p:LinearLayout,top:Int)=tv("",15f,ink,1).apply{gravity=Gravity.CENTER_VERTICAL;compoundDrawablePadding=dp(9);minHeight=dp(34);p.addView(this,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(top)})}
   val b=ChessBoard(this,dark);board=b;b.onSquare={tapSquare(it)}
-  root.addView(b,LinearLayout.LayoutParams(-2,-2).apply{gravity=Gravity.CENTER_HORIZONTAL;topMargin=dp(4)})
-  chessBottom=player(4)
-  chessStatus=text(root,"",17f,ink,1,10).apply{gravity=Gravity.CENTER}
-  dock.visibility=View.VISIBLE
-  val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL};dock.addView(r,LinearLayout.LayoutParams(-1,-2))
-  undoButton=button(r,"Deshacer",Kind.LINE,R.drawable.ic_undo,top=0){undoChess()}.also{it.view.layoutParams=LinearLayout.LayoutParams(0,dp(54),1f)}
-  button(r,"Partida nueva",Kind.LINE,R.drawable.ic_plus,top=0){askNewChess()}.view.layoutParams=LinearLayout.LayoutParams(0,dp(54),1f).apply{marginStart=dp(10)}
+  // The board as big as the screen leaves for it, so nothing has to scroll: upright, between the names and above the
+  // buttons; turned, at the left of the names and the buttons.
+  val w=resources.displayMetrics.widthPixels;val h=resources.displayMetrics.heightPixels
+  if(resources.configuration.orientation==Configuration.ORIENTATION_LANDSCAPE){
+   val size=minOf(h-dp(170),w/2).coerceAtLeast(dp(200))
+   val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL};root.addView(r,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(10)})
+   r.addView(b,LinearLayout.LayoutParams(size,size))
+   val side=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(18),0,0,0)};r.addView(side,LinearLayout.LayoutParams(0,-2,1f))
+   chessTop=player(side,0);chessStatus=text(side,"",17f,ink,1,14);chessBottom=player(side,14)
+   undoButton=button(side,"Deshacer",Kind.LINE,R.drawable.ic_undo,top=18){undoChess()}
+   button(side,"Partida nueva",Kind.LINE,R.drawable.ic_plus,top=10){askNewChess()}
+  }else{
+   val size=minOf(w-dp(28),h-dp(350)).coerceAtLeast(dp(200))
+   chessTop=player(root,8)
+   root.addView(b,LinearLayout.LayoutParams(size,size).apply{gravity=Gravity.CENTER_HORIZONTAL;topMargin=dp(4)})
+   chessBottom=player(root,4)
+   chessStatus=text(root,"",17f,ink,1,10).apply{gravity=Gravity.CENTER}
+   dock.visibility=View.VISIBLE
+   val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL};dock.addView(r,LinearLayout.LayoutParams(-1,-2))
+   undoButton=button(r,"Deshacer",Kind.LINE,R.drawable.ic_undo,top=0){undoChess()}.also{it.view.layoutParams=LinearLayout.LayoutParams(0,dp(54),1f)}
+   button(r,"Partida nueva",Kind.LINE,R.drawable.ic_plus,top=0){askNewChess()}.view.layoutParams=LinearLayout.LayoutParams(0,dp(54),1f).apply{marginStart=dp(10)}
+  }
   chessViews();phoneTurn()
  }
  /** The board, the players and the line under them, after a move, an undo or a turn of the board. */

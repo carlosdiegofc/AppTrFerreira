@@ -29,11 +29,11 @@ class ChessBoard(context:Context,dark:Boolean):View(context){
     private val art=ChessArt.PIECES.mapValues{(_,a)->a.parts.map{path(it)} to a.details.map{path(it)}}
     private var scaled:Map<Int,Pair<List<Path>,List<Path>>> =emptyMap();private var scaledTo=0f
 
+    /** Square: the screen decides its size (MainActivity.chess) and the board takes the smaller side it is given. */
     override fun onMeasure(widthSpec:Int,heightSpec:Int){
-        // Square, and short enough to leave room for the rest of the screen when the phone is turned.
-        val room=resources.displayMetrics.heightPixels-(220*resources.displayMetrics.density).toInt()
-        val size=minOf(MeasureSpec.getSize(widthSpec),maxOf(room,(240*resources.displayMetrics.density).toInt()))
-        setMeasuredDimension(size,size)
+        val w=MeasureSpec.getSize(widthSpec)
+        val h=if(MeasureSpec.getMode(heightSpec)==MeasureSpec.UNSPECIFIED)w else MeasureSpec.getSize(heightSpec)
+        val size=minOf(w,h);setMeasuredDimension(size,size)
     }
 
     /** The square under a column and a row of the screen, counted from the top left. */
