@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  accountNames,
   belongsTo,
   type Driver,
   driverFormValues,
@@ -136,6 +137,12 @@ describe('choferes: fichas y cuentas de la app', () => {
     expect(belongsTo(ana, { driverId: null, driverName: 'Ana Pereira' })).toBe(true);
     expect(belongsTo({ userId: null, name: 'Eduardo Núñez' }, { driverId: 'u-x', driverName: 'eduardo nunez' })).toBe(true);
     expect(belongsTo({ userId: null, name: 'Eduardo Núñez' }, { driverId: null, driverName: '' })).toBe(false);
+    // A trip typed with a name the account used in the app is still the driver's after the card's name changes.
+    const rows = [{ driverId: 'u-ana', driverName: 'Ana P.' }, { driverId: 'u-ana', driverName: 'Ana Pereira' }, { driverId: 'u-otra', driverName: 'Otra' }];
+    expect(accountNames(rows, 'u-ana')).toEqual(['Ana P.', 'Ana Pereira']);
+    expect(accountNames(rows, null)).toEqual([]);
+    expect(belongsTo({ ...ana, name: 'Ana María Pereira' }, { driverId: null, driverName: 'ana pereira' })).toBe(false);
+    expect(belongsTo({ ...ana, name: 'Ana María Pereira', aliases: accountNames(rows, 'u-ana') }, { driverId: null, driverName: 'ana pereira' })).toBe(true);
   });
 
   it('lista los choferes de la app que todavía no tienen ficha', () => {
@@ -231,6 +238,9 @@ describe('choferes: la lista', () => {
           { driverId: null, driverName: 'Ana Pereira', gpsKm: 50, deleted: false },
           { driverId: 'u-ana', driverName: 'Ana Pereira', gpsKm: 999, deleted: true },
           { driverId: null, driverName: 'Eduardo Nuñez', gpsKm: 20, deleted: false },
+          // A name Ana used in the app, and a trip typed by hand with it.
+          { driverId: 'u-ana', driverName: 'Ana P.', gpsKm: 10, deleted: false },
+          { driverId: null, driverName: 'Ana P.', gpsKm: 5, deleted: false },
         ],
         papers: [
           // The old licence expired; the renewed one is the one that counts.
@@ -246,7 +256,8 @@ describe('choferes: la lista', () => {
     );
     expect(list.map((s) => s.key)).toEqual(['ficha:d-ana', 'ficha:d-edu', 'ficha:d-old', 'ficha:d-oct', 'app:u-carla', 'app:u-diego']);
     const [ana, edu, old, oct, carla] = list;
-    expect(ana).toMatchObject({ trips: 2, km: 200, papers: { late: 2, soon: 1 }, license: { expiresOn: '2026-10-30', state: 'soon' } });
+    // The renewed licence counts; the old one, expired, does not.
+    expect(ana).toMatchObject({ trips: 4, km: 215, papers: { late: 1, soon: 1 }, license: { expiresOn: '2026-10-30', state: 'soon' } });
     expect(ana?.presence?.state).toBe('trip');
     expect(ana?.month).toMatchObject({ month: '2026-10-01', paid: 10000, pending: 35000 });
     expect(edu).toMatchObject({ trips: 1, km: 20, presence: null, license: null });

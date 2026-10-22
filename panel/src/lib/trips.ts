@@ -197,7 +197,7 @@ export interface TripFilter {
   vehicle?: string;
   driver?: string;
   /** A driver's card: the trips of its app account under any name, and the ones typed in the panel with its name. */
-  card?: { userId: string | null; name: string } | null;
+  card?: { userId: string | null; name: string; aliases?: readonly string[] } | null;
   /** The trash: only deleted trips. */
   bin?: boolean;
 }

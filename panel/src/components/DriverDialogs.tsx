@@ -233,7 +233,12 @@ export function DriverFormDialog({
   return (
     <Shell f={f} title={base ? `Ficha de ${base.name}` : 'Nueva ficha'} busy={save.isPending} onClose={onClose} onSubmit={() => void submit()}>
       <div className="form-grid">
-        {f.field('name', 'Nombre y apellido', <input {...f.props('name')} type="text" value={v.name} maxLength={DRIVER_LIMITS.name} autoComplete="off" onChange={(e) => f.set('name', e.target.value)} />)}
+        {f.field(
+          'name',
+          'Nombre y apellido',
+          <input {...f.props('name')} type="text" value={v.name} maxLength={DRIVER_LIMITS.name} autoComplete="off" onChange={(e) => f.set('name', e.target.value)} />,
+          base && v.name.trim() !== base.name ? 'Los viajes cargados a mano se reconocen por este nombre y por los que usa en la app: los que tienen el nombre anterior pueden dejar de contar en la ficha.' : undefined,
+        )}
         {f.field(
           'userId',
           'Cuenta de la app',

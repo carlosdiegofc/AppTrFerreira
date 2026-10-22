@@ -6,6 +6,7 @@ import { CatalogNote, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton,
 import { useNow, useTripList } from '../data/hooks';
 import type { ListFormat } from '../exports/trips';
 import { ago, dayInZone, formatDay, formatDayTime } from '../lib/dates';
+import { accountNames } from '../lib/drivers';
 import { count, decimal, number } from '../lib/format';
 import { routeText, sourceLabel, truckOf } from '../lib/tripTable';
 import { countByStatus, filterTrips, knownValues, type PeriodKind, periodRange, periodToIso, type StatusFilter, type Trip } from '../lib/trips';
@@ -96,9 +97,10 @@ export function Viajes() {
   // typed in the panel with its name, as the card counts them.
   const cardName = params.get('nombre') ?? '';
   const cardAccount = params.get('cuenta') ?? '';
-  const card = useMemo(() => (cardName ? { userId: cardAccount || null, name: cardName } : null), [cardName, cardAccount]);
 
   const { trips, query, catalog } = useTripList(instants?.fromIso ?? null, instants?.toIso ?? null);
+  // The names the account used in the app count for the trips typed by hand, as in the card.
+  const card = useMemo(() => (cardName ? { userId: cardAccount || null, name: cardName, aliases: accountNames(trips, cardAccount || null) } : null), [cardName, cardAccount, trips]);
   const counts = useMemo(() => countByStatus(trips), [trips]);
   const bin = tab.status === 'bin';
   const inTab = bin ? counts.deleted : counts.all;

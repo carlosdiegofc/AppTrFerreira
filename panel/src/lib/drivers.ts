@@ -267,12 +267,19 @@ export function seniority(hiredOn: string, today: string): string | null {
 
 /**
  * Whether a trip, a paper or a receipt is the driver's: by the app account when both have it, by the name otherwise
- * (trips typed in the panel, or a driver without the app).
+ * (trips typed in the panel, or a driver without the app). The names the account used in the app count too (aliases),
+ * so a trip typed with one of them stays the driver's after the card's name is corrected.
  */
-export function belongsTo(driver: Pick<Driver, 'userId' | 'name'>, row: { driverId: string | null; driverName: string | null }): boolean {
+export function belongsTo(driver: Pick<Driver, 'userId' | 'name'> & { aliases?: readonly string[] }, row: { driverId: string | null; driverName: string | null }): boolean {
   if (driver.userId && row.driverId) return driver.userId === row.driverId;
   const name = sameName(row.driverName);
-  return name !== '' && name === sameName(driver.name);
+  return name !== '' && [driver.name, ...(driver.aliases ?? [])].some((n) => sameName(n) === name);
+}
+
+/** The names an app account's rows were saved with («Luis Ferreira», «Los Ferreira»): a card's aliases. */
+export function accountNames(rows: readonly { driverId: string | null; driverName: string | null }[], userId: string | null): string[] {
+  if (!userId) return [];
+  return [...new Set(rows.filter((r) => r.driverId === userId && r.driverName).map((r) => r.driverName as string))];
 }
 
 /** A name to compare: no accents, lower case, single spaces. */
@@ -314,20 +321,24 @@ export interface SummaryInput {
 
 const LICENSE = fold('Licencia de conducir');
 
+/** Whether a paper is a driving licence. */
+export const isLicense = (p: { kind: string }) => fold(p.kind) === LICENSE;
+
 /** The driving licence among a driver's papers: the one that expires last, so a renewed one wins over the old one. */
 export function latestLicense<T extends { kind: string; expiresOn: string | null }>(papers: readonly T[]): T | null {
-  return papers.filter((p) => fold(p.kind) === LICENSE).sort((a, b) => (b.expiresOn ?? '').localeCompare(a.expiresOn ?? ''))[0] ?? null;
+  return papers.filter(isLicense).sort((a, b) => (b.expiresOn ?? '').localeCompare(a.expiresOn ?? ''))[0] ?? null;
 }
 
 /** Every card and every app driver without one, each with its summary; the ones with a card first, by name. */
 export function driverSummaries(input: SummaryInput, today: string): DriverSummary[] {
   const month = firstOfMonth(today);
   const summary = (driver: Driver | null, userId: string | null, name: string): DriverSummary => {
-    const who = { userId, name };
+    const who = { userId, name, aliases: accountNames(input.trips, userId) };
     const mine = input.trips.filter((t) => !t.deleted && belongsTo(who, t));
     const papers = input.papers.filter((p) => p.scope === 'driver' && belongsTo(who, { driverId: p.driverId, driverName: p.driverName }));
-    const states = papers.map((p) => paperState(p.expiresOn, today));
     const license = latestLicense(papers);
+    // A licence that was renewed does not count as expired: only the latest one does.
+    const states = papers.filter((p) => !isLicense(p) || p === license).map((p) => paperState(p.expiresOn, today));
     return {
       key: driver ? `ficha:${driver.id}` : `app:${userId}`,
       driver,

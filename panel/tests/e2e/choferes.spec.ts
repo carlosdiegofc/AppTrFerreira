@@ -43,6 +43,8 @@ test('Choferes lista las fichas con su mes, sus papeles y su sueldo, y los de la
   await list.getByRole('link', { name: 'Ramón Sosa' }).click();
   await expect(page.locator('.card', { has: page.getByRole('heading', { name: 'Datos' }) })).toContainText('31/08/2026');
   await expect(page.getByText('Dejó de trabajar el 31/08/2026: los meses siguientes no llevan sueldo.')).toBeVisible();
+  // His last salary, not a current one.
+  await expect(page.locator('.card', { has: page.getByRole('heading', { name: 'Sueldo' }) })).toContainText('Último sueldo$ 30.000 desde julio de 2026');
   // His settlement, for September, shows without a salary in that month.
   const months = page.getByRole('table', { name: 'Sueldo por mes' }).getByRole('row').filter({ hasText: / de 20\d\d/ });
   await expect(months).toHaveCount(3);

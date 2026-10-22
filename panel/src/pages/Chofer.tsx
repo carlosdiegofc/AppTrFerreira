@@ -9,9 +9,11 @@ import { useDocuments, useDrivers, useFleetData, useFuel, useNow, usePaperDriver
 import { ago, dayInZone, firstOfMonth, firstOfNextMonth, formatDay, inDays, startOfDay } from '../lib/dates';
 import { paperViews } from '../lib/documents';
 import {
+  accountNames,
   belongsTo,
   conceptLabel,
   type Driver,
+  isLicense,
   latestLicense,
   type MonthLine,
   monthLabel,
@@ -134,12 +136,16 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
   const [chosenYear, setYear] = useState<number | null>(null);
   const year = chosenYear !== null && years.includes(chosenYear) ? chosenYear : (years[0] ?? Number(today.slice(0, 4)));
   const lines = monthLines(salaries, payments, yearMonths(year, today, history), driver.leftOn);
-  const current = salaryFor(salaries, month);
-  const later = salaries.filter((s) => !s.deleted && s.startsOn > month).sort((a, b) => a.startsOn.localeCompare(b.startsOn));
+  // Who left before this month: the salary of the month they left is the last one, not a current one.
+  const salaryMonth = driver.leftOn && firstOfMonth(driver.leftOn) < month ? firstOfMonth(driver.leftOn) : month;
+  const current = salaryFor(salaries, salaryMonth);
+  const later = salaries.filter((s) => !s.deleted && s.startsOn > salaryMonth).sort((a, b) => a.startsOn.localeCompare(b.startsOn));
 
   const onTrip = useMemo(() => new Set((fleet.data?.active ?? []).map((t) => t.driver_id)), [fleet.data]);
   const present = useMemo(() => (presence.data && driver.userId ? (driverPresence(presence.data, onTrip, now).find((p) => p.driverId === driver.userId) ?? null) : null), [presence.data, onTrip, now, driver.userId]);
-  const mine = (row: { driverId: string | null; driverName: string | null }) => belongsTo(driver, row);
+  // The names the account used in the app count for the trips typed by hand, as in the list and in Viajes.
+  const who = { userId: driver.userId, name: driver.name, aliases: accountNames(trips, driver.userId) };
+  const mine = (row: { driverId: string | null; driverName: string | null }) => belongsTo(who, row);
   const work = summarize(
     trips.filter((t) => mine(t)),
     receipts.filter((r) => r.date !== null && r.date >= month && r.date < firstOfNextMonth(today) && mine({ driverId: r.driverId, driverName: r.driverName })),
@@ -198,6 +204,16 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
         }
       />
       {query.error && <StaleNote onRetry={() => void query.refetch()} />}
+      {driver.userId && !presenceRead && (presence.error || fleet.error) && (
+        <ErrorNote
+          onRetry={() => {
+            void presence.refetch();
+            void fleet.refetch();
+          }}
+        >
+          No se pudo leer si tiene la app abierta o está de viaje: se ve con «—».
+        </ErrorNote>
+      )}
       {notice && (
         <p className={`notice notice-${notice.tone}`} role={notice.tone === 'ok' ? 'status' : 'alert'}>
           <Icon name={notice.tone === 'ok' ? 'check' : 'warning'} size={18} /> {notice.text}
@@ -318,7 +334,7 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
                 <li key={p.id}>
                   <span>{p.kind || 'Sin tipo'}</span>
                   <span className="muted">{p.expiresOn ? `${p.state === 'late' ? 'Venció' : 'Vence'} el ${formatDay(p.expiresOn)}${p.state === 'late' || p.state === 'soon' ? ` · ${inDays(p.expiresOn, today)}` : ''}` : 'Sin vencimiento'}</span>
-                  <Pill tone={PAPER_STATE[p.state].tone}>{PAPER_STATE[p.state].label}</Pill>
+                  {isLicense(p) && p !== license ? <Pill tone="grey">Renovada</Pill> : <Pill tone={PAPER_STATE[p.state].tone}>{PAPER_STATE[p.state].label}</Pill>}
                 </li>
               ))}
             </ul>
@@ -338,7 +354,7 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
         <div className="card-body account-facts">
           <dl className="facts facts-tight">
             <div>
-              <dt>Sueldo por mes</dt>
+              <dt>{salaryMonth < month ? 'Último sueldo' : 'Sueldo por mes'}</dt>
               <dd>{current ? `${money(current.amount, current.currency)} desde ${monthLabel(current.startsOn)}` : <span className="muted">Sin sueldo cargado: los pagos se anotan igual</span>}</dd>
             </div>
             {later.map((s) => (
