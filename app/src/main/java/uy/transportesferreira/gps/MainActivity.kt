@@ -1080,7 +1080,8 @@ class MainActivity:AppCompatActivity(){
   saveMatch(ChessMatch(newVsPhone,newLevel,white,Chess.Game()));chessSel=-1;chess()
  }
  private fun levelName(l:ChessAi.Level)=when(l){ChessAi.Level.EASY->"fácil";ChessAi.Level.MEDIUM->"medio";ChessAi.Level.HARD->"difícil"}
- private fun sideDot(white:Boolean)=GradientDrawable().apply{shape=GradientDrawable.OVAL;setColor(if(white)Color.WHITE else 0xFF2B303A.toInt());setStroke(dp(1),0xFF1B1F27.toInt());setSize(dp(14),dp(14))}
+ // The black dot gets a light edge in dark mode, or it disappears into the background.
+ private fun sideDot(white:Boolean)=GradientDrawable().apply{shape=GradientDrawable.OVAL;setColor(if(white)Color.WHITE else 0xFF2B303A.toInt());setStroke(dp(1),if(dark&&!white)muted else 0xFF1B1F27.toInt());setSize(dp(14),dp(14))}
  private fun chess(){
   val s=parkedState();if(!s.allowed){toast(parkedText(s));homeOrTrip();return}
   val m=savedMatch()?:return newChess()
