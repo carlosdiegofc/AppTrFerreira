@@ -21,14 +21,12 @@ class TrucoTally(context:Context,private val ink:Int,private val empty:Int):View
     override fun onDraw(c:Canvas){
         val s=side(width.toFloat());val pad=s*0.15f;val y0=pad;val y1=pad+s
         val thick=maxOf(s*0.15f,2f);val thin=maxOf(s*0.06f,1f)
+        fun stick(point:Int,ax:Float,ay:Float,bx:Float,by:Float){
+            val on=point<points;paint.color=if(on)ink else empty;paint.strokeWidth=if(on)thick else thin;c.drawLine(ax,ay,bx,by,paint)
+        }
         for(g in 0 until 6){
-            val x0=s*0.1f+g*s*1.45f+(if(g>=3)s*0.95f else 0f);val x1=x0+s
-            val sticks=listOf(floatArrayOf(x0,y0,x0,y1),floatArrayOf(x0,y0,x1,y0),floatArrayOf(x1,y0,x1,y1),floatArrayOf(x0,y1,x1,y1),floatArrayOf(x0,y0,x1,y1))
-            sticks.forEachIndexed{i,l->
-                val on=g*5+i<points
-                paint.color=if(on)ink else empty;paint.strokeWidth=if(on)thick else thin
-                c.drawLine(l[0],l[1],l[2],l[3],paint)
-            }
+            val x0=s*0.1f+g*s*1.45f+(if(g>=3)s*0.95f else 0f);val x1=x0+s;val n=g*5
+            stick(n,x0,y0,x0,y1);stick(n+1,x0,y0,x1,y0);stick(n+2,x1,y0,x1,y1);stick(n+3,x0,y1,x1,y1);stick(n+4,x0,y0,x1,y1)
         }
         // Between the malas and the buenas.
         val mid=s*0.1f+3*s*1.45f+s*0.95f/2-s*0.45f/2

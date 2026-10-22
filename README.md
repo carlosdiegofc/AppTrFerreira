@@ -5,14 +5,26 @@ Panel web nuevo (React + TypeScript), en construcción al lado del actual: [pane
 # Panel web (nuevo)
 La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
 
-# Transportes Ferreira GPS — v0.18.0
+# Transportes Ferreira GPS — v0.19.0
+
+## Nuevo en v0.19.0 (Juegos: truco uruguayo contra el teléfono; versionCode 31)
+- **Truco uruguayo** en Juegos, contra el teléfono, con las reglas decididas el 21 y el 22/10/2026:
+  - A 30 puntos: 15 malas y 15 buenas. El tanteador los muestra en palabras y con fósforos, como se anotan en la mesa.
+  - La muestra y sus piezas (el 2, 4, 5, 11 y 10 del palo; si la muestra es una de ellas, el 12 toma su lugar), con una estrella en cada pieza. Después, el 1 de espada, el 1 de basto, el 7 de espada y el 7 de oro.
+  - Envido, real envido y falta envido: la falta vale lo que le falta al que va ganando para llegar a 30. La sota de la muestra vale 27, como el caballo. El envido está primero: se puede cantar en vez de responder el truco.
+  - Flor obligatoria (3 puntos), con contraflor (6), contraflor al resto y «con flor me achico» (4 para el otro).
+  - Truco, retruco y vale cuatro, y la posibilidad de irse al mazo (pide confirmación).
+- **La mesa:** el tanteador, las cartas del teléfono boca abajo (al terminar la mano se dan vuelta), la muestra y las tres rondas con quién ganó cada una, lo que cantó cada uno, los tantos y los puntos de la mano, y tus cartas con tus tantos. Una carta se elige con un toque y se juega con el segundo. Los cantos y las respuestas que corresponden aparecen como botones. Las reglas de la mesa están al pie de la pantalla.
+- **El rival** (`TrucoAi.kt`): canta el envido por sus tantos y el truco por lo que estima ganar, jugando muchas veces el resto de la mano con las cartas que vos podrías tener (solo mira sus cartas, la muestra y lo que ya se jugó). A veces miente.
+- **Las cartas** son dibujos propios de la app (`TrucoArt.kt`): espada azul, basto verde, oro dorado y copa roja, con el número grande en la esquina.
+- Igual que el ajedrez: se juega con el camión parado, la partida queda solo en el teléfono (una por cuenta) y se sigue donde quedó.
 
 ## Nuevo en v0.18.0 (Juegos: ajedrez para las esperas; versionCode 30)
 - **Juegos:** para pasar el rato mientras se espera la carga. Están en el Inicio de los dos modos, en el viaje en curso y en la Flota en vivo de la cuenta de la empresa; los ven todas las cuentas.
 - **Ajedrez:** contra el teléfono, en nivel fácil, medio o difícil, con blancas, negras o al azar; o entre dos personas, pasándose el teléfono. Tiene todas las reglas: enroque, captura al paso, coronación (se elige la pieza), jaque, mate, ahogado y tablas por falta de material, por 50 jugadas y por triple repetición. Se puede deshacer y girar el tablero. Las piezas son dibujos propios de la app.
 - **Con el camión parado:** los juegos se abren sin viaje, con el viaje pausado o con el camión detenido según el GPS (una lectura de los últimos 2 minutos, a menos de 5 km/h). Mientras se juega, la app lo vuelve a mirar cada 5 segundos: si el camión arranca, la partida se guarda y se cierra, y vuelve la pantalla del viaje.
 - **La partida queda solo en el teléfono**, una por cuenta, y se sigue donde quedó. No se envía nada al panel ni a la base.
-- Vienen después el truco uruguayo y las partidas en línea con los compañeros ([docs/PLAN-PLATAFORMA.md](docs/PLAN-PLATAFORMA.md)).
+- Vienen después el truco uruguayo (en la v0.19.0) y las partidas en línea con los compañeros ([docs/PLAN-PLATAFORMA.md](docs/PLAN-PLATAFORMA.md)).
 
 ## Nuevo en v0.17.3 (Rendimiento cuenta cada boleta en su fecha; versionCode 29)
 - **Rendimiento:** cada boleta de combustible cuenta en el mes de su fecha, o de la fecha que le corrigió el panel, igual que en Combustible y en Métricas del panel. Antes contaba en el mes en que llegó a la base, así que una boleta mandada tarde o con la fecha corregida podía caer en otro mes.
