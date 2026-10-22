@@ -1211,12 +1211,13 @@ class MainActivity:AppCompatActivity(){
   // What a player sang or answered last, until they play a card.
   fun bubble(p:LinearLayout)=pill("",amber,amberBg).apply{visibility=View.INVISIBLE;(layoutParams as LinearLayout.LayoutParams).marginStart=dp(10);p.addView(this)}
   // Each one's points in words and in matches, the way they are kept at the table.
-  fun scoreBoard(p:LinearLayout,top:Int):Pair<List<TextView>,List<TrucoTally>>{
+  // In the narrow column of the turned screen, the name goes above the points.
+  fun scoreBoard(p:LinearLayout,top:Int,stacked:Boolean=false):Pair<List<TextView>,List<TrucoTally>>{
    val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;setPadding(dp(14),dp(9),dp(14),dp(10))};card(p,top=top).addView(r)
    val scores=ArrayList<TextView>();val tallies=ArrayList<TrucoTally>()
    for(i in 0..1){val col=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};r.addView(col,LinearLayout.LayoutParams(0,-2,1f).apply{if(i==1)marginStart=dp(18)})
-    val words=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.BOTTOM};col.addView(words)
-    words.addView(tv(if(i==0)"Vos" else "Teléfono",13f,muted,1).apply{setPadding(0,0,dp(8),dp(1))});scores.add(tv("",16f,ink,2).also{words.addView(it)})
+    val words=LinearLayout(this).apply{orientation=if(stacked)LinearLayout.VERTICAL else LinearLayout.HORIZONTAL;gravity=if(stacked)Gravity.START else Gravity.BOTTOM};col.addView(words)
+    words.addView(tv(if(i==0)"Vos" else "Teléfono",13f,muted,1).apply{if(!stacked)setPadding(0,0,dp(8),dp(1))});scores.add(tv("",16f,ink,2).also{words.addView(it)})
     tallies.add(TrucoTally(this,ink,fieldLine).also{col.addView(it,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(6)})})}
    return scores to tallies
   }
@@ -1228,7 +1229,8 @@ class MainActivity:AppCompatActivity(){
   // The muestra, and each round with the phone's card above the person's and who won it below.
   fun table(p:LinearLayout,top:Int):Triple<TrucoCard,List<List<TrucoCard>>,List<TextView>>{
    val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;setPadding(dp(10),dp(10),dp(10),dp(8))};card(p,top=top).addView(r,LinearLayout.LayoutParams(-1,-2))
-   fun column(label:String,start:Int)=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER_HORIZONTAL;addView(tv(label,12.5f,muted,1));r.addView(this,LinearLayout.LayoutParams(-2,-2).apply{marginStart=start})}
+   // The label wraps its text, so that a column is as wide as «Muestra» when the cards are narrower.
+   fun column(label:String,start:Int)=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER_HORIZONTAL;addView(tv(label,12.5f,muted,1),LinearLayout.LayoutParams(-2,-2));r.addView(this,LinearLayout.LayoutParams(-2,-2).apply{marginStart=start})}
    val muestra=TrucoCard(this,dark).also{column("Muestra",0).addView(it,LinearLayout.LayoutParams(small,-2).apply{topMargin=dp(4)})}
    val slots=List(2){ArrayList<TrucoCard>()};val won=ArrayList<TextView>()
    for(i in 0..2){val col=column(listOf("1ª","2ª","3ª")[i],dp(if(i==0)18 else 8))
@@ -1241,8 +1243,8 @@ class MainActivity:AppCompatActivity(){
    return Triple(name,said,text(p,"",13.5f,muted,0,2))
   }
   fun hand(p:LinearLayout,top:Int):List<TrucoCard>{
-   // Room above the cards for the chosen one, which rises.
-   val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_HORIZONTAL;clipToPadding=false;clipChildren=false;setPadding(0,dp(12),0,0)}
+   // Room above the cards for the chosen one, which rises; the row keeps its height when no card is left.
+   val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_HORIZONTAL;clipToPadding=false;clipChildren=false;setPadding(0,dp(12),0,0);minimumHeight=Math.round(big*1.5f)+dp(12)}
    p.addView(r,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(top)})
    return (0..2).map{i->TrucoCard(this,dark).also{c->r.addView(c,LinearLayout.LayoutParams(big,-2).apply{if(i>0)marginStart=dp(10)});c.setOnClickListener{tapTruco(i)}}}
   }
@@ -1259,7 +1261,7 @@ class MainActivity:AppCompatActivity(){
    val (muestra,slots,won)=table(box,6)
    val me=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(16),0,0,0)};tr.addView(me,LinearLayout.LayoutParams(0,-2,1f))
    val (myName,mySaid,hint)=mine(me,8);val cards=hand(me,0)
-   val (scores,tallies)=scoreBoard(side,0);val st=status(side,12);val nw=news(side)
+   val (scores,tallies)=scoreBoard(side,0,stacked=true);val st=status(side,12);val nw=news(side)
    side.addView(calls,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(10)});link(side,"Reglas de esta mesa",top=4){trucoRules()}
    TrucoViews(listOf(myName,phoneName),scores,tallies,listOf(mySaid,phoneSaid),backs,muestra,slots,won,st,nw,hint,cards,calls)
   }else{
@@ -1299,8 +1301,9 @@ class MainActivity:AppCompatActivity(){
   // Cards dimmed while a call waits for the person's answer.
   val answering=h.actor==0&&playable.isEmpty()
   v.hint.text=if(trucoPick!=null)"Tocá otra vez la carta para jugarla." else TrucoTalk.tantos(mu,h.dealt[0])
+  // The cards left are always the first places (the list closes up), so hiding the rest keeps them in the middle.
   v.hand.forEachIndexed{i,c->val card=h.cards[0].getOrNull(i)
-   c.visibility=if(card!=null)View.VISIBLE else View.INVISIBLE;c.card=card;c.pieza=card!=null&&mu.isPieza(card)
+   c.visibility=if(card!=null)View.VISIBLE else View.GONE;c.card=card;c.pieza=card!=null&&mu.isPieza(card)
    c.picked=card!=null&&card==trucoPick;c.translationY=if(c.picked)-dpf(10f) else 0f;c.alpha=if(answering)0.55f else 1f
    c.isClickable=card!=null&&card in playable
    c.contentDescription=card?.let{TrucoTalk.cardName(it)+(if(c.pieza)", pieza" else "")+when{it !in playable->"";c.picked->". Tocá otra vez para jugarla.";else->". Tocá para elegirla."}}}
