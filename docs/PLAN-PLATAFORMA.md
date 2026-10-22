@@ -139,5 +139,5 @@ Más adelante: proveedor de mapas, método de lectura de boletas, modelo de IA y
 - [x] Referencia de combustible, consumo editable, estimación y aviso visual de nivel bajo.
 - [x] Migración aditiva con pasos GPS estimados y controles de acceso; pruebas fuera de producción.
 - [x] Validación de navegador en computadora y celular (CI con datos inventados).
-- [ ] Publicación con respaldo previo. Detalles: [GPS-CONTROL-RUTA.md](GPS-CONTROL-RUTA.md).
+- [x] Publicación el 21/10/2026 con respaldo manual completo de estructura y datos, verificado y entregado localmente antes de aplicar 0005. Migración aplicada y despliegue #11 exitoso (commit aef848d); 157 pruebas unitarias y 94 de navegador aprobadas, además de SQL/RLS. Detalles: [GPS-CONTROL-RUTA.md](GPS-CONTROL-RUTA.md).
 - [ ] Etapa Android posterior: notificaciones y sonido al chofer.
