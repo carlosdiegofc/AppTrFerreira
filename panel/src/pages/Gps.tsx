@@ -2,15 +2,16 @@ import { useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { FleetMap, type PersonMark } from '../components/FleetMap';
 import { Icon } from '../components/Icon';
-import { Dot, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote, type Tone } from '../components/ui';
+import { Dot, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote } from '../components/ui';
 import { LIVE_REFRESH_MS } from '../config';
 import { useFleet, useNow, usePresence, useRoute } from '../data/hooks';
 import { ago, dayInZone, formatDay, formatTime } from '../lib/dates';
 import { type FleetUnit, fleetCounts, STATE_LABEL, unitTitle } from '../lib/fleet';
 import { count, km, kmh } from '../lib/format';
-import { type DriverPresence, driverPresence, PRESENCE_LABEL, type PresenceState } from '../lib/presence';
+import { type DriverPresence, driverPresence, PRESENCE_LABEL } from '../lib/presence';
 import { drawable } from '../lib/route';
-import { STATE_TONE } from './states';
+import { presenceLine } from './presenceText';
+import { PRESENCE_TONE, STATE_TONE } from './states';
 import { PointEditor, TruckRoad, type RoadView } from '../components/RoadControls';
 import { useRoadPoints, useRoadWrite } from '../data/road';
 import { POINT_LABEL, pointTitle, type RoadPoint, type PointKind, sortedPoints } from '../lib/road';
@@ -102,19 +103,6 @@ function Detail({
       {stale && <StaleNote onRetry={onRetry}>No se pudo actualizar el recorrido: se ve el último que se leyó.</StaleNote>}
     </section>
   );
-}
-
-/** On a trip blue, active with the app open green, not seen for a while grey. */
-const PRESENCE_TONE: Record<PresenceState, Tone> = { trip: 'blue', active: 'green', seen: 'grey' };
-
-const version = (p: DriverPresence) => `app ${p.version}${p.newer ? ` (hay una más nueva: ${p.newer})` : ''}`;
-
-/** What the list says of each driver: on a trip, active and since when, or when the app was last open. */
-function presenceLine(p: DriverPresence, now: number): string {
-  if (p.state === 'trip') return ['En viaje', version(p)].join(' · ');
-  if (p.state === 'active')
-    return [`Activo ${ago(p.seenAt, now)}`, 'sin viaje', p.place ? null : 'sin posición', version(p)].filter(Boolean).join(' · ');
-  return [`Abrió la app ${ago(p.seenAt, now)}`, version(p)].join(' · ');
 }
 
 function PersonDetail({ person, now, onClose }: { person: DriverPresence; now: number; onClose: () => void }) {

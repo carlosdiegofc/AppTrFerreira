@@ -74,6 +74,13 @@ Va armándose al costado del panel actual y lo reemplaza sección por sección.
 6. [x] Publicarlo: el código pasa a `main` y el panel nuevo queda en `/nuevo/` de la dirección del panel actual (18/10/2026).
 7. [x] GPS en vivo más rápido (aprobado el 18/10/2026, adelanta parte de la etapa 6): posición cada 3 segundos y recorrido cada 5, con la app 0.17.0 mandando un punto cada 2 segundos. La 0.17.0 se sube a Google Play cuando lo decidas (18/10/2026).
 8. [x] «Chofer activo» (aprobado el 18/10/2026): GPS en vivo y la «Flota en vivo» de la app dicen qué choferes tienen la app abierta, con qué versión y, si no viajan, dónde está el teléfono. Migración [`0002_chofer_activo.sql`](../supabase/migrations/0002_chofer_activo.sql), una tabla nueva: aplicada en producción el 19/10/2026 a las 08:20 (Uruguay). El respaldo completo se tomó a la 01:22, se probó en una base local y se entregó; entre el respaldo y la migración no cambió ningún dato. Avisan los teléfonos con la app 0.17.0 o posterior (19/10/2026).
+9. [x] Choferes (aprobado el 22/10/2026, adelanta parte de la etapa 2): la ficha de cada chofer y su sueldo de cada mes, con lo que se le va pagando. Migración [`0008_choferes_sueldos.sql`](../supabase/migrations/0008_choferes_sueldos.sql), que solo agrega tres tablas, su historial de cambios y sus permisos:
+   - La lista separa a los choferes con ficha, a los de la app que todavía no la tienen (se les crea desde ahí) y a los que ya no trabajan. De cada uno muestra los viajes y los kilómetros del mes, los papeles vencidos o por vencer y cómo va el sueldo del mes.
+   - La ficha: teléfono, cédula, fecha de ingreso con la antigüedad, categoría de la libreta (su vencimiento sigue en Documentación), la actividad del mes con el enlace a sus viajes, sus papeles y los datos para pagarle: forma de pago, banco y cuenta.
+   - El sueldo, mes a mes: el sueldo del mes, lo pagado y lo que falta. Los adelantos y los pagos de sueldo se restan; el aguinaldo, la licencia, los viáticos y otros pagos se muestran aparte. Pesos y dólares no se mezclan. Un sueldo nuevo rige desde el mes que se elige, y los meses anteriores quedan con el de antes.
+   - Nada se borra: un sueldo o un pago mal cargado se corrige o se anula, y quien ya no trabaja queda con su ficha y sus pagos. La base guarda quién cargó o cambió cada cosa y cómo estaba antes.
+   - Lo ven y lo cargan solo las cuentas del panel (dueño y administración). Los choferes no ven las fichas ni los sueldos, ni siquiera el suyo.
+   - [ ] Publicación: respaldo completo antes, 0008 en producción y panel publicado.
 
 ### App: juegos para las esperas
 Para pasar el rato mientras se espera la carga (aprobado el 21/10/2026). Se juega con el camión parado, y los juegos los ven todas las cuentas.
@@ -99,6 +106,10 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 22/10/2026: choferes y sueldos.
+  - El sueldo se lleva mes a mes: se carga el sueldo del mes y cada pago, y el panel muestra lo pagado y lo que falta.
+  - La ficha lleva contacto y documento, la libreta de conducir, la actividad y los datos para pagarle.
+  - Los sueldos los ven solo el dueño y la administración, con las cuentas del panel. Los choferes no los ven, ni siquiera el suyo.
 - 22/10/2026: mapa del GPS.
   - La vista satelital viene de Google Maps, por su Map Tiles API: entra en el mismo mapa, así que no cambia nada de lo que ya muestra.
   - Va en los mapas de GPS en vivo y de cada viaje del panel.
@@ -181,4 +192,5 @@ Más adelante: proveedor de mapas, método de lectura de boletas, modelo de IA y
 - [ ] La clave de Google Maps: la crea el dueño en Google Cloud, con una cuenta de facturación.
 - [x] Los 15 peajes de las rutas nacionales, los 2 de los puentes a Argentina y los 24 puestos de balanza del MTOP, con la ubicación del Geoportal del MTOP comparada con OpenStreetMap y revisada en la foto satelital (migración 0006, solo agrega; detalle en [GPS-CONTROL-RUTA.md](GPS-CONTROL-RUTA.md)). Los 3 peajes ya cargados estaban en el lugar justo y no se tocan.
 - [x] El logo oficial de Google Maps y su enlace a los términos en los créditos de la vista satelital, como piden las condiciones de la Map Tiles API.
+- [x] Los 122 radares del MTOP (pedido el 22/10/2026), con la ubicación del Geoportal comparada con las calles y los radares de OpenStreetMap (migración 0007, solo agrega; detalle en [GPS-CONTROL-RUTA.md](GPS-CONTROL-RUTA.md)). Van sin velocidad máxima: se carga en cada uno desde el panel.
 - [x] Publicación el 22/10/2026: respaldo completo de estructura y datos (04:02 UTC), probado restaurándolo y entregado al dueño fuera del repositorio; 0006 aplicada en producción, con 14 peajes y 24 balanzas nuevos, y los 3 peajes y los puntos propios sin cambios; panel publicado (despliegue #12, commit 2f5e1ba).
