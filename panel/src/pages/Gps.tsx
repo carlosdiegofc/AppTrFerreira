@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { FleetMap, type PersonMark } from '../components/FleetMap';
 import { Icon } from '../components/Icon';
@@ -163,6 +163,8 @@ export function Gps() {
   const [filter, setFilter] = useState<Filter>('all');
   const [fitToken, setFitToken] = useState(0);
   const [view, setView] = useState<RoadView>('live');
+  // The map's card goes over the whole screen with it, «Ver todos» included.
+  const mapCard = useRef<HTMLDivElement>(null);
   const [kinds, setKinds] = useState<PointKind[]>(['toll', 'scale', 'radar']);
   const [newKind, setNewKind] = useState<PointKind>('toll');
   const [picking, setPicking] = useState(false);
@@ -427,8 +429,10 @@ export function Gps() {
             </p>
           </section>
         </aside>
-        <div className="card gps-map">
+        <div ref={mapCard} className="card gps-map">
           <FleetMap
+            tools
+            fullTarget={mapCard}
             units={fleet.units}
             people={people}
             selected={selected}

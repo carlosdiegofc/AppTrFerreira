@@ -7,6 +7,13 @@ export const CURRENT_PANEL_URL = 'https://carlosdiegofc.github.io/AppTrFerreira/
 export const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 export const TILE_ATTRIBUTION = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
+/**
+ * Key of Google Maps Platform for the satellite view (Map Tiles API, decision of 22/10/2026). It is put in when the
+ * panel is built (the GOOGLE_MAPS_KEY secret of the repository) and is limited in Google Cloud to this site and to that
+ * API. Without it the maps show only the street map.
+ */
+export const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_KEY ?? '';
+
 /** Uruguay, for a map that has nothing to show yet. */
 export const DEFAULT_CENTER: [number, number] = [-32.7, -56.0];
 export const DEFAULT_ZOOM = 7;

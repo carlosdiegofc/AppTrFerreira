@@ -3,8 +3,9 @@
 // the map neither flickers nor jumps every few seconds; the route of the selected truck reaches the marker.
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { useEffect, useRef } from 'react';
+import { type RefObject, useEffect, useRef } from 'react';
 import { DEFAULT_CENTER, DEFAULT_ZOOM, LIVE_REFRESH_MS, TILE_ATTRIBUTION, TILE_URL } from '../config';
+import { mapView } from './mapView';
 import type { RoutePoint } from '../data/api';
 import { type FleetUnit, STATE_LABEL, unitTitle } from '../lib/fleet';
 import { type Glide, glideAt, type Point, startGlide, tailStart } from '../lib/glide';
@@ -36,6 +37,10 @@ interface Props {
   focusPoint?: RoadPoint | null;
   onPointSelect?: (point: RoadPoint) => void;
   onPickLocation?: (location: { latitude: number; longitude: number }) => void;
+  /** The satellite view and the full screen (GPS en vivo); the map of Inicio stays the plain street map. */
+  tools?: boolean;
+  /** What goes over the whole screen with the map: the box that holds it with its own buttons. */
+  fullTarget?: RefObject<HTMLElement | null>;
 }
 
 /** A marker on the map: where it is drawn now, where it is going, and the glide between the two. */
@@ -94,6 +99,8 @@ export function FleetMap({
   focusPoint,
   onPointSelect,
   onPickLocation,
+  tools = false,
+  fullTarget,
 }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
@@ -148,7 +155,8 @@ export function FleetMap({
       fadeAnimation: !still,
       markerZoomAnimation: !still,
     }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-    L.tileLayer(TILE_URL, { maxZoom: 18, attribution: TILE_ATTRIBUTION }).addTo(m);
+    const undoView = tools ? mapView(m, { full: () => fullTarget?.current ?? null }) : null;
+    if (!tools) L.tileLayer(TILE_URL, { maxZoom: 18, attribution: TILE_ATTRIBUTION }).addTo(m);
     routeLayer.current = L.layerGroup().addTo(m);
     map.current = m;
     const resize = new ResizeObserver(() => m.invalidateSize());
@@ -159,6 +167,7 @@ export function FleetMap({
       frame.current = 0;
       resize.disconnect();
       known.clear();
+      undoView?.();
       m.remove();
       map.current = null;
     };
