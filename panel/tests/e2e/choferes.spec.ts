@@ -1,7 +1,7 @@
 // Choferes, as seed.sql leaves it (decision of 22/10/2026): the cards with this month's work, papers and salary, the app
 // drivers without a card, and a driver's card with the salary month by month. Nothing here saves.
 import { expect, test } from '@playwright/test';
-import { open, prepare, shot, signIn } from './helpers';
+import { open, prepare, rows, shot, signIn } from './helpers';
 
 test.beforeEach(async ({ page }) => prepare(page));
 
@@ -68,9 +68,42 @@ test('la ficha muestra los datos, la libreta, el mes y el sueldo mes a mes con c
   await expect(page.getByRole('group', { name: 'Año' })).toHaveCount(0);
   await shot(page, 'chofer-ficha');
 
-  // The links to her trips and her papers.
-  await expect(page.getByRole('link', { name: 'Ver sus viajes' })).toHaveAttribute('href', /chofer=Ana%20Pereira/);
   await expect(page.getByRole('link', { name: 'Ir a Documentación' })).toHaveAttribute('href', /de=driver%3A00000000-0000-4000-8000-000000000011/);
+
+  // Her trips of the month as the card counts them: her account's, and the one typed in the panel with her name.
+  await page.getByRole('link', { name: 'Ver sus viajes' }).click();
+  await expect(page).toHaveURL(/periodo=mes/);
+  await expect(page).toHaveURL(/cuenta=00000000-0000-4000-8000-000000000011/);
+  await expect(page.getByLabel('Chofer')).toHaveValue('ficha');
+  await expect(page.getByLabel('Chofer').locator('option:checked')).toHaveText('Ana Pereira (ficha)');
+  await expect(rows(page)).toHaveCount(3);
+  await expect(rows(page).last()).toContainText('Cargado a mano · Orden 24101');
+  // Another driver in the list leaves the card's filter.
+  await page.getByLabel('Chofer').selectOption('Bruno Díaz');
+  await expect(page).not.toHaveURL(/cuenta=/);
+  await expect(rows(page)).toHaveCount(1);
+});
+
+test('si no se pueden leer los papeles, lo dice y no los da por al día', async ({ page }) => {
+  await page.route('**/rest/v1/trf_documents*', (route) => route.fulfill({ status: 500, json: { message: 'Falla de prueba' } }));
+  await signIn(page, 'dueno@ejemplo.uy');
+  await open(page, 'Choferes');
+  const note = page.getByRole('alert');
+  await expect(note).toContainText('los papeles');
+  await expect(note).toContainText('lo que depende de eso se ve con «—»');
+  const list = page.getByRole('list', { name: 'Choferes' });
+  const ana = list.getByRole('listitem').filter({ hasText: 'Ana Pereira' });
+  // The trips and the salary were read; the papers were not.
+  await expect(ana).toContainText('3 viajes');
+  await expect(ana).toContainText('Falta $ 35.000');
+  await expect(ana).not.toContainText('Libreta por vencer');
+  await expect(list.getByRole('listitem').filter({ hasText: 'Eduardo Núñez' })).not.toContainText('Al día');
+
+  await list.getByRole('link', { name: 'Ana Pereira' }).click();
+  await expect(page.locator('.card', { has: page.getByRole('heading', { name: 'Papeles' }) })).toContainText('No se pudieron leer los papeles.');
+  const data = page.locator('.card', { has: page.getByRole('heading', { name: 'Datos' }) });
+  await expect(data).toContainText('Categoría E');
+  await expect(data).not.toContainText('sin cargar en Documentación');
 });
 
 test('una ficha que no existe lo dice', async ({ page }) => {

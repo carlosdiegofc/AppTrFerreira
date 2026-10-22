@@ -111,10 +111,17 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
   const app = usePaperDrivers(true);
   const presence = usePresence();
   const fleet = useFleetData();
-  const { papers } = useDocuments();
-  const { receipts } = useFuel();
+  const docs = useDocuments();
+  const fuel = useFuel();
   const month = firstOfMonth(today);
-  const { trips } = useTripList(startOfDay(month), startOfDay(firstOfNextMonth(today)));
+  const tripList = useTripList(startOfDay(month), startOfDay(firstOfNextMonth(today)));
+  const { papers } = docs;
+  const { receipts } = fuel;
+  const { trips } = tripList;
+  // Until each read answers, nothing shows as zero or as missing; a read that failed says so.
+  const activityRead = tripList.query.data !== undefined && fuel.query.data !== undefined;
+  const papersRead = docs.query.data !== undefined;
+  const presenceRead = presence.data !== undefined && fleet.data !== undefined;
   const [editing, setEditing] = useState<Editing | null>(null);
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null);
   const salaries = useMemo(() => allSalaries.filter((s) => s.driverId === driver.id), [allSalaries, driver.id]);
@@ -143,7 +150,8 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
   const linked = new Set(drivers.filter((d) => d.id !== driver.id).map((d) => d.userId).filter((id): id is string => id !== null));
   const appDrivers = (app.data ?? []).filter((a) => !linked.has(a.id));
   const appName = driver.userId ? (app.data?.find((a) => a.id === driver.userId)?.name ?? null) : null;
-  const tripsLink = `/viajes?chofer=${encodeURIComponent(appName ?? driver.name)}`;
+  // The month's trips as this card counts them: the account's under any name, and the ones typed with its name.
+  const tripsLink = `/viajes?periodo=mes&nombre=${encodeURIComponent(driver.name)}${driver.userId ? `&cuenta=${encodeURIComponent(driver.userId)}` : ''}`;
   const papersLink = driver.userId ? `/documentacion?de=${encodeURIComponent(`driver:${driver.userId}`)}` : '/documentacion?vista=choferes';
 
   const done = (text: string) => {
@@ -167,7 +175,7 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
       <Back />
       <PageHead
         title={driver.name}
-        subtitle={[driver.active ? null : 'Ya no trabaja en la empresa', driver.userId ? (present ? presenceLine(present, now) : 'Usa la app') : 'Sin cuenta de la app'].filter(Boolean).join(' · ')}
+        subtitle={[driver.active ? null : 'Ya no trabaja en la empresa', driver.userId ? (present && presenceRead ? presenceLine(present, now) : 'Usa la app') : 'Sin cuenta de la app'].filter(Boolean).join(' · ')}
         actions={
           <>
             <RefreshButton onClick={() => void query.refetch()} busy={query.isFetching} />
@@ -211,9 +219,9 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
                     {' · '}
                     <Pill tone={PAPER_STATE[license.state].tone}>{license.expiresOn ? `${license.state === 'late' ? 'Venció' : 'Vence'} el ${formatDay(license.expiresOn)}` : 'Sin vencimiento'}</Pill>
                   </>
-                ) : (
+                ) : papersRead ? (
                   <span className="muted"> · sin cargar en Documentación</span>
-                )}
+                ) : null}
               </dd>
             </div>
             <div>
@@ -229,44 +237,65 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
         </Card>
 
         <Card title={`Actividad de ${monthLabel(month).replace(/ de \d+$/, '')}`} action={<Link className="link" to={tripsLink}>Ver sus viajes</Link>}>
-          <dl className="facts facts-tight">
-            <div>
-              <dt>Viajes</dt>
-              <dd>{count(work.trips)}</dd>
-            </div>
-            <div>
-              <dt>Kilómetros (GPS)</dt>
-              <dd>{number(work.gpsKm)} km</dd>
-            </div>
-            <div>
-              <dt>Litros cargados</dt>
-              <dd>{decimal(work.liters, 0)} L</dd>
-            </div>
-            <div>
-              <dt>Consumo</dt>
-              <dd>{ratio === null ? <span className="muted">Pocos km para calcular</span> : `${decimal(ratio, 1)} L/100 km`}</dd>
-            </div>
-            <div>
-              <dt>Facturado</dt>
-              <dd>{[work.billed.UYU > 0 ? money(work.billed.UYU, 'UYU') : null, work.billed.USD > 0 ? money(work.billed.USD, 'USD') : null].filter(Boolean).join(' y ') || <span className="muted">Nada todavía</span>}</dd>
-            </div>
-            <div>
-              <dt>La app</dt>
-              <dd>
-                {present ? (
-                  <>
-                    <Pill tone={PRESENCE_TONE[present.state]}>{PRESENCE_LABEL[present.state]}</Pill> <span className="muted">abierta {ago(present.seenAt, now)}</span>
-                  </>
-                ) : (
-                  <span className="muted">{driver.userId ? 'Sin aviso todavía' : 'No usa la app'}</span>
-                )}
-              </dd>
-            </div>
-          </dl>
+          {!activityRead ? (
+            tripList.query.error || fuel.query.error ? (
+              <ErrorNote
+                onRetry={() => {
+                  void tripList.query.refetch();
+                  void fuel.query.refetch();
+                }}
+              >
+                No se pudieron leer los viajes o las boletas del mes.
+              </ErrorNote>
+            ) : (
+              <Skeleton lines={4} />
+            )
+          ) : (
+            <dl className="facts facts-tight">
+              <div>
+                <dt>Viajes</dt>
+                <dd>{count(work.trips)}</dd>
+              </div>
+              <div>
+                <dt>Kilómetros (GPS)</dt>
+                <dd>{number(work.gpsKm)} km</dd>
+              </div>
+              <div>
+                <dt>Litros cargados</dt>
+                <dd>{decimal(work.liters, 0)} L</dd>
+              </div>
+              <div>
+                <dt>Consumo</dt>
+                <dd>{ratio === null ? <span className="muted">Pocos km para calcular</span> : `${decimal(ratio, 1)} L/100 km`}</dd>
+              </div>
+              <div>
+                <dt>Facturado</dt>
+                <dd>{[work.billed.UYU > 0 ? money(work.billed.UYU, 'UYU') : null, work.billed.USD > 0 ? money(work.billed.USD, 'USD') : null].filter(Boolean).join(' y ') || <span className="muted">Nada todavía</span>}</dd>
+              </div>
+              <div>
+                <dt>La app</dt>
+                <dd>
+                  {present && presenceRead ? (
+                    <>
+                      <Pill tone={PRESENCE_TONE[present.state]}>{PRESENCE_LABEL[present.state]}</Pill> <span className="muted">abierta {ago(present.seenAt, now)}</span>
+                    </>
+                  ) : (
+                    <span className="muted">{driver.userId ? (presenceRead ? 'Sin aviso todavía' : '—') : 'No usa la app'}</span>
+                  )}
+                </dd>
+              </div>
+            </dl>
+          )}
         </Card>
 
         <Card title="Papeles" action={<Link className="link" to={papersLink}>Ir a Documentación</Link>}>
-          {myPapers.length === 0 ? (
+          {!papersRead ? (
+            docs.query.error ? (
+              <ErrorNote onRetry={() => void docs.query.refetch()}>No se pudieron leer los papeles.</ErrorNote>
+            ) : (
+              <Skeleton lines={3} />
+            )
+          ) : myPapers.length === 0 ? (
             <p className="note">Todavía no tiene papeles cargados. Se cargan en Documentación, o los sube el chofer desde la app.</p>
           ) : (
             <ul className="driver-papers">

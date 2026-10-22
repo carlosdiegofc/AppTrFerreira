@@ -31,6 +31,17 @@ const Lines = ({ parts }: { parts: string[] }) => (
   </span>
 );
 
+/** What the other reads gave: a row shows «—» for what could not be read, never a zero or «Al día» it does not know. */
+interface Known {
+  app: boolean;
+  trips: boolean;
+  papers: boolean;
+  presence: boolean;
+}
+
+/** «a», «a y b», «a, b y c». */
+const andList = (items: string[]) => (items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} y ${items[items.length - 1]}`);
+
 const inView = (s: DriverSummary, view: View) => (view === 'sin-ficha' ? s.driver === null : view === 'baja' ? s.driver?.active === false : s.driver?.active === true);
 
 /** The papers in one pill: the licence first when it expired or is about to, else how many are expired or close. */
@@ -43,29 +54,26 @@ function PapersPill({ s }: { s: DriverSummary }) {
   return <span className="muted">Al día</span>;
 }
 
-function DriverRow({ s, now, onCreate }: { s: DriverSummary; now: number; onCreate: (s: DriverSummary) => void }) {
+function DriverRow({ s, now, known, onCreate }: { s: DriverSummary; now: number; known: Known; onCreate: (s: DriverSummary) => void }) {
   const status = s.month ? monthStatus(s.month, money) : null;
-  const app = s.presence ? presenceDetail(s.presence, now) : s.userId ? 'Usa la app; todavía no avisó cuándo la abrió' : 'Sin cuenta de la app';
+  const presence = known.presence ? s.presence : null;
+  const app = presence ? presenceDetail(presence, now) : !s.userId ? 'Sin cuenta de la app' : known.presence ? 'Usa la app; todavía no avisó cuándo la abrió' : 'Usa la app';
   return (
     <li className="card driver-row">
       <div className="driver-main">
         <h2>{s.driver ? <Link to={`/choferes/${s.driver.id}`}>{s.name}</Link> : s.name}</h2>
         <p className="muted">
-          {s.presence && <Pill tone={PRESENCE_TONE[s.presence.state]}>{s.presence.state === 'trip' ? 'En viaje' : s.presence.state === 'active' ? 'Activo' : 'Sin la app abierta'}</Pill>} {app}
+          {presence && <Pill tone={PRESENCE_TONE[presence.state]}>{presence.state === 'trip' ? 'En viaje' : presence.state === 'active' ? 'Activo' : 'Sin la app abierta'}</Pill>} {app}
         </p>
       </div>
       <dl className="driver-facts">
         <div>
           <dt>Este mes</dt>
-          <dd>
-            {s.trips === 1 ? '1 viaje' : `${count(s.trips)} viajes`} · {number(s.km)} km
-          </dd>
+          <dd>{known.trips ? `${s.trips === 1 ? '1 viaje' : `${count(s.trips)} viajes`} · ${number(s.km)} km` : '—'}</dd>
         </div>
         <div>
           <dt>Papeles</dt>
-          <dd>
-            <PapersPill s={s} />
-          </dd>
+          <dd>{known.papers ? <PapersPill s={s} /> : '—'}</dd>
         </div>
         {status && (
           <div>
@@ -97,9 +105,11 @@ export function Choferes() {
   const app = usePaperDrivers(true);
   const presence = usePresence();
   const fleet = useFleetData();
-  const { papers } = useDocuments();
+  const docs = useDocuments();
   const month = firstOfMonth(today);
-  const { trips } = useTripList(startOfDay(month), startOfDay(firstOfNextMonth(today)));
+  const tripList = useTripList(startOfDay(month), startOfDay(firstOfNextMonth(today)));
+  const { papers } = docs;
+  const { trips } = tripList;
   const [creating, setCreating] = useState<{ preset?: { userId: string; name: string } } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -113,7 +123,18 @@ export function Choferes() {
   const shown = list.filter((s) => inView(s, view));
   const pending = pendingThisMonth(list);
   const linked = new Set(drivers.map((d) => d.userId).filter((id): id is string => id !== null));
-  const ready = query.data !== undefined;
+  // The list waits for every read to answer, so nothing shows as zero while it loads; a read that failed leaves «—» where
+  // it counts and says so.
+  const reads = [
+    { query: app, what: 'los choferes de la app' },
+    { query: tripList.query, what: 'los viajes del mes' },
+    { query: docs.query, what: 'los papeles' },
+    { query: presence, what: 'quién tiene la app abierta' },
+    { query: fleet, what: 'quién está de viaje' },
+  ];
+  const failed = reads.filter((r) => r.query.data === undefined && r.query.error);
+  const ready = query.data !== undefined && reads.every((r) => r.query.data !== undefined || r.query.error);
+  const known: Known = { app: app.data !== undefined, trips: tripList.query.data !== undefined, papers: docs.query.data !== undefined, presence: presence.data !== undefined && fleet.data !== undefined };
 
   return (
     <div className="page">
@@ -131,10 +152,21 @@ export function Choferes() {
           <Icon name="check" size={18} /> {notice}
         </p>
       )}
+      {ready && failed.length > 0 && (
+        <ErrorNote onRetry={() => failed.forEach((r) => void r.query.refetch())}>
+          No se pudieron leer {andList(failed.map((r) => r.what))}: lo que depende de eso se ve con «—».
+        </ErrorNote>
+      )}
       {ready && (
         <div className="stats stats-money">
-          <Stat tone="blue" icon="person" label="Con ficha" value={count(list.filter((s) => s.driver?.active).length)} detail={`${count(list.filter((s) => !s.driver).length)} de la app sin ficha`} />
-          <Stat tone="green" icon="route" label="En viaje ahora" value={count(list.filter((s) => s.presence?.state === 'trip').length)} />
+          <Stat
+            tone="blue"
+            icon="person"
+            label="Con ficha"
+            value={count(list.filter((s) => s.driver?.active).length)}
+            detail={known.app ? `${count(list.filter((s) => !s.driver).length)} de la app sin ficha` : undefined}
+          />
+          <Stat tone="green" icon="route" label="En viaje ahora" value={known.presence ? count(list.filter((s) => s.presence?.state === 'trip').length) : '—'} />
           <Stat
             tone={pending.UYU > 0 || pending.USD > 0 ? 'amber' : 'green'}
             icon="money"
@@ -155,7 +187,7 @@ export function Choferes() {
               aria-pressed={view === v.value}
               onClick={() => setParams(v.value === 'activos' ? {} : { vista: v.value }, { replace: true })}
             >
-              {v.label} <span>{count(list.filter((s) => inView(s, v.value)).length)}</span>
+              {v.label} <span>{v.value === 'sin-ficha' && !known.app ? '—' : count(list.filter((s) => inView(s, v.value)).length)}</span>
             </button>
           ))}
         </div>
@@ -176,18 +208,31 @@ export function Choferes() {
         </div>
       ) : shown.length === 0 ? (
         <div className="card">
-          <Empty icon="person" title={view === 'activos' ? 'Todavía no hay fichas' : view === 'sin-ficha' ? 'Todos los choferes de la app tienen su ficha' : 'Nadie dejó de trabajar'}>
+          <Empty
+            icon="person"
+            title={
+              view === 'activos'
+                ? 'Todavía no hay fichas'
+                : view === 'baja'
+                  ? 'Nadie dejó de trabajar'
+                  : known.app
+                    ? 'Todos los choferes que ya usaron la app tienen su ficha'
+                    : 'No se pudieron leer los choferes de la app'
+            }
+          >
             {view === 'activos' ? 'Creá la ficha de cada chofer con «Nueva ficha», o desde «Sin ficha» para los que ya usan la app.' : null}
           </Empty>
         </div>
       ) : (
         <ul className="driver-list" aria-label="Choferes">
           {shown.map((s) => (
-            <DriverRow key={s.key} s={s} now={now} onCreate={(x) => setCreating({ preset: { userId: x.userId ?? '', name: x.name } })} />
+            <DriverRow key={s.key} s={s} now={now} known={known} onCreate={(x) => setCreating({ preset: { userId: x.userId ?? '', name: x.name } })} />
           ))}
         </ul>
       )}
-      <p className="note">Los viajes y los kilómetros son los del mes, medidos por la app. Las fichas, los sueldos y los pagos no los ve ningún chofer, ni siquiera el suyo.</p>
+      <p className="note">
+        Los viajes y los kilómetros son los del mes, medidos por la app. En «Sin ficha» están las cuentas que ya usaron la app: la abrieron, viajaron o tienen papeles cargados. Las fichas, los sueldos y los pagos no los ve ningún chofer, ni siquiera el suyo.
+      </p>
 
       {creating && (
         <DriverFormDialog

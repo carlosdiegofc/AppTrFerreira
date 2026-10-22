@@ -92,6 +92,11 @@ export function Viajes() {
   }, [location.key, fromHere, urlQ]);
   const vehicle = params.get('camion') ?? '';
   const driver = params.get('chofer') ?? '';
+  // A driver's card links here with its name and its app account: the trips of the account under any name, and the ones
+  // typed in the panel with its name, as the card counts them.
+  const cardName = params.get('nombre') ?? '';
+  const cardAccount = params.get('cuenta') ?? '';
+  const card = useMemo(() => (cardName ? { userId: cardAccount || null, name: cardName } : null), [cardName, cardAccount]);
 
   const { trips, query, catalog } = useTripList(instants?.fromIso ?? null, instants?.toIso ?? null);
   const counts = useMemo(() => countByStatus(trips), [trips]);
@@ -99,8 +104,8 @@ export function Viajes() {
   const inTab = bin ? counts.deleted : counts.all;
   const known = useMemo(() => knownValues(trips), [trips]);
   const shown = useMemo(
-    () => filterTrips(trips, { q, vehicle, driver, status: tab.status === 'bin' ? 'all' : tab.status, bin: tab.status === 'bin' }),
-    [trips, q, vehicle, driver, tab.status],
+    () => filterTrips(trips, { q, vehicle, driver, card, status: tab.status === 'bin' ? 'all' : tab.status, bin: tab.status === 'bin' }),
+    [trips, q, vehicle, driver, card, tab.status],
   );
 
   // The router updates the address in the background: changes made before it does (a tab, then the search right after)
@@ -129,7 +134,7 @@ export function Viajes() {
     setExportFailed(false);
     try {
       const { downloadTrips } = await import('../exports/trips');
-      const what = [tab.status === 'all' ? null : tab.label, vehicle ? `Camión ${vehicle}` : null, driver ? `Chofer ${driver}` : null, q ? `Búsqueda «${q}»` : null].filter(Boolean).join(' · ');
+      const what = [tab.status === 'all' ? null : tab.label, vehicle ? `Camión ${vehicle}` : null, card ? `Chofer ${card.name}` : driver ? `Chofer ${driver}` : null, q ? `Búsqueda «${q}»` : null].filter(Boolean).join(' · ');
       await downloadTrips(format, shown, {
         title: `Viajes del ${formatDay(range.from)} al ${formatDay(range.to)}`,
         subtitle: what || 'Todos los viajes del período',
@@ -231,8 +236,9 @@ export function Viajes() {
         </label>
         <label className="field">
           <span>Chofer</span>
-          <select value={driver} onChange={(e) => set({ chofer: e.target.value })}>
+          <select value={card ? 'ficha' : driver} onChange={(e) => e.target.value !== 'ficha' && set({ chofer: e.target.value, nombre: null, cuenta: null })}>
             <option value="">Todos los choferes</option>
+            {card && <option value="ficha">{card.name} (ficha)</option>}
             {withChosen(known.drivers, driver).map((d) => (
               <option key={d} value={d}>
                 {d}
