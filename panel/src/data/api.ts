@@ -609,24 +609,22 @@ export async function fetchTanks(): Promise<TanksData> {
  * in the trash, and with the truck it corrected).
  */
 export async function fetchTankTrips(sinceIso: string): Promise<TankTrip[]> {
-  // The office's row of an app trip starts when the trip does; a trip still going may have started a while before.
-  const panelSince = new Date(Date.parse(sinceIso) - 30 * 86_400_000).toISOString();
-  const [trips, panel] = await Promise.all([
-    all(
-      (from, to) =>
-        supabase
-          .from('trf_driver_tracking_sessions')
-          .select('id,vehicle,started_at,ended_at,active,distance_meters')
-          .or(`started_at.gte."${sinceIso}",active.is.true,ended_at.gte."${sinceIso}"`)
-          .order('started_at')
-          .order('id')
-          .range(from, to),
-      50_000,
-      true,
-    ),
-    all((from, to) => supabase.from('trf_panel_trips').select('app_trip_id,vehicle,deleted_at').eq('source', 'app').gte('departure_at', panelSince).order('id').range(from, to), 50_000, true),
-  ]);
-  return kmTripsAsCorrected(trips, panel).map((t) => ({ id: t.id, vehicle: t.vehicle, startedAt: t.started_at, endedAt: t.ended_at, active: t.active, meters: t.distance_meters }));
+  const trips = await all(
+    (from, to) =>
+      supabase
+        .from('trf_driver_tracking_sessions')
+        .select('id,vehicle,started_at,ended_at,active,distance_meters')
+        .or(`started_at.gte."${sinceIso}",active.is.true,ended_at.gte."${sinceIso}"`)
+        .order('started_at')
+        .order('id')
+        .range(from, to),
+    50_000,
+    true,
+  );
+  // The office's rows of exactly these trips, however long ago they started: a trip going on for weeks counts as the
+  // office left it too.
+  const parts = await Promise.all(chunks(trips.map((t) => t.id), 100).map(async (ids) => rows(await supabase.from('trf_panel_trips').select('app_trip_id,vehicle,deleted_at').eq('source', 'app').in('app_trip_id', ids))));
+  return kmTripsAsCorrected(trips, parts.flat()).map((t) => ({ id: t.id, vehicle: t.vehicle, startedAt: t.started_at, endedAt: t.ended_at, active: t.active, meters: t.distance_meters }));
 }
 
 /**
