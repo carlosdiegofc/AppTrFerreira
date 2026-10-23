@@ -5,7 +5,7 @@ import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } fr
 import { usePanelUser } from '../auth/AuthProvider';
 import { ConflictError, describeWriteError, receiptExists } from '../data/api';
 import { useCreateReceipt, useUpdateReceipt } from '../data/hooks';
-import { formatDay } from '../lib/dates';
+import { formatDay, formatTime } from '../lib/dates';
 import { type CatalogStation, type Receipt } from '../lib/fuel';
 import { arrivalNote, correctedPanelData, FUEL_LIMITS, newReceiptRow, type ReceiptField, receiptFormChanged, type ReceiptFormValues, receiptFormValues, sameReceipt, validateReceiptForm } from '../lib/fuelForm';
 import { type CatalogTruck, truckLabel } from '../lib/fleet';
@@ -49,7 +49,7 @@ export function ReceiptFormDialog({ receipt: opened, today, stations, writtenSta
   // The last save tried with that id, and the photo it had (none is a photo too).
   const tried = useRef<{ photo: Blob | null } | null>(null);
   const [checking, setChecking] = useState(false);
-  const [initial] = useState(() => receiptFormValues(receipt, stations, today));
+  const [initial] = useState(() => receiptFormValues(receipt, stations, today, formatTime(Date.now())));
   const [values, setValues] = useState(initial);
   // A listed station shows in the list; one written by hand, in the text box below it.
   const [pickOther, setPickOther] = useState(initial.stationId === '' && initial.station !== '');
@@ -120,7 +120,7 @@ export function ReceiptFormDialog({ receipt: opened, today, stations, writtenSta
       setFormError('Esperá a que termine de prepararse la foto.');
       return;
     }
-    const check = validateReceiptForm(values, stations, today, receipt?.declared);
+    const check = validateReceiptForm(values, stations, today, receipt?.declared, receipt ? undefined : formatTime(Date.now()));
     setErrors(check.errors);
     if (!check.ok) {
       setFormError('Revisá los campos marcados.');
@@ -277,7 +277,14 @@ export function ReceiptFormDialog({ receipt: opened, today, stations, writtenSta
           <fieldset>
             <legend>Carga</legend>
             <div className="form-grid">
-              {field('date', 'Fecha de la boleta', <input {...fieldProps('date')} type="date" value={values.date} max={today} onChange={(e) => set('date', e.target.value)} />, arrivalNote(receipt, values.date, today))}
+              {field('date', 'Fecha de la boleta', <input {...fieldProps('date')} type="date" value={values.date} max={today} onChange={(e) => set('date', e.target.value)} />, receipt ? arrivalNote(receipt, values.date) : undefined)}
+              {!receipt &&
+                field(
+                  'time',
+                  'Hora de la boleta',
+                  <input {...fieldProps('time')} type="time" value={values.time} onChange={(e) => set('time', e.target.value)} />,
+                  'La que dice la boleta: el tanque del camión cuenta la carga desde esa hora.',
+                )}
               {field(
                 'stationId',
                 'Estación',

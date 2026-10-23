@@ -244,7 +244,7 @@ describe('formulario de boleta', () => {
     const future = validateReceiptForm({ ...receiptFormValues(null, STATIONS, today), date: '2026-10-16', station: 'El Tala', total: '0' }, STATIONS, today);
     expect(future.errors).toEqual({ date: 'La fecha no puede ser posterior a hoy.', total: 'El importe tiene que ser mayor que cero.' });
     const ok = validateReceiptForm({ ...receiptFormValues(null, STATIONS, today), stationId: 'est-ruta5', total: '12.500', liters: '230,5', currency: 'USD' }, STATIONS, today);
-    expect(ok.ok && ok.payload).toEqual({ date: today, stationId: 'est-ruta5', station: 'Ancap Ruta 5 km 32', vehicle: '', liters: 230.5, total: 12500, currency: 'USD', fullTank: false });
+    expect(ok.ok && ok.payload).toEqual({ date: today, at: null, stationId: 'est-ruta5', station: 'Ancap Ruta 5 km 32', vehicle: '', liters: 230.5, total: 12500, currency: 'USD', fullTank: false });
     // A full tank is a truck's: without the truck it cannot be said.
     const full = validateReceiptForm({ ...receiptFormValues(null, STATIONS, today), stationId: 'est-ruta5', total: '12.500', fullTank: true }, STATIONS, today);
     expect(full.errors).toEqual({ vehicle: 'Para marcar el tanque lleno, escribí el camión.' });
@@ -272,6 +272,29 @@ describe('formulario de boleta', () => {
     expect(sameReceipt({ ...saved, full_tank: true }, sent)).toBe(false);
   });
 
+  it('una boleta nueva va con su hora, en hora de Uruguay: así el tanque ubica la carga entre los viajes del camión', () => {
+    const base = { ...receiptFormValues(null, STATIONS, today, '12:00'), stationId: 'est-ruta5', total: '6600', vehicle: 'Volvo FH 460 · ABC1234' };
+    expect(base.time).toBe('12:00');
+    const yesterday = validateReceiptForm({ ...base, date: '2026-10-14', time: '07:30' }, STATIONS, today, undefined, '12:00');
+    if (!yesterday.ok) throw new Error('tendría que ser válida');
+    expect(yesterday.payload.at).toBe('2026-10-14T10:30:00.000Z');
+    const sent = newReceiptRow('r9', { id: 'u2', name: 'Socio Lectura' }, yesterday.payload, false);
+    expect(sent.recorded_at).toBe('2026-10-14T10:30:00.000Z');
+    // The database writes the instant its own way: it is the same one.
+    const saved = { ...row({ id: 'r9', driver_id: 'u2', driver_name: 'Socio Lectura' }), ...sent, recorded_at: '2026-10-14T10:30:00+00:00' } as FuelRow;
+    expect(sameReceipt(saved, sent)).toBe(true);
+    expect(sameReceipt({ ...saved, recorded_at: '2026-10-14T15:00:00+00:00' }, sent)).toBe(false);
+    // Today it cannot be later than now; any other day, any time.
+    expect(validateReceiptForm({ ...base, time: '12:01' }, STATIONS, today, undefined, '12:00').errors).toEqual({ time: 'La hora no puede ser posterior a ahora.' });
+    expect(validateReceiptForm({ ...base, date: '2026-10-14', time: '23:59' }, STATIONS, today, undefined, '12:00').ok).toBe(true);
+    expect(validateReceiptForm({ ...base, time: '' }, STATIONS, today, undefined, '12:00').errors).toEqual({ time: 'Escribí la hora de la boleta.' });
+    expect(validateReceiptForm({ ...base, time: '25:00' }, STATIONS, today, undefined, '12:00').errors).toEqual({ time: 'La hora no es válida.' });
+    // A correction keeps the moment the receipt has.
+    const r = receiptFromRow(row(), TRUCKS, STATIONS);
+    const fix = validateReceiptForm({ ...receiptFormValues(r, STATIONS, today, '12:00'), total: '9000' }, STATIONS, today, r.declared);
+    expect(fix.ok && fix.payload.at).toBeNull();
+  });
+
   it('al corregir, lo que la boleta tenía no se puede dejar vacío: volvería a leerse lo declarado', () => {
     const r = receiptFromRow(row(), TRUCKS, STATIONS);
     const values = { ...receiptFormValues(r, STATIONS, today), liters: '', vehicle: ' ' };
@@ -286,14 +309,11 @@ describe('formulario de boleta', () => {
 
   it('avisa cuando la fecha cae en otro mes que el día en que llegó la boleta, que es como la cuentan la app y el panel actual', () => {
     const r = receiptFromRow(row({ recorded_at: '2026-10-15T15:00:00Z' }), TRUCKS, STATIONS);
-    expect(arrivalNote(r, '2026-10-01', today)).toBeNull();
-    expect(arrivalNote(r, '2026-09-30', today)).toBe('El resumen del mes de la app y el panel actual la cuentan el 15/10/2026, el día en que llegó.');
-    expect(arrivalNote(r, '', today)).toBeNull();
+    expect(arrivalNote(r, '2026-10-01')).toBeNull();
+    expect(arrivalNote(r, '2026-09-30')).toBe('El resumen del mes de la app y el panel actual la cuentan el 15/10/2026, el día en que llegó.');
+    expect(arrivalNote(r, '')).toBeNull();
     // 23:30 of 31/10 in Uruguay is already November in UTC.
-    expect(arrivalNote(receiptFromRow(row({ recorded_at: '2026-11-01T02:30:00Z' }), TRUCKS, STATIONS), '2026-10-31', today)).toBeNull();
-    // A receipt typed in the panel arrives today.
-    expect(arrivalNote(null, '2026-10-02', today)).toBeNull();
-    expect(arrivalNote(null, '2026-09-28', today)).toBe('El resumen del mes de la app y el panel actual la van a contar hoy, el día en que se carga.');
+    expect(arrivalNote(receiptFromRow(row({ recorded_at: '2026-11-01T02:30:00Z' }), TRUCKS, STATIONS), '2026-10-31')).toBeNull();
   });
 
   it('una corrección guarda solo lo que cambió y deja lo declarado como estaba', () => {

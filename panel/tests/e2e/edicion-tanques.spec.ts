@@ -1,6 +1,6 @@
-// Saving tanks in a real browser: a truck's tank and consumption, a measurement, and a load marked «Tanque lleno» from
-// the receipt's correction. Saving changes the test data, so this file runs after the read-only tests (project
-// "edicion" in playwright.config.ts), in this order.
+// Saving tanks in a real browser: a truck's tank and consumption, a measurement, a load marked «Tanque lleno» from the
+// receipt's correction, and a new receipt typed with its time and a full tank. Saving changes the test data, so this
+// file runs after the read-only tests (project "edicion" in playwright.config.ts), in this order.
 import { expect, test } from '@playwright/test';
 import { open, prepare, shot, signIn } from './helpers';
 
@@ -58,4 +58,30 @@ test('una carga marcada «Tanque lleno» al corregir la boleta arranca el tanque
   const iveco = page.getByRole('list', { name: 'Tanques' }).getByRole('listitem').filter({ hasText: 'Iveco Stralis · MNO7890' });
   await expect(iveco).toContainText('≈ 359 L');
   await expect(iveco).toContainText('Desde el tanque lleno del 25/09/2026 a las 12:00 en Ancap Ruta 5 km 32: 132 km y 0 L cargados.');
+});
+
+test('una boleta cargada en el panel con el tanque lleno cuenta los viajes desde la hora de la boleta', async ({ page }) => {
+  await signIn(page, 'dueno@ejemplo.uy');
+  await open(page, 'Combustible');
+  await page.getByRole('button', { name: 'Nueva boleta' }).click();
+  const form = page.getByRole('dialog', { name: 'Nueva boleta' });
+  await expect(form.getByLabel('Hora de la boleta')).toHaveValue('12:00');
+  await form.getByLabel('Estación', { exact: true }).selectOption({ label: 'Ancap Ruta 5 km 32' });
+  await form.getByLabel('Camión').fill('Ford Cargo 1722 · JKL3456');
+  await form.getByLabel('Litros').fill('210');
+  await form.getByLabel('Importe').fill('12.000');
+  await form.getByRole('checkbox', { name: 'Llenó el tanque' }).check();
+  await form.getByLabel('Hora de la boleta').fill('12:30');
+  await form.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(form).toContainText('La hora no puede ser posterior a ahora.');
+  // Loaded at 05:30, before Diego's trip of 95 km this morning: that trip comes after the full tank.
+  await form.getByLabel('Hora de la boleta').fill('05:30');
+  await form.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Boleta cargada.');
+
+  await page.getByRole('group', { name: 'Vista' }).getByRole('button', { name: /Tanques/ }).click();
+  const ford = page.getByRole('list', { name: 'Tanques' }).getByRole('listitem').filter({ hasText: 'Ford Cargo 1722 · JKL3456' });
+  await expect(ford).toContainText('≈ 268 L');
+  await expect(ford).toContainText('Desde el tanque lleno del 15/10/2026 a las 05:30 en Ancap Ruta 5 km 32: 95 km y 0 L cargados.');
+  await expect(ford).not.toContainText('Combustible bajo');
 });
