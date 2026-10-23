@@ -243,8 +243,11 @@ export function measuredConsumption(key: string, trips: readonly TankTrip[], rec
   const [from, to] = [time(a.recordedAt), time(b.recordedAt)];
   const liters = litersBetween(loads, from, to, null);
   if ('missing' in liters || liters.liters <= 0) return null;
+  const ours = trips.filter((t) => mine(t.vehicle));
+  // The trip of a load that has not reached the database yet would leave its kilometres out: none until it is there.
+  if ([a, b].some((r) => r.tripId !== null && !ours.some((t) => t.id === r.tripId))) return null;
   const distance = metersBetween(
-    trips.filter((t) => mine(t.vehicle)),
+    ours,
     { at: from, tripId: a.tripId, tripMeters: a.tripMeters, snapshot: null },
     { at: to, tripId: b.tripId, tripMeters: b.tripMeters, snapshot: null },
   );
