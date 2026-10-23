@@ -1,5 +1,5 @@
 // Saving in Choferes in a real browser: a card for an app driver, its salary, a payment that is corrected and annulled,
-// a card marked as no longer working, two people changing the same card at once, and changes whose answer is cut.
+// a card marked as no longer working, two people changing the same card at once, and saves whose answer is cut.
 // Saving changes the test data, so this file runs after the read-only tests (project "edicion" in playwright.config.ts),
 // in this order.
 import { expect, type Page, test } from '@playwright/test';
@@ -7,11 +7,11 @@ import { BASE, open, prepare, shot, signIn } from './helpers';
 
 test.beforeEach(async ({ page }) => prepare(page));
 
-/** The first change to a table reaches the database, but its answer never comes back. */
-async function cutFirstChange(page: Page, table: string) {
+/** The first change (or, with POST, the first new row) to a table reaches the database, but its answer never comes back. */
+async function cutFirstChange(page: Page, table: string, method: 'PATCH' | 'POST' = 'PATCH') {
   let cut = true;
   await page.route(`**/rest/v1/${table}*`, async (route) => {
-    if (route.request().method() !== 'PATCH' || !cut) return route.fallback();
+    if (route.request().method() !== method || !cut) return route.fallback();
     cut = false;
     await route.fetch();
     await route.abort('failed');
@@ -213,4 +213,40 @@ test('si se corta la respuesta al cambiar una ficha o al anular un pago, el rein
   await expect(fix).toBeHidden();
   await expect(page.getByRole('status')).toContainText('Pago anulado: ya no cuenta en el mes.');
   await expect(october).not.toContainText('Viático');
+});
+
+test('si se corta la respuesta al crear una ficha con su cuenta o un sueldo, y la lista ya lo trae, el reintento lo da por hecho', async ({ page }) => {
+  await signIn(page, 'dueno@ejemplo.uy');
+  await open(page, 'Choferes');
+  await cutFirstChange(page, 'trf_drivers', 'POST');
+  await cutFirstChange(page, 'trf_driver_salaries', 'POST');
+  /** The read of a table that already brings what the cut save sent. */
+  const reread = (table: string, text: string) =>
+    page.waitForResponse(async (r) => r.url().includes(`/rest/v1/${table}?`) && r.request().method() === 'GET' && (await r.text()).includes(text));
+
+  // The card went in with its account, and the list brings it before the second try: the account is still the card's own.
+  await page.getByRole('group', { name: 'Vista' }).getByRole('button', { name: /Sin ficha/ }).click();
+  await page.getByRole('list', { name: 'Choferes' }).getByRole('listitem').filter({ hasText: 'Diego Silva' }).getByRole('button', { name: 'Crear ficha' }).click();
+  const card = page.getByRole('dialog', { name: 'Nueva ficha' });
+  const cards = reread('trf_drivers', '00000000-0000-4000-8000-000000000014');
+  await card.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(card.getByRole('alert')).toContainText('Sin conexión con el servidor');
+  await cards;
+  await expect(card.getByLabel('Cuenta de la app')).toHaveValue('00000000-0000-4000-8000-000000000014');
+  await card.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(card).toBeHidden();
+  await expect(page.getByRole('heading', { name: 'Diego Silva', level: 1 })).toBeVisible();
+
+  // The same with a salary: the one the list brings is this one, not another from the same month.
+  await page.getByRole('button', { name: 'Cargar sueldo' }).click();
+  const salary = page.getByRole('dialog', { name: 'Sueldo de Diego Silva' });
+  await salary.getByLabel('Sueldo por mes').fill('38.000');
+  const salaries = reread('trf_driver_salaries', '38000');
+  await salary.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(salary.getByRole('alert')).toContainText('Sin conexión con el servidor');
+  await salaries;
+  await salary.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(salary).toBeHidden();
+  await expect(page.getByRole('status')).toContainText('Sueldo guardado desde octubre de 2026.');
+  await expect(page.getByRole('table', { name: 'Sueldo por mes' }).getByRole('row').filter({ hasText: 'Octubre de 2026' })).toContainText('Falta $ 38.000');
 });

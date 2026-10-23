@@ -120,7 +120,6 @@ export function Choferes() {
   );
   const shown = list.filter((s) => inView(s, view));
   const pending = pendingThisMonth(list);
-  const linked = new Set(drivers.map((d) => d.userId).filter((id): id is string => id !== null));
   // The list waits for every read to answer, so nothing shows as zero while it loads; a read that failed leaves «—» where
   // it counts and says so.
   const reads = [
@@ -245,9 +244,9 @@ export function Choferes() {
         <DriverFormDialog
           driver={null}
           preset={creating.preset}
-          appDrivers={appDrivers.filter((a) => !linked.has(a.id))}
+          appDrivers={appDrivers}
           accountsFailed={app.data === undefined && !!app.error}
-          linkedElsewhere={linked}
+          cards={drivers}
           today={today}
           onClose={() => setCreating(null)}
           onDone={(text) => {

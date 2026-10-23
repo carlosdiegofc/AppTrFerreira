@@ -186,7 +186,7 @@ export function DriverFormDialog({
   preset,
   appDrivers,
   accountsFailed = false,
-  linkedElsewhere,
+  cards,
   today,
   onClose,
   onDone,
@@ -197,11 +197,12 @@ export function DriverFormDialog({
   driver: Driver | null;
   /** A new card for an app driver: the account and its name. */
   preset?: { userId: string; name: string };
-  /** The app accounts that can be linked: the ones without a card, and the card's own. */
+  /** The app accounts: the form offers the ones no other card has. */
   appDrivers: readonly { id: string; name: string }[];
   /** The list of app accounts could not be read: the form says so instead of offering none. */
   accountsFailed?: boolean;
-  linkedElsewhere: ReadonlySet<string>;
+  /** Every card, with its account: an account goes with one card. */
+  cards: readonly Pick<Driver, 'id' | 'userId'>[];
   onCreated?: (id: string) => void;
 }) {
   const save = useSaveDriver();
@@ -211,6 +212,10 @@ export function DriverFormDialog({
   const [initial] = useState(() => driverFormValues(base, preset));
   const f = useForm<DriverFormValues>(initial, save.isPending, onClose);
   const v = f.values;
+  // The accounts the other cards have. A new card is itself by the id it is saved with: a save whose answer was cut may
+  // have brought it to the list already, and trying again must not find its account taken.
+  const own = base?.id ?? newId;
+  const linkedElsewhere = new Set(cards.filter((d) => d.id !== own).map((d) => d.userId).filter((id): id is string => id !== null));
 
   const submit = async () => {
     f.setFormError(null);
@@ -234,7 +239,9 @@ export function DriverFormDialog({
     }
   };
 
-  const choices = [...appDrivers].sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  const free = appDrivers.filter((a) => !linkedElsewhere.has(a.id));
+  // The card's own account stays a choice even when the list of app accounts does not bring it.
+  const choices = (base?.userId && !free.some((a) => a.id === base.userId) ? [...free, { id: base.userId, name: base.name }] : free).sort((a, b) => a.name.localeCompare(b.name, 'es'));
   // Who left more than a month ago cannot be marked as working again here: a new card keeps the months without work out.
   const away = base?.leftOn ?? null;
   const locked = away !== null && !canComeBack(away, today);
@@ -367,7 +374,8 @@ export function SalaryFormDialog({
 
   const submit = async () => {
     f.setFormError(null);
-    const { row, errors } = validateSalary(v, salaries, base?.id ?? null, driver.leftOn);
+    // A new salary is itself by the id it is saved with: a save whose answer was cut may have brought it to the list already.
+    const { row, errors } = validateSalary(v, salaries, base?.id ?? newId, driver.leftOn);
     if (!f.check(errors) || !row) return;
     if (base && !f.dirty) return onClose();
     const sent = base ? row : { ...row, id: newId, driver_id: driver.id };

@@ -162,10 +162,6 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
     today,
   );
   const license = latestLicense(myPapers);
-  const linked = new Set(drivers.filter((d) => d.id !== driver.id).map((d) => d.userId).filter((id): id is string => id !== null));
-  const roster = (app.data ?? []).filter((a) => !linked.has(a.id));
-  // The card's own account stays a choice even when the list of app accounts does not bring it.
-  const appDrivers = driver.userId && !roster.some((a) => a.id === driver.userId) ? [...roster, { id: driver.userId, name: driver.name }] : roster;
   const appName = driver.userId ? (app.data?.find((a) => a.id === driver.userId)?.name ?? null) : null;
   // The month's trips as this card counts them: the account's under any name, and the ones typed with its name.
   const tripsLink = `/viajes?periodo=mes&nombre=${encodeURIComponent(driver.name)}${driver.userId ? `&cuenta=${encodeURIComponent(driver.userId)}` : ''}`;
@@ -430,7 +426,7 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
       </Card>
 
       {editing?.kind === 'card' && (
-        <DriverFormDialog driver={driver} appDrivers={appDrivers} accountsFailed={accountsFailed} linkedElsewhere={linked} today={today} onClose={() => setEditing(null)} onDone={done} onConflict={conflict} />
+        <DriverFormDialog driver={driver} appDrivers={app.data ?? []} accountsFailed={accountsFailed} cards={drivers} today={today} onClose={() => setEditing(null)} onDone={done} onConflict={conflict} />
       )}
       {editing?.kind === 'salary' && (
         <SalaryFormDialog driver={driver} salary={editing.salary} salaries={salaries} current={current} today={today} onClose={() => setEditing(null)} onDone={done} onConflict={conflict} />
