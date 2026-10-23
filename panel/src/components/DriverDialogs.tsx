@@ -354,7 +354,7 @@ export function SalaryFormDialog({
   const busy = save.isPending || annul.isPending;
   const [newId] = useState(() => crypto.randomUUID());
   const [base] = useState(salary);
-  const [initial] = useState(() => salaryFormValues(base, today, current));
+  const [initial] = useState(() => salaryFormValues(base, today, current, driver.leftOn));
   const f = useForm<SalaryFormValues>(initial, busy, onClose);
   const [annulling, setAnnulling] = useState(false);
   const v = f.values;
@@ -367,7 +367,7 @@ export function SalaryFormDialog({
 
   const submit = async () => {
     f.setFormError(null);
-    const { row, errors } = validateSalary(v, salaries, base?.id ?? null);
+    const { row, errors } = validateSalary(v, salaries, base?.id ?? null, driver.leftOn);
     if (!f.check(errors) || !row) return;
     if (base && !f.dirty) return onClose();
     const sent = base ? row : { ...row, id: newId, driver_id: driver.id };
@@ -405,7 +405,7 @@ export function SalaryFormDialog({
         <div className="form-grid">
           {f.field('amount', 'Sueldo por mes', <input {...f.props('amount')} type="text" inputMode="decimal" value={v.amount} autoComplete="off" onChange={(e) => f.set('amount', e.target.value)} />, amountNote(v.amount))}
           {f.field('currency', 'Moneda', currencySelect(f.props('currency'), v.currency, (c) => f.set('currency', c)))}
-          {f.field('startsOn', 'Desde el mes', <input {...f.props('startsOn')} type="month" value={v.startsOn} min="2000-01" onChange={(e) => f.set('startsOn', e.target.value)} />)}
+          {f.field('startsOn', 'Desde el mes', <input {...f.props('startsOn')} type="month" value={v.startsOn} min="2000-01" max={driver.leftOn?.slice(0, 7)} onChange={(e) => f.set('startsOn', e.target.value)} />)}
         </div>
         {f.field('notes', 'Nota', <textarea {...f.props('notes')} rows={2} value={v.notes} maxLength={DRIVER_LIMITS.moneyNotes} onChange={(e) => f.set('notes', e.target.value)} />, 'Opcional: un aumento, el convenio…', true)}
       </Shell>

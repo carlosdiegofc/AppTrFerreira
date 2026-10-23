@@ -1,7 +1,7 @@
 import { ago } from '../lib/dates';
 import type { DriverPresence } from '../lib/presence';
 
-const version = (p: DriverPresence) => `app ${p.version}${p.newer ? ` (hay una más nueva: ${p.newer})` : ''}`;
+const version = (p: DriverPresence) => (p.version ? `app ${p.version}${p.newer ? ` (hay una más nueva: ${p.newer})` : ''}` : 'app anterior a la 0.17.0');
 
 /** What a list says of a driver: on a trip, active and since when, or when the app was last open. */
 export function presenceLine(p: DriverPresence, now: number): string {

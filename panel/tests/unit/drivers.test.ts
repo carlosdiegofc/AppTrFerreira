@@ -15,6 +15,7 @@ import {
   pendingThisMonth,
   type Salary,
   salaryFor,
+  salaryFormValues,
   savedAsSent,
   seniority,
   validateDriver,
@@ -215,6 +216,12 @@ describe('choferes: los formularios del sueldo y de los pagos', () => {
       row: { paid_on: '2026-10-15', period: '2026-09-01', amount: 12345.5, currency: 'UYU', concept: 'sueldo', method: 'efectivo', notes: '' },
       errors: {},
     });
+    // Who stopped working before this month: a new salary starts the month they left, and none after it.
+    expect(salaryFormValues(null, '2026-10-15', null, '2026-08-31').startsOn).toBe('2026-08');
+    expect(salaryFormValues(null, '2026-10-15', null, '2026-10-05').startsOn).toBe('2026-10');
+    const late = validateSalary({ amount: '30000', currency: 'UYU', startsOn: '2026-09', notes: '' }, [], null, '2026-08-31');
+    expect(late.errors).toEqual({ startsOn: 'Dejó de trabajar en agosto de 2026: el sueldo tiene que empezar ese mes o antes.' });
+    expect(validateSalary({ amount: '30000', currency: 'UYU', startsOn: '2026-08', notes: '' }, [], null, '2026-08-31').errors).toEqual({});
     const bad = validatePayment({ ...v, paidOn: '2026-10-16', period: '2026-13', amount: '1,234' }, '2026-10-15');
     expect(bad.row).toBeNull();
     expect(bad.errors).toEqual({ paidOn: 'La fecha no puede ser posterior a hoy.', period: 'Elegí el mes al que corresponde.', amount: 'Hasta dos decimales.' });

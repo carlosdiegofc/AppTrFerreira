@@ -524,18 +524,29 @@ export interface SalaryFormValues {
 
 export type SalaryField = keyof SalaryFormValues;
 
-export function salaryFormValues(s: Salary | null, today: string, current: Salary | null): SalaryFormValues {
+/** A new salary starts this month, or, for who stopped working before it, the month they left (their last one). */
+export function salaryFormValues(s: Salary | null, today: string, current: Salary | null, leftOn: string | null = null): SalaryFormValues {
   if (s) return { amount: String(s.amount).replace('.', ','), currency: s.currency, startsOn: s.startsOn.slice(0, 7), notes: s.notes };
-  return { amount: '', currency: current?.currency ?? 'UYU', startsOn: today.slice(0, 7), notes: '' };
+  const month = leftOn && leftOn.slice(0, 7) < today.slice(0, 7) ? leftOn.slice(0, 7) : today.slice(0, 7);
+  return { amount: '', currency: current?.currency ?? 'UYU', startsOn: month, notes: '' };
 }
 
-/** The row to save, or what is wrong. Two salaries in force cannot start the same month. */
-export function validateSalary(v: SalaryFormValues, others: readonly Salary[], editingId: string | null): { row: Omit<TablesInsert<'trf_driver_salaries'>, 'driver_id'> | null; errors: Partial<Record<SalaryField, string>> } {
+/**
+ * The row to save, or what is wrong. Two salaries in force cannot start the same month, and none after the month the
+ * driver stopped working (leftOn): the months after it have no salary, so it would never count.
+ */
+export function validateSalary(
+  v: SalaryFormValues,
+  others: readonly Salary[],
+  editingId: string | null,
+  leftOn: string | null = null,
+): { row: Omit<TablesInsert<'trf_driver_salaries'>, 'driver_id'> | null; errors: Partial<Record<SalaryField, string>> } {
   const errors: Partial<Record<SalaryField, string>> = {};
   const a = amount(v.amount);
   if (a.error) errors.amount = a.error;
   const startsOn = monthStart(v.startsOn);
   if (!startsOn) errors.startsOn = 'Elegí el mes.';
+  else if (leftOn && startsOn > firstOfMonth(leftOn)) errors.startsOn = `Dejó de trabajar en ${monthLabel(firstOfMonth(leftOn))}: el sueldo tiene que empezar ese mes o antes.`;
   else if (others.some((s) => !s.deleted && s.id !== editingId && s.startsOn === startsOn)) errors.startsOn = 'Ya hay un sueldo desde ese mes: corregilo en vez de cargar otro.';
   const notes = v.notes.trim();
   if (notes.length > DRIVER_LIMITS.moneyNotes) errors.notes = `Hasta ${DRIVER_LIMITS.moneyNotes} caracteres.`;

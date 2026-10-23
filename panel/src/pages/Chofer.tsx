@@ -29,7 +29,7 @@ import {
 import { andList, count, decimal, money, number } from '../lib/format';
 import { PAYMENT_METHODS } from '../lib/fuel';
 import { litersPer100, summarize } from '../lib/metrics';
-import { driverPresence, PRESENCE_LABEL } from '../lib/presence';
+import { driverPresence, PRESENCE_LABEL, withTripDrivers } from '../lib/presence';
 import { presenceLine } from './presenceText';
 import { PAPER_STATE, PRESENCE_TONE } from './states';
 
@@ -142,7 +142,10 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
   const later = salaries.filter((s) => !s.deleted && s.startsOn > salaryMonth).sort((a, b) => a.startsOn.localeCompare(b.startsOn));
 
   const onTrip = useMemo(() => new Set((fleet.data?.active ?? []).map((t) => t.driver_id)), [fleet.data]);
-  const present = useMemo(() => (presence.data && driver.userId ? (driverPresence(presence.data, onTrip, now).find((p) => p.driverId === driver.userId) ?? null) : null), [presence.data, onTrip, now, driver.userId]);
+  const present = useMemo(
+    () => (presence.data && driver.userId ? (withTripDrivers(driverPresence(presence.data, onTrip, now), fleet.data?.active ?? []).find((p) => p.driverId === driver.userId) ?? null) : null),
+    [presence.data, onTrip, now, driver.userId, fleet.data],
+  );
   // The names the account used in the app count for the trips typed by hand, as in the list and in Viajes.
   const who = { userId: driver.userId, name: driver.name, aliases: accountNames(trips, driver.userId) };
   // The accounts other cards have: their rows are those cards', even with this card's name.

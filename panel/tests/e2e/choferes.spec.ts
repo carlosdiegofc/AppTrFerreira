@@ -60,6 +60,17 @@ test('Choferes lista las fichas con su mes, sus papeles y su sueldo, y los de la
   await expect(card.getByLabel('Ya no trabaja en la empresa (la ficha queda guardada, con sus pagos)')).toBeDisabled();
   await expect(card).toContainText('Dejó de trabajar el 31/08/2026. Si vuelve, creá una ficha nueva');
   await card.getByRole('button', { name: 'Cancelar' }).click();
+  // A new salary for him starts in his last month, and not after it: those months have no salary.
+  await page.getByRole('button', { name: 'Cambiar sueldo' }).click();
+  const salary = page.getByRole('dialog', { name: 'Sueldo de Ramón Sosa' });
+  await expect(salary.getByLabel('Desde el mes')).toHaveValue('2026-08');
+  await salary.getByLabel('Sueldo por mes').fill('31.000');
+  await salary.getByLabel('Desde el mes').fill('2026-09');
+  await salary.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(salary).toContainText('Dejó de trabajar en agosto de 2026: el sueldo tiene que empezar ese mes o antes.');
+  await salary.getByRole('button', { name: 'Cancelar' }).click();
+  await salary.getByRole('button', { name: 'Salir sin guardar' }).click();
+  await expect(salary).toBeHidden();
 });
 
 test('la ficha muestra los datos, la libreta, el mes y el sueldo mes a mes con cada pago', async ({ page }) => {

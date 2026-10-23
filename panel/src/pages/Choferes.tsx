@@ -10,7 +10,7 @@ import { useDocuments, useDrivers, useFleetData, useNow, usePaperDrivers, usePre
 import { ago, dayInZone, firstOfMonth, firstOfNextMonth, startOfDay } from '../lib/dates';
 import { type DriverSummary, driverSummaries, monthLabel, monthStatus, pendingThisMonth } from '../lib/drivers';
 import { andList, count, money, number } from '../lib/format';
-import { driverPresence } from '../lib/presence';
+import { driverPresence, withTripDrivers } from '../lib/presence';
 import { amountParts } from './fuelText';
 import { presenceDetail } from './presenceText';
 import { PAPER_STATE, PRESENCE_TONE } from './states';
@@ -111,7 +111,8 @@ export function Choferes() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const onTrip = useMemo(() => new Set((fleet.data?.active ?? []).map((t) => t.driver_id)), [fleet.data]);
-  const present = useMemo(() => (presence.data ? driverPresence(presence.data, onTrip, now) : []), [presence.data, onTrip, now]);
+  // A driver on a trip counts as on a trip even when the phone does not send the notice of the app open.
+  const present = useMemo(() => (presence.data ? withTripDrivers(driverPresence(presence.data, onTrip, now), fleet.data?.active ?? []) : []), [presence.data, onTrip, now, fleet.data]);
   const appDrivers = useMemo(() => app.data ?? [], [app.data]);
   const list = useMemo(
     () => driverSummaries({ drivers, appDrivers, presence: present, trips, papers, salaries, payments }, today),

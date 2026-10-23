@@ -32,7 +32,8 @@ pids: set[str] = set()
 
 
 def adb(*args: str, check: bool = True, timeout: int = 60) -> subprocess.CompletedProcess:
-    result = subprocess.run(['adb', *args], capture_output=True, text=True, timeout=timeout)
+    # The phone's log can carry bytes that are not UTF-8: they are replaced, as in probar_juegos.py.
+    result = subprocess.run(['adb', *args], capture_output=True, text=True, errors='replace', timeout=timeout)
     if check and result.returncode != 0:
         raise SystemExit(f'adb {" ".join(args)} falló: {result.stdout}{result.stderr}')
     return result
