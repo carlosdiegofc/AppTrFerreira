@@ -11,7 +11,9 @@ import { ago, dayInZone, formatDay } from '../lib/dates';
 import { count, decimal, money } from '../lib/format';
 import { balances, filterReceipts, isFuture, NO_STATION, type Receipt, receiptVehicles, type Station, totals } from '../lib/fuel';
 import { type PeriodKind, periodRange } from '../lib/trips';
+import { useTanks } from '../data/tanks';
 import { amountParts, amounts, balanceText, balanceTone, fuelReadError, NO_LIST, stationPath } from './fuelText';
+import { lowTanks, TanksView } from './Tanques';
 
 // The filters live in the address (?vista=boletas&periodo=mes…): going back from a station, reloading or sharing the
 // link keeps them.
@@ -28,6 +30,7 @@ const VIEWS = [
   { value: 'estaciones', label: 'Por estación' },
   { value: 'boletas', label: 'Boletas' },
   { value: 'papelera', label: 'Papelera' },
+  { value: 'tanques', label: 'Tanques' },
 ] as const;
 
 const withChosen = (values: string[], chosen: string) => (chosen && !values.includes(chosen) ? [chosen, ...values] : values);
@@ -88,7 +91,10 @@ function ReceiptRow({ receipt, stationName, today, onOpen, onPhoto, action }: { 
         <strong>{receipt.total === null ? 'Sin importe' : money(receipt.total, receipt.currency)}</strong>
         <small>{receipt.liters === null ? '— L' : `${decimal(receipt.liters, 2)} L`}</small>
       </span>
-      <span className="fr-flags">{receipt.updatedAt && !receipt.archived && <Pill tone="blue">Corregida</Pill>}</span>
+      <span className="fr-flags">
+        {receipt.fullTank && <Pill tone="green">Tanque lleno</Pill>}
+        {receipt.updatedAt && !receipt.archived && <Pill tone="blue">Corregida</Pill>}
+      </span>
     </>
   );
   return (
@@ -130,6 +136,8 @@ export function Combustible() {
   const [photo, setPhoto] = useState<Photo | null>(null);
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn' | 'error'; text: string } | null>(null);
   const restore = useUpdateReceipt();
+  const tanks = useTanks();
+  const low = lowTanks(tanks.rows);
 
   const view = VIEWS.find((v) => v.value === params.get('vista')) ?? VIEWS[0];
   const period = PERIODS.find((p) => p.value === params.get('periodo')) ?? PERIODS[0]!;
@@ -250,6 +258,15 @@ export function Combustible() {
           <Icon name={notice.tone === 'ok' ? 'check' : 'warning'} size={18} /> {notice.text}
         </p>
       )}
+      {low.length > 0 && view.value !== 'tanques' && (
+        <p className="notice notice-warn notice-with-action notice-fuel">
+          <Icon name="fuel" size={18} />
+          <span>Combustible bajo: {low.map((t) => `${t.settings.name} (≈ ${decimal(t.liters, 0)} L)`).join(', ')}.</span>
+          <button type="button" className="link-button notice-action" onClick={() => set({ vista: 'tanques' })}>
+            Ver los tanques
+          </button>
+        </p>
+      )}
       {future > 0 && (
         <p className="notice notice-warn notice-with-action">
           <Icon name="warning" size={18} />
@@ -271,6 +288,7 @@ export function Combustible() {
         </div>
       )}
 
+      {view.value !== 'tanques' && (
       <section className="card filters" aria-label="Filtros">
         <label className="field">
           <span>Período</span>
@@ -336,25 +354,29 @@ export function Combustible() {
           </>
         )}
       </section>
+      )}
 
       <div className="list-bar">
         <div className="chips" role="group" aria-label="Vista">
           {VIEWS.map((v) => (
             <button key={v.value} type="button" className={`chip${view.value === v.value ? ' is-on' : ''}`} aria-pressed={view.value === v.value} onClick={() => set({ vista: v.value === 'estaciones' ? null : v.value })}>
-              {v.label} <span>{count(v.value === 'estaciones' ? stations.length : v.value === 'papelera' ? binned : receipts.length - binned)}</span>
+              {v.label}{' '}
+              <span>{v.value === 'tanques' ? (tanks.rows ? count(tanks.rows.length) : '—') : count(v.value === 'estaciones' ? stations.length : v.value === 'papelera' ? binned : receipts.length - binned)}</span>
             </button>
           ))}
         </div>
         <div className="list-info">
           {loadedAt !== null && <span className="updated">actualizado {ago(loadedAt, now)}</span>}
-          <RefreshButton onClick={() => void query.refetch()} busy={query.isFetching} />
+          <RefreshButton onClick={() => (view.value === 'tanques' ? tanks.refetch() : void query.refetch())} busy={view.value === 'tanques' ? tanks.isFetching : query.isFetching} />
         </div>
       </div>
 
       {query.error && query.data !== undefined && <StaleNote onRetry={() => void query.refetch()} />}
       {catalog.error && <CatalogNote onRetry={() => void catalog.refetch()} />}
       {lists.error && !noList && <StaleNote onRetry={() => void lists.refetch()}>No se pudo actualizar la lista de estaciones de la app: se usa la que se leyó antes.</StaleNote>}
-      {badRange ? (
+      {view.value === 'tanques' ? (
+        <TanksView />
+      ) : badRange ? (
         <ErrorNote>Revisá las fechas: «hasta» no puede ser antes de «desde».</ErrorNote>
       ) : query.error && query.data === undefined ? (
         <ErrorNote onRetry={() => void query.refetch()}>{fuelReadError(query.error)}</ErrorNote>

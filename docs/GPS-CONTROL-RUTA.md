@@ -40,7 +40,7 @@ El observador del historial funciona sin dejar una web abierta. Solo considera l
 
 Los avisos web son proximidad en línea recta con posición de menos de 30 segundos, no una ruta calculada. El GPS no prueba infracciones a 5 km/h. Avisos sonoros y funcionamiento de alertas con el teléfono cerrado necesitan la próxima etapa Android.
 
-El tanque se calibra con litros medidos, capacidad, consumo L/100 km y umbral. Se guardan distancias y boletas de referencia: después se descuentan kilómetros GPS y se suman nuevas cargas. Una boleta corregida/eliminada, distancia reducida o carga sin litros suspende la estimación hasta revisar y recalibrar. No estima ralentí ni combustible no registrado. Boletas cargadas tardíamente pueden requerir recalibración.
+Desde el 22/10/2026 el tanque de cada camión es el mismo en GPS y en Combustible («Tanques», migración 0009): capacidad, consumo en km por litro y desde cuántos litros avisar, que se cambian sin volver a medir. El cálculo arranca en la última medición (los litros que tenía en un momento, con los kilómetros de cada viaje y las cargas que ya conocía) o en la última carga marcada «Tanque lleno», lo que sea más reciente. Después resta los kilómetros GPS según el consumo y suma las cargas posteriores. Un viaje que iba en curso sin estar vinculado a ese momento cuenta entero, y el resultado dice que es aproximado. Una carga sin litros, cargas que pasan la capacidad o un viaje que pierde kilómetros piden revisar en lugar de dar un número. No estima ralentí ni combustible no registrado, y una boleta cargada tarde cuenta desde que se registró.
 
 ## Entrega y publicación
 

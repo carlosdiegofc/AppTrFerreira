@@ -6,11 +6,14 @@ import { Icon } from '../components/Icon';
 import { Card, Dot, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote, Stat } from '../components/ui';
 import type { TripRow } from '../data/api';
 import { useCatalog, useDocuments, useFleet, useMaintenance, useNow, useTrips } from '../data/hooks';
+import { useTanks } from '../data/tanks';
 import { addDays, ago, dayInZone, firstOfMonth, firstOfNextMonth, formatTime, greeting, longDate, startOfDay } from '../lib/dates';
 import { type CatalogTruck, canonical, fleetCounts, truckParts } from '../lib/fleet';
-import { count, km, percent } from '../lib/format';
+import { count, decimal, km, percent } from '../lib/format';
 import { monthTotals } from '../lib/month';
 import { type Alert, alerts } from '../lib/papers';
+import type { TankState } from '../lib/tanks';
+import { lowTanks } from './Tanques';
 
 function TripLine({ trip, catalog }: { trip: TripRow; catalog: readonly CatalogTruck[] }) {
   const { model, plate } = truckParts(canonical(trip.vehicle, catalog) ?? '');
@@ -61,6 +64,26 @@ function AlertLine({ alert }: { alert: Alert }) {
   );
 }
 
+/** A truck low on fuel, by the tank's estimate. */
+function FuelLine({ tank }: { tank: Extract<TankState, { status: 'known' }> }) {
+  return (
+    <li>
+      <Link className="alert-line" to="/combustible?vista=tanques" title="Ver los tanques en Combustible">
+        <span className="alert-icon tone-red">
+          <Icon name="fuel" size={18} />
+        </span>
+        <span className="alert-main">
+          <strong>{tank.settings.name}</strong>
+          <span>
+            ≈ {decimal(tank.liters, 0)} L · rinde ≈ {count(Math.round(tank.autonomyKm))} km
+          </span>
+        </span>
+        <Pill tone="red">Combustible bajo</Pill>
+      </Link>
+    </li>
+  );
+}
+
 export function Inicio() {
   const { user } = usePanelUser();
   const navigate = useNavigate();
@@ -72,6 +95,8 @@ export function Inicio() {
   const month = useTrips(startOfDay(firstOfMonth(today)), startOfDay(firstOfNextMonth(today)));
   const documents = useDocuments();
   const maintenance = useMaintenance();
+  const tanks = useTanks();
+  const low = lowTanks(tanks.rows);
 
   const counts = fleetCounts(fleet.units);
   // The warnings by kilometres need the trips: until they arrive (or fail), the list is not complete.
@@ -88,7 +113,10 @@ export function Inicio() {
   const running = todays.data?.filter((t) => t.active).length ?? 0;
   const refreshing = fleet.isFetching || todays.isFetching || documents.query.isFetching || maintenance.query.isFetching;
   const refreshPapers = () => Promise.all([documents.query.refetch(), maintenance.query.refetch(), maintenance.refetchTrips()]);
-  const refresh = () => void Promise.all([fleet.refetch(), todays.refetch(), month.refetch(), refreshPapers()]);
+  const refresh = () => {
+    tanks.refetch();
+    void Promise.all([fleet.refetch(), todays.refetch(), month.refetch(), refreshPapers()]);
+  };
   const firstName = user.name.split(' ')[0] ?? user.name;
 
   return (
@@ -138,11 +166,21 @@ export function Inicio() {
               {maintenance.kmMissing ? 'No se pudieron leer los viajes: los avisos por kilómetros no se ven ahora.' : 'No se pudieron actualizar los viajes: los avisos por kilómetros son de la última lectura.'}
             </StaleNote>
           )}
+          {tanks.error && (
+            <StaleNote onRetry={tanks.refetch}>No se pudo leer el combustible de los camiones: los avisos de combustible bajo no se ven ahora.</StaleNote>
+          )}
+          {low.length > 0 && (
+            <ul className="alert-list" aria-label="Combustible bajo">
+              {low.map((t) => (
+                <FuelLine key={t.settings.key} tank={t} />
+              ))}
+            </ul>
+          )}
           {papersError && !papersLoaded ? (
             <ErrorNote onRetry={() => void refreshPapers()} />
           ) : !papersLoaded ? (
             <Skeleton />
-          ) : pending.length === 0 ? (
+          ) : pending.length === 0 && low.length > 0 ? null : pending.length === 0 ? (
             <Empty icon="check" title="Todo en orden">
               No hay papeles vencidos ni por vencer en 30 días, ni services atrasados o próximos (15 días o 1.000 km).
             </Empty>

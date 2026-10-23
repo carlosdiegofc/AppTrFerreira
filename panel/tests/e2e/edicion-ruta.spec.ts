@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { open, prepare, shot, signIn } from './helpers';
 test.beforeEach(async ({ page }) => prepare(page));
-test('punto, tarifa, cuenta individual y referencia del tanque', async ({ page }) => {
+test('punto, tarifa, cuenta individual y medición del tanque', async ({ page }) => {
   await signIn(page, 'lectura@ejemplo.uy');
   await open(page, 'GPS');
   await page.getByRole('button', { name: 'Peajes, balanzas y radares', exact: true }).click();
@@ -32,11 +32,11 @@ test('punto, tarifa, cuenta individual y referencia del tanque', async ({ page }
   await page.getByRole('dialog').getByRole('button', { name: 'Guardar', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeHidden();
   await expect(page.locator('.road-truck .road-point').filter({ hasText: 'Peaje de ensayo' })).toContainText('250');
-  await page.getByRole('button', { name: 'Calibrar tanque / consumo' }).click();
+  // The same tank as in Combustible: measured with 40 litres, under its alert of 80.
+  await page.getByRole('button', { name: 'Medir el tanque' }).click();
   form = page.getByRole('dialog');
-  await form.getByLabel('Capacidad del tanque').fill('400');
-  await form.getByLabel('Litros que tiene ahora').fill('40');
-  await form.getByLabel('Consumo de referencia').fill('40');
+  await form.getByRole('radio', { name: 'Tiene otra cantidad' }).check();
+  await form.getByLabel('Litros que tiene').fill('40');
   await form.getByRole('button', { name: 'Guardar', exact: true }).click();
   await expect(form).toBeHidden();
   await expect(page.locator('.road-truck')).toContainText('Combustible bajo');

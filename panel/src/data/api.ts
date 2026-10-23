@@ -11,6 +11,8 @@ import { toNumber } from '../lib/numbers';
 import type { PresenceRow } from '../lib/presence';
 import { supabase } from '../lib/supabase';
 import type { TripPayload } from '../lib/tripForm';
+import type { TankReference } from '../lib/road';
+import type { TankSettings, TankSettingsRow, TankTrip } from '../lib/tanks';
 import type { DetailRow, FuelRow, PanelTripRow, SessionRow, Trip } from '../lib/trips';
 
 /** A query that failed; the message is for the console, the code (PostgreSQL's or PostgREST's) says why. */
@@ -585,4 +587,68 @@ export async function photoUrl(bucket: PhotoBucket, path: string): Promise<strin
   const result = await supabase.storage.from(bucket).createSignedUrl(path, 600);
   if (result.error) throw new DataError(result.error.message);
   return result.data.signedUrl;
+}
+
+export interface TanksData {
+  settings: TankSettingsRow[];
+  references: TankReference[];
+}
+
+/** Every truck's tank and its latest measurement: few rows, read whole. */
+export async function fetchTanks(): Promise<TanksData> {
+  const [settings, references] = await Promise.all([
+    all((from, to) => supabase.from('trf_tank_settings').select('*').order('vehicle_key').range(from, to), 5000, true),
+    all((from, to) => supabase.from('trf_tank_references').select('*').order('vehicle_key').range(from, to), 5000, true),
+  ]);
+  return { settings, references };
+}
+
+/**
+ * The app's trips the tanks need: the ones that started since an instant and the ones still going, as the office left
+ * them (without the ones in the trash, and with the truck it corrected).
+ */
+export async function fetchTankTrips(sinceIso: string): Promise<TankTrip[]> {
+  // The office's row of an app trip starts when the trip does; a trip still going may have started a while before.
+  const panelSince = new Date(Date.parse(sinceIso) - 30 * 86_400_000).toISOString();
+  const [trips, panel] = await Promise.all([
+    all(
+      (from, to) =>
+        supabase
+          .from('trf_driver_tracking_sessions')
+          .select('id,vehicle,started_at,ended_at,active,distance_meters')
+          .or(`started_at.gte."${sinceIso}",active.is.true`)
+          .order('started_at')
+          .order('id')
+          .range(from, to),
+      50_000,
+      true,
+    ),
+    all((from, to) => supabase.from('trf_panel_trips').select('app_trip_id,vehicle,deleted_at').eq('source', 'app').gte('departure_at', panelSince).order('id').range(from, to), 50_000, true),
+  ]);
+  return kmTripsAsCorrected(trips, panel).map((t) => ({ id: t.id, vehicle: t.vehicle, startedAt: t.started_at, endedAt: t.ended_at, active: t.active, meters: t.distance_meters }));
+}
+
+/**
+ * A truck's tank, new or changed: a change only applies if nobody saved it meanwhile (otherwise ConflictError). A save
+ * tried again after its answer was cut finds the tank as it was sent and counts as saved.
+ */
+export async function saveTankSettings(current: Pick<TankSettings, 'key' | 'updatedAt'> | null, row: TablesInsert<'trf_tank_settings'>): Promise<Tables<'trf_tank_settings'>> {
+  const sent = { vehicle_name: row.vehicle_name, capacity_l: row.capacity_l, consumption: row.consumption, warning_l: row.warning_l };
+  const find = async () => rows(await supabase.from('trf_tank_settings').select('*').eq('vehicle_key', row.vehicle_key).limit(1))[0];
+  if (!current?.updatedAt) {
+    const result = await supabase.from('trf_tank_settings').insert(row).select();
+    if (result.error?.code === '23505') {
+      const saved = await find();
+      if (saved && savedAsSent(saved, sent)) return saved;
+      throw new ConflictError('Otra persona cargó el tanque de este camión');
+    }
+    const saved = rows(result)[0];
+    if (!saved) throw new DataError('El alta no devolvió la fila');
+    return saved;
+  }
+  const saved = rows(await supabase.from('trf_tank_settings').update(row).eq('vehicle_key', current.key).eq('updated_at', current.updatedAt).select())[0];
+  if (saved) return saved;
+  const now = await find();
+  if (now && savedAsSent(now, sent)) return now;
+  throw new ConflictError('Otra persona cambió el tanque');
 }

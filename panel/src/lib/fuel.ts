@@ -71,6 +71,8 @@ export interface Declared {
   station: string | null;
   liters: number | null;
   total: number | null;
+  /** «Llené el tanque» (migration 0009); null when it was not said, as in the receipts of older app versions. */
+  fullTank: boolean | null;
 }
 
 export interface Receipt {
@@ -89,6 +91,10 @@ export interface Receipt {
   liters: number | null;
   total: number | null;
   currency: Currency;
+  /** The load filled the tank: the tank's estimate starts again from full here. */
+  fullTank: boolean;
+  /** The trip's GPS metres when the receipt was loaded in it (null without a trip). */
+  tripMeters: number | null;
   objectPath: string | null;
   /** In the trash: it does not count anywhere. */
   archived: boolean;
@@ -111,6 +117,7 @@ export function receiptFromRow(r: FuelRow, trucks: readonly CatalogTruck[] = [],
     station: text(r.station_name),
     liters: toNumber(r.liters),
     total: toNumber(r.total),
+    fullTank: typeof r.full_tank === 'boolean' ? r.full_tank : null,
   };
   const correctedId = text(d.estacionId);
   const correctedName = text(d.estacionNombre);
@@ -127,6 +134,8 @@ export function receiptFromRow(r: FuelRow, trucks: readonly CatalogTruck[] = [],
     liters: toNumber(d.litros) ?? declared.liters,
     total: toNumber(d.monto) ?? declared.total,
     currency: d.moneda === 'USD' ? 'USD' : 'UYU',
+    fullTank: typeof d.tanque_lleno === 'boolean' ? d.tanque_lleno : declared.fullTank === true,
+    tripMeters: r.trip_id ? toNumber(r.distance_meters) : null,
     objectPath: text(r.object_path),
     archived: r.archived === true,
     updatedAt: r.updated_at ?? null,

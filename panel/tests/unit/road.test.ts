@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   applicableRate,
   externalMaps,
-  fuelEstimate,
   pointTitle,
   roadVehicleKey,
   sortedPoints,
@@ -24,8 +23,6 @@ const ref: TankReference = {
   measured_at: '2026-10-21T10:00:00Z',
   updated_at: '2026-10-21T10:00:00Z',
 };
-const trip = { id: 'a', vehicle: ref.vehicle_name, distance_meters: 110000 };
-const receipt = { id: 'r', vehicle: ref.vehicle_name, liters: 100 };
 describe('control de ruta', () => {
   it('keeps different plates separate, independent of model spelling', () => {
     expect(roadVehicleKey('Otro modelo · ABC1234')).toBe(ref.vehicle_key);
@@ -57,25 +54,6 @@ describe('control de ruta', () => {
         'a',
       ),
     ).toBe(0.3);
-  });
-  it('subtracts only new distance and adds only new loads', () => {
-    expect(fuelEstimate(ref, [trip], [receipt, { ...receipt, id: 'new', liters: 40 }])).toMatchObject({
-      known: true,
-      liters: 200,
-      km: 500,
-      low: false,
-    });
-    expect(fuelEstimate(ref, [{ ...trip, distance_meters: 410000 }], [receipt])).toMatchObject({ known: true, liters: 40, low: true });
-  });
-  it('refuses guesses after missing/changed old records or a distance reset', () => {
-    for (const [trips, receipts] of [
-      [[], [receipt]],
-      [[trip], []],
-      [[trip], [{ ...receipt, liters: null }]],
-      [[trip], [{ ...receipt, liters: 99 }]],
-      [[{ ...trip, distance_meters: 0 }], [receipt]],
-    ] as const)
-      expect(fuelEstimate(ref, trips, receipts).known).toBe(false);
   });
   it('rejects impossible zones and limits', () => {
     const p = { name: 'Balanza', latitude: -34, longitude: -56, radius_m: 50, warning_m: 500, speed_limit: 5, notes: '' };

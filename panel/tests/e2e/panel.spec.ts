@@ -36,10 +36,11 @@ test('el inicio muestra la flota, los viajes de hoy y lo que hay que tener en cu
   await expect(stat(page, 'Viajes hoy')).toContainText('3 en curso');
   // The trip of 08:30 was sent to the trash in the old panel.
   await expect(page.locator('.trip-time')).toHaveText(['11:00', '10:00', '09:00', '06:00']);
-  // The Ford's oil is due by kilometres: about 405 km left, estimated today.
-  await expect(page.locator('.alert-line strong')).toHaveText(['SOA · GHI9012', 'Frenos · ABC1234', 'Cambio de aceite · JKL3456', 'Cambio de aceite · DEF5678', 'Licencia de conducir · Ana Pereira']);
-  await expect(page.locator('.alert-line', { hasText: 'JKL3456' })).toContainText('A los 412.500 km · faltan unos 405 km');
-  await expect(page.locator('.alert-line').first()).toContainText('Venció el 12/10/2026');
+  // A truck low on fuel first (its tank, in Combustible); the Ford's oil is due by kilometres: about 405 km left,
+  // estimated today.
+  await expect(page.locator('.alert-line strong')).toHaveText(['Ford Cargo 1722 · JKL3456', 'SOA · GHI9012', 'Frenos · ABC1234', 'Cambio de aceite · JKL3456', 'Cambio de aceite · DEF5678', 'Licencia de conducir · Ana Pereira']);
+  await expect(page.locator('.alert-line', { hasText: 'Cambio de aceite · JKL3456' })).toContainText('A los 412.500 km · faltan unos 405 km');
+  await expect(page.locator('.alert-line', { hasText: 'SOA · GHI9012' })).toContainText('Venció el 12/10/2026');
   await expect(page.locator('.map-home .fm')).toHaveCount(5);
   await shot(page, 'inicio');
 

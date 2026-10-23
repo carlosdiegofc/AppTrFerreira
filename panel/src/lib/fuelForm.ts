@@ -42,13 +42,15 @@ export interface ReceiptFormValues {
   liters: string;
   total: string;
   currency: Currency;
+  /** The load filled the tank. */
+  fullTank: boolean;
 }
 
 export type ReceiptField = keyof ReceiptFormValues;
 
 /** What the form starts with: a new receipt dated today, or the receipt as it reads now (with its corrections). */
 export function receiptFormValues(receipt: Receipt | null, catalog: readonly CatalogStation[], today: string): ReceiptFormValues {
-  if (!receipt) return { date: today, stationId: '', station: '', vehicle: '', liters: '', total: '', currency: 'UYU' };
+  if (!receipt) return { date: today, stationId: '', station: '', vehicle: '', liters: '', total: '', currency: 'UYU', fullTank: false };
   const listed = catalog.find((s) => 'id:' + s.id === receipt.stationKey);
   return {
     date: receipt.date ?? today,
@@ -58,6 +60,7 @@ export function receiptFormValues(receipt: Receipt | null, catalog: readonly Cat
     liters: typed(receipt.liters),
     total: typed(receipt.total),
     currency: receipt.currency,
+    fullTank: receipt.fullTank,
   };
 }
 
@@ -70,6 +73,7 @@ export interface ReceiptPayload {
   liters: number | null;
   total: number;
   currency: Currency;
+  fullTank: boolean;
 }
 
 export type Checked<F extends string, P> = { ok: true; payload: P; errors: Partial<Record<F, string>> } | { ok: false; errors: Partial<Record<F, string>> };
@@ -89,6 +93,7 @@ export function validateReceiptForm(v: ReceiptFormValues, catalog: readonly Cata
   else if (!listed && (written ?? '').length > FUEL_LIMITS.station) errors.station = `Hasta ${FUEL_LIMITS.station} letras.`;
   if (v.vehicle.trim().length > FUEL_LIMITS.vehicle) errors.vehicle = `Hasta ${FUEL_LIMITS.vehicle} letras.`;
   else if (v.vehicle.trim() === '' && declared?.vehicle) errors.vehicle = 'La boleta tiene camión: para cambiarlo, escribí el correcto.';
+  else if (v.vehicle.trim() === '' && v.fullTank) errors.vehicle = 'Para marcar el tanque lleno, escribí el camión.';
   const liters = checkNumber(v.liters, MAX.liters);
   if (liters.error) errors.liters = liters.error;
   else if (liters.value === null && declared?.liters != null) errors.liters = 'La boleta tiene litros: para corregirlos, escribí el número correcto.';
@@ -108,6 +113,7 @@ export function validateReceiptForm(v: ReceiptFormValues, catalog: readonly Cata
       liters: liters.value,
       total: total.value as number,
       currency: v.currency === 'USD' ? 'USD' : 'UYU',
+      fullTank: v.fullTank,
     },
   };
 }
@@ -146,6 +152,7 @@ export function newReceiptRow(id: string, user: { id: string; name: string }, p:
     total: p.total,
     object_path: withPhoto ? `${user.id}/standalone/${id}.jpg` : null,
     panel_data: p.currency === 'USD' ? { moneda: 'USD' } : null,
+    full_tank: p.fullTank,
   };
 }
 
@@ -154,7 +161,7 @@ export function newReceiptRow(id: string, user: { id: string; name: string }, p:
  * the form had then; a save tried again gets that one back.
  */
 export function sameReceipt(saved: Tables<'trf_driver_fuel_receipts'>, row: TablesInsert<'trf_driver_fuel_receipts'>): boolean {
-  const keys = ['receipt_date', 'station_id', 'station_name', 'vehicle', 'liters', 'total', 'object_path'] as const;
+  const keys = ['receipt_date', 'station_id', 'station_name', 'vehicle', 'liters', 'total', 'object_path', 'full_tank'] as const;
   return keys.every((k) => (saved[k] ?? null) === (row[k] ?? null)) && JSON.stringify(saved.panel_data ?? null) === JSON.stringify(row.panel_data ?? null);
 }
 
@@ -198,6 +205,10 @@ export function correctedPanelData(receipt: Receipt, initial: ReceiptFormValues,
   if (changed('currency')) {
     if (p.currency === 'UYU') delete d.moneda;
     else d.moneda = 'USD';
+  }
+  if (changed('fullTank')) {
+    if (p.fullTank === (declared.fullTank === true)) delete d.tanque_lleno;
+    else d.tanque_lleno = p.fullTank;
   }
   return Object.keys(d).length > 0 ? (d as Json) : null;
 }

@@ -84,6 +84,7 @@ export type Database = {
           distance_meters: number
           driver_id: string
           driver_name: string
+          full_tank: boolean | null
           id: string
           liters: number | null
           object_path: string | null
@@ -103,6 +104,7 @@ export type Database = {
           distance_meters?: number
           driver_id: string
           driver_name: string
+          full_tank?: boolean | null
           id: string
           liters?: number | null
           object_path?: string | null
@@ -122,6 +124,7 @@ export type Database = {
           distance_meters?: number
           driver_id?: string
           driver_name?: string
+          full_tank?: boolean | null
           id?: string
           liters?: number | null
           object_path?: string | null
@@ -772,6 +775,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      trf_tank_settings: {
+        Row: {
+          capacity_l: number
+          consumption: number
+          created_at: string
+          created_by: string | null
+          updated_at: string
+          updated_by: string | null
+          vehicle_key: string
+          vehicle_name: string
+          warning_l: number
+        }
+        Insert: {
+          capacity_l: number
+          consumption: number
+          created_at?: string
+          created_by?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vehicle_key: string
+          vehicle_name: string
+          warning_l: number
+        }
+        Update: {
+          capacity_l?: number
+          consumption?: number
+          created_at?: string
+          created_by?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vehicle_key?: string
+          vehicle_name?: string
+          warning_l?: number
+        }
+        Relationships: []
       }
       trf_trip_details: {
         Row: {

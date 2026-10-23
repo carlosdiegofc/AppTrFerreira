@@ -30,7 +30,7 @@ const TRUCKS = [{ model: 'Volvo FH 460', plate: 'ABC1234' }];
 const row = (over: Partial<FuelRow> = {}): FuelRow => ({
   id: 'r1', trip_id: null, driver_id: 'd1', driver_name: 'Ana Pereira', vehicle: 'Volvo FH 460 · ABC1234', recorded_at: '2026-10-15T12:00:00Z',
   receipt_date: '2026-10-15', distance_meters: 0, object_path: null, archived: false, station_id: '', station_name: 'Ancap Ruta 5 km 32',
-  liters: 180, total: 9800, panel_data: null, updated_at: null, updated_by: null, ...over,
+  liters: 180, total: 9800, panel_data: null, updated_at: null, updated_by: null, full_tank: null, ...over,
 });
 const move = (over: Partial<MovementRow> = {}): MovementRow => ({
   id: 'm1', station_key: 'id:est-ruta5', station_name: 'Ancap Ruta 5 km 32', kind: 'payment', happened_on: '2026-10-12', amount: 20000, currency: 'UYU',
@@ -68,7 +68,16 @@ describe('boletas', () => {
       STATIONS,
     );
     expect(r).toMatchObject({ date: '2026-10-14', liters: 182.5, total: 9950, currency: 'USD', vehicle: 'Volvo FH 460 · ABC1234', station: 'Petrobras  salto', stationKey: 'id:est-salto', updatedAt: '2026-10-15T13:00:00Z' });
-    expect(r.declared).toEqual({ date: '2026-10-15', vehicle: 'Volvo FH 460 · ABC1234', stationId: null, station: 'Ancap Ruta 5 km 32', liters: 180, total: 9800 });
+    expect(r.declared).toEqual({ date: '2026-10-15', vehicle: 'Volvo FH 460 · ABC1234', stationId: null, station: 'Ancap Ruta 5 km 32', liters: 180, total: 9800, fullTank: null });
+  });
+
+  it('el tanque lleno: lo que dijo el chofer, salvo que la oficina lo corrija; y los metros del viaje al cargar', () => {
+    expect(receiptFromRow(row()).fullTank).toBe(false);
+    expect(receiptFromRow(row({ full_tank: true })).fullTank).toBe(true);
+    expect(receiptFromRow(row({ full_tank: true, panel_data: { tanque_lleno: false } })).fullTank).toBe(false);
+    expect(receiptFromRow(row({ full_tank: null, panel_data: { tanque_lleno: true } }))).toMatchObject({ fullTank: true, declared: { fullTank: null } });
+    expect(receiptFromRow(row({ trip_id: 't1', distance_meters: 152300 })).tripMeters).toBe(152300);
+    expect(receiptFromRow(row({ trip_id: null, distance_meters: 0 })).tripMeters).toBeNull();
   });
 
   it('panel_data guardado como texto se lee igual', () => {
@@ -235,7 +244,10 @@ describe('formulario de boleta', () => {
     const future = validateReceiptForm({ ...receiptFormValues(null, STATIONS, today), date: '2026-10-16', station: 'El Tala', total: '0' }, STATIONS, today);
     expect(future.errors).toEqual({ date: 'La fecha no puede ser posterior a hoy.', total: 'El importe tiene que ser mayor que cero.' });
     const ok = validateReceiptForm({ ...receiptFormValues(null, STATIONS, today), stationId: 'est-ruta5', total: '12.500', liters: '230,5', currency: 'USD' }, STATIONS, today);
-    expect(ok.ok && ok.payload).toEqual({ date: today, stationId: 'est-ruta5', station: 'Ancap Ruta 5 km 32', vehicle: '', liters: 230.5, total: 12500, currency: 'USD' });
+    expect(ok.ok && ok.payload).toEqual({ date: today, stationId: 'est-ruta5', station: 'Ancap Ruta 5 km 32', vehicle: '', liters: 230.5, total: 12500, currency: 'USD', fullTank: false });
+    // A full tank is a truck's: without the truck it cannot be said.
+    const full = validateReceiptForm({ ...receiptFormValues(null, STATIONS, today), stationId: 'est-ruta5', total: '12.500', fullTank: true }, STATIONS, today);
+    expect(full.errors).toEqual({ vehicle: 'Para marcar el tanque lleno, escribí el camión.' });
   });
 
   it('una boleta cargada en el panel queda a nombre de quien la carga, sin viaje y con la foto en su carpeta', () => {
@@ -243,7 +255,7 @@ describe('formulario de boleta', () => {
     if (!check.ok) throw new Error('tendría que ser válida');
     expect(newReceiptRow('r9', { id: 'u2', name: 'Socio Lectura' }, check.payload, true)).toEqual({
       id: 'r9', driver_id: 'u2', driver_name: 'Socio Lectura', trip_id: null, vehicle: 'Volvo FH 460 · ABC1234', receipt_date: today, station_id: '',
-      station_name: 'Estación El Tala', liters: null, total: 6600, object_path: 'u2/standalone/r9.jpg', panel_data: { moneda: 'USD' },
+      station_name: 'Estación El Tala', liters: null, total: 6600, object_path: 'u2/standalone/r9.jpg', panel_data: { moneda: 'USD' }, full_tank: false,
     });
     expect(newReceiptRow('r9', { id: 'u2', name: 'Socio Lectura' }, { ...check.payload, currency: 'UYU' }, false)).toMatchObject({ object_path: null, panel_data: null });
   });
@@ -257,6 +269,7 @@ describe('formulario de boleta', () => {
     expect(sameReceipt({ ...saved, total: 6000 }, sent)).toBe(false);
     expect(sameReceipt({ ...saved, object_path: null }, sent)).toBe(false);
     expect(sameReceipt({ ...saved, panel_data: null }, sent)).toBe(false);
+    expect(sameReceipt({ ...saved, full_tank: true }, sent)).toBe(false);
   });
 
   it('al corregir, lo que la boleta tenía no se puede dejar vacío: volvería a leerse lo declarado', () => {
@@ -301,6 +314,14 @@ describe('formulario de boleta', () => {
     expect(save({ stationId: '', station: 'Estación El Tala' })).toEqual({ litros: 182.5, otro: 'se conserva', estacionNombre: 'Estación El Tala' });
     expect(save({ stationId: 'est-salto' })).toEqual({ litros: 182.5, otro: 'se conserva', estacionNombre: 'Petrobras Salto', estacionId: 'est-salto' });
     expect(save({ vehicle: 'abc1234' })).toEqual({ litros: 182.5, otro: 'se conserva' });
+    // The full tank: the office's word goes in panel_data, and back to what was said it goes away.
+    expect(save({ fullTank: true })).toEqual({ litros: 182.5, otro: 'se conserva', tanque_lleno: true });
+    const said = receiptFromRow(row({ full_tank: true, panel_data: { tanque_lleno: false } }), TRUCKS, STATIONS);
+    const saidStart = receiptFormValues(said, STATIONS, today);
+    expect(saidStart.fullTank).toBe(false);
+    const saidBack = { ...saidStart, fullTank: true };
+    const saidCheck = validateReceiptForm(saidBack, STATIONS, today);
+    expect(saidCheck.ok && correctedPanelData(said, saidStart, saidBack, saidCheck.payload, STATIONS, TRUCKS)).toBeNull();
     const clean = receiptFromRow(row({ panel_data: { monto: 9950 } }), TRUCKS, STATIONS);
     const start = receiptFormValues(clean, STATIONS, today);
     const back = { ...start, total: '9800' };

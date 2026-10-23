@@ -230,6 +230,7 @@ export function ReceiptFormDialog({ receipt: opened, today, stations, writtenSta
               <span>Camión: {declared.vehicle ?? '—'}</span>
               <span>Litros: {declared.liters === null ? '—' : decimal(declared.liters, 2)}</span>
               <span>Importe: {declared.total === null ? '—' : decimal(declared.total, 2)}</span>
+              <span>Tanque lleno: {declared.fullTank === null ? 'no se dijo' : declared.fullTank ? 'sí' : 'no'}</span>
               <span className="facts-note">Lo declarado no se cambia: la corrección se guarda aparte y es lo que cuenta en los totales.</span>
               {receipt.objectPath && (
                 <button type="button" className="link-button" onClick={() => setViewing({ bucket: 'trf-fuel-receipts', path: receipt.objectPath as string, title: `Boleta de ${receipt.station ?? 'combustible'}` })}>
@@ -303,6 +304,11 @@ export function ReceiptFormDialog({ receipt: opened, today, stations, writtenSta
               {pickOther && field('station', 'Nombre de la estación', <input {...fieldProps('station')} type="text" value={values.station} maxLength={FUEL_LIMITS.station} list={`${id}-written`} autoComplete="off" onChange={(e) => set('station', e.target.value)} />, 'Se agrupa con las que tienen el mismo nombre, sin importar mayúsculas ni tildes.')}
               {field('vehicle', 'Camión', <input {...fieldProps('vehicle')} type="text" value={values.vehicle} maxLength={FUEL_LIMITS.vehicle} list={`${id}-trucks`} autoComplete="off" onChange={(e) => set('vehicle', e.target.value)} />, 'Opcional')}
             </div>
+            <label className="check-row">
+              <input type="checkbox" checked={values.fullTank} onChange={(e) => set('fullTank', e.target.checked)} />
+              Llenó el tanque
+            </label>
+            <p className="hint">Con el tanque lleno, el tanque estimado del camión vuelve a arrancar lleno desde esta carga.</p>
           </fieldset>
 
           <fieldset>

@@ -817,6 +817,11 @@ class MainActivity:AppCompatActivity(){
   val left=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};val right=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
   two.addView(left,LinearLayout.LayoutParams(0,-2,1f));two.addView(right,LinearLayout.LayoutParams(0,-2,1f).apply{marginStart=dp(12)})
   bound(left,"Litros",fuelForm,"liters",true,"0");bound(right,"Total (UYU)",fuelForm,"total",true,"0")
+  // A full tank starts the truck's estimated tank in the panel again from full.
+  caption(c,"¿Llenaste el tanque?");val full=fuelForm.optBoolean("full_tank")
+  radio(c,"No, cargué una parte",!full){fuelForm.put("full_tank",false);fuel()}
+  radio(c,"Sí, lo llené",full){fuelForm.put("full_tank",true);fuel()}
+  note("Si lo llenaste, el panel vuelve a calcular desde lleno cuánto gasoil le queda al camión.",c,8)
   dock.visibility=View.VISIBLE
   button(dock,"Guardar combustible",top=0){
    if(photoBusy){toast("Esperá a que termine de prepararse la foto");return@button}
@@ -951,11 +956,13 @@ class MainActivity:AppCompatActivity(){
   val station=d.optString("estacionNombre").takeIf{it.isNotBlank()&&it!="null"}?:r.optString("station_name").ifBlank{"Estación por completar"}
   val day=fuelDay(r)?.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
   val who=if(fleet)r.optString("driver_name").substringBefore(" ").ifBlank{null} else null
+  // The office's correction wins over what was declared, as for the rest of the receipt.
+  val full=(d.opt("tanque_lleno") as? Boolean)?:r.optBoolean("full_tank",false)
   val v=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(14),dp(12),dp(14),dp(12))}
   v.addView(square(R.drawable.ic_fuel,green,greenBg))
   val col=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),0,dp(8),0)}
   col.addView(tv(station,15f,ink,1).apply{maxLines=1;ellipsize=TextUtils.TruncateAt.END})
-  col.addView(tv(listOfNotNull(day,who,if(r.isNull("trip_id"))"Sin viaje" else "En viaje").joinToString(" · "),13f,muted).apply{setPadding(0,dp(3),0,0)})
+  col.addView(tv(listOfNotNull(day,who,if(r.isNull("trip_id"))"Sin viaje" else "En viaje",if(full)"Tanque lleno" else null).joinToString(" · "),13f,muted).apply{setPadding(0,dp(3),0,0)})
   v.addView(col,LinearLayout.LayoutParams(0,-2,1f))
   val right=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.END}
   val lt=amount(d,"litros",r,"liters");val paid=amount(d,"monto",r,"total");val cur=currency(d)
