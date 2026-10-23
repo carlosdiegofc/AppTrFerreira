@@ -4,10 +4,11 @@ import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } fr
 import { ConflictError, describeWriteError, fetchTankTrips } from '../data/api';
 import { type TankRow, useMeasureTank, useSaveTank } from '../data/tanks';
 import { dayInZone, formatDay } from '../lib/dates';
+import type { CatalogTruck } from '../lib/fleet';
 import { decimal } from '../lib/format';
 import type { Receipt } from '../lib/fuel';
 import { roadVehicleKey } from '../lib/road';
-import { defaultWarning, kmPerLiter, type TankFormValues, tankFormValues, validateMeasurement, validateTankForm } from '../lib/tanks';
+import { defaultWarning, kmPerLiter, type TankFormValues, tankFormValues, tripsInCatalog, validateMeasurement, validateTankForm } from '../lib/tanks';
 import { parseNumber } from '../lib/numbers';
 import { Icon } from './Icon';
 
@@ -189,7 +190,7 @@ export function TankSettingsDialog({ row, onClose, onDone, onConflict }: Common)
  * What the tank has now: measured, or full. It keeps the trips and loads it already knows, so the estimate counts only
  * what comes after.
  */
-export function TankMeasureDialog({ row, receipts, onClose, onDone, onConflict }: Common & { receipts: readonly Receipt[] }) {
+export function TankMeasureDialog({ row, receipts, trucks, onClose, onDone, onConflict }: Common & { receipts: readonly Receipt[]; trucks: readonly CatalogTruck[] }) {
   const measure = useMeasureTank();
   const id = useId();
   const [base] = useState(row.reference);
@@ -208,9 +209,9 @@ export function TankMeasureDialog({ row, receipts, onClose, onDone, onConflict }
     setError(check.error);
     if (check.liters === null) return setFormError('Revisá los litros.');
     try {
-      // The trips as they are now: their kilometres so far are inside the measurement.
+      // The trips as they are now, each with its catalog truck: their kilometres so far are inside the measurement.
       setReading(true);
-      const trips = await fetchTankTrips(new Date(Date.now() - 7 * 86_400_000).toISOString()).finally(() => setReading(false));
+      const trips = tripsInCatalog(await fetchTankTrips(new Date(Date.now() - 7 * 86_400_000).toISOString()).finally(() => setReading(false)), trucks);
       const mine = (label: string | null) => label !== null && label !== '' && roadVehicleKey(label) === row.key;
       const now = new Date().toISOString();
       await measure.mutateAsync({

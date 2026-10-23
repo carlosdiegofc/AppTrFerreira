@@ -135,7 +135,9 @@ export function TanksView() {
         </ul>
       )}
       {editing?.kind === 'settings' && <TankSettingsDialog row={editing.row} onClose={() => setEditing(null)} onDone={done} onConflict={conflict} />}
-      {editing?.kind === 'measure' && <TankMeasureDialog row={editing.row} receipts={tanks.fuel.receipts} onClose={() => setEditing(null)} onDone={done} onConflict={conflict} />}
+      {editing?.kind === 'measure' && (
+        <TankMeasureDialog row={editing.row} receipts={tanks.fuel.receipts} trucks={tanks.fuel.catalog.data ?? []} onClose={() => setEditing(null)} onDone={done} onConflict={conflict} />
+      )}
     </>
   );
 }

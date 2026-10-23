@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { type FuelRow, receiptFromRow } from '../../src/lib/fuel';
 import type { TankReference } from '../../src/lib/road';
 import {
+  consumptionFrom,
   defaultWarning,
   kmPerLiter,
   litersPer100,
@@ -11,6 +12,7 @@ import {
   tankStart,
   tankState,
   type TankTrip,
+  tripsInCatalog,
   tripsSince,
   validateMeasurement,
   validateTankForm,
@@ -46,8 +48,18 @@ describe('tanques: dónde arranca el cálculo', () => {
     expect(tankStart(settings, reference({ measured_at: at(13), liters: 250 }), [full])).toMatchObject({ kind: 'measured', liters: 250 });
     // The office can say a load filled the tank.
     expect(tankStart(settings, null, [receipt('o', { panel_data: { tanque_lleno: true } })])).toMatchObject({ kind: 'full' });
-    expect(tripsSince([tankStart(settings, reference(), []), null])).toBe(new Date(Date.parse(at(10)) - 7 * 86_400_000).toISOString());
+    expect(tripsSince([tankStart(settings, reference(), [])?.at ?? null, null, at(12)])).toBe(new Date(Date.parse(at(10)) - 7 * 86_400_000).toISOString());
     expect(tripsSince([null])).toBeNull();
+  });
+
+  it('un viaje guardado con el nombre viejo del camión cuenta para su camión del catálogo, como las boletas', () => {
+    const full = receipt('f', { full_tank: true, recorded_at: at(8) });
+    const old = [trip('t1', at(9), 300, { vehicle: 'Volvo FH 460', endedAt: at(12) })];
+    // Without the catalog the trip is another truck's, and the tank stays full.
+    expect(tankState(settings, null, old, [full])).toMatchObject({ status: 'known', km: 0, liters: 400 });
+    expect(tankState(settings, null, tripsInCatalog(old, [{ model: 'Volvo FH 460', plate: 'ABC1234' }]), [full])).toMatchObject({ status: 'known', km: 300, liters: 300 });
+    // A label the catalog does not tell apart keeps its own.
+    expect(tripsInCatalog(old, [{ model: 'Volvo FH 460', plate: 'ABC1234' }, { model: 'Volvo FH 460', plate: 'XYZ9876' }])[0]?.vehicle).toBe('Volvo FH 460');
   });
 });
 
@@ -113,19 +125,23 @@ describe('tanques: el cálculo', () => {
 });
 
 describe('tanques: el consumo real y el formulario', () => {
-  it('mide el consumo de tanque lleno a tanque lleno, con 100 km o más en el medio', () => {
+  it('mide el consumo entre los dos últimos tanques llenos, con 100 km o más en el medio', () => {
     const trips = [trip('t1', at(9), 300, { endedAt: at(11) }), trip('t2', at(13), 300, { endedAt: at(15) }), trip('t3', at(17), 50, { endedAt: at(18) })];
     const loads = [
       receipt('a', { full_tank: true, recorded_at: at(8) }),
       receipt('medio', { recorded_at: at(12), liters: 50 }),
       receipt('b', { full_tank: true, recorded_at: at(16), liters: 150 }),
-      // The last pair has too few kilometres: the one before counts.
       receipt('c', { full_tank: true, recorded_at: at(19), liters: 20 }),
     ];
-    const measured = measuredConsumption(KEY, trips, loads);
+    const measured = measuredConsumption(KEY, trips, loads.slice(0, 3));
     expect(measured).toMatchObject({ km: 600, from: at(8), to: at(16) });
     expect(measured?.litersPer100).toBeCloseTo((200 / 600) * 100, 6);
+    // Its trips are read from the full tank before the last one.
+    expect(consumptionFrom(KEY, loads.slice(0, 3))).toBe(at(8));
+    // The last two have too few kilometres in between: there is none, rather than an older one the screen would call theirs.
+    expect(measuredConsumption(KEY, trips, loads)).toBeNull();
     expect(measuredConsumption(KEY, trips, loads.slice(0, 1))).toBeNull();
+    expect(consumptionFrom(KEY, loads.slice(0, 1))).toBeNull();
   });
 
   it('el consumo se escribe en km por litro y se guarda en litros cada 100 km', () => {

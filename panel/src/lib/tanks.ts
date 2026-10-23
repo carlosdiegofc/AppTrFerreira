@@ -1,6 +1,7 @@
 // The tank of each truck (decision of 22/10/2026): an estimate, never a reading. It starts at the last moment its level
 // was known, a measurement typed in the panel (trf_tank_references) or a load that filled the tank (a receipt marked
 // «Tanque lleno»), adds the loads after that and takes off the GPS kilometres at the truck's consumption. Pure functions.
+import { canonical, type CatalogTruck } from './fleet';
 import type { Receipt } from './fuel';
 import { parseNumber } from './numbers';
 import { roadVehicleKey, type TankReference } from './road';
@@ -32,6 +33,14 @@ export interface TankTrip {
   endedAt: string | null;
   active: boolean;
   meters: number;
+}
+
+/**
+ * The trips with their truck as the catalog names it, like the receipts: one saved with an older label («Volvo FH 460»)
+ * counts for its catalog truck («Volvo FH 460 · ABC1234»).
+ */
+export function tripsInCatalog(trips: readonly TankTrip[], catalog: readonly CatalogTruck[]): TankTrip[] {
+  return trips.map((t) => ({ ...t, vehicle: canonical(t.vehicle, catalog) ?? t.vehicle }));
 }
 
 /** Where the estimate starts: the measurement, or the load that filled the tank. */
@@ -215,32 +224,42 @@ export interface MeasuredConsumption {
   to: string;
 }
 
+/** The loads that filled the tank, oldest first. */
+const fullTanks = (loads: readonly Receipt[]) => loads.filter((r) => r.fullTank).sort((a, b) => time(a.recordedAt) - time(b.recordedAt));
+
 /**
- * The consumption measured from full tank to full tank: the litres it took to fill it again (with the loads in between)
- * over the kilometres in between. Pairs whose kilometres cannot be told exactly, or with a load without litres, are left
- * out.
+ * The consumption measured between the last two full tanks: the litres it took to fill it again (with the loads in
+ * between) over the kilometres in between. None when their kilometres cannot be told exactly, a load in between has no
+ * litres, or they are less than 100 km apart.
  */
 export function measuredConsumption(key: string, trips: readonly TankTrip[], receipts: readonly Receipt[]): MeasuredConsumption | null {
   const mine = sameTruck(key);
-  const ours = trips.filter((t) => mine(t.vehicle));
   const loads = loadsOf(key, receipts);
-  const fulls = loads.filter((r) => r.fullTank).sort((a, b) => time(a.recordedAt) - time(b.recordedAt));
-  for (let i = fulls.length - 1; i > 0; i--) {
-    const [a, b] = [fulls[i - 1], fulls[i]] as [Receipt, Receipt];
-    const [from, to] = [time(a.recordedAt), time(b.recordedAt)];
-    const liters = litersBetween(loads, from, to, null);
-    if ('missing' in liters || liters.liters <= 0) continue;
-    const distance = metersBetween(ours, { at: from, tripId: a.tripId, tripMeters: a.tripMeters, snapshot: null }, { at: to, tripId: b.tripId, tripMeters: b.tripMeters, snapshot: null });
-    if ('error' in distance || distance.approximate || distance.meters < 100_000) continue;
-    const km = distance.meters / 1000;
-    return { litersPer100: (liters.liters / km) * 100, km, from: a.recordedAt as string, to: b.recordedAt as string };
-  }
-  return null;
+  const fulls = fullTanks(loads);
+  const [a, b] = [fulls[fulls.length - 2], fulls[fulls.length - 1]];
+  if (!a || !b) return null;
+  const [from, to] = [time(a.recordedAt), time(b.recordedAt)];
+  const liters = litersBetween(loads, from, to, null);
+  if ('missing' in liters || liters.liters <= 0) return null;
+  const distance = metersBetween(
+    trips.filter((t) => mine(t.vehicle)),
+    { at: from, tripId: a.tripId, tripMeters: a.tripMeters, snapshot: null },
+    { at: to, tripId: b.tripId, tripMeters: b.tripMeters, snapshot: null },
+  );
+  if ('error' in distance || distance.approximate || distance.meters < 100_000) return null;
+  const km = distance.meters / 1000;
+  return { litersPer100: (liters.liters / km) * 100, km, from: a.recordedAt as string, to: b.recordedAt as string };
 }
 
-/** Since when the trips are needed: the earliest start, a week back for a trip that was already going on then. */
-export function tripsSince(starts: readonly (TankStart | null)[]): string | null {
-  const times = starts.filter((s): s is TankStart => s !== null).map((s) => time(s.at)).filter(Number.isFinite);
+/** Where the measured consumption starts, so its trips are read too: the full tank before the last one. */
+export function consumptionFrom(key: string, receipts: readonly Receipt[]): string | null {
+  const fulls = fullTanks(loadsOf(key, receipts));
+  return fulls[fulls.length - 2]?.recordedAt ?? null;
+}
+
+/** Since when the trips are needed: the earliest of these moments, a week back for a trip that was already going on then. */
+export function tripsSince(moments: readonly (string | null)[]): string | null {
+  const times = moments.map(time).filter(Number.isFinite);
   if (times.length === 0) return null;
   return new Date(Math.min(...times) - 7 * 86_400_000).toISOString();
 }

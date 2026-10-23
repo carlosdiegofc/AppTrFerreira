@@ -6,6 +6,7 @@ import type { TablesInsert } from '../lib/database.types';
 import { truckLabel } from '../lib/fleet';
 import { roadVehicleKey, type TankReference } from '../lib/road';
 import {
+  consumptionFrom,
   measuredConsumption,
   type MeasuredConsumption,
   settingsFromRow,
@@ -13,6 +14,7 @@ import {
   tankStart,
   tankState,
   type TankState,
+  tripsInCatalog,
   tripsSince,
 } from '../lib/tanks';
 import { fetchTanks, fetchTankTrips, saveTankSettings } from './api';
@@ -71,22 +73,24 @@ export function useTanks() {
     });
   }, [tanks.data, trucks]);
 
+  // The trips of each tank since its start, and of its measured consumption since the full tank before the last one.
   const since = useMemo(() => {
     if (!base || !fuel.query.data) return null;
-    return tripsSince(base.map((b) => (b.settings ? tankStart(b.settings, b.reference, fuel.receipts) : null)));
+    return tripsSince(base.flatMap((b) => [b.settings ? (tankStart(b.settings, b.reference, fuel.receipts)?.at ?? null) : null, consumptionFrom(b.key, fuel.receipts)]));
   }, [base, fuel.query.data, fuel.receipts]);
   const trips = useQuery({ queryKey: ['tankTrips', since], queryFn: () => fetchTankTrips(since as string), enabled: since !== null, refetchInterval: 30_000, staleTime: 15_000 });
 
-  // Without any start there are no trips to read: the estimate needs none.
-  const tripList = since === null ? [] : trips.data;
+  // Without any start there are no trips to read: the estimate needs none. A trip counts for its catalog truck, like the
+  // receipts, so the list waits for the catalog too.
+  const tripList = useMemo(() => (since === null ? [] : trips.data && trucks ? tripsInCatalog(trips.data, trucks) : undefined), [since, trips.data, trucks]);
   const rows = useMemo<TankRow[] | null>(() => {
-    if (!base || !fuel.query.data || !tripList) return null;
+    if (!base || !fuel.query.data || !trucks || !tripList) return null;
     return base
       .map((b) => ({ ...b, state: tankState(b.settings, b.reference, tripList, fuel.receipts), measured: measuredConsumption(b.key, tripList, fuel.receipts) }))
       .sort(order);
-  }, [base, fuel.query.data, fuel.receipts, tripList]);
+  }, [base, fuel.query.data, fuel.receipts, trucks, tripList]);
 
-  const reads = [tanks, fuel.query, ...(since === null ? [] : [trips])];
+  const reads = [tanks, fuel.query, fuel.catalog, ...(since === null ? [] : [trips])];
   return {
     rows,
     tanks,

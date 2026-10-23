@@ -440,6 +440,7 @@ export function TruckRoad({ unit, points, now }: { unit: FleetUnit; points: read
         <TankMeasureDialog
           row={tank}
           receipts={tanks.fuel.receipts}
+          trucks={tanks.fuel.catalog.data ?? []}
           onClose={() => setTankForm(null)}
           onDone={(text) => {
             setTankForm(null);
