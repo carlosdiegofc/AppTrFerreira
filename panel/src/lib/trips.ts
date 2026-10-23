@@ -2,6 +2,7 @@
 // panel wins), plus the trips typed by hand in the panel. Same rules as web/js/trips.js. Pure functions.
 import type { Tables } from './database.types';
 import { addDays, calendarDay, firstOfMonth, firstOfNextMonth, startOfDay } from './dates';
+import { belongsTo } from './drivers';
 import { canonical, type CatalogTruck, text, truck } from './fleet';
 import { asObject, fold, toNumber } from './numbers';
 import { validPosition } from './route';
@@ -195,17 +196,20 @@ export interface TripFilter {
   status?: StatusFilter;
   vehicle?: string;
   driver?: string;
+  /** A driver's card: the trips of its app account under any name, and the ones typed in the panel with its name. */
+  card?: { userId: string | null; name: string; aliases?: readonly string[]; claimed?: ReadonlySet<string> | null } | null;
   /** The trash: only deleted trips. */
   bin?: boolean;
 }
 
-export function filterTrips(list: readonly Trip[], { q = '', status = 'all', vehicle = '', driver = '', bin = false }: TripFilter = {}): Trip[] {
+export function filterTrips(list: readonly Trip[], { q = '', status = 'all', vehicle = '', driver = '', card = null, bin = false }: TripFilter = {}): Trip[] {
   const needle = fold(q);
   return list.filter((t) => {
     if (bin !== t.deleted) return false;
     if (!bin && status !== 'all' && t.status.code !== status) return false;
     if (vehicle && (t.vehicle ?? '') !== vehicle) return false;
     if (driver && (t.driverName ?? '') !== driver) return false;
+    if (card && !belongsTo(card, t, card.claimed)) return false;
     if (!needle) return true;
     return [t.orderNumber, t.client, t.product, t.originName, t.destinationName, t.driverName, t.vehicle, t.notes].some((v) => v !== null && fold(v).includes(needle));
   });

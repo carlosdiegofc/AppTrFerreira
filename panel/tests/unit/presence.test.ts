@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ACTIVE_FOR_MS, compareVersions, driverPresence, type PresenceRow } from '../../src/lib/presence';
+import { ACTIVE_FOR_MS, compareVersions, driverPresence, type PresenceRow, withTripDrivers } from '../../src/lib/presence';
 
 const NOW = Date.parse('2026-10-18T15:00:00Z');
 const ago = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
@@ -68,5 +68,23 @@ describe('where an active driver is', () => {
     expect(driverPresence([row('d', 'Diego', '0.17.0', 2, { ...at, minutes: -60 })], new Set(), NOW)[0]?.place).toBeNull();
     // A minute ahead is a phone clock slightly off: it still counts.
     expect(driverPresence([row('d', 'Diego', '0.17.0', 2, { ...at, minutes: 1 })], new Set(), NOW)[0]?.place).not.toBeNull();
+  });
+});
+
+describe('drivers on a trip without the notice', () => {
+  it('a phone older than 0.17.0 does not say it has the app open, but its trip does: it is on a trip', () => {
+    const present = driverPresence([row('a', 'Ana', '0.17.0', 1)], new Set(['a']), NOW);
+    const trips = [
+      { driver_id: 'a', driver_name: 'Ana', vehicle: 'Volvo · ABC1234', started_at: '2026-10-15T13:00:00Z' },
+      { driver_id: 'v', driver_name: 'Viejo', vehicle: 'Scania · DEF5678', started_at: '2026-10-15T12:00:00Z' },
+      { driver_id: 'v', driver_name: 'Viejo', vehicle: 'Scania · DEF5678', started_at: '2026-10-15T12:30:00Z' },
+    ];
+    const list = withTripDrivers(present, trips);
+    expect(list.map((p) => [p.driverId, p.state, p.version])).toEqual([
+      ['a', 'trip', '0.17.0'],
+      ['v', 'trip', null],
+    ]);
+    expect(list[1]).toMatchObject({ name: 'Viejo', vehicle: 'Scania · DEF5678', place: null, newer: null });
+    expect(withTripDrivers(present, [])).toEqual(present);
   });
 });

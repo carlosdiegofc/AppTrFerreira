@@ -121,6 +121,25 @@ describe('the list', () => {
     expect(knownValues(list)).toEqual({ vehicles: ['Ford Cargo 1722 · ITP2187', 'Leyland', 'Mercedes · SAB1234'], drivers: ['Hugo Silva', 'Immer Sampayo'] });
   });
 
+  it('a driver card brings its account\'s trips under any name and the ones typed with its name, nobody else\'s', () => {
+    const list = mergeTrips({
+      sessions: [
+        session({ id: 'a1', driver_id: 'luis', driver_name: 'Luis Ferreira', started_at: '2025-08-03T00:00:00Z' }),
+        session({ id: 'a2', driver_id: 'luis', driver_name: 'Los Ferreira', started_at: '2025-08-02T00:00:00Z' }),
+        session({ id: 'a3', driver_id: 'otro', driver_name: 'Luis Ferreira', started_at: '2025-08-01T00:00:00Z' }),
+      ],
+      panelRows: [panel({ id: 'm1', source: 'manual', app_trip_id: null, departure_at: '2025-08-01T10:00:00Z', vehicle: 'Leyland', driver_name: 'luis  ferreira' })],
+      details: [],
+    });
+    expect(filterTrips(list, { card: { userId: 'luis', name: 'Luis Ferreira' } }).map((t) => t.key)).toEqual(['app:a1', 'app:a2', 'web:m1']);
+    // A card without the app: by its name.
+    expect(filterTrips(list, { card: { userId: null, name: 'Luis Ferreira' } }).map((t) => t.key)).toEqual(['app:a1', 'web:m1', 'app:a3']);
+    // ...but not the trips of an account another card has; until the cards are read, only the ones typed by hand.
+    expect(filterTrips(list, { card: { userId: null, name: 'Luis Ferreira', claimed: new Set(['luis']) } }).map((t) => t.key)).toEqual(['web:m1', 'app:a3']);
+    expect(filterTrips(list, { card: { userId: null, name: 'Luis Ferreira', claimed: null } }).map((t) => t.key)).toEqual(['web:m1']);
+    expect(filterTrips(list, { driver: 'Luis Ferreira' })).toHaveLength(2);
+  });
+
   it('a manual trip keeps what was typed', () => {
     const t = tripFromPanel(panel({ id: 'm1', source: 'manual', app_trip_id: null, departure_at: '2025-08-01T10:00:00Z', vehicle: 'Leyland', billable_km: 320, amount: 52000 }));
     expect(t.key).toBe('web:m1');

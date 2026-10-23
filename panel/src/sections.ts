@@ -17,7 +17,7 @@ export const SECTIONS: Section[] = [
   { path: 'inicio', label: 'Inicio', icon: 'home', ready: true, about: 'La flota de un vistazo.' },
   { path: 'flota', label: 'Flota', icon: 'truck', ready: false, about: 'La ficha de cada camión con foto, sus acoplados y su historial, los kilómetros y los vencimientos.' },
   { path: 'viajes', label: 'Viajes', icon: 'route', ready: true, about: 'Todos los viajes con filtros por estado, camión, chofer y fechas, el recorrido real y la exportación a Excel, PDF y Word.' },
-  { path: 'choferes', label: 'Choferes', icon: 'person', ready: false, about: 'La ficha de cada chofer con sus viajes, sus documentos y los vencimientos.' },
+  { path: 'choferes', label: 'Choferes', icon: 'person', ready: true, about: 'La ficha de cada chofer con sus viajes, sus papeles y su sueldo de cada mes, con los pagos.' },
   { path: 'combustible', label: 'Combustible', icon: 'fuel', ready: true, about: 'Las boletas agrupadas por estación, con la cuenta corriente de cada una: cargas, pagos y saldo.' },
   { path: 'gps', label: 'GPS en vivo', icon: 'pin', ready: true, about: 'Dónde está cada camión ahora.' },
   { path: 'mantenimiento', label: 'Mantenimiento', icon: 'wrench', ready: true, about: 'Los services preventivos y correctivos, con avisos por kilómetros y por fecha.' },

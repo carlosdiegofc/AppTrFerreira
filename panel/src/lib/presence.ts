@@ -31,7 +31,8 @@ export interface DriverPresence {
   name: string;
   /** The truck the phone has saved for the driver. */
   vehicle: string | null;
-  version: string;
+  /** null: the phone does not say it (a version before 0.17.0, on a trip). */
+  version: string | null;
   /** A newer version some other phone of the fleet already has, when this one is older. */
   newer: string | null;
   seenAt: number;
@@ -88,3 +89,17 @@ export function driverPresence(rows: readonly PresenceRow[], onTrip: ReadonlySet
 }
 
 export const PRESENCE_LABEL: Record<PresenceState, string> = { trip: 'En viaje', active: 'Activo', seen: 'Sin la app abierta' };
+
+/**
+ * The drivers as the lists of drivers show them: driverPresence, plus the drivers on a trip whose phone does not send the
+ * notice (versions before 0.17.0), on their trip with what it says and without a version.
+ */
+export function withTripDrivers(present: readonly DriverPresence[], active: readonly { driver_id: string; driver_name: string | null; vehicle: string | null; started_at: string }[]): DriverPresence[] {
+  const known = new Set(present.map((p) => p.driverId));
+  const added = new Map<string, DriverPresence>();
+  for (const t of active) {
+    if (known.has(t.driver_id) || added.has(t.driver_id)) continue;
+    added.set(t.driver_id, { driverId: t.driver_id, name: text(t.driver_name) ?? 'Chofer', vehicle: text(t.vehicle), version: null, newer: null, seenAt: Date.parse(t.started_at), state: 'trip', place: null });
+  }
+  return [...present, ...added.values()].sort((a, b) => ORDER[a.state] - ORDER[b.state] || b.seenAt - a.seenAt || a.name.localeCompare(b.name, 'es'));
+}

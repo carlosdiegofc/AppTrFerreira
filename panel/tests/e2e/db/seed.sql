@@ -154,3 +154,24 @@ insert into public.trf_fuel_station_movements (station_key, station_name, kind, 
   ('id:est-ruta5', 'Ancap Ruta 5 km 32', 'opening', (select today from t0) - 10, 25000, 'UYU', null, null),
   ('id:est-ruta5', 'Ancap Ruta 5 km 32', 'payment', (select today from t0) - 3, 20000, 'UYU', 'transferencia', 'Transferencia BROU'),
   ('id:est-salto', 'Petrobras Salto', 'payment', (select today from t0) - 1, 100, 'USD', 'efectivo', null);
+
+-- Choferes (migration 0008). Ana has her card, a salary since last month and the payments of last month (up to date)
+-- and of this one (an advance, and a viático apart); Bruno has a card without a salary and an advance in dollars; Eduardo
+-- started this month without the app; Ramón no longer works. Carla and Diego use the app without a card.
+insert into public.trf_drivers (id, user_id, name, phone, document_id, hired_on, license_category, pay_method, bank, bank_account, notes, active, left_on) values
+  ('70000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000011', 'Ana Pereira', '099 111 222', '1.111.111-1', (select today from t0) - 600, 'E', 'transferencia', 'BROU', '001122334-00001', '', true, null),
+  ('70000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000012', 'Bruno Díaz', '098 333 444', '2.222.222-2', (select today from t0) - 90, 'E', 'efectivo', '', '', '', true, null),
+  ('70000000-0000-4000-8000-000000000003', null, 'Eduardo Núñez', '', '', (select today from t0) - 10, 'C', '', '', '', 'Entró este mes; todavía no usa la app.', true, null),
+  -- He stopped working 45 days ago: his salary stops with that month.
+  ('70000000-0000-4000-8000-000000000004', null, 'Ramón Sosa', '', '', null, '', '', '', '', '', false, (select today from t0) - 45);
+insert into public.trf_driver_salaries (driver_id, starts_on, amount, currency) values
+  ('70000000-0000-4000-8000-000000000001', (date_trunc('month', (select today from t0)) - interval '1 month')::date, 45000, 'UYU'),
+  ('70000000-0000-4000-8000-000000000004', (date_trunc('month', (select today from t0)) - interval '3 months')::date, 30000, 'UYU');
+insert into public.trf_driver_payments (driver_id, paid_on, period, amount, currency, concept, method, notes) values
+  ('70000000-0000-4000-8000-000000000001', (date_trunc('month', (select today from t0)) - interval '1 month')::date + 9, (date_trunc('month', (select today from t0)) - interval '1 month')::date, 15000, 'UYU', 'adelanto', 'efectivo', ''),
+  ('70000000-0000-4000-8000-000000000001', date_trunc('month', (select today from t0))::date, (date_trunc('month', (select today from t0)) - interval '1 month')::date, 30000, 'UYU', 'sueldo', 'transferencia', 'Transferencia BROU'),
+  ('70000000-0000-4000-8000-000000000001', (select today from t0) - 5, date_trunc('month', (select today from t0))::date, 10000, 'UYU', 'adelanto', 'efectivo', ''),
+  ('70000000-0000-4000-8000-000000000001', (select today from t0) - 3, date_trunc('month', (select today from t0))::date, 3500, 'UYU', 'viatico', 'efectivo', 'Viaje a Salto'),
+  -- Ramón's settlement, for the month after he left.
+  ('70000000-0000-4000-8000-000000000004', (select today from t0) - 30, (date_trunc('month', (select today from t0)) - interval '1 month')::date, 12000, 'UYU', 'sueldo', 'efectivo', 'Liquidación'),
+  ('70000000-0000-4000-8000-000000000002', (select today from t0) - 2, date_trunc('month', (select today from t0))::date, 100, 'USD', 'adelanto', 'efectivo', '');

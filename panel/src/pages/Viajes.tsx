@@ -3,9 +3,10 @@ import { Link, useLocation, useNavigate, useNavigationType, useSearchParams } fr
 import { Icon } from '../components/Icon';
 import { TripFormDialog } from '../components/TripFormDialog';
 import { CatalogNote, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote } from '../components/ui';
-import { useNow, useTripList } from '../data/hooks';
+import { useDrivers, useNow, useTripList } from '../data/hooks';
 import type { ListFormat } from '../exports/trips';
 import { ago, dayInZone, formatDay, formatDayTime } from '../lib/dates';
+import { accountNames } from '../lib/drivers';
 import { count, decimal, number } from '../lib/format';
 import { routeText, sourceLabel, truckOf } from '../lib/tripTable';
 import { countByStatus, filterTrips, knownValues, type PeriodKind, periodRange, periodToIso, type StatusFilter, type Trip } from '../lib/trips';
@@ -92,15 +93,28 @@ export function Viajes() {
   }, [location.key, fromHere, urlQ]);
   const vehicle = params.get('camion') ?? '';
   const driver = params.get('chofer') ?? '';
+  // A driver's card links here with its name and its app account: the trips of the account under any name, and the ones
+  // typed in the panel with its name, as the card counts them.
+  const cardName = params.get('nombre') ?? '';
+  const cardAccount = params.get('cuenta') ?? '';
 
   const { trips, query, catalog } = useTripList(instants?.fromIso ?? null, instants?.toIso ?? null);
+  // A card without an account takes an account's trips by its name only while no card has that account: the cards are
+  // read for it, and until they are, only the trips typed with its name count.
+  const cards = useDrivers(cardName !== '' && !cardAccount);
+  const claimed = useMemo(() => (cards.query.data ? new Set(cards.drivers.flatMap((d) => (d.userId ? [d.userId] : []))) : null), [cards.query.data, cards.drivers]);
+  // The names the account used in the app count for the trips typed by hand, as in the card.
+  const card = useMemo(
+    () => (cardName ? { userId: cardAccount || null, name: cardName, aliases: accountNames(trips, cardAccount || null), claimed: cardAccount ? undefined : claimed } : null),
+    [cardName, cardAccount, trips, claimed],
+  );
   const counts = useMemo(() => countByStatus(trips), [trips]);
   const bin = tab.status === 'bin';
   const inTab = bin ? counts.deleted : counts.all;
   const known = useMemo(() => knownValues(trips), [trips]);
   const shown = useMemo(
-    () => filterTrips(trips, { q, vehicle, driver, status: tab.status === 'bin' ? 'all' : tab.status, bin: tab.status === 'bin' }),
-    [trips, q, vehicle, driver, tab.status],
+    () => filterTrips(trips, { q, vehicle, driver, card, status: tab.status === 'bin' ? 'all' : tab.status, bin: tab.status === 'bin' }),
+    [trips, q, vehicle, driver, card, tab.status],
   );
 
   // The router updates the address in the background: changes made before it does (a tab, then the search right after)
@@ -129,7 +143,7 @@ export function Viajes() {
     setExportFailed(false);
     try {
       const { downloadTrips } = await import('../exports/trips');
-      const what = [tab.status === 'all' ? null : tab.label, vehicle ? `Camión ${vehicle}` : null, driver ? `Chofer ${driver}` : null, q ? `Búsqueda «${q}»` : null].filter(Boolean).join(' · ');
+      const what = [tab.status === 'all' ? null : tab.label, vehicle ? `Camión ${vehicle}` : null, card ? `Chofer ${card.name}` : driver ? `Chofer ${driver}` : null, q ? `Búsqueda «${q}»` : null].filter(Boolean).join(' · ');
       await downloadTrips(format, shown, {
         title: `Viajes del ${formatDay(range.from)} al ${formatDay(range.to)}`,
         subtitle: what || 'Todos los viajes del período',
@@ -231,8 +245,9 @@ export function Viajes() {
         </label>
         <label className="field">
           <span>Chofer</span>
-          <select value={driver} onChange={(e) => set({ chofer: e.target.value })}>
+          <select value={card ? 'ficha' : driver} onChange={(e) => e.target.value !== 'ficha' && set({ chofer: e.target.value, nombre: null, cuenta: null })}>
             <option value="">Todos los choferes</option>
+            {card && <option value="ficha">{card.name} (ficha)</option>}
             {withChosen(known.drivers, driver).map((d) => (
               <option key={d} value={d}>
                 {d}
@@ -262,6 +277,9 @@ export function Viajes() {
 
       {/* Only a first read that failed takes the list: after that, a failed refresh keeps the last list with a note. */}
       {instants !== null && query.error && query.data !== undefined && <StaleNote onRetry={() => void query.refetch()} />}
+      {card && !card.userId && cards.query.error && cards.query.data === undefined && (
+        <ErrorNote onRetry={() => void cards.query.refetch()}>No se pudieron leer las fichas: por ahora se ven solo los viajes cargados a mano con este nombre.</ErrorNote>
+      )}
       {catalog.error && <CatalogNote onRetry={() => void catalog.refetch()} />}
       {instants === null ? (
         <ErrorNote>Revisá las fechas: «hasta» no puede ser antes de «desde».</ErrorNote>

@@ -4,6 +4,7 @@ import { FLEET_REFRESH_MS, LIVE_REFRESH_MS, PRESENCE_REFRESH_MS, ROUTE_REFRESH_M
 import type { TablesInsert, TablesUpdate } from '../lib/database.types';
 import { startOfDay } from '../lib/dates';
 import { type FileType, type Paper, type PaperDocRow, paperFromRow, samePaper } from '../lib/documents';
+import { type Driver, driverFromRow, type Payment, paymentFromRow, type Salary, salaryFromRow } from '../lib/drivers';
 import { type ActiveTrip, type CatalogTruck, fleetUnits, truckLabel, withLivePositions } from '../lib/fleet';
 import { groupStations, type Movement, movementFromRow, type Receipt, receiptFromRow } from '../lib/fuel';
 import { kmReferences, kmSince, type MaintenanceRow, sameService, type Service, serviceFromRow, type TruckKm, truckKms } from '../lib/maintenance';
@@ -21,6 +22,7 @@ import {
   fetchCatalogLists,
   fetchDocuments,
   fetchDriverNames,
+  fetchDrivers,
   fetchFleet,
   fetchFuel,
   fetchKmTrips,
@@ -37,11 +39,16 @@ import {
   removeDocumentFile,
   type RoutePoint,
   saveDocument,
+  saveDriver,
   saveMovement,
+  savePayment,
+  saveSalary,
   saveService,
   saveTrip,
   serviceRow,
   setMovementDeleted,
+  setPaymentDeleted,
+  setSalaryDeleted,
   setTripDeleted,
   updateReceipt,
   uploadDocumentFile,
@@ -429,4 +436,57 @@ export function useSetMovementDeleted() {
     mutationFn: ({ movement, deleted }: { movement: Movement; deleted: boolean }) => setMovementDeleted(movement, deleted),
     onSettled: changed,
   });
+}
+
+/** Every driver's card with its salaries and payments (only the panel accounts read them). */
+export function useDrivers(enabled = true) {
+  const query = useQuery({ queryKey: ['drivers'], queryFn: fetchDrivers, staleTime: 30_000, enabled });
+  const drivers = useMemo(() => (query.data?.drivers ?? []).map(driverFromRow).sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })), [query.data]);
+  const salaries = useMemo(() => (query.data?.salaries ?? []).map(salaryFromRow), [query.data]);
+  const payments = useMemo(() => (query.data?.payments ?? []).map(paymentFromRow), [query.data]);
+  return { query, drivers, salaries, payments };
+}
+
+function useDriversChanged() {
+  const client = useQueryClient();
+  return () => client.invalidateQueries({ queryKey: ['drivers'] });
+}
+
+/** A new card or a change to one; on a conflict the page reads them again. */
+export function useSaveDriver() {
+  const changed = useDriversChanged();
+  return useMutation({
+    mutationFn: ({ driver, row }: { driver: Driver | null; row: TablesInsert<'trf_drivers'> | TablesUpdate<'trf_drivers'> }) => saveDriver(driver, row),
+    onSettled: changed,
+  });
+}
+
+/** A salary from a month, new or corrected. */
+export function useSaveSalary() {
+  const changed = useDriversChanged();
+  return useMutation({
+    mutationFn: ({ salary, row }: { salary: Salary | null; row: TablesInsert<'trf_driver_salaries'> | TablesUpdate<'trf_driver_salaries'> }) => saveSalary(salary, row),
+    onSettled: changed,
+  });
+}
+
+/** Annuls a salary: the one before rules again from its month. */
+export function useSetSalaryDeleted() {
+  const changed = useDriversChanged();
+  return useMutation({ mutationFn: ({ salary, deleted }: { salary: Salary; deleted: boolean }) => setSalaryDeleted(salary, deleted), onSettled: changed });
+}
+
+/** A payment, new or corrected. */
+export function useSavePayment() {
+  const changed = useDriversChanged();
+  return useMutation({
+    mutationFn: ({ payment, row }: { payment: Payment | null; row: TablesInsert<'trf_driver_payments'> | TablesUpdate<'trf_driver_payments'> }) => savePayment(payment, row),
+    onSettled: changed,
+  });
+}
+
+/** Annuls a payment, or brings it back: nothing is deleted. */
+export function useSetPaymentDeleted() {
+  const changed = useDriversChanged();
+  return useMutation({ mutationFn: ({ payment, deleted }: { payment: Payment; deleted: boolean }) => setPaymentDeleted(payment, deleted), onSettled: changed });
 }

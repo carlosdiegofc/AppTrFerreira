@@ -1,5 +1,7 @@
 // Generated from the production database (Supabase type generator) on 2026-10-20, after migration 0004. Regenerate after
 // every migration.
+// trf_drivers, trf_driver_salaries and trf_driver_payments (migration 0008) are written by hand in the generator's format
+// until the next generation; the tables of migration 0005 are in roadDatabase.ts.
 export type Json =
   | string
   | number
@@ -246,6 +248,65 @@ export type Database = {
         }
         Relationships: []
       }
+      trf_driver_payments: {
+        Row: {
+          amount: number
+          concept: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          deleted_at: string | null
+          driver_id: string
+          id: string
+          method: string
+          notes: string
+          paid_on: string
+          period: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          amount: number
+          concept: string
+          created_at?: string
+          created_by?: string | null
+          currency: string
+          deleted_at?: string | null
+          driver_id: string
+          id?: string
+          method: string
+          notes?: string
+          paid_on: string
+          period: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          amount?: number
+          concept?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          deleted_at?: string | null
+          driver_id?: string
+          id?: string
+          method?: string
+          notes?: string
+          paid_on?: string
+          period?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trf_driver_payments_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "trf_drivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trf_driver_presence: {
         Row: {
           accuracy_m: number | null
@@ -281,6 +342,56 @@ export type Database = {
           vehicle?: string | null
         }
         Relationships: []
+      }
+      trf_driver_salaries: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          currency: string
+          deleted_at: string | null
+          driver_id: string
+          id: string
+          notes: string
+          starts_on: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          currency: string
+          deleted_at?: string | null
+          driver_id: string
+          id?: string
+          notes?: string
+          starts_on: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          deleted_at?: string | null
+          driver_id?: string
+          id?: string
+          notes?: string
+          starts_on?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trf_driver_salaries_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "trf_drivers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       trf_driver_tracking_sessions: {
         Row: {
@@ -330,6 +441,66 @@ export type Database = {
           paused?: boolean
           started_at?: string
           vehicle?: string
+        }
+        Relationships: []
+      }
+      trf_drivers: {
+        Row: {
+          active: boolean
+          bank: string
+          bank_account: string
+          created_at: string
+          created_by: string | null
+          document_id: string
+          hired_on: string | null
+          id: string
+          left_on: string | null
+          license_category: string
+          name: string
+          notes: string
+          pay_method: string
+          phone: string
+          updated_at: string
+          updated_by: string | null
+          user_id: string | null
+        }
+        Insert: {
+          active?: boolean
+          bank?: string
+          bank_account?: string
+          created_at?: string
+          created_by?: string | null
+          document_id?: string
+          hired_on?: string | null
+          id?: string
+          left_on?: string | null
+          license_category?: string
+          name: string
+          notes?: string
+          pay_method?: string
+          phone?: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          active?: boolean
+          bank?: string
+          bank_account?: string
+          created_at?: string
+          created_by?: string | null
+          document_id?: string
+          hired_on?: string | null
+          id?: string
+          left_on?: string | null
+          license_category?: string
+          name?: string
+          notes?: string
+          pay_method?: string
+          phone?: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }

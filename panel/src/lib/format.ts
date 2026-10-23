@@ -30,6 +30,11 @@ export function decimal(value: number, decimals = 1): string {
   return new Intl.NumberFormat('es-UY', { maximumFractionDigits: decimals }).format(value);
 }
 
+/** «a», «a y b», «a, b y c». */
+export function andList(items: readonly string[]): string {
+  return items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} y ${items[items.length - 1]}`;
+}
+
 /** "$ 41.000" in pesos, "US$ 1.250,50" in dollars: cents only when there are. */
 export function money(value: number, currency: 'UYU' | 'USD'): string {
   const decimals = Number.isInteger(value) ? 0 : 2;

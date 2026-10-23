@@ -104,21 +104,25 @@ test('el GPS y el viaje se ven en satélite de Google con las rutas encima, con 
   await expect(trip.locator('.leaflet-control-attribution')).not.toContainText('Google Maps');
 });
 
-test('los peajes y las balanzas de la 0006: en orden en la lista, de lejos solo el punto y de cerca con su nombre', async ({ page }) => {
+test('los peajes y las balanzas de la 0006 y los radares de la 0007: en orden en la lista, de lejos solo el punto y de cerca con su nombre', async ({ page }) => {
   await signIn(page, 'dueno@ejemplo.uy');
   await open(page, 'GPS en vivo');
   await page.getByRole('button', { name: 'Peajes, balanzas y radares', exact: true }).click();
   const list = page.locator('.road-controls .road-point');
-  // 17 tolls, then 24 scales, each by name and named once.
-  await expect(list).toHaveCount(41);
+  // 17 tolls, then 24 scales, then 122 radars, each by name and named once.
+  await expect(list).toHaveCount(163);
   await expect(list.nth(0).getByRole('button').first()).toHaveText('Peaje Barra de Santa Lucía');
   await expect(list.nth(16).getByRole('button').first()).toHaveText('Peaje Solís');
   await expect(list.nth(17).getByRole('button').first()).toHaveText('Balanza Arrayanes');
   await expect(list.nth(0)).toContainText('Ruta 1 km 23,5, San José. Concesión: Consorcio Cruz del Sur.');
   await expect(list.nth(0)).toContainText('Tarifa pendiente.');
+  await expect(list.nth(41).getByRole('button').first()).toHaveText('Radar 18 de Julio · Ruta 19 km 10');
+  await expect(list.nth(41)).toContainText('En el MTOP: «18 de Julio», progresiva 9K970.');
+  await expect(list.nth(162).getByRole('button').first()).toHaveText('Radar Villa María, acceso · Ruta 3 km 71,8');
   // The whole country: only the dots, so the names do not cover the map.
   const map = page.locator('.gps-map .fleet-map');
-  await expect(map.locator('.road-marker')).toHaveCount(41);
+  await expect(map.locator('.road-marker')).toHaveCount(163);
+  await expect(map.locator('.road-marker.road-radar')).toHaveCount(122);
   await page.locator('.gps-map').getByRole('button', { name: 'Ver todos' }).click();
   await expect(map).toHaveClass(/points-far/);
   await expect(map.locator('.road-marker span').first()).toBeHidden();

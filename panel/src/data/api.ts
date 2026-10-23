@@ -2,6 +2,7 @@
 // what each account gets back and what it may change.
 import type { Tables, TablesInsert, TablesUpdate } from '../lib/database.types';
 import { type DriverChoice, driverChoices, type FileType, type Paper, type PaperDocRow } from '../lib/documents';
+import { type Driver, type DriverRow, type Payment, type PaymentRow, type Salary, type SalaryRow, savedAsSent } from '../lib/drivers';
 import { type ActiveTrip, type CatalogTruck, catalogTrucks, type FinishedTrip, lastTripByTruck, type LivePosition, text, truckLabel } from '../lib/fleet';
 import { type CatalogStation, catalogStations, type Movement, type MovementRow, type Receipt } from '../lib/fuel';
 import { type KmTrip, kmTripsAsCorrected, type MaintenanceRow, type Service } from '../lib/maintenance';
@@ -506,6 +507,76 @@ export async function saveMovement(movement: Movement | null, row: TablesInsert<
 
 /** Annuls a payment or an opening balance, or brings it back: nothing is deleted. */
 export const setMovementDeleted = (movement: Movement, deleted: boolean) => saveMovement(movement, { deleted_at: deleted ? new Date().toISOString() : null });
+
+export interface DriversData {
+  drivers: DriverRow[];
+  salaries: SalaryRow[];
+  payments: PaymentRow[];
+}
+
+/** Every driver's card, salary and payment. They are few and read whole: a month's sums never use part of them. */
+export async function fetchDrivers(): Promise<DriversData> {
+  const [drivers, salaries, payments] = await Promise.all([
+    all((from, to) => supabase.from('trf_drivers').select('*').order('id').range(from, to), 5000, true),
+    all((from, to) => supabase.from('trf_driver_salaries').select('*').order('id').range(from, to), 20_000, true),
+    all((from, to) => supabase.from('trf_driver_payments').select('*').order('id').range(from, to), 20_000, true),
+  ]);
+  return { drivers, salaries, payments };
+}
+
+type Answer<R> = { data: R[] | null; error: { message: string; code?: string } | null };
+
+/**
+ * A new row, or a change that only applies if nobody saved it meanwhile. A new one comes with its id: if it was saved
+ * before (a save tried again after its answer was cut), that one comes back, so nothing is saved twice. A change tried
+ * again after its answer was cut finds the row already changed: if it has what is sent, it counts as saved.
+ */
+async function saveOnce<R extends Readonly<Record<string, unknown>>>(
+  current: { id: string; updatedAt: string } | null,
+  sent: Readonly<Record<string, unknown>> & { id?: string },
+  ops: { insert: () => PromiseLike<Answer<R>>; find: (id: string) => PromiseLike<Answer<R>>; update: (id: string, updatedAt: string) => PromiseLike<Answer<R>> },
+): Promise<R> {
+  if (!current) {
+    const result = await ops.insert();
+    if (result.error?.code === '23505' && sent.id) {
+      const saved = rows(await ops.find(sent.id))[0];
+      if (saved) return saved;
+    }
+    const saved = rows(result)[0];
+    if (!saved) throw new DataError('El alta no devolvió la fila');
+    return saved;
+  }
+  const saved = rows(await ops.update(current.id, current.updatedAt))[0];
+  if (saved) return saved;
+  const now = rows(await ops.find(current.id))[0];
+  if (now && savedAsSent(now, sent)) return now;
+  throw new ConflictError('Otra persona lo cambió');
+}
+
+export const saveDriver = (driver: Pick<Driver, 'id' | 'updatedAt'> | null, row: TablesInsert<'trf_drivers'> | TablesUpdate<'trf_drivers'>) =>
+  saveOnce<DriverRow>(driver, row, {
+    insert: () => supabase.from('trf_drivers').insert(row as TablesInsert<'trf_drivers'>).select(),
+    find: (id) => supabase.from('trf_drivers').select('*').eq('id', id).limit(1),
+    update: (id, at) => supabase.from('trf_drivers').update(row).eq('id', id).eq('updated_at', at).select(),
+  });
+
+export const saveSalary = (salary: Pick<Salary, 'id' | 'updatedAt'> | null, row: TablesInsert<'trf_driver_salaries'> | TablesUpdate<'trf_driver_salaries'>) =>
+  saveOnce<SalaryRow>(salary, row, {
+    insert: () => supabase.from('trf_driver_salaries').insert(row as TablesInsert<'trf_driver_salaries'>).select(),
+    find: (id) => supabase.from('trf_driver_salaries').select('*').eq('id', id).limit(1),
+    update: (id, at) => supabase.from('trf_driver_salaries').update(row).eq('id', id).eq('updated_at', at).select(),
+  });
+
+export const savePayment = (payment: Pick<Payment, 'id' | 'updatedAt'> | null, row: TablesInsert<'trf_driver_payments'> | TablesUpdate<'trf_driver_payments'>) =>
+  saveOnce<PaymentRow>(payment, row, {
+    insert: () => supabase.from('trf_driver_payments').insert(row as TablesInsert<'trf_driver_payments'>).select(),
+    find: (id) => supabase.from('trf_driver_payments').select('*').eq('id', id).limit(1),
+    update: (id, at) => supabase.from('trf_driver_payments').update(row).eq('id', id).eq('updated_at', at).select(),
+  });
+
+/** Annuls a salary or a payment, or brings it back: nothing is deleted. */
+export const setSalaryDeleted = (salary: Salary, deleted: boolean) => saveSalary(salary, { deleted_at: deleted ? new Date().toISOString() : null });
+export const setPaymentDeleted = (payment: Payment, deleted: boolean) => savePayment(payment, { deleted_at: deleted ? new Date().toISOString() : null });
 
 export type PhotoBucket = 'trf-trip-documents' | 'trf-fuel-receipts' | 'trf-documents';
 

@@ -2,28 +2,20 @@ import { useMemo, useState } from 'react';
 import { DocumentFormDialog } from '../components/DocumentFormDialog';
 import { Icon } from '../components/Icon';
 import { type Photo, PhotoDialog } from '../components/PhotoDialog';
-import { CatalogNote, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote, Stat, type Tone } from '../components/ui';
+import { CatalogNote, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote, Stat } from '../components/ui';
 import { TOO_MANY } from '../data/api';
 import { useDocuments, useNow } from '../data/hooks';
 import { ago, dayInZone, formatDay, inDays } from '../lib/dates';
 import { filterPapers, groupPapers, type Paper, type PaperListView, paperOwner, type PaperStateFilter, paperVehicles, type PaperView, paperViews } from '../lib/documents';
 import { count } from '../lib/format';
-import type { PaperState } from '../lib/papers';
 import { useAddressFilters } from './addressFilters';
+import { PAPER_STATE } from './states';
 
 const VIEWS: { value: PaperListView; label: string }[] = [
   { value: 'todos', label: 'Todos' },
   { value: 'camiones', label: 'Camiones' },
   { value: 'choferes', label: 'Choferes' },
 ];
-
-// The words and colours of the app.
-const PAPER_STATE: Record<PaperState, { label: string; tone: Tone }> = {
-  late: { label: 'Vencido', tone: 'red' },
-  soon: { label: 'Por vencer', tone: 'amber' },
-  ok: { label: 'Vigente', tone: 'green' },
-  nodate: { label: 'Sin fecha', tone: 'grey' },
-};
 
 const STATES: { value: PaperStateFilter; label: string }[] = [
   { value: '', label: 'Todos los estados' },
