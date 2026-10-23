@@ -144,6 +144,15 @@ describe('tanques: el consumo real y el formulario', () => {
     expect(consumptionFrom(KEY, loads.slice(0, 1))).toBeNull();
   });
 
+  it('no mide el consumo mientras el viaje de la primera carga no mandó sus metros', () => {
+    // 80 km on the receipt; the trip has sent 70 so far.
+    const loads = [receipt('a', { full_tank: true, recorded_at: at(8), trip_id: 't1', distance_meters: 80_000 }), receipt('b', { full_tank: true, recorded_at: at(16), liters: 150 })];
+    const later = trip('t2', at(12), 300, { endedAt: at(15) });
+    expect(measuredConsumption(KEY, [trip('t1', at(6), 70, { endedAt: at(11) }), later], loads)).toBeNull();
+    // Once it has its 230 km: 150 km after the load and 300 more.
+    expect(measuredConsumption(KEY, [trip('t1', at(6), 230, { endedAt: at(11) }), later], loads)?.litersPer100).toBeCloseTo((150 / 450) * 100, 6);
+  });
+
   it('el consumo se escribe en km por litro y se guarda en litros cada 100 km', () => {
     expect(litersPer100(4)).toBe(25);
     expect(kmPerLiter(25)).toBe(4);

@@ -147,7 +147,9 @@ function metersBetween(trips: readonly TankTrip[], from: Moment, to: Moment | nu
       approximate = true;
     }
     if (high < low) {
-      if (to || lagging) continue;
+      // The tank catches up once those metres arrive; a consumption between two full tanks would be made with part of
+      // the kilometres, so there is none until then.
+      if (lagging && !to) continue;
       return { error: 'Un viaje tiene menos kilómetros que cuando se supo cuánto tenía el tanque: medilo de nuevo o marcá la próxima carga que lo llene.' };
     }
     meters += high - low;
@@ -257,7 +259,10 @@ export function consumptionFrom(key: string, receipts: readonly Receipt[]): stri
   return fulls[fulls.length - 2]?.recordedAt ?? null;
 }
 
-/** Since when the trips are needed: the earliest of these moments, a week back for a trip that was already going on then. */
+/**
+ * Since when the trips are needed: the earliest of these moments, a week back. A trip that was already going on then
+ * comes too, while it goes on and once it ends (fetchTankTrips).
+ */
 export function tripsSince(moments: readonly (string | null)[]): string | null {
   const times = moments.map(time).filter(Number.isFinite);
   if (times.length === 0) return null;

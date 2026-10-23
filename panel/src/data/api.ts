@@ -604,8 +604,9 @@ export async function fetchTanks(): Promise<TanksData> {
 }
 
 /**
- * The app's trips the tanks need: the ones that started since an instant and the ones still going, as the office left
- * them (without the ones in the trash, and with the truck it corrected).
+ * The app's trips the tanks need: the ones that started since an instant, the ones still going and the ones that ended
+ * since then (a trip going on at a tank's start keeps counting once it ends), as the office left them (without the ones
+ * in the trash, and with the truck it corrected).
  */
 export async function fetchTankTrips(sinceIso: string): Promise<TankTrip[]> {
   // The office's row of an app trip starts when the trip does; a trip still going may have started a while before.
@@ -616,7 +617,7 @@ export async function fetchTankTrips(sinceIso: string): Promise<TankTrip[]> {
         supabase
           .from('trf_driver_tracking_sessions')
           .select('id,vehicle,started_at,ended_at,active,distance_meters')
-          .or(`started_at.gte."${sinceIso}",active.is.true`)
+          .or(`started_at.gte."${sinceIso}",active.is.true,ended_at.gte."${sinceIso}"`)
           .order('started_at')
           .order('id')
           .range(from, to),
