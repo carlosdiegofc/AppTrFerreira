@@ -189,3 +189,16 @@ insert into public.trf_driver_payments (driver_id, paid_on, period, amount, curr
   -- Ramón's settlement, for the month after he left.
   ('70000000-0000-4000-8000-000000000004', (select today from t0) - 30, (date_trunc('month', (select today from t0)) - interval '1 month')::date, 12000, 'UYU', 'sueldo', 'efectivo', 'Liquidación'),
   ('70000000-0000-4000-8000-000000000002', (select today from t0) - 2, date_trunc('month', (select today from t0))::date, 100, 'USD', 'adelanto', 'efectivo', '');
+
+-- Flota (migration 0010). The Volvo has its card with a photo and its trailer: a grain semi-trailer since March 2025,
+-- before that a trailer that was sold. The tanker is free. The other trucks of the catalog have no card yet.
+insert into public.trf_fleet_units (id, kind, vehicle_key, plate, brand, model, body, year, chassis, engine, capacity, capacity_unit, notes, photo_path, left_on, left_reason) values
+  ('a0000000-0000-4000-8000-000000000001', 'truck', 'plate:abc1234', 'ABC1234', 'Volvo', 'FH 460', '', 2018, 'YV2RT40A0JB000001', 'D13K-000001', 30000, 'kg', 'Tractor con cabina dormitorio.', 'a0000000-0000-4000-8000-000000000001/a1000000-0000-4000-8000-000000000001.jpg', null, ''),
+  ('a0000000-0000-4000-8000-000000000002', 'trailer', 'plate:rem1001', 'REM1001', 'Randon', 'SR Granelero', 'Semirremolque', 2019, '9ADG1243JKM000001', '', 28000, 'kg', '', null, null, ''),
+  ('a0000000-0000-4000-8000-000000000003', 'trailer', 'plate:cis2002', 'CIS2002', 'Facchini', 'Cisterna 30', 'Cisterna', 2016, '', '', 30, 'm3', 'Para vinasa.', null, null, ''),
+  ('a0000000-0000-4000-8000-000000000004', 'trailer', 'plate:old0099', 'OLD0099', 'Pastrana', 'Acoplado 2 ejes', 'Acoplado', 2005, '', '', 18000, 'kg', '', null, date '2025-03-05', 'Vendido');
+insert into public.trf_fleet_hitches (id, trailer_id, truck_key, from_on, to_on, notes) values
+  ('a2000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000002', 'plate:abc1234', date '2025-03-01', null, ''),
+  ('a2000000-0000-4000-8000-000000000002', 'a0000000-0000-4000-8000-000000000004', 'plate:abc1234', date '2023-01-10', date '2025-02-28', 'Lo llevó hasta que se vendió.');
+insert into storage.objects (bucket_id, name) values
+  ('trf-fleet-photos', 'a0000000-0000-4000-8000-000000000001/a1000000-0000-4000-8000-000000000001.jpg');

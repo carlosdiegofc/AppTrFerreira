@@ -282,8 +282,8 @@ begin
   if n <> 1 then raise exception 'lectura: tendría que poder borrar el archivo de un documento'; end if;
   if (select count(*) from public.trf_documents) <> 5 or (select count(*) from storage.objects where bucket_id = 'trf-documents') <> 3 then raise exception 'lectura: tendrían que quedar los documentos y archivos de antes'; end if;
   -- The other folders keep their rules: the photos of remitos and receipts are read, never deleted.
-  if (select count(*) from storage.objects where bucket_id <> 'trf-documents') <> 3 then raise exception 'lectura: tendría que ver las fotos de remitos y boletas'; end if;
-  delete from storage.objects where bucket_id <> 'trf-documents';
+  if (select count(*) from storage.objects where bucket_id in ('trf-trip-documents', 'trf-fuel-receipts')) <> 3 then raise exception 'lectura: tendría que ver las fotos de remitos y boletas'; end if;
+  delete from storage.objects where bucket_id in ('trf-trip-documents', 'trf-fuel-receipts');
   get diagnostics n = row_count;
   if n <> 0 then raise exception 'lectura: no tendría que poder borrar fotos de remitos ni de boletas'; end if;
 end $$;
