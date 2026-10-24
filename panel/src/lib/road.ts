@@ -77,17 +77,6 @@ export interface TankReference {
   measured_at: string;
   updated_at: string;
 }
-export interface FuelObservation {
-  id: string;
-  vehicle: string;
-  liters: number | null;
-}
-export interface TripObservation {
-  id: string;
-  vehicle: string;
-  distance_meters: number;
-}
-
 /** Same key on the server: a plate when present; otherwise the full model (no ambiguous fuzzy money matching). */
 export function roadVehicleKey(label: string): string {
   const cut = label.lastIndexOf(' · ');
@@ -136,27 +125,6 @@ export function applicableRate(rates: readonly TollRate[], point: string, key: s
       .sort((a, b) => Date.parse(b.valid_from) - Date.parse(a.valid_from))[0] ?? null
   );
 }
-export function fuelEstimate(ref: TankReference, trips: readonly TripObservation[], receipts: readonly FuelObservation[]) {
-  const ours = trips.filter((t) => roadVehicleKey(t.vehicle) === ref.vehicle_key);
-  const fuels = receipts.filter((r) => roadVehicleKey(r.vehicle) === ref.vehicle_key);
-  const meters = ours.reduce((n, t) => n + Math.max(0, t.distance_meters - (ref.trip_meters[t.id] ?? 0)), 0);
-  // Changed/deleted old receipts can make the reference uncertain; never quietly assume no fuel was added.
-  const incomplete =
-    ours.some((t) => !Number.isFinite(t.distance_meters) || t.distance_meters < (ref.trip_meters[t.id] ?? 0)) ||
-    fuels.some((r) => r.liters === null) ||
-    Object.keys(ref.trip_meters).some((id) => !ours.some((t) => t.id === id)) ||
-    Object.entries(ref.receipt_liters).some(([id, liters]) => !fuels.some((r) => r.id === id && r.liters === liters));
-  const added = fuels.reduce((n, r) => n + (r.id in ref.receipt_liters ? 0 : (r.liters ?? 0)), 0);
-  const raw = ref.liters + added - ((meters / 1000) * ref.consumption) / 100;
-  if (incomplete || !Number.isFinite(raw) || raw > ref.capacity_l)
-    return {
-      known: false as const,
-      reason: 'Faltan litros o cambiaron registros de la referencia. Revisá las cargas y recalibrá el tanque.',
-    };
-  const liters = Math.max(0, raw);
-  return { known: true as const, liters, km: (liters / ref.consumption) * 100, low: liters <= ref.warning_l, meters };
-}
-
 export function validatePoint(
   p: Pick<RoadPoint, 'name' | 'latitude' | 'longitude' | 'radius_m' | 'warning_m' | 'speed_limit' | 'notes'>,
 ): string | null {

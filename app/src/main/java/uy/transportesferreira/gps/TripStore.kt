@@ -58,6 +58,7 @@ class TripStore(private val c:Context) {
             .put("vehicle",InputRules.vehicle(trip?.optString("vehicle")?:vehicle)).put("recorded_at",Instant.now().toString()).put("receipt_date",fields.optString("receipt_date",LocalDate.now().toString()))
             .put("distance_meters",trip?.optDouble("distance_meters",0.0)?:0.0).put("object_path",JSONObject.NULL).put("synced",false)
             .put("station_id",fields.optString("station_id")).put("station_name",fields.optString("station_name")).put("liters",fields.opt("liters")?:JSONObject.NULL).put("total",fields.opt("total")?:JSONObject.NULL)
+            .put("full_tank",fields.optBoolean("full_tank",false))
         if(photo!=null){val dest=File(dir("receipts"),"$id.jpg");photo.copyTo(dest,overwrite=true);r.put("local_path",dest.absolutePath).put("object_path","$uid/${tid?:"standalone"}/$id.jpg")}
         write(File(dir("receipts"),"$id.json"),r);r
     }

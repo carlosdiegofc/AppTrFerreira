@@ -2,7 +2,7 @@
 // a station and a station's opening balance. What each form starts with, what it checks and what it saves. A correction
 // never changes what was declared: it goes in panel_data, with the keys the app and both panels read. Pure functions.
 import type { Json, Tables, TablesInsert } from './database.types';
-import { dayInZone, formatDay } from './dates';
+import { dayInZone, formatDay, fromZoneInput } from './dates';
 import { canonical, type CatalogTruck, text, truck } from './fleet';
 import { parseNumber } from './numbers';
 import { type CatalogStation, type Currency, type Declared, type Movement, NO_STATION, type PaymentMethod, PAYMENT_METHODS, type Receipt, stationKey } from './fuel';
@@ -34,6 +34,8 @@ const typed = (n: number | null) => (n === null ? '' : String(n).replace('.', ',
 
 export interface ReceiptFormValues {
   date: string;
+  /** A new receipt's time, «14:05» in Uruguay, as the receipt says it; a correction keeps the one it has (''). */
+  time: string;
   /** A station of the catalog list (its id); '' for one written by hand. */
   stationId: string;
   /** The name of a station written by hand (when stationId is ''). */
@@ -42,27 +44,33 @@ export interface ReceiptFormValues {
   liters: string;
   total: string;
   currency: Currency;
+  /** The load filled the tank. */
+  fullTank: boolean;
 }
 
 export type ReceiptField = keyof ReceiptFormValues;
 
-/** What the form starts with: a new receipt dated today, or the receipt as it reads now (with its corrections). */
-export function receiptFormValues(receipt: Receipt | null, catalog: readonly CatalogStation[], today: string): ReceiptFormValues {
-  if (!receipt) return { date: today, stationId: '', station: '', vehicle: '', liters: '', total: '', currency: 'UYU' };
+/** What the form starts with: a new receipt dated today at the time it is now (clock), or the receipt as it reads now (with its corrections). */
+export function receiptFormValues(receipt: Receipt | null, catalog: readonly CatalogStation[], today: string, clock = ''): ReceiptFormValues {
+  if (!receipt) return { date: today, time: clock, stationId: '', station: '', vehicle: '', liters: '', total: '', currency: 'UYU', fullTank: false };
   const listed = catalog.find((s) => 'id:' + s.id === receipt.stationKey);
   return {
     date: receipt.date ?? today,
+    time: '',
     stationId: listed?.id ?? '',
     station: listed ? '' : (receipt.station ?? ''),
     vehicle: receipt.vehicle ?? '',
     liters: typed(receipt.liters),
     total: typed(receipt.total),
     currency: receipt.currency,
+    fullTank: receipt.fullTank,
   };
 }
 
 export interface ReceiptPayload {
   date: string;
+  /** A new receipt's moment, its day at its time in Uruguay (ISO); null for a correction, which keeps its own. */
+  at: string | null;
   stationId: string | null;
   /** The catalog's name for a listed station, else as written. */
   station: string;
@@ -70,18 +78,33 @@ export interface ReceiptPayload {
   liters: number | null;
   total: number;
   currency: Currency;
+  fullTank: boolean;
 }
 
 export type Checked<F extends string, P> = { ok: true; payload: P; errors: Partial<Record<F, string>> } | { ok: false; errors: Partial<Record<F, string>> };
 
 /**
  * Checks the form. For a correction, declared is what the receipt was loaded with: a field it had cannot be left blank,
- * because a correction cannot erase it (the receipt would read as declared again).
+ * because a correction cannot erase it (the receipt would read as declared again). For a new receipt, clock is the time
+ * it is now («14:05» in Uruguay): its time is checked too, because it places the load among the truck's trips.
  */
-export function validateReceiptForm(v: ReceiptFormValues, catalog: readonly CatalogStation[], today: string, declared?: Declared): Checked<ReceiptField, ReceiptPayload> {
+export function validateReceiptForm(
+  v: ReceiptFormValues,
+  catalog: readonly CatalogStation[],
+  today: string,
+  declared?: Declared,
+  clock?: string,
+): Checked<ReceiptField, ReceiptPayload> {
   const errors: Partial<Record<ReceiptField, string>> = {};
   const day = checkDay(v.date, today);
   if (day) errors.date = day;
+  let at: string | null = null;
+  if (clock !== undefined) {
+    if (v.time.trim() === '') errors.time = 'Escribí la hora de la boleta.';
+    else if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(v.time)) errors.time = 'La hora no es válida.';
+    else if (!day && v.date === today && v.time > clock) errors.time = 'La hora no puede ser posterior a ahora.';
+    else if (!day) at = fromZoneInput(`${v.date}T${v.time}`) ?? null;
+  }
   const listed = v.stationId ? catalog.find((s) => s.id === v.stationId) : undefined;
   const written = text(v.station);
   if (v.stationId && !listed) errors.stationId = 'Esa estación ya no está en la lista. Elegí otra o escribí su nombre.';
@@ -89,6 +112,7 @@ export function validateReceiptForm(v: ReceiptFormValues, catalog: readonly Cata
   else if (!listed && (written ?? '').length > FUEL_LIMITS.station) errors.station = `Hasta ${FUEL_LIMITS.station} letras.`;
   if (v.vehicle.trim().length > FUEL_LIMITS.vehicle) errors.vehicle = `Hasta ${FUEL_LIMITS.vehicle} letras.`;
   else if (v.vehicle.trim() === '' && declared?.vehicle) errors.vehicle = 'La boleta tiene camión: para cambiarlo, escribí el correcto.';
+  else if (v.vehicle.trim() === '' && v.fullTank) errors.vehicle = 'Para marcar el tanque lleno, escribí el camión.';
   const liters = checkNumber(v.liters, MAX.liters);
   if (liters.error) errors.liters = liters.error;
   else if (liters.value === null && declared?.liters != null) errors.liters = 'La boleta tiene litros: para corregirlos, escribí el número correcto.';
@@ -102,26 +126,27 @@ export function validateReceiptForm(v: ReceiptFormValues, catalog: readonly Cata
     errors,
     payload: {
       date: v.date,
+      at,
       stationId: listed?.id ?? null,
       station: listed?.name ?? (written as string),
       vehicle: v.vehicle.trim(),
       liters: liters.value,
       total: total.value as number,
       currency: v.currency === 'USD' ? 'USD' : 'UYU',
+      fullTank: v.fullTank,
     },
   };
 }
 
 /**
  * The app's month summary and the current panel count a receipt on the day it reached the database (recorded_at), not
- * on its date, and a correction does not move it there: the form says so when the two fall in different months.
+ * on its date, and a correction does not move it there: the form says so when the two fall in different months. A new
+ * receipt typed in the panel goes in with its own day and time, so it falls on its date.
  */
-export function arrivalNote(receipt: Pick<Receipt, 'recordedAt'> | null, date: string, today: string): string | null {
-  const arrived = receipt ? (receipt.recordedAt ? dayInZone(Date.parse(receipt.recordedAt)) : null) : today;
+export function arrivalNote(receipt: Pick<Receipt, 'recordedAt'>, date: string): string | null {
+  const arrived = receipt.recordedAt ? dayInZone(Date.parse(receipt.recordedAt)) : null;
   if (!arrived || !isDay(date) || date.slice(0, 7) === arrived.slice(0, 7)) return null;
-  return receipt
-    ? `El resumen del mes de la app y el panel actual la cuentan el ${formatDay(arrived)}, el día en que llegó.`
-    : 'El resumen del mes de la app y el panel actual la van a contar hoy, el día en que se carga.';
+  return `El resumen del mes de la app y el panel actual la cuentan el ${formatDay(arrived)}, el día en que llegó.`;
 }
 
 /** Whether the form changed since it opened: closing asks first, and an unchanged correction saves nothing. */
@@ -130,7 +155,8 @@ export const receiptFormChanged = (a: ReceiptFormValues, b: ReceiptFormValues) =
 /**
  * A receipt typed in the panel: in the name of whoever loads it and without a trip, like the app's receipts out of a
  * trip. Its photo goes to that account's own folder (<account>/standalone/<id>.jpg). The currency goes in panel_data,
- * where the app and both panels read it.
+ * where the app and both panels read it. recorded_at is when it was loaded, the receipt's day and time, as the app sends
+ * the moment its driver saves it at the pump: the tank places the load among the truck's trips by it.
  */
 export function newReceiptRow(id: string, user: { id: string; name: string }, p: ReceiptPayload, withPhoto: boolean): TablesInsert<'trf_driver_fuel_receipts'> {
   return {
@@ -140,22 +166,29 @@ export function newReceiptRow(id: string, user: { id: string; name: string }, p:
     trip_id: null,
     vehicle: p.vehicle,
     receipt_date: p.date,
+    ...(p.at ? { recorded_at: p.at } : {}),
     station_id: p.stationId ?? '',
     station_name: p.station,
     liters: p.liters,
     total: p.total,
     object_path: withPhoto ? `${user.id}/standalone/${id}.jpg` : null,
     panel_data: p.currency === 'USD' ? { moneda: 'USD' } : null,
+    full_tank: p.fullTank,
   };
 }
 
 /**
  * Whether the receipt the database has is the one this save sent. A try whose answer was cut may have saved it with what
- * the form had then; a save tried again gets that one back.
+ * the form had then; a save tried again gets that one back. The moment is compared as an instant: the database writes
+ * it its own way.
  */
 export function sameReceipt(saved: Tables<'trf_driver_fuel_receipts'>, row: TablesInsert<'trf_driver_fuel_receipts'>): boolean {
-  const keys = ['receipt_date', 'station_id', 'station_name', 'vehicle', 'liters', 'total', 'object_path'] as const;
-  return keys.every((k) => (saved[k] ?? null) === (row[k] ?? null)) && JSON.stringify(saved.panel_data ?? null) === JSON.stringify(row.panel_data ?? null);
+  const keys = ['receipt_date', 'station_id', 'station_name', 'vehicle', 'liters', 'total', 'object_path', 'full_tank'] as const;
+  return (
+    keys.every((k) => (saved[k] ?? null) === (row[k] ?? null)) &&
+    JSON.stringify(saved.panel_data ?? null) === JSON.stringify(row.panel_data ?? null) &&
+    (row.recorded_at === undefined || Date.parse(saved.recorded_at) === Date.parse(row.recorded_at))
+  );
 }
 
 /**
@@ -198,6 +231,10 @@ export function correctedPanelData(receipt: Receipt, initial: ReceiptFormValues,
   if (changed('currency')) {
     if (p.currency === 'UYU') delete d.moneda;
     else d.moneda = 'USD';
+  }
+  if (changed('fullTank')) {
+    if (p.fullTank === (declared.fullTank === true)) delete d.tanque_lleno;
+    else d.tanque_lleno = p.fullTank;
   }
   return Object.keys(d).length > 0 ? (d as Json) : null;
 }

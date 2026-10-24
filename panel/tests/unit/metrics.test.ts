@@ -60,10 +60,12 @@ function receipt(over: Partial<Receipt> = {}): Receipt {
     liters: null,
     total: null,
     currency: 'UYU',
+    fullTank: false,
+    tripMeters: null,
     objectPath: null,
     archived: false,
     updatedAt: null,
-    declared: { date: '2026-10-10', vehicle: 'A', stationId: '1', station: null, liters: null, total: null },
+    declared: { date: '2026-10-10', vehicle: 'A', stationId: '1', station: null, liters: null, total: null, fullTank: null },
     panelData: {},
     ...over,
   };

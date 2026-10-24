@@ -5,7 +5,16 @@ Panel web nuevo (React + TypeScript), en construcción al lado del actual: [pane
 # Panel web (nuevo)
 La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
 
-# Transportes Ferreira GPS — v0.19.0
+# Transportes Ferreira GPS — v0.20.0
+
+## Nuevo en v0.20.0 (combustible: «¿Llenaste el tanque?»; versionCode 32)
+- **Cargar combustible** pregunta si llenaste el tanque. Las opciones son «No, cargué una parte», que viene marcada, y «Sí, lo llené». La respuesta llega al panel con el resto de la boleta.
+- **El panel** la usa para estimar cuánto gasoil tiene cada camión:
+  - Desde una carga con el tanque lleno, arranca de lleno.
+  - Le resta lo que gasta según los kilómetros del GPS y el consumo de ese camión.
+  - Avisa en Inicio y en Combustible cuando le queda poco.
+- **Mi combustible y Combustible de la flota** muestran «Tanque lleno» en las cargas que lo llenaron, o en las que la oficina marcó así en el panel.
+- Antes de publicarla hay que aplicar la migración `0009` del panel en la base. Sin la columna nueva, las boletas de esta versión no se podrían enviar.
 
 ## Nuevo en v0.19.0 (Juegos: truco uruguayo contra el teléfono; versionCode 31)
 - **Truco uruguayo** en Juegos, contra el teléfono, con las reglas decididas el 21 y el 22/10/2026:

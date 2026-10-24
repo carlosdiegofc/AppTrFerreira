@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
-import { receiptFromRow } from '../lib/fuel';
-import { type RoadPoint, type TankReference, type TollMovement, type TollRate, roadVehicleKey } from '../lib/road';
+import type { RoadPoint, TankReference, TollMovement, TollRate } from '../lib/road';
 import { ConflictError, DataError } from './api';
 
 function checked<T>(r: { data: T | null; error: { message: string; code?: string } | null }): T {
@@ -44,26 +43,6 @@ export function useRoadAccount(key: string | null) {
         supabase.from('trf_tank_references').select('*').eq('vehicle_key', key!).then(checked),
       ]);
       return { movements, rates, events, tank: tank[0] ?? null };
-    },
-  });
-}
-export function useTankObservations(key: string | null) {
-  return useQuery({
-    queryKey: ['tankObservations', key],
-    enabled: !!key,
-    refetchInterval: 30000,
-    queryFn: async () => {
-      const [trips, fuel] = await Promise.all([
-        complete((a, b) => supabase.from('trf_driver_tracking_sessions').select('id,vehicle,distance_meters').order('id').range(a, b)),
-        complete((a, b) => supabase.from('trf_driver_fuel_receipts').select('*').order('id').range(a, b)),
-      ]);
-      return {
-        trips: trips.filter((t) => roadVehicleKey(t.vehicle) === key),
-        receipts: fuel
-          .map((r) => receiptFromRow(r))
-          .filter((r) => !r.archived && r.vehicle && roadVehicleKey(r.vehicle) === key)
-          .map((r) => ({ id: r.id, vehicle: r.vehicle!, liters: r.liters })),
-      };
     },
   });
 }

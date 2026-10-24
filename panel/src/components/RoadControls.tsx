@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { ConfirmDialog } from './ConfirmDialog';
 import { DataError, refused } from '../data/api';
 import { Link } from 'react-router';
-import { useRoadAccount, useRoadWrite, useTankObservations, type RoadWrite } from '../data/road';
+import { useRoadAccount, useRoadWrite, type RoadWrite } from '../data/road';
+import { type TankRow, useTanks } from '../data/tanks';
 import { type FleetUnit, unitTitle } from '../lib/fleet';
 import { money, decimal } from '../lib/format';
+import { TankMeasureDialog, TankSettingsDialog } from './TankDialogs';
 import {
   POINT_LABEL,
   pointTitle,
@@ -14,7 +16,6 @@ import {
   roadVehicleKey,
   tollBalance,
   applicableRate,
-  fuelEstimate,
   nearbyPoints,
   validatePoint,
 } from '../lib/road';
@@ -196,8 +197,12 @@ export function TruckRoad({ unit, points, now }: { unit: FleetUnit; points: read
   const label = unitTitle(unit),
     key = roadVehicleKey(label);
   const account = useRoadAccount(key),
-    observations = useTankObservations(key),
+    tanks = useTanks(),
     mutation = useRoadWrite();
+  // The same tank as in Combustible: a truck without one can start it here.
+  const tank: TankRow = tanks.rows?.find((r) => r.key === key) ?? { key, name: label, settings: null, reference: null, state: { status: 'unset' }, measured: null };
+  const [tankForm, setTankForm] = useState<'settings' | 'measure' | null>(null);
+  const [tankNotice, setTankNotice] = useState<string | null>(null);
   const [editor, setEditor] = useState<{
     title: string;
     fields: Field[];
@@ -206,8 +211,7 @@ export function TruckRoad({ unit, points, now }: { unit: FleetUnit; points: read
   } | null>(null);
   const maps = externalMaps(unit.lat, unit.lng);
   const a = account.data;
-  const estimate =
-    a?.tank && observations.data && !observations.error ? fuelEstimate(a.tank, observations.data.trips, observations.data.receipts) : null;
+  const estimate = tank.state;
   const nearby = nearbyPoints(unit, points, now);
   const movement = () => {
     const id = crypto.randomUUID(),
@@ -233,63 +237,6 @@ export function TruckRoad({ unit, points, now }: { unit: FleetUnit; points: read
             happened_at: time,
             created_at: time,
             event_id: null,
-          },
-        };
-      },
-    });
-  };
-  const tank = () => {
-    const o = observations.data;
-    if (!o || observations.error || o.receipts.some((r) => r.liters === null)) return;
-    const ref = a?.tank;
-    setEditor({
-      title: 'Referencia de combustible actual',
-      fields: [
-        {
-          name: 'capacity',
-          label: 'Capacidad del tanque (L)',
-          type: 'number',
-          step: 'any',
-          min: 1,
-          max: 5000,
-          value: ref?.capacity_l ?? '',
-        },
-        { name: 'liters', label: 'Litros que tiene ahora (medidos)', type: 'number', step: 'any', min: 0, max: 5000, value: '' },
-        {
-          name: 'consumption',
-          label: 'Consumo de referencia (L / 100 km)',
-          type: 'number',
-          step: 'any',
-          min: 0.1,
-          max: 200,
-          value: ref?.consumption ?? '',
-        },
-        { name: 'warning', label: 'Avisar por debajo de (L)', type: 'number', step: 'any', min: 0, max: 5000, value: ref?.warning_l ?? 50 },
-      ],
-      build: async (v) => {
-        const fresh = await observations.refetch();
-        if (fresh.error || !fresh.data || fresh.data.receipts.some((r) => r.liters === null))
-          throw new Error('No se pudo leer una referencia completa. Revisá las cargas.');
-        const baseline = fresh.data;
-        const capacity = Number(v.capacity),
-          liters = Number(v.liters),
-          warning = Number(v.warning);
-        if (liters > capacity || warning > capacity) throw new Error('Los litros y el aviso no pueden superar la capacidad.');
-        const time = new Date().toISOString();
-        return {
-          type: 'tank',
-          before: ref?.updated_at ?? null,
-          row: {
-            vehicle_key: key,
-            vehicle_name: label,
-            capacity_l: capacity,
-            liters,
-            warning_l: warning,
-            consumption: Number(v.consumption),
-            trip_meters: Object.fromEntries(baseline.trips.map((t) => [t.id, t.distance_meters])),
-            receipt_liters: Object.fromEntries(baseline.receipts.map((r) => [r.id, r.liters!])),
-            measured_at: time,
-            updated_at: ref?.updated_at ?? time,
           },
         };
       },
@@ -406,19 +353,28 @@ export function TruckRoad({ unit, points, now }: { unit: FleetUnit; points: read
               })}
           </details>
           <h3>Combustible estimado</h3>
-          {observations.error ? (
+          {tankNotice && <p role="status">{tankNotice}</p>}
+          {tanks.rows === null && tanks.error ? (
             <p role="alert">
-              No se pudieron leer todas las cargas y distancias.{' '}
-              <button className="btn" onClick={() => void observations.refetch()}>
+              No se pudieron leer las cargas y los kilómetros.{' '}
+              <button className="btn" onClick={tanks.refetch}>
                 Reintentar
               </button>
             </p>
-          ) : estimate?.known ? (
+          ) : tanks.rows === null ? (
+            <p>Calculando…</p>
+          ) : estimate.status === 'known' ? (
             <p className={estimate.low ? 'road-warning' : ''}>
-              {decimal(estimate.liters)} L · autonomía aproximada {Math.round(estimate.km)} km{estimate.low ? ' · Combustible bajo' : ''}
+              {decimal(estimate.liters)} L · autonomía aproximada {Math.round(estimate.autonomyKm)} km{estimate.low ? ' · Combustible bajo' : ''}
             </p>
           ) : (
-            <p>{estimate && !estimate.known ? estimate.reason : 'Definí los litros actuales y el consumo para comenzar.'}</p>
+            <p>
+              {estimate.status === 'unknown'
+                ? estimate.reason
+                : estimate.status === 'waiting'
+                  ? 'Falta saber cuánto tiene: medilo, o marcá «Tanque lleno» en la próxima carga que lo llene.'
+                  : 'Cargá cuánto le entra y cuántos kilómetros hace por litro para empezar.'}
+            </p>
           )}
           <p className="muted">
             Se calcula con kilómetros GPS y las cargas de Combustible; no es una medición del tanque. Una pérdida de señal o carga sin
@@ -427,16 +383,28 @@ export function TruckRoad({ unit, points, now }: { unit: FleetUnit; points: read
           <div className="road-actions">
             <button
               className="btn"
-              onClick={tank}
-              disabled={!observations.data || !!observations.error || observations.data.receipts.some((r) => r.liters === null)}
+              onClick={() => {
+                setTankNotice(null);
+                setTankForm('settings');
+              }}
             >
-              Calibrar tanque / consumo
+              {tank.settings ? 'Tanque y consumo' : 'Configurar tanque'}
             </button>
+            {tank.settings && (
+              <button
+                className="btn"
+                onClick={() => {
+                  setTankNotice(null);
+                  setTankForm('measure');
+                }}
+              >
+                Medir el tanque
+              </button>
+            )}
             <Link className="btn" to="/combustible">
               Cargar combustible
             </Link>
           </div>
-          {observations.data?.receipts.some((r) => r.liters === null) && <p>Completá los litros de las boletas antes de calibrar.</p>}
           <details>
             <summary>Últimos 30 pasos registrados</summary>
             {a.events.length === 0 && <p>Todavía no hay pasos registrados.</p>}
@@ -453,6 +421,36 @@ export function TruckRoad({ unit, points, now }: { unit: FleetUnit; points: read
             Los avisos sonoros del teléfono requieren una próxima actualización móvil. A baja velocidad, el GPS no certifica una infracción.
           </p>
         </>
+      )}
+      {tankForm === 'settings' && (
+        <TankSettingsDialog
+          row={tank}
+          onClose={() => setTankForm(null)}
+          onDone={(text) => {
+            setTankForm(null);
+            setTankNotice(text);
+          }}
+          onConflict={() => {
+            setTankForm(null);
+            setTankNotice('Otra persona cambió ese tanque: ya se ven sus datos nuevos.');
+          }}
+        />
+      )}
+      {tankForm === 'measure' && (
+        <TankMeasureDialog
+          row={tank}
+          receipts={tanks.fuel.receipts}
+          trucks={tanks.fuel.catalog.data ?? []}
+          onClose={() => setTankForm(null)}
+          onDone={(text) => {
+            setTankForm(null);
+            setTankNotice(text);
+          }}
+          onConflict={() => {
+            setTankForm(null);
+            setTankNotice('Otra persona cambió ese tanque: ya se ven sus datos nuevos.');
+          }}
+        />
       )}
       {editor && (
         <Editor

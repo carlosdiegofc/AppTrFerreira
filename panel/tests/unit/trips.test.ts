@@ -169,7 +169,7 @@ describe('addresses and periods', () => {
 
 describe('fuel, route and numbers', () => {
   it('fuel receipts use the corrections made in the panel', () => {
-    const r = { id: 'f1', trip_id: ID, driver_id: 'd1', driver_name: 'Immer', vehicle: 'Leyland · HTP1545', recorded_at: '2025-07-30T12:00:00Z', receipt_date: '2025-07-30', distance_meters: 0, object_path: 'd1/f1.jpg', archived: false, station_id: '', station_name: 'Ancap Young', liters: 100, total: 6000, panel_data: { litros: '120,5', moneda: 'USD', monto: '150' }, updated_at: null, updated_by: null } as FuelRow;
+    const r = { id: 'f1', trip_id: ID, driver_id: 'd1', driver_name: 'Immer', vehicle: 'Leyland · HTP1545', recorded_at: '2025-07-30T12:00:00Z', receipt_date: '2025-07-30', distance_meters: 0, object_path: 'd1/f1.jpg', archived: false, station_id: '', station_name: 'Ancap Young', liters: 100, total: 6000, panel_data: { litros: '120,5', moneda: 'USD', monto: '150' }, updated_at: null, updated_by: null, full_tank: null } as FuelRow;
     expect(fuelFromReceipt(r)).toMatchObject({ liters: 120.5, total: 150, currency: 'USD', station: 'Ancap Young', date: '2025-07-30', objectPath: 'd1/f1.jpg' });
     // Without a receipt day, the day it was loaded in Uruguay: 22:30 of the 29th is not the 30th.
     expect(fuelFromReceipt({ ...r, receipt_date: '', recorded_at: '2025-07-30T01:30:00Z', panel_data: {} } as FuelRow).date).toBe('2025-07-29');

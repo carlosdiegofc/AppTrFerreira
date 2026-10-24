@@ -3440,3 +3440,94 @@ button.fr-open {
     margin-top: 4px;
   }
 }
+
+/* Tanques: the fuel each truck should have now, an estimate. */
+.tank-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 6px;
+}
+
+.tank-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tank-list li:last-child {
+  border-bottom: 0;
+}
+
+.tank-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tank-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tank-name strong {
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.tank-name small,
+.tank-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.tank-level {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+
+.tank-level strong {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tank-level span {
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.tank-bar {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--grey-bg);
+}
+
+.tank-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--green);
+}
+
+.tank-item.is-low .tank-bar > span {
+  background: var(--red);
+}
+
+.tank-warn {
+  color: var(--amber);
+}
+
+.tank-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

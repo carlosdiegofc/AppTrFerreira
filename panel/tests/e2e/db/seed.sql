@@ -124,9 +124,10 @@ insert into public.trf_trip_documents (id, trip_id, driver_id, kind, number, car
   ('30000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000011', 'departure', '0001-00012345', 'Soja', 30000,
    '00000000-0000-4000-8000-000000000011/10000000-0000-4000-8000-00000000000a/30000000-0000-4000-8000-000000000001.jpg', (select now from t0) - interval '110 minutes'),
   ('30000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000011', 'arrival', '', '', null, null, (select now from t0) - interval '100 minutes');
-insert into public.trf_driver_fuel_receipts (id, trip_id, driver_id, driver_name, vehicle, recorded_at, receipt_date, object_path, station_name, liters, total, panel_data, updated_at) values
+-- Ana filled the Volvo's tank on her trip, when it had done 120 km (the tanks, below).
+insert into public.trf_driver_fuel_receipts (id, trip_id, driver_id, driver_name, vehicle, recorded_at, receipt_date, object_path, station_name, liters, total, panel_data, updated_at, distance_meters, full_tank) values
   ('40000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000011', 'Ana Pereira', 'Volvo FH 460 · ABC1234', (select now from t0) - interval '90 minutes', (select today from t0),
-   '00000000-0000-4000-8000-000000000011/10000000-0000-4000-8000-00000000000a/40000000-0000-4000-8000-000000000001.jpg', 'Ancap Ruta 5 km 32', 180, 9800, '{"litros": "182,5", "monto": "9.950"}', (select now from t0) - interval '60 minutes');
+   '00000000-0000-4000-8000-000000000011/10000000-0000-4000-8000-00000000000a/40000000-0000-4000-8000-000000000001.jpg', 'Ancap Ruta 5 km 32', 180, 9800, '{"litros": "182,5", "monto": "9.950"}', (select now from t0) - interval '60 minutes', 120000, true);
 
 -- Combustible: receipts out of a trip too. Diego typed a catalog station in his own way (it counts for that station) and
 -- sent the photo; Bruno's receipt on his trip is in dollars; Carla loaded at a station that is not in the list; Ana's
@@ -154,6 +155,19 @@ insert into public.trf_fuel_station_movements (station_key, station_name, kind, 
   ('id:est-ruta5', 'Ancap Ruta 5 km 32', 'opening', (select today from t0) - 10, 25000, 'UYU', null, null),
   ('id:est-ruta5', 'Ancap Ruta 5 km 32', 'payment', (select today from t0) - 3, 20000, 'UYU', 'transferencia', 'Transferencia BROU'),
   ('id:est-salto', 'Petrobras Salto', 'payment', (select today from t0) - 1, 100, 'USD', 'efectivo', null);
+
+-- The tanks (migration 0009). The Volvo's tank was filled 90 minutes ago, with 120 km of Ana's trip done: since then it
+-- did 32,3 km at 3 km per litre. The Ford was measured with 90 litres seven hours ago and then did Diego's trip of 95 km:
+-- it is low. The Iveco has its tank but its level was never known; the Mercedes has no tank yet. The measurement keeps
+-- its time (the server sets it), like the presence above.
+insert into public.trf_tank_settings (vehicle_key, vehicle_name, capacity_l, consumption, warning_l) values
+  ('plate:abc1234', 'Volvo FH 460 · ABC1234', 400, 100.0 / 3, 80),
+  ('plate:jkl3456', 'Ford Cargo 1722 · JKL3456', 300, 100.0 / 3, 60),
+  ('plate:mno7890', 'Iveco Stralis · MNO7890', 400, 31.25, 80);
+alter table public.trf_tank_references disable trigger trf_tank_references_touch;
+insert into public.trf_tank_references (vehicle_key, vehicle_name, capacity_l, liters, consumption, warning_l, trip_meters, receipt_liters, measured_at, updated_at) values
+  ('plate:jkl3456', 'Ford Cargo 1722 · JKL3456', 300, 90, 100.0 / 3, 60, '{}', '{"40000000-0000-4000-8000-000000000002": 300}', (select now from t0) - interval '7 hours', (select now from t0) - interval '7 hours');
+alter table public.trf_tank_references enable trigger trf_tank_references_touch;
 
 -- Choferes (migration 0008). Ana has her card, a salary since last month and the payments of last month (up to date)
 -- and of this one (an advance, and a viático apart); Bruno has a card without a salary and an advance in dollars; Eduardo

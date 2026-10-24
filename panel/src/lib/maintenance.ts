@@ -65,7 +65,7 @@ export interface KmPanelRow {
 }
 
 /** The app's trips as the office left them: without the ones in the trash, and with the truck it corrected. */
-export function kmTripsAsCorrected(trips: readonly KmTrip[], panel: readonly KmPanelRow[]): KmTrip[] {
+export function kmTripsAsCorrected<T extends KmTrip>(trips: readonly T[], panel: readonly KmPanelRow[]): T[] {
   const byTrip = new Map(panel.filter((p) => p.app_trip_id !== null).map((p) => [p.app_trip_id as string, p]));
   return trips.flatMap((t) => {
     const p = byTrip.get(t.id);
