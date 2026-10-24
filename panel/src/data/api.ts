@@ -13,6 +13,7 @@ import { supabase } from '../lib/supabase';
 import type { TripPayload } from '../lib/tripForm';
 import type { TankReference } from '../lib/road';
 import type { TankSettings, TankSettingsRow, TankTrip } from '../lib/tanks';
+import type { Hitch, HitchRow, Vehicle, VehicleRow } from '../lib/vehicles';
 import type { DetailRow, FuelRow, PanelTripRow, SessionRow, Trip } from '../lib/trips';
 
 /** A query that failed; the message is for the console, the code (PostgreSQL's or PostgREST's) says why. */
@@ -580,7 +581,7 @@ export const savePayment = (payment: Pick<Payment, 'id' | 'updatedAt'> | null, r
 export const setSalaryDeleted = (salary: Salary, deleted: boolean) => saveSalary(salary, { deleted_at: deleted ? new Date().toISOString() : null });
 export const setPaymentDeleted = (payment: Payment, deleted: boolean) => savePayment(payment, { deleted_at: deleted ? new Date().toISOString() : null });
 
-export type PhotoBucket = 'trf-trip-documents' | 'trf-fuel-receipts' | 'trf-documents';
+export type PhotoBucket = 'trf-trip-documents' | 'trf-fuel-receipts' | 'trf-documents' | 'trf-fleet-photos';
 
 /** A link that opens a photo (or the PDF of a paper) of the private buckets for ten minutes; the storage rules decide who can open it. */
 export async function photoUrl(bucket: PhotoBucket, path: string): Promise<string> {
@@ -651,3 +652,77 @@ export async function saveTankSettings(current: Pick<TankSettings, 'key' | 'upda
   if (now && savedAsSent(now, sent)) return now;
   throw new ConflictError('Otra persona cambió el tanque');
 }
+
+export interface VehiclesData {
+  units: VehicleRow[];
+  hitches: HitchRow[];
+}
+
+/** Every card of trucks and trailers and every hitch: few rows, read whole (only the panel accounts read them). */
+export async function fetchVehicles(): Promise<VehiclesData> {
+  const [units, hitches] = await Promise.all([
+    all((from, to) => supabase.from('trf_fleet_units').select('*').order('id').range(from, to), 5000, true),
+    all((from, to) => supabase.from('trf_fleet_hitches').select('*').order('id').range(from, to), 20_000, true),
+  ]);
+  return { units, hitches };
+}
+
+/**
+ * A card, new or changed, as saveOnce saves: a change only applies if nobody saved it meanwhile. A new one for a truck or
+ * a plate that already has another card is refused with the code of a duplicate (23505).
+ */
+export const saveVehicle = (vehicle: Pick<Vehicle, 'id' | 'updatedAt'> | null, row: TablesInsert<'trf_fleet_units'> | TablesUpdate<'trf_fleet_units'>) =>
+  saveOnce<VehicleRow>(vehicle, row, {
+    insert: () => supabase.from('trf_fleet_units').insert(row as TablesInsert<'trf_fleet_units'>).select(),
+    find: (id) => supabase.from('trf_fleet_units').select('*').eq('id', id).limit(1),
+    update: (id, at) => supabase.from('trf_fleet_units').update(row).eq('id', id).eq('updated_at', at).select(),
+  });
+
+/** The photo of a card. One already uploaded (a save tried again) counts as uploaded. */
+export async function uploadVehiclePhoto(path: string, photo: Blob): Promise<void> {
+  const result = await supabase.storage.from('trf-fleet-photos').upload(path, photo, { contentType: 'image/jpeg', upsert: false });
+  if (!result.error) return;
+  const e = result.error as { message: string; statusCode?: string; status?: number };
+  if (e.statusCode === '409' || e.status === 409 || /already exists|duplicate/i.test(e.message)) return;
+  throw new DataError(e.message, e.statusCode ?? (e.status === undefined ? undefined : String(e.status)));
+}
+
+export interface HitchRequest {
+  /** The id of the new hitch: a request repeated because its answer was cut finds it. */
+  id: string;
+  truckKey: string;
+  trailerId: string;
+  fromOn: string;
+  /** What the office saw: the hitch of the truck now and the one of the trailer now. */
+  truckNow: string | null;
+  trailerNow: string | null;
+  notes: string;
+}
+
+/**
+ * A trailer on a truck from a day, in one step: the trailer the truck had and the truck the trailer was on stay until the
+ * day before. If someone changed either meanwhile, nothing is saved (ConflictError).
+ */
+export async function hitchTrailer(r: HitchRequest): Promise<HitchRow> {
+  const result = await supabase.rpc('trf_fleet_hitch', {
+    p_id: r.id,
+    p_truck_key: r.truckKey,
+    p_trailer_id: r.trailerId,
+    p_from: r.fromOn,
+    p_truck_current: r.truckNow,
+    p_trailer_current: r.trailerNow,
+    p_notes: r.notes,
+  });
+  if (result.error?.code === '40001') throw new ConflictError(result.error.message, result.error.code);
+  return rows(result);
+}
+
+/** A hitch changed (its last day, its notes) or annulled: only if nobody saved it meanwhile. */
+export const saveHitch = (hitch: Pick<Hitch, 'id' | 'updatedAt'>, row: TablesUpdate<'trf_fleet_hitches'>) =>
+  saveOnce<HitchRow>(hitch, row, {
+    insert: () => {
+      throw new DataError('Un enganche nuevo va con hitchTrailer');
+    },
+    find: (id) => supabase.from('trf_fleet_hitches').select('*').eq('id', id).limit(1),
+    update: (id, at) => supabase.from('trf_fleet_hitches').update(row).eq('id', id).eq('updated_at', at).select(),
+  });

@@ -15,7 +15,7 @@ export interface Section {
 
 export const SECTIONS: Section[] = [
   { path: 'inicio', label: 'Inicio', icon: 'home', ready: true, about: 'La flota de un vistazo.' },
-  { path: 'flota', label: 'Flota', icon: 'truck', ready: false, about: 'La ficha de cada camión con foto, sus acoplados y su historial, los kilómetros y los vencimientos.' },
+  { path: 'flota', label: 'Flota', icon: 'truck', ready: true, about: 'La ficha de cada camión y de su acoplado, con foto, y lo que se sabe de cada uno: kilómetros, tanque, services, papeles y viajes.' },
   { path: 'viajes', label: 'Viajes', icon: 'route', ready: true, about: 'Todos los viajes con filtros por estado, camión, chofer y fechas, el recorrido real y la exportación a Excel, PDF y Word.' },
   { path: 'choferes', label: 'Choferes', icon: 'person', ready: true, about: 'La ficha de cada chofer con sus viajes, sus papeles y su sueldo de cada mes, con los pagos.' },
   { path: 'combustible', label: 'Combustible', icon: 'fuel', ready: true, about: 'Las boletas agrupadas por estación, con la cuenta corriente de cada una: cargas, pagos y saldo.' },

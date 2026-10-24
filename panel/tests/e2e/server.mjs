@@ -5,6 +5,7 @@
 //  /sb/storage/v1/object/sign → signed links to the invented photos and files of tests/e2e/db/seed.sql and to the uploaded ones
 //  /sb/storage/v1/object/trf-fuel-receipts/… → uploads of receipt photos, with the folder rule of the storage
 //  /sb/storage/v1/object/trf-documents… → uploads and deletes of the files of papers (photo or PDF), for the panel accounts
+//  /sb/storage/v1/object/trf-fleet-photos/… → uploads of the photos of trucks and trailers, for the panel accounts
 import crypto from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import http from 'node:http';
@@ -35,6 +36,7 @@ const PHOTOS = {
     '50000000-0000-4000-8000-000000000002/60000000-0000-4000-8000-000000000002.pdf',
     '50000000-0000-4000-8000-000000000004/60000000-0000-4000-8000-000000000004.jpg',
   ],
+  'trf-fleet-photos': ['a0000000-0000-4000-8000-000000000001/a1000000-0000-4000-8000-000000000001.jpg'],
 };
 // Photos and files uploaded during the tests, and files of papers deleted, as "bucket/path".
 const UPLOADED = new Set();
@@ -125,7 +127,7 @@ async function handle(req, res) {
       return;
     }
     res.writeHead(200, { 'Content-Type': 'image/svg+xml' });
-    res.end(photoSvg(bucket === 'trf-fuel-receipts' ? 'Boleta de combustible' : bucket === 'trf-documents' ? 'Documento' : 'Remito'));
+    res.end(photoSvg(bucket === 'trf-fuel-receipts' ? 'Boleta de combustible' : bucket === 'trf-documents' ? 'Documento' : bucket === 'trf-fleet-photos' ? 'Camión' : 'Remito'));
     return;
   }
   if (p.startsWith('/sb/storage/v1/object/trf-documents/') && req.method === 'POST') {
@@ -161,6 +163,21 @@ async function handle(req, res) {
       gone.push({ name, bucket_id: 'trf-documents' });
     }
     return json(res, 200, gone);
+  }
+  if (p.startsWith('/sb/storage/v1/object/trf-fleet-photos/') && req.method === 'POST') {
+    // Like the storage rule trf_fleet_photos_insert: the panel accounts upload a photo (JPEG) into the folder of a card. A
+    // second upload of the same photo is a duplicate.
+    const object = decodeURIComponent(p.slice('/sb/storage/v1/object/'.length));
+    const name = object.slice('trf-fleet-photos/'.length);
+    const claims = verifyJwt(String(req.headers.authorization || '').replace(/^Bearer /, ''));
+    const body = (await readBody(req)).toString('latin1');
+    if (!claims) return json(res, 400, { statusCode: '403', error: 'Unauthorized', message: 'invalid JWT' });
+    if (!PHOTO_READERS.has(claims.sub)) return json(res, 400, { statusCode: '403', error: 'Unauthorized', message: 'new row violates row-level security policy' });
+    if (!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.jpg$/.test(name)) return json(res, 400, { statusCode: '400', error: 'InvalidKey', message: 'Invalid key' });
+    if (!/content-type: image\/jpeg/i.test(body) && req.headers['content-type'] !== 'image/jpeg') return json(res, 400, { statusCode: '415', error: 'invalid_mime_type', message: 'mime type not supported' });
+    if (UPLOADED.has(object)) return json(res, 400, { statusCode: '409', error: 'Duplicate', message: 'The resource already exists' });
+    UPLOADED.add(object);
+    return json(res, 200, { Key: object, Id: crypto.randomUUID() });
   }
   if (p.startsWith('/sb/storage/v1/object/trf-fuel-receipts/') && req.method === 'POST') {
     // Like the storage rule fuel_photos_insert: a signed-in account uploads into its own folder, out of a trip

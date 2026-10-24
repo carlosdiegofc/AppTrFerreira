@@ -11,6 +11,7 @@ import { kmReferences, kmSince, type MaintenanceRow, sameService, type Service, 
 import { appendReadings } from '../lib/route';
 import type { TripPayload } from '../lib/tripForm';
 import { mergeTrips, type Trip, tripFromPanel, tripFromSession } from '../lib/trips';
+import { hitchFromRow, type Hitch, type Vehicle, vehicleFromRow } from '../lib/vehicles';
 import {
   ConflictError,
   createReceipt,
@@ -35,6 +36,11 @@ import {
   fetchTripDetail,
   fetchTripList,
   fetchTrips,
+  fetchVehicles,
+  hitchTrailer,
+  type HitchRequest,
+  photoUrl,
+  type PhotoBucket,
   refused,
   removeDocumentFile,
   type RoutePoint,
@@ -43,8 +49,10 @@ import {
   saveMovement,
   savePayment,
   saveSalary,
+  saveHitch,
   saveService,
   saveTrip,
+  saveVehicle,
   serviceRow,
   setMovementDeleted,
   setPaymentDeleted,
@@ -53,6 +61,7 @@ import {
   updateReceipt,
   uploadDocumentFile,
   uploadReceiptPhoto,
+  uploadVehiclePhoto,
 } from './api';
 
 /** The current time, refreshed every few seconds so "hace 2 min" keeps moving. */
@@ -490,3 +499,47 @@ export function useSetPaymentDeleted() {
   const changed = useDriversChanged();
   return useMutation({ mutationFn: ({ payment, deleted }: { payment: Payment; deleted: boolean }) => setPaymentDeleted(payment, deleted), onSettled: changed });
 }
+
+/** Every card of trucks and trailers and which trailer each truck takes (only the panel accounts read them). */
+export function useVehicles(enabled = true) {
+  const query = useQuery({ queryKey: ['vehicles'], queryFn: fetchVehicles, staleTime: 30_000, enabled });
+  const vehicles = useMemo(() => (query.data?.units ?? []).map(vehicleFromRow), [query.data]);
+  const hitches = useMemo(() => (query.data?.hitches ?? []).map(hitchFromRow), [query.data]);
+  return { query, vehicles, hitches };
+}
+
+function useVehiclesChanged() {
+  const client = useQueryClient();
+  return () => client.invalidateQueries({ queryKey: ['vehicles'] });
+}
+
+/**
+ * A card, new or changed, with its new photo when one was chosen: the photo goes first, so a card never points to a
+ * photo that is not there. A save tried again finds the photo already uploaded.
+ */
+export function useSaveVehicle() {
+  const changed = useVehiclesChanged();
+  return useMutation({
+    mutationFn: async ({ vehicle, row, photo }: { vehicle: Vehicle | null; row: TablesInsert<'trf_fleet_units'> | TablesUpdate<'trf_fleet_units'>; photo: { path: string; jpeg: Blob } | null }) => {
+      if (photo) await uploadVehiclePhoto(photo.path, photo.jpeg);
+      return saveVehicle(vehicle, photo ? { ...row, photo_path: photo.path } : row);
+    },
+    onSettled: changed,
+  });
+}
+
+/** A trailer on a truck from a day; on a conflict the page reads the hitches again. */
+export function useHitchTrailer() {
+  const changed = useVehiclesChanged();
+  return useMutation({ mutationFn: (r: HitchRequest) => hitchTrailer(r), onSettled: changed });
+}
+
+/** A hitch that ends (unhitched), with other notes, or annulled. */
+export function useSaveHitch() {
+  const changed = useVehiclesChanged();
+  return useMutation({ mutationFn: ({ hitch, row }: { hitch: Hitch; row: TablesUpdate<'trf_fleet_hitches'> }) => saveHitch(hitch, row), onSettled: changed });
+}
+
+/** A link to a private photo for a list or a card: read once and kept nine minutes, as each link lasts ten. */
+export const usePhotoUrl = (bucket: PhotoBucket, path: string | null) =>
+  useQuery({ queryKey: ['photoUrl', bucket, path], queryFn: () => photoUrl(bucket, path as string), enabled: path !== null, staleTime: 9 * 60_000, gcTime: 10 * 60_000, retry: 1 });

@@ -89,10 +89,10 @@ Va armándose al costado del panel actual y lo reemplaza sección por sección.
    - [x] La cuenta del camión en GPS usa el mismo cálculo y los mismos formularios.
    - [x] Publicación el 24/10/2026: respaldo completo de estructura y datos (18:34 UTC), probado restaurándolo y con la 0009 aplicada sobre esa copia, y entregado al dueño fuera del repositorio; 0009 aplicada en producción, con los datos que ya estaban sin cambios; panel publicado (despliegue #14, commit 5731b8e); la app 0.20.0 (versionCode 32), firmada con la llave de subida, entregada para Google Play.
 11. [ ] Flota (aprobado el 24/10/2026, completa la etapa 2 junto con Choferes): la ficha de cada camión y de su acoplado, con su foto, y en una sola pantalla lo que ya se sabe de cada camión. Migración [`0010_flota.sql`](../supabase/migrations/0010_flota.sql), que solo agrega dos tablas, una carpeta privada para las fotos, su historial de cambios y sus permisos:
-   - [ ] La lista: cada camión del catálogo con su foto, si está en viaje, su acoplado, los kilómetros estimados, el combustible del tanque, el próximo service, los papeles y el mes (viajes y kilómetros). Primero van los que tienen algo para atender.
-   - [ ] La ficha del camión: marca, modelo, matrícula, año, chasis, motor, capacidad de carga (kilos, o metros cúbicos si es cisterna), foto y notas; su acoplado y los que tuvo antes; sus viajes, combustible, services, papeles y tanque, con enlace a cada sección; y quién lo manejó cada mes, según los viajes.
-   - [ ] Los acoplados: su ficha con los mismos datos y el tipo, y a qué camión estuvo enganchado y desde cuándo. Sus papeles se cargan en Documentación, como los de los camiones.
-   - [ ] Nada se borra: un camión o un acoplado que se vende queda con su fecha de baja y su historial, y un enganche mal cargado se anula.
+   - [x] La lista: cada camión del catálogo con su foto, si está en viaje, su acoplado, los kilómetros estimados, el combustible del tanque, el próximo service, los papeles y el mes (viajes y kilómetros). Primero van los que tienen algo para atender.
+   - [x] La ficha del camión: marca, modelo, matrícula, año, chasis, motor, capacidad de carga (kilos, o metros cúbicos si es cisterna), foto y notas; su acoplado y los que tuvo antes; sus viajes, combustible, services, papeles y tanque, con enlace a cada sección; y quién lo manejó cada mes, según los viajes.
+   - [x] Los acoplados: su ficha con los mismos datos y el tipo, y a qué camión estuvo enganchado y desde cuándo. Sus papeles se cargan en Documentación, como los de los camiones.
+   - [x] Nada se borra: un camión o un acoplado que se vende queda con su fecha de baja y su historial, y un enganche mal cargado se anula.
    - [ ] Publicación: respaldo completo antes, 0010 en producción y panel publicado. La app no cambia.
 
 ### App: juegos para las esperas

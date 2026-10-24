@@ -65,3 +65,25 @@ Decisión del 22/10/2026. En Combustible («Tanques»), en Inicio y en la cuenta
   - Una carga sin litros, cargas que pasan lo que le entra al tanque o un viaje que perdió kilómetros dejan el cálculo en «Revisar» con el motivo.
   - El consumo real sale de los dos últimos tanques llenos, con 100 km o más en el medio, y se ofrece para usarlo. Los viajes se leen desde el primero de los dos, así ninguno queda afuera.
 - «Combustible bajo»: con los litros estimados en el aviso del camión o menos. Lo dicen Combustible (arriba de cada vista, y primero en «Tanques») e Inicio. El panel vuelve a leer los viajes cada 30 segundos.
+
+## Flota del panel (migración 0010)
+Decisión del 24/10/2026. La lista de camiones sigue siendo la del catálogo que lee la app (`trf_mobile_catalog`, `equipos`), y el panel no la cambia. Las tablas nuevas no las usa la app:
+
+- `trf_fleet_units`: la ficha de un camión del catálogo o de un acoplado (`kind`: `truck` o `trailer`). Guarda marca, modelo, matrícula, año, números de chasis y de motor, la capacidad de carga (`capacity`, con `capacity_unit` `kg` o `m3`), notas y foto, y el tipo de acoplado en `body`.
+  - La ficha de un camión se une a su camión del catálogo por `vehicle_key`, la misma clave del tanque y de las cuentas de ruta: `plate:<matrícula en minúsculas>`, o `model:<modelo>` si no tiene matrícula.
+  - Un acoplado va con su matrícula (`plate:<matrícula>`), que ningún otro camión ni acoplado puede tener. Hay una ficha por clave.
+  - Baja: `left_on` y `left_reason`. La ficha queda con su historial, fuera de las listas de uso.
+- La foto va en la carpeta privada `trf-fleet-photos` como `<id de la ficha>/<id de la foto>.jpg`: un JPEG de hasta 10 MB, achicado como las fotos de las boletas. Una foto nueva va con otro nombre y la anterior queda en la carpeta; nadie las borra.
+- `trf_fleet_hitches`: qué acoplado llevó cada camión (`trailer_id`, `truck_key`), del primer al último día inclusive (`from_on`, `to_on`). Sin `to_on`, lo lleva ahora.
+  - Los días de un acoplado no se pisan entre sí, ni los de un camión.
+  - Un acoplado va en un solo camión a la vez, y un camión lleva uno solo.
+  - Un enganche mal cargado se anula con `deleted_at` y deja de contar.
+- `trf_fleet_hitch()` engancha un acoplado a un camión desde un día, en un solo paso.
+  - El acoplado que llevaba el camión, y el camión en el que iba el acoplado, quedan hasta el día anterior.
+  - Recibe el enganche actual del camión y el del acoplado tal como los vio la oficina. Si cambiaron, no guarda nada (código 40001).
+  - Un pedido repetido con el mismo id devuelve el enganche ya guardado.
+- Solo las cuentas del panel leen y escriben (`trf_is_panel_admin()`), y nadie borra. Cada alta y cada cambio queda en `trf_private.road_audit`, con quién lo hizo.
+  - Los disparadores dejan fijos el id, quién creó la fila y cuándo, y la clase de la ficha.
+  - En la ficha de un camión dejan fijas su clave y su matrícula; en un enganche, el acoplado y el camión.
+- Los papeles de un acoplado van en `trf_documents` como los de un camión (`scope` `vehicle`), con el nombre del acoplado en `vehicle` («Semirremolque Randon · REM1001»). La ficha los encuentra por la matrícula.
+- Lo que la ficha del camión muestra de las demás secciones sale de las mismas lecturas de esas secciones, sin datos nuevos: la posición, los kilómetros, el tanque, los services, los papeles, los viajes y el combustible del mes, y los choferes de cada mes.

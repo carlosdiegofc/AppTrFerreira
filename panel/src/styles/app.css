@@ -3252,6 +3252,185 @@ button.fr-open {
 .points-far .road-marker span { display: none; }
 .road-fields { padding: 18px; margin: 0; overflow-y: auto; min-height: 0; }
 
+/* Flota: the list of trucks and trailers, and their cards. */
+.vehicle-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vehicle-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1.2fr) minmax(0, 2.6fr) auto;
+  align-items: center;
+  gap: 12px 18px;
+  padding: 14px 18px;
+}
+
+.vehicle-row-gone {
+  grid-template-columns: 64px minmax(0, 1fr);
+}
+
+.vehicle-main h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.vehicle-main h2 a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.vehicle-main h2 a:hover {
+  text-decoration: underline;
+}
+
+.vehicle-main p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.vehicle-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px 16px;
+  margin: 0;
+}
+
+.vehicle-facts-short {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.vehicle-facts dt {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.vehicle-facts dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.vehicle-thumb {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--grey-bg);
+  color: var(--muted);
+}
+
+button.vehicle-thumb {
+  cursor: zoom-in;
+}
+
+.vehicle-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vehicle-data {
+  display: grid;
+  gap: 12px;
+}
+
+.vehicle-data .vehicle-thumb {
+  width: 100%;
+  height: 180px;
+}
+
+.vehicle-trailer {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 6px;
+  font-weight: 620;
+}
+
+.vehicle-trailer .muted {
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.vehicle-trailer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+}
+
+.vehicle-data .facts dd {
+  overflow-wrap: anywhere;
+}
+
+.vehicle-now {
+  grid-template-columns: 1fr;
+}
+
+.hitch-list {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+}
+
+.hitch-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  align-items: center;
+}
+
+.hitch-list li > .muted {
+  grid-row: 2;
+  font-size: 12.5px;
+}
+
+.hitch-list li > .link-button {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+}
+
+@media (max-width: 1099px) {
+  .vehicle-row {
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+  }
+
+  .vehicle-facts {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .vehicle-row {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .vehicle-row > .btn {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .vehicle-facts,
+  .vehicle-facts-short {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vehicle-row .vehicle-thumb {
+    width: 56px;
+    height: 56px;
+  }
+}
+
 /* Choferes: the list, the card and the salary by month. */
 .driver-list {
   display: grid;
