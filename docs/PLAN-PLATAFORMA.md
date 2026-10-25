@@ -26,7 +26,7 @@ El diagnóstico completo, el esquema de la base (unas 50 tablas), las funciones 
 |---|---|---|
 | 0 | Preparación | En curso |
 | 1 | Multiempresa, roles y auditoría | Pendiente |
-| 2 | Flota (fichas con foto, acoplados y su historial) y choferes | En curso |
+| 2 | Flota (fichas con foto, acoplados y su historial) y choferes | Hecha (25/10/2026) |
 | 3 | Viajes y métricas: estados, tramos con carga y vacíos, medido/declarado/estimado, exportar a PDF, Excel y Word | Pendiente |
 | 4 | Combustible con lectura automática de la boleta y control de litros × precio | Pendiente |
 | 5 | Mantenimiento preventivo y correctivo con avisos por km y por fecha; documentación con archivos y vencimientos | Pendiente |
@@ -88,12 +88,12 @@ Va armándose al costado del panel actual y lo reemplaza sección por sección.
    - [x] «¿Llenaste el tanque?» en la app, al cargar combustible (versión 0.20.0): manda sí o no con la boleta, y Mi combustible y Combustible de la flota muestran «Tanque lleno».
    - [x] La cuenta del camión en GPS usa el mismo cálculo y los mismos formularios.
    - [x] Publicación el 24/10/2026: respaldo completo de estructura y datos (18:34 UTC), probado restaurándolo y con la 0009 aplicada sobre esa copia, y entregado al dueño fuera del repositorio; 0009 aplicada en producción, con los datos que ya estaban sin cambios; panel publicado (despliegue #14, commit 5731b8e); la app 0.20.0 (versionCode 32), firmada con la llave de subida, entregada para Google Play.
-11. [ ] Flota (aprobado el 24/10/2026, completa la etapa 2 junto con Choferes): la ficha de cada camión y de su acoplado, con su foto, y en una sola pantalla lo que ya se sabe de cada camión. Migración [`0010_flota.sql`](../supabase/migrations/0010_flota.sql), que solo agrega dos tablas, una carpeta privada para las fotos, su historial de cambios y sus permisos:
+11. [x] Flota (aprobado el 24/10/2026, completa la etapa 2 junto con Choferes): la ficha de cada camión y de su acoplado, con su foto, y en una sola pantalla lo que ya se sabe de cada camión. Migración [`0010_flota.sql`](../supabase/migrations/0010_flota.sql), que solo agrega dos tablas, una carpeta privada para las fotos, su historial de cambios y sus permisos:
    - [x] La lista: cada camión del catálogo con su foto, si está en viaje, su acoplado, los kilómetros estimados, el combustible del tanque, el próximo service, los papeles y el mes (viajes y kilómetros). Primero van los que tienen algo para atender.
    - [x] La ficha del camión: marca, modelo, matrícula, año, chasis, motor, capacidad de carga (kilos, o metros cúbicos si es cisterna), foto y notas; su acoplado y los que tuvo antes; sus viajes, combustible, services, papeles y tanque, con enlace a cada sección; y quién lo manejó cada mes, según los viajes.
    - [x] Los acoplados: su ficha con los mismos datos y el tipo, y a qué camión estuvo enganchado y desde cuándo. Sus papeles se cargan en Documentación, como los de los camiones.
    - [x] Nada se borra: un camión o un acoplado que se vende queda con su fecha de baja y su historial, y deja de llevar su acoplado, o de ir en su camión, desde ese día. Un enganche mal cargado se anula.
-   - [ ] Publicación: respaldo completo antes, 0010 en producción y panel publicado. La app no cambia.
+   - [x] Publicación el 25/10/2026: respaldo completo de estructura y datos (02:29 UTC), probado restaurándolo y con la 0010 final aplicada sobre esa copia, y entregado al dueño fuera del repositorio; 0010 aplicada en producción (18:45 UTC), con los datos que ya estaban sin cambios; panel publicado (despliegue #15, commit 6a581dc). La app no cambia.
 
 ### App: juegos para las esperas
 Para pasar el rato mientras se espera la carga (aprobado el 21/10/2026). Se juega con el camión parado, y los juegos los ven todas las cuentas.
