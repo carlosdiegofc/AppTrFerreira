@@ -101,7 +101,9 @@ export function Documentacion() {
 
   const loadedAt = query.dataUpdatedAt || null;
   const loading = query.isLoading || catalog.isLoading;
-  const ready = !loading && query.data !== undefined;
+  // A new paper waits for the trailers too, so a trailer is not missing from the choices without notice.
+  const trailersRead = fleetCards.query.data !== undefined || !!fleetCards.query.error;
+  const ready = !loading && query.data !== undefined && trailersRead;
 
   return (
     <div className="page">
@@ -173,6 +175,9 @@ export function Documentacion() {
 
       {query.error && query.data !== undefined && <StaleNote onRetry={() => void query.refetch()} />}
       {catalog.error && <CatalogNote onRetry={() => void catalog.refetch()} />}
+      {fleetCards.query.error && fleetCards.query.data === undefined && (
+        <ErrorNote onRetry={() => void fleetCards.query.refetch()}>No se pudieron leer los acoplados de Flota: no aparecen para elegirlos en «Nuevo documento».</ErrorNote>
+      )}
       {query.error && query.data === undefined ? (
         <ErrorNote onRetry={() => void query.refetch()}>{(query.error as { code?: string }).code === TOO_MANY ? 'Hay demasiados documentos para leerlos de una vez.' : 'No se pudieron leer los documentos.'}</ErrorNote>
       ) : loading ? (

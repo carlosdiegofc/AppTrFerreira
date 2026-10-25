@@ -563,6 +563,7 @@ export type Database = {
           brand: string
           capacity: number | null
           capacity_unit: string | null
+          catalog_name: string
           chassis: string
           created_at: string
           created_by: string | null
@@ -585,6 +586,7 @@ export type Database = {
           brand?: string
           capacity?: number | null
           capacity_unit?: string | null
+          catalog_name?: string
           chassis?: string
           created_at?: string
           created_by?: string | null
@@ -607,6 +609,7 @@ export type Database = {
           brand?: string
           capacity?: number | null
           capacity_unit?: string | null
+          catalog_name?: string
           chassis?: string
           created_at?: string
           created_by?: string | null

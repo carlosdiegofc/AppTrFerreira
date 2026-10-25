@@ -84,6 +84,12 @@ begin
     raise exception 'lectura: aceptó un acoplado con clave de modelo';
   exception when check_violation then null;
   end;
+  -- Only a truck keeps the name the app's list gives it.
+  begin
+    insert into public.trf_fleet_units (kind, vehicle_key, plate, catalog_name) values ('trailer', 'plate:cat0001', 'CAT0001', 'Volvo FH 460 · CAT0001');
+    raise exception 'lectura: aceptó un acoplado con nombre de la lista de camiones';
+  exception when check_violation then null;
+  end;
   begin
     insert into public.trf_fleet_units (kind, vehicle_key, plate, body) values ('truck', 'plate:ghi9012', 'GHI9012', 'Cisterna');
     raise exception 'lectura: aceptó un camión con tipo de acoplado';

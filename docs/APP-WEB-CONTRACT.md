@@ -71,6 +71,7 @@ Decisión del 24/10/2026. La lista de camiones sigue siendo la del catálogo que
 
 - `trf_fleet_units`: la ficha de un camión del catálogo o de un acoplado (`kind`: `truck` o `trailer`). Guarda marca, modelo, matrícula, año, números de chasis y de motor, la capacidad de carga (`capacity`, con `capacity_unit` `kg` o `m3`), notas y foto, y el tipo de acoplado en `body`.
   - La ficha de un camión se une a su camión del catálogo por `vehicle_key`, la misma clave del tanque y de las cuentas de ruta: `plate:<matrícula en minúsculas>`, o `model:<modelo>` si no tiene matrícula. Si tiene matrícula pero no modelo, su nombre es la matrícula sola y la clave es `model:<matrícula en minúsculas>`; la ficha guarda igual la matrícula.
+  - `catalog_name`: cómo nombra al camión la lista de la app («Volvo FH 460 · ABC1234»), el nombre de sus viajes, papeles y services. El panel lo guarda al crear la ficha y lo pone al día cada vez que la guarda mientras el camión está en la lista. Si el camión sale de la lista, la ficha lo sigue nombrando así, aunque se le corrijan la marca o el modelo. Un acoplado no lleva.
   - Un acoplado va con su matrícula (`plate:<matrícula>`), que ningún otro camión ni acoplado puede tener. Hay una ficha por clave.
   - Baja: `left_on` y `left_reason`. La ficha queda con su historial, fuera de las listas de uso.
   - Al guardar la baja (`left_on` pasa de vacío a un día), el enganche de ahora de ese camión o acoplado queda hasta el día anterior (disparador `trf_fleet_units_leave`). Por eso la baja tiene que ser posterior al día en que se enganchó (código 23514). Corregir después el día de la baja no cambia los enganches.
@@ -80,6 +81,7 @@ Decisión del 24/10/2026. La lista de camiones sigue siendo la del catálogo que
   - Un acoplado va en un solo camión a la vez, y un camión lleva uno solo.
   - Un camión o un acoplado dado de baja no queda enganchado: un enganche abierto suyo se rechaza (código 55000).
   - Un enganche mal cargado se anula con `deleted_at` y deja de contar.
+  - Los cambios que pueden pisar a otro enganche (engancharlo, alargarle los días, dar de baja) esperan un mismo turno, de a uno, así nunca se esperan entre sí. Desenganchar, anular o cambiar la nota no esperan.
 - `trf_fleet_hitch()` engancha un acoplado a un camión desde un día, en un solo paso.
   - El acoplado que llevaba el camión, y el camión en el que iba el acoplado, quedan hasta el día anterior.
   - Recibe el enganche actual del camión y el del acoplado tal como los vio la oficina. Si cambiaron, no guarda nada (código 40001). Si mientras tanto se dio de baja alguno de los dos, tampoco (código 55000).
@@ -87,7 +89,7 @@ Decisión del 24/10/2026. La lista de camiones sigue siendo la del catálogo que
 - Solo las cuentas del panel leen y escriben (`trf_is_panel_admin()`), y nadie borra. Cada alta y cada cambio queda en `trf_private.road_audit`, con quién lo hizo.
   - Los disparadores dejan fijos el id, quién creó la fila y cuándo, y la clase de la ficha.
   - En la ficha de un camión dejan fijas su clave y su matrícula; en un enganche, el acoplado y el camión.
-- Los papeles de un acoplado van en `trf_documents` como los de un camión (`scope` `vehicle`), con el nombre del acoplado en `vehicle` («Semirremolque Randon · REM1001»). La ficha los encuentra por la matrícula.
+- Los papeles de un acoplado van en `trf_documents` como los de un camión (`scope` `vehicle`), con el nombre del acoplado en `vehicle` («Semirremolque Randon · REM1001»). La ficha los encuentra por la matrícula, y en Documentación elegir un camión o un acoplado muestra también los guardados con un nombre anterior suyo, por la matrícula.
 - Lo que la ficha del camión muestra de las demás secciones sale de las mismas lecturas de esas secciones, sin datos nuevos: la posición, los kilómetros, el tanque, los services, los papeles, los viajes y el combustible del mes, y los choferes de cada mes.
   - Los papeles y los services se le asignan por el nombre del camión o por su matrícula. Así, un camión que ya no está en la lista de la app conserva los que se guardaron con su nombre anterior.
   - Un acoplado no puede tener la matrícula de un camión del catálogo, aunque esté escrita de otra manera («ABC-1234» y «ABC1234» son la misma).

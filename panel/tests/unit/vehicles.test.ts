@@ -36,6 +36,7 @@ const vehicle = (extra: Partial<Vehicle> = {}): Vehicle => ({
   kind: 'truck',
   key: 'plate:abc1234',
   plate: 'ABC1234',
+  catalogName: 'Volvo FH 460 · ABC1234',
   brand: 'Volvo',
   model: 'FH 460',
   body: '',
@@ -71,6 +72,7 @@ describe('flota: la ficha', () => {
       kind: 'trailer',
       vehicle_key: 'plate:cis2002',
       plate: 'CIS2002',
+      catalog_name: '',
       brand: ' Facchini ',
       model: 'Cisterna 30',
       body: 'Cisterna',
@@ -113,14 +115,16 @@ describe('flota: la ficha', () => {
     const values = { ...vehicleFormValues(null, SCANIA), year: '2020', capacity: '32.000', chassis: ' 9bsr4x ' };
     const { row, errors } = validateVehicle(values, 'truck', TODAY, truckIdentity(null, SCANIA), new Set());
     expect(errors).toEqual({});
-    expect(row).toMatchObject({ kind: 'truck', vehicle_key: 'plate:def5678', plate: 'DEF5678', brand: 'Scania', model: 'R450', year: 2020, capacity: 32000, capacity_unit: 'kg', chassis: '9BSR4X', body: '', left_on: null });
+    expect(row).toMatchObject({ kind: 'truck', vehicle_key: 'plate:def5678', plate: 'DEF5678', catalog_name: 'Scania R450 · DEF5678', brand: 'Scania', model: 'R450', year: 2020, capacity: 32000, capacity_unit: 'kg', chassis: '9BSR4X', body: '', left_on: null });
     // Without its truck there is nothing to join the card to.
     expect(validateVehicle(values, 'truck', TODAY, null, new Set()).errors.plate).toBe('Elegí el camión.');
     // A card already saved keeps its own truck, even if the catalog no longer has it.
-    expect(truckIdentity(vehicle(), null)).toEqual({ plate: 'ABC1234', key: 'plate:abc1234' });
+    expect(truckIdentity(vehicle(), null)).toEqual({ plate: 'ABC1234', key: 'plate:abc1234', name: 'Volvo FH 460 · ABC1234' });
+    // While its truck is in the app's list, the card takes the list's name of now.
+    expect(truckIdentity(vehicle(), { model: 'Volvo FH 500', plate: 'ABC1234' })?.name).toBe('Volvo FH 500 · ABC1234');
     // A catalog truck with a plate and no model is named by its plate alone: its key, like its tank's, is «model:».
     const plateOnly = { model: '', plate: 'PLA1234' };
-    expect(truckIdentity(null, plateOnly)).toEqual({ plate: 'PLA1234', key: 'model:pla1234' });
+    expect(truckIdentity(null, plateOnly)).toEqual({ plate: 'PLA1234', key: 'model:pla1234', name: 'PLA1234' });
     expect(validateVehicle(vehicleFormValues(null, plateOnly), 'truck', TODAY, truckIdentity(null, plateOnly), new Set()).row).toMatchObject({ vehicle_key: 'model:pla1234', plate: 'PLA1234' });
   });
 
@@ -196,9 +200,10 @@ describe('flota: qué acoplado lleva cada camión', () => {
 
 describe('flota: la lista', () => {
   it('los camiones del catálogo con su ficha y su acoplado; las fichas que ya no están en el catálogo y los vendidos aparte', () => {
-    const trailer = vehicle({ id: 't1', kind: 'trailer', key: 'plate:rem1001', plate: 'REM1001', body: 'Semirremolque', brand: 'Randon' });
-    const gone = vehicle({ id: 'v2', key: 'plate:xyz0001', plate: 'XYZ0001', brand: 'Leyland', model: 'Roadtrain', leftOn: '2026-01-31' });
-    const outside = vehicle({ id: 'v3', key: 'plate:out0001', plate: 'OUT0001', brand: 'Fiat', model: '619' });
+    const trailer = vehicle({ id: 't1', kind: 'trailer', key: 'plate:rem1001', plate: 'REM1001', catalogName: '', body: 'Semirremolque', brand: 'Randon' });
+    // Out of the app's list, a card keeps the list's name even with its model corrected: its trips and papers have it.
+    const gone = vehicle({ id: 'v2', key: 'plate:xyz0001', plate: 'XYZ0001', catalogName: 'Leyland Roadtrain · XYZ0001', brand: 'Leyland', model: 'Roadtrain 2', leftOn: '2026-01-31' });
+    const outside = vehicle({ id: 'v3', key: 'plate:out0001', plate: 'OUT0001', catalogName: '', brand: 'Fiat', model: '619' });
     const { current, gone: sold } = truckEntries([SCANIA, VOLVO, VOLVO], [vehicle(), trailer, gone, outside], [hitch()]);
     expect(current.map((e) => e.label)).toEqual(['Fiat 619 · OUT0001', 'Scania R450 · DEF5678', 'Volvo FH 460 · ABC1234']);
     const volvo = current.find((e) => e.key === 'plate:abc1234');

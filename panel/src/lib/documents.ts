@@ -5,6 +5,7 @@ import { calendarDay } from './dates';
 import { canonical, type CatalogTruck, text, truckLabel } from './fleet';
 import { fold } from './numbers';
 import { type PaperState, paperState } from './papers';
+import { samePlate } from './vehicles';
 
 export type PaperDocRow = Tables<'trf_documents'>;
 
@@ -81,11 +82,14 @@ export const ownerKey = (p: Pick<Paper, 'scope' | 'vehicle' | 'driverId' | 'driv
 
 export function filterPapers(list: readonly PaperView[], { view = 'todos', state = '', owner = '', q = '' }: PaperFilter = {}): PaperView[] {
   const words = fold(q).split(/\s+/).filter(Boolean);
+  // A truck's or a trailer's papers saved with an older name of it (a trailer renamed in Flota) still have its plate.
+  const cut = owner.lastIndexOf(' · ');
+  const plate = owner.startsWith('vehicle:') && cut >= 0 ? owner.slice(cut + 3) : '';
   return list.filter((p) => {
     if (view === 'camiones' && p.scope !== 'vehicle') return false;
     if (view === 'choferes' && p.scope !== 'driver') return false;
     if (state && p.state !== state) return false;
-    if (owner && ownerKey(p) !== owner) return false;
+    if (owner && ownerKey(p) !== owner && !(p.scope === 'vehicle' && samePlate(p.vehicle, plate))) return false;
     const hay = fold([p.kind, paperOwner(p), p.notes].join(' '));
     return words.every((w) => hay.includes(w));
   });

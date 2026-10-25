@@ -15,6 +15,9 @@ create table public.trf_fleet_units (
   -- siempre con su matrícula.
   vehicle_key text not null unique,
   plate text not null default '',
+  -- Cómo nombra al camión la lista de la app («Volvo FH 460 · ABC1234»), el nombre de sus viajes, papeles y services. Si
+  -- sale de la lista, la ficha lo sigue nombrando así aunque se le corrijan la marca o el modelo. Un acoplado no lleva.
+  catalog_name text not null default '',
   brand text not null default '',
   model text not null default '',
   -- El tipo de acoplado (semirremolque, cisterna, volcadora…); un camión no lleva.
@@ -44,9 +47,10 @@ create table public.trf_fleet_units (
   constraint trf_fleet_units_texts check (
     plate = trim(plate) and length(plate) <= 20 and length(vehicle_key) <= 200 and length(brand) <= 60
     and length(model) <= 80 and length(body) <= 40 and length(chassis) <= 40 and length(engine) <= 40
-    and length(notes) <= 1000 and length(left_reason) <= 200
+    and length(notes) <= 1000 and length(left_reason) <= 200 and length(catalog_name) <= 200
   ),
   constraint trf_fleet_units_body check (kind = 'trailer' or body = ''),
+  constraint trf_fleet_units_catalog_name check (kind = 'truck' or catalog_name = ''),
   constraint trf_fleet_units_year check (year is null or year between 1950 and 2100),
   constraint trf_fleet_units_capacity check (
     (capacity is null and capacity_unit is null)
@@ -126,8 +130,8 @@ create trigger trf_fleet_hitches_touch before insert or update on public.trf_fle
   for each row execute function trf_private.fleet_touch();
 
 -- Un enganche es de un acoplado, y sus días no se pisan con otro del mismo acoplado ni con otro del mismo camión (los
--- anulados no cuentan). Un camión o un acoplado dado de baja no queda enganchado. Dos cambios a la vez del mismo camión
--- o del mismo acoplado se hacen uno después del otro.
+-- anulados no cuentan). Un camión o un acoplado dado de baja no queda enganchado. Los cambios que pueden pisar a otro
+-- enganche se hacen de a uno, con un solo turno para todos: así dos cambios nunca se esperan entre sí.
 create function trf_private.fleet_hitch_check()
 returns trigger
 language plpgsql
@@ -139,11 +143,15 @@ begin
   if new.deleted_at is not null or new.to_on < new.from_on then
     return new;
   end if;
+  -- Achicar los días de uno que cuenta (desengancharlo, o cambiarle la nota) no puede pisar a otro: no espera turno.
+  if tg_op = 'UPDATE' and old.deleted_at is null and new.from_on >= old.from_on
+    and (old.to_on is null or (new.to_on is not null and new.to_on <= old.to_on)) then
+    return new;
+  end if;
   if not exists (select 1 from public.trf_fleet_units u where u.id = new.trailer_id and u.kind = 'trailer') then
     raise exception 'Solo se engancha un acoplado' using errcode = '23514';
   end if;
-  perform pg_advisory_xact_lock(hashtextextended('trf_fleet_hitches truck ' || new.truck_key, 0));
-  perform pg_advisory_xact_lock(hashtextextended('trf_fleet_hitches trailer ' || new.trailer_id::text, 0));
+  perform pg_advisory_xact_lock(hashtextextended('trf_fleet_hitches', 0));
   if new.to_on is null and exists (
     select 1 from public.trf_fleet_units u
     where u.left_on is not null
@@ -170,18 +178,15 @@ create trigger trf_fleet_hitches_verify before insert or update on public.trf_fl
 
 -- Un camión o un acoplado que se da de baja deja de llevar su acoplado, o de ir en su camión, desde ese día: el enganche
 -- de ahora queda hasta el día anterior, en el historial de los dos. Por eso la baja tiene que ser posterior al día en
--- que se enganchó. Corre con los permisos de quien guarda la baja.
+-- que se enganchó. Espera el mismo turno que los cambios de enganche, así nadie lo engancha mientras tanto. Corre con los
+-- permisos de quien guarda la baja.
 create function trf_private.fleet_leave()
 returns trigger
 language plpgsql
 set search_path = ''
 as $$
 begin
-  if new.kind = 'trailer' then
-    perform pg_advisory_xact_lock(hashtextextended('trf_fleet_hitches trailer ' || new.id::text, 0));
-  else
-    perform pg_advisory_xact_lock(hashtextextended('trf_fleet_hitches truck ' || new.vehicle_key, 0));
-  end if;
+  perform pg_advisory_xact_lock(hashtextextended('trf_fleet_hitches', 0));
   if exists (
     select 1 from public.trf_fleet_hitches h
     where h.to_on is null and h.deleted_at is null and h.from_on >= new.left_on
@@ -228,8 +233,7 @@ as $$
 declare
   saved public.trf_fleet_hitches;
 begin
-  perform pg_advisory_xact_lock(hashtextextended('trf_fleet_hitches truck ' || p_truck_key, 0));
-  perform pg_advisory_xact_lock(hashtextextended('trf_fleet_hitches trailer ' || p_trailer_id::text, 0));
+  perform pg_advisory_xact_lock(hashtextextended('trf_fleet_hitches', 0));
   -- Después de esperar su turno: un pedido repetido mientras el primero todavía se guardaba también lo encuentra.
   select * into saved from public.trf_fleet_hitches where id = p_id;
   if found then

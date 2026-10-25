@@ -11,7 +11,7 @@ import { dayInZone, formatDay, inDays } from '../lib/dates';
 import { paperViews } from '../lib/documents';
 import { truckLabel } from '../lib/fleet';
 import { number } from '../lib/format';
-import { capacityText, type Hitch, hitchDays, makeLine, samePlate, takenKeys, trailerLabel, trailerTrucks, truckKey, type Vehicle } from '../lib/vehicles';
+import { capacityText, cardTruckLabel, type Hitch, hitchDays, makeLine, samePlate, takenKeys, trailerLabel, trailerTrucks, truckKey, type Vehicle } from '../lib/vehicles';
 import { type Notice, noticeOf, PapersPill, truckPath } from './Flota';
 import { PAPER_STATE } from './states';
 
@@ -42,7 +42,7 @@ function TrailerPage({ v, now }: { v: Vehicle; now: number }) {
   const names = useMemo(() => {
     const out = new Map<string, string>();
     for (const t of catalog.data ?? []) out.set(truckKey(t), truckLabel(t));
-    for (const c of vehicles) if (c.kind === 'truck' && !out.has(c.key)) out.set(c.key, [[c.brand, c.model].filter(Boolean).join(' '), c.plate].filter(Boolean).join(' · '));
+    for (const c of vehicles) if (c.kind === 'truck' && !out.has(c.key)) out.set(c.key, cardTruckLabel(c));
     return out;
   }, [catalog.data, vehicles]);
   const nameOf = (key: string) => names.get(key) ?? key.replace(/^(plate|model):/, '').toUpperCase();

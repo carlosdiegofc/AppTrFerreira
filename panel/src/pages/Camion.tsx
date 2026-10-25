@@ -218,7 +218,8 @@ function TruckPage({ t, now }: { t: TruckView; now: number }) {
                       Ver en el GPS
                     </Link>
                   </>
-                ) : known.lastTrip ? (
+                ) : known.lastTrip && t.truck ? (
+                  // The last trip is looked for only for the trucks of the app's list.
                   <span className="muted">Sin viajes con la app</span>
                 ) : (
                   '—'

@@ -27,6 +27,8 @@ export interface Vehicle {
   /** «plate:abc1234», as the tank and the account in GPS; «model:…» for a catalog truck without plate. */
   key: string;
   plate: string;
+  /** A truck as the app's list names it, as its trips, papers and services do; '' for a trailer. */
+  catalogName: string;
   brand: string;
   model: string;
   /** The kind of trailer; '' for a truck. */
@@ -55,6 +57,7 @@ export function vehicleFromRow(r: VehicleRow): Vehicle {
     kind: r.kind === 'trailer' ? 'trailer' : 'truck',
     key: r.vehicle_key,
     plate: clean(r.plate),
+    catalogName: clean(r.catalog_name),
     brand: clean(r.brand),
     model: clean(r.model),
     body: clean(r.body),
@@ -281,9 +284,24 @@ export function vehicleFormValues(v: Vehicle | null, truck: CatalogTruck | null 
 
 export type VehicleCardRow = Omit<TablesInsert<'trf_fleet_units'>, 'id' | 'photo_path' | 'created_at' | 'created_by' | 'updated_at' | 'updated_by'>;
 
+export interface TruckIdentity {
+  plate: string;
+  key: string;
+  /** How the app's list names it: now, while it is in the list; as it last did, once it is not. */
+  name: string;
+}
+
 /** The truck a truck's card goes with: its catalog truck, or the card itself once it exists. */
-export const truckIdentity = (card: Pick<Vehicle, 'plate' | 'key'> | null, truck: CatalogTruck | null): { plate: string; key: string } | null =>
-  card ? { plate: card.plate, key: card.key } : truck ? { plate: truck.plate.trim(), key: truckKey(truck) } : null;
+export const truckIdentity = (card: Pick<Vehicle, 'plate' | 'key' | 'catalogName'> | null, truck: CatalogTruck | null): TruckIdentity | null =>
+  card
+    ? { plate: card.plate, key: card.key, name: truck ? truckLabel(truck) : card.catalogName }
+    : truck
+      ? { plate: truck.plate.trim(), key: truckKey(truck), name: truckLabel(truck) }
+      : null;
+
+/** A truck's card no longer in the app's list is named as the list named it, or else by its card. */
+export const cardTruckLabel = (card: Pick<Vehicle, 'catalogName' | 'brand' | 'model' | 'plate' | 'key'>) =>
+  card.catalogName || [[card.brand, card.model].filter(Boolean).join(' '), card.plate].filter(Boolean).join(' · ') || card.key.replace(/^(plate|model):/, '').toUpperCase();
 
 /**
  * The card to save, or what is wrong with each field. A truck's card goes with its truck (identity: its key and plate);
@@ -293,7 +311,7 @@ export function validateVehicle(
   v: VehicleFormValues,
   kind: VehicleKind,
   today: string,
-  identity: { plate: string; key: string } | null,
+  identity: TruckIdentity | null,
   taken: ReadonlySet<string>,
   /** The day its hitch of now started, for a card not given away yet: the database closes it the day before the sale. */
   hitchedFrom: string | null = null,
@@ -301,9 +319,10 @@ export function validateVehicle(
   const errors: Partial<Record<VehicleField, string>> = {};
   let plate = '';
   let key = '';
+  let name = '';
   if (kind === 'truck') {
     if (!identity) errors.plate = 'Elegí el camión.';
-    else ({ plate, key } = identity);
+    else ({ plate, key, name } = identity);
   } else {
     plate = normalPlate(v.plate);
     key = plateKey(plate);
@@ -349,6 +368,7 @@ export function validateVehicle(
       kind,
       vehicle_key: key,
       plate,
+      catalog_name: name,
       brand: v.brand.trim().replace(/\s+/g, ' '),
       model: v.model.trim().replace(/\s+/g, ' '),
       body: kind === 'trailer' ? v.body.trim().replace(/\s+/g, ' ') : '',
@@ -403,8 +423,7 @@ export function truckEntries(catalog: readonly CatalogTruck[], vehicles: readonl
   }
   for (const card of cards.values()) {
     if (seen.has(card.key)) continue;
-    const label = [[card.brand, card.model].filter(Boolean).join(' '), card.plate].filter(Boolean).join(' · ') || card.key.replace(/^(plate|model):/, '').toUpperCase();
-    all.push(entry(card.key, label, null));
+    all.push(entry(card.key, cardTruckLabel(card), null));
   }
   const byLabel = (a: TruckEntry, b: TruckEntry) => a.label.localeCompare(b.label, 'es');
   return { current: all.filter((e) => !e.card?.leftOn).sort(byLabel), gone: all.filter((e) => e.card?.leftOn).sort(byLabel) };
