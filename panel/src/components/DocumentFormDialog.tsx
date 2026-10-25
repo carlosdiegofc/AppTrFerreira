@@ -33,6 +33,8 @@ interface Props {
   /** The paper to change; null loads a new one. */
   paper: Paper | null;
   vehicles: readonly string[];
+  /** The trailers in use, listed apart after the trucks. */
+  trailers?: readonly string[];
   onClose: () => void;
   /** What happened, for the page to say it. */
   onDone: (text: string, tone?: 'ok' | 'warn') => void;
@@ -58,7 +60,7 @@ const dataUrl = (blob: Blob) =>
 
 const size = (bytes: number) => (bytes >= 1024 * 1024 ? `${decimal(bytes / 1024 / 1024, 1)} MB` : `${decimal(bytes / 1024, 0)} KB`);
 
-export function DocumentFormDialog({ paper: opened, vehicles, onClose, onDone, onConflict }: Props) {
+export function DocumentFormDialog({ paper: opened, vehicles, trailers = [], onClose, onDone, onConflict }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const form = useRef<HTMLFormElement>(null);
   const id = useId();
@@ -212,7 +214,7 @@ export function DocumentFormDialog({ paper: opened, vehicles, onClose, onDone, o
   );
 
   const kinds = paperKinds(values.scope);
-  const choices = values.vehicle && !vehicles.includes(values.vehicle) ? [values.vehicle, ...vehicles] : vehicles;
+  const choices = values.vehicle && !vehicles.includes(values.vehicle) && !trailers.includes(values.vehicle) ? [values.vehicle, ...vehicles] : vehicles;
   const current = paper?.file ?? null;
   const fileInput = (label: string) => (
     <label className="btn">
@@ -285,11 +287,30 @@ export function DocumentFormDialog({ paper: opened, vehicles, onClose, onDone, o
                     'Camión',
                     <select {...fieldProps('vehicle')} value={values.vehicle} onChange={(e) => set('vehicle', e.target.value)}>
                       <option value="">Elegí el camión…</option>
-                      {choices.map((v) => (
-                        <option key={v} value={v}>
-                          {v}
-                        </option>
-                      ))}
+                      {trailers.length === 0 ? (
+                        choices.map((v) => (
+                          <option key={v} value={v}>
+                            {v}
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <optgroup label="Camiones">
+                            {choices.map((v) => (
+                              <option key={v} value={v}>
+                                {v}
+                              </option>
+                            ))}
+                          </optgroup>
+                          <optgroup label="Acoplados">
+                            {trailers.map((v) => (
+                              <option key={v} value={v}>
+                                {v}
+                              </option>
+                            ))}
+                          </optgroup>
+                        </>
+                      )}
                     </select>,
                   )
                 : !paper &&

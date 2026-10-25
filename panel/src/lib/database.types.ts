@@ -507,6 +507,131 @@ export type Database = {
         }
         Relationships: []
       }
+      trf_fleet_hitches: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          ended_by_leave: string | null
+          from_on: string
+          id: string
+          notes: string
+          to_on: string | null
+          trailer_id: string
+          truck_key: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          ended_by_leave?: string | null
+          from_on: string
+          id?: string
+          notes?: string
+          to_on?: string | null
+          trailer_id: string
+          truck_key: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          ended_by_leave?: string | null
+          from_on?: string
+          id?: string
+          notes?: string
+          to_on?: string | null
+          trailer_id?: string
+          truck_key?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trf_fleet_hitches_trailer_id_fkey"
+            columns: ["trailer_id"]
+            isOneToOne: false
+            referencedRelation: "trf_fleet_units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trf_fleet_units: {
+        Row: {
+          body: string
+          brand: string
+          capacity: number | null
+          capacity_unit: string | null
+          catalog_name: string
+          chassis: string
+          created_at: string
+          created_by: string | null
+          engine: string
+          id: string
+          kind: string
+          left_on: string | null
+          left_reason: string
+          model: string
+          notes: string
+          photo_path: string | null
+          plate: string
+          updated_at: string
+          updated_by: string | null
+          vehicle_key: string
+          year: number | null
+        }
+        Insert: {
+          body?: string
+          brand?: string
+          capacity?: number | null
+          capacity_unit?: string | null
+          catalog_name?: string
+          chassis?: string
+          created_at?: string
+          created_by?: string | null
+          engine?: string
+          id?: string
+          kind: string
+          left_on?: string | null
+          left_reason?: string
+          model?: string
+          notes?: string
+          photo_path?: string | null
+          plate?: string
+          updated_at?: string
+          updated_by?: string | null
+          vehicle_key: string
+          year?: number | null
+        }
+        Update: {
+          body?: string
+          brand?: string
+          capacity?: number | null
+          capacity_unit?: string | null
+          catalog_name?: string
+          chassis?: string
+          created_at?: string
+          created_by?: string | null
+          engine?: string
+          id?: string
+          kind?: string
+          left_on?: string | null
+          left_reason?: string
+          model?: string
+          notes?: string
+          photo_path?: string | null
+          plate?: string
+          updated_at?: string
+          updated_by?: string | null
+          vehicle_key?: string
+          year?: number | null
+        }
+        Relationships: []
+      }
       trf_fuel_station_movements: {
         Row: {
           amount: number
@@ -941,6 +1066,31 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      trf_fleet_hitch: {
+        Args: {
+          p_from: string
+          p_id: string
+          p_notes?: string
+          p_trailer_current: string | null
+          p_trailer_id: string
+          p_truck_current: string | null
+          p_truck_key: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          ended_by_leave: string | null
+          from_on: string
+          id: string
+          notes: string
+          to_on: string | null
+          trailer_id: string
+          truck_key: string
+          updated_at: string
+          updated_by: string | null
+        }
+      }
       trf_is_admin: { Args: never; Returns: boolean }
       trf_is_panel_admin: { Args: never; Returns: boolean }
       trf_stop_my_tracking: { Args: never; Returns: undefined }

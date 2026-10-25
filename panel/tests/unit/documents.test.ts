@@ -66,6 +66,9 @@ describe('papers', () => {
     expect(filterPapers(views, { view: 'camiones' }).map((p) => p.id)).toEqual(['p2', 'p3', 'p4']);
     expect(filterPapers(views, { state: 'soon' }).map((p) => p.id)).toEqual(['p1']);
     expect(filterPapers(views, { owner: 'vehicle:Volvo FH 460 · ABC1234' }).map((p) => p.id)).toEqual(['p3', 'p4']);
+    // A vehicle's papers saved with an older name of it are found by its plate, as a renamed trailer's.
+    expect(filterPapers(views, { owner: 'vehicle:Volvo FH 500 · ABC-1234' }).map((p) => p.id)).toEqual(['p3', 'p4']);
+    expect(filterPapers(views, { owner: 'vehicle:Mercedes Benz Actros' }).map((p) => p.id)).toEqual([]);
     expect(filterPapers(views, { q: 'licencia ana' }).map((p) => p.id)).toEqual(['p1']);
     expect(groupPapers(views).map((g) => [g.owner, g.papers.map((p) => p.id)])).toEqual([
       ['Mercedes Benz Actros · GHI9012', ['p2']],

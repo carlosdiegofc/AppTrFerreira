@@ -14,7 +14,7 @@ La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la
   - Le resta lo que gasta según los kilómetros del GPS y el consumo de ese camión.
   - Avisa en Inicio y en Combustible cuando le queda poco.
 - **Mi combustible y Combustible de la flota** muestran «Tanque lleno» en las cargas que lo llenaron, o en las que la oficina marcó así en el panel.
-- Antes de publicarla hay que aplicar la migración `0009` del panel en la base. Sin la columna nueva, las boletas de esta versión no se podrían enviar.
+- Necesita la migración `0009` del panel, aplicada en la base el 24/10/2026. Sin la columna nueva, las boletas de esta versión no se podrían enviar.
 
 ## Nuevo en v0.19.0 (Juegos: truco uruguayo contra el teléfono; versionCode 31)
 - **Truco uruguayo** en Juegos, contra el teléfono, con las reglas decididas el 21 y el 22/10/2026:

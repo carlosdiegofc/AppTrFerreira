@@ -26,7 +26,7 @@ El diagnóstico completo, el esquema de la base (unas 50 tablas), las funciones 
 |---|---|---|
 | 0 | Preparación | En curso |
 | 1 | Multiempresa, roles y auditoría | Pendiente |
-| 2 | Flota (fichas con foto, acoplados y su historial) y choferes | Pendiente |
+| 2 | Flota (fichas con foto, acoplados y su historial) y choferes | En curso |
 | 3 | Viajes y métricas: estados, tramos con carga y vacíos, medido/declarado/estimado, exportar a PDF, Excel y Word | Pendiente |
 | 4 | Combustible con lectura automática de la boleta y control de litros × precio | Pendiente |
 | 5 | Mantenimiento preventivo y correctivo con avisos por km y por fecha; documentación con archivos y vencimientos | Pendiente |
@@ -81,13 +81,19 @@ Va armándose al costado del panel actual y lo reemplaza sección por sección.
    - Nada se borra: un sueldo o un pago mal cargado se corrige o se anula, y quien ya no trabaja queda con su ficha y sus pagos, con el día en que dejó de trabajar: su sueldo termina ese mes. La base guarda quién cargó o cambió cada cosa y cómo estaba antes.
    - Lo ven y lo cargan solo las cuentas del panel (dueño y administración). Los choferes no ven las fichas ni los sueldos, ni siquiera el suyo.
    - [x] Publicación el 23/10/2026: respaldo completo de estructura y datos (21:06 UTC), probado restaurándolo y con las migraciones 0007 y 0008 aplicadas sobre esa copia, y entregado al dueño fuera del repositorio; 0008 aplicada en producción, con las tres tablas solo para las cuentas del panel; panel publicado (despliegue #13, commit fd4495e).
-10. [ ] El tanque de cada camión (aprobado el 22/10/2026): en Combustible, cuánto combustible debería tener cada camión ahora, con aviso cuando le queda poco. Migración [`0009_tanques.sql`](../supabase/migrations/0009_tanques.sql), que solo agrega una columna en las boletas y una tabla con el tanque de cada camión, con su historial y sus permisos:
+10. [x] El tanque de cada camión (aprobado el 22/10/2026): en Combustible, cuánto combustible debería tener cada camión ahora, con aviso cuando le queda poco. Migración [`0009_tanques.sql`](../supabase/migrations/0009_tanques.sql), que solo agrega una columna en las boletas y una tabla con el tanque de cada camión, con su historial y sus permisos:
    - [x] El cálculo: arranca en la última medición o en la última carga con el tanque lleno, suma las cargas de las boletas y resta los kilómetros del GPS según lo que consume el camión, que se escribe en km por litro. Se actualiza cada 30 segundos mientras el camión anda. Es una estimación y lo dice: si una carga no tiene litros, o las cargas pasan lo que le entra al tanque, pide revisar en lugar de inventar.
    - [x] «Tanques» en Combustible: cada camión con los litros, la barra del tanque, los kilómetros que rinde y desde cuándo cuenta, y el consumo real entre los dos últimos tanques llenos. Los que tienen poco van primero, y Combustible e Inicio avisan «Combustible bajo»: por defecto con el 20 % del tanque, y se cambia por camión.
    - [x] «Tanque lleno» en cada boleta: lo marca la oficina en el panel, al cargarla o al corregirla, sin tocar lo que declaró el chofer. Al cargarla se escribe también la hora de la boleta, para que el tanque cuente los viajes desde la carga.
    - [x] «¿Llenaste el tanque?» en la app, al cargar combustible (versión 0.20.0): manda sí o no con la boleta, y Mi combustible y Combustible de la flota muestran «Tanque lleno».
    - [x] La cuenta del camión en GPS usa el mismo cálculo y los mismos formularios.
-   - [ ] Publicación: respaldo completo antes, 0009 en producción, panel publicado y la app 0.20.0 lista para Google Play.
+   - [x] Publicación el 24/10/2026: respaldo completo de estructura y datos (18:34 UTC), probado restaurándolo y con la 0009 aplicada sobre esa copia, y entregado al dueño fuera del repositorio; 0009 aplicada en producción, con los datos que ya estaban sin cambios; panel publicado (despliegue #14, commit 5731b8e); la app 0.20.0 (versionCode 32), firmada con la llave de subida, entregada para Google Play.
+11. [ ] Flota (aprobado el 24/10/2026, completa la etapa 2 junto con Choferes): la ficha de cada camión y de su acoplado, con su foto, y en una sola pantalla lo que ya se sabe de cada camión. Migración [`0010_flota.sql`](../supabase/migrations/0010_flota.sql), que solo agrega dos tablas, una carpeta privada para las fotos, su historial de cambios y sus permisos:
+   - [x] La lista: cada camión del catálogo con su foto, si está en viaje, su acoplado, los kilómetros estimados, el combustible del tanque, el próximo service, los papeles y el mes (viajes y kilómetros). Primero van los que tienen algo para atender.
+   - [x] La ficha del camión: marca, modelo, matrícula, año, chasis, motor, capacidad de carga (kilos, o metros cúbicos si es cisterna), foto y notas; su acoplado y los que tuvo antes; sus viajes, combustible, services, papeles y tanque, con enlace a cada sección; y quién lo manejó cada mes, según los viajes.
+   - [x] Los acoplados: su ficha con los mismos datos y el tipo, y a qué camión estuvo enganchado y desde cuándo. Sus papeles se cargan en Documentación, como los de los camiones.
+   - [x] Nada se borra: un camión o un acoplado que se vende queda con su fecha de baja y su historial, y deja de llevar su acoplado, o de ir en su camión, desde ese día. Un enganche mal cargado se anula.
+   - [ ] Publicación: respaldo completo antes, 0010 en producción y panel publicado. La app no cambia.
 
 ### App: juegos para las esperas
 Para pasar el rato mientras se espera la carga (aprobado el 21/10/2026). Se juega con el camión parado, y los juegos los ven todas las cuentas.
@@ -113,6 +119,12 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 24/10/2026: Flota.
+  - La lista de camiones sigue siendo la del catálogo que usa la app: la ficha le agrega los datos y la foto, unida por la matrícula. Agregar o sacar camiones de la lista sigue como hoy, y pasa al panel con Configuración.
+  - Cada camión lleva siempre el mismo acoplado: figura en su ficha y se cambia solo si se vende o se reemplaza, y el cambio queda en el historial.
+  - La ficha lleva marca, modelo, matrícula, foto y notas, más el año, los números de chasis y de motor y la capacidad de carga: kilos, o metros cúbicos si es cisterna. Una sola foto por camión o acoplado.
+  - Los camiones no tienen chofer asignado: la ficha muestra quién lo manejó cada mes, según los viajes de la app.
+  - Lo ven y lo cargan solo las cuentas del panel, como Choferes.
 - 22/10/2026: el tanque de cada camión.
   - El cálculo se corrige con cada carga que llena el tanque: la marca «Tanque lleno» la pone la oficina en el panel y el chofer en la app.
   - El aviso de combustible bajo va en Combustible y en Inicio. El aviso en el teléfono queda para la etapa de avisos de la app.

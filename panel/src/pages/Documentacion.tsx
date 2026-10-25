@@ -4,10 +4,11 @@ import { Icon } from '../components/Icon';
 import { type Photo, PhotoDialog } from '../components/PhotoDialog';
 import { CatalogNote, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote, Stat } from '../components/ui';
 import { TOO_MANY } from '../data/api';
-import { useDocuments, useNow } from '../data/hooks';
+import { useDocuments, useNow, useVehicles } from '../data/hooks';
 import { ago, dayInZone, formatDay, inDays } from '../lib/dates';
 import { filterPapers, groupPapers, type Paper, type PaperListView, paperOwner, type PaperStateFilter, paperVehicles, type PaperView, paperViews } from '../lib/documents';
 import { count } from '../lib/format';
+import { trailerLabel } from '../lib/vehicles';
 import { useAddressFilters } from './addressFilters';
 import { PAPER_STATE } from './states';
 
@@ -75,10 +76,14 @@ export function Documentacion() {
   const owner = params.get('de') ?? '';
   const views = useMemo(() => paperViews(papers, today), [papers, today]);
   const vehicles = useMemo(() => paperVehicles(papers, catalog.data ?? []), [papers, catalog.data]);
+  // The trailers in use (Flota) go apart, after the trucks: their papers are loaded like a truck's.
+  const fleetCards = useVehicles();
+  const trailers = useMemo(() => fleetCards.vehicles.filter((v) => v.kind === 'trailer' && !v.leftOn).map(trailerLabel).sort((a, b) => a.localeCompare(b, 'es')), [fleetCards.vehicles]);
+  const trucks = useMemo(() => vehicles.filter((v) => !trailers.includes(v)), [vehicles, trailers]);
   const shown = useMemo(() => filterPapers(views, { view: view.value, state: state.value, owner, q: typed }), [views, view.value, state.value, owner, typed]);
   const groups = useMemo(() => groupPapers(shown), [shown]);
   // Whose papers there are, to choose one: the trucks first.
-  const owners = useMemo(() => groupPapers(views).map((g) => ({ key: g.key, label: `${g.scope === 'vehicle' ? 'Camión' : 'Chofer'}: ${g.owner}` })), [views]);
+  const owners = useMemo(() => groupPapers(views).map((g) => ({ key: g.key, label: `${g.scope === 'vehicle' ? (trailers.includes(g.owner) ? 'Acoplado' : 'Camión') : 'Chofer'}: ${g.owner}` })), [views, trailers]);
   const late = views.filter((p) => p.state === 'late').length;
   const soon = views.filter((p) => p.state === 'soon').length;
   const ok = views.filter((p) => p.state === 'ok').length;
@@ -96,7 +101,9 @@ export function Documentacion() {
 
   const loadedAt = query.dataUpdatedAt || null;
   const loading = query.isLoading || catalog.isLoading;
-  const ready = !loading && query.data !== undefined;
+  // A new paper waits for the trailers too, so a trailer is not missing from the choices without notice.
+  const trailersRead = fleetCards.query.data !== undefined || !!fleetCards.query.error;
+  const ready = !loading && query.data !== undefined && trailersRead;
 
   return (
     <div className="page">
@@ -168,6 +175,9 @@ export function Documentacion() {
 
       {query.error && query.data !== undefined && <StaleNote onRetry={() => void query.refetch()} />}
       {catalog.error && <CatalogNote onRetry={() => void catalog.refetch()} />}
+      {fleetCards.query.error && fleetCards.query.data === undefined && (
+        <ErrorNote onRetry={() => void fleetCards.query.refetch()}>No se pudieron leer los acoplados de Flota: no aparecen para elegirlos en «Nuevo documento».</ErrorNote>
+      )}
       {query.error && query.data === undefined ? (
         <ErrorNote onRetry={() => void query.refetch()}>{(query.error as { code?: string }).code === TOO_MANY ? 'Hay demasiados documentos para leerlos de una vez.' : 'No se pudieron leer los documentos.'}</ErrorNote>
       ) : loading ? (
@@ -220,7 +230,7 @@ export function Documentacion() {
       {(adding || editing) && (
         <DocumentFormDialog
           paper={editing}
-          vehicles={vehicles}
+          vehicles={trucks} trailers={trailers}
           onClose={() => {
             setAdding(false);
             setEditing(null);
