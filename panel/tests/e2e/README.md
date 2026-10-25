@@ -30,7 +30,9 @@ Las pruebas corren con «reducir movimiento», así los mapas no animan y los ca
 - la foto del Volvo, los acoplados y los de baja;
 - la ficha del camión, con sus datos, su acoplado y los anteriores, cómo está, el mes, los services, los papeles y quién lo manejó cada mes;
 - la ficha del acoplado, un camión sin ficha y los acoplados entre los vehículos de Documentación;
-- que si no se puede leer el último viaje de cada camión, lo dice en vez de darlo por sabido.
+- que si no se puede leer el último viaje de cada camión, lo dice en vez de darlo por sabido;
+- que sin los kilómetros de los viajes los services siguen avisando por su fecha;
+- que si las fichas o los papeles dejan de responder después de leerse, la lista y las fichas avisan que se ve lo último que se leyó.
 
 `db/fleet.sql` revisa en la base las fichas y los enganches:
 - solo las cuentas del panel los leen y los cargan, y nadie los borra;
@@ -39,7 +41,9 @@ Las pruebas corren con «reducir movimiento», así los mapas no animan y los ca
 - los controles de año, capacidad, foto y baja;
 - el cambio de acoplado en un solo paso, que no guarda nada si otra persona lo cambió y que un pedido repetido no duplica;
 - los días de un camión o de un acoplado no se pisan, también en una corrección que intenta cambiarle el camión, y un enganche se anula sin borrarlo;
-- la baja de un acoplado o de un camión enganchado lo desengancha el día anterior, tiene que ser posterior al enganche, y lo dado de baja no se engancha; corregir el día de la baja mueve el final de ese enganche, sin pisar otro;
+- la baja de un acoplado o de un camión enganchado lo desengancha el día anterior, tiene que ser posterior al enganche, y lo dado de baja no se engancha; corregir el día de la baja mueve el final de ese enganche, sin pisar otro ni pasar la baja del otro vehículo;
+- corregir la baja no alarga un enganche que terminó por otra razón (desenganchado a mano, o por un cambio de acoplado), y nada sigue desde el día de la baja: un enganche que pasaría de ese día termina el anterior, y no se guarda uno que siga después;
+- solo la baja anota qué enganche cerró, y cambiarle el último día a mano lo borra;
 - las fotos las suben y las ven solo las cuentas del panel, y nadie las borra;
 - cada cambio queda en el historial privado.
 
@@ -51,7 +55,7 @@ En flota:
 - la ficha de un camión con su foto;
 - el cisterna enganchado y anulado, y un cambio de acoplado desde el mismo día que no se acepta;
 - el semirremolque que pasa del Volvo al Scania y queda en el historial del Volvo;
-- un acoplado nuevo, que no acepta la matrícula de un camión, enganchado al Iveco y dado de baja: no acepta una baja del mismo día del enganche, y al guardarla deja de ir en el Iveco;
+- un acoplado nuevo, que no acepta la matrícula de un camión, enganchado al Iveco y dado de baja: no acepta una baja del mismo día del enganche, al guardarla deja de ir en el Iveco, y corregir el día de la baja mueve el final de ese enganche;
 - dos pestañas que cambian la misma ficha;
 - una ficha y un enganche cuya respuesta se corta: el reintento los da por guardados una sola vez, y si el enganche se reintenta con otro día, avisa que quedó el del primer intento.
 

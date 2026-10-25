@@ -137,6 +137,51 @@ test('si no se puede leer el último viaje de cada camión, lo dice en vez de da
   await expect(page.getByRole('alert')).toContainText('No se pudieron leer los últimos viajes de cada camión');
 });
 
+test('si no se pueden leer los kilómetros, los services siguen avisando por su fecha', async ({ page }) => {
+  // The kilometres of each truck add the trips since its last service done with the odometer.
+  await page.route('**/rest/v1/trf_driver_tracking_sessions*', (route) =>
+    decodeURIComponent(route.request().url()).includes('select=id,vehicle,started_at,distance_meters') ? route.fulfill({ status: 500, json: { message: 'Falla de prueba' } }) : route.fallback(),
+  );
+  await signIn(page, 'dueno@ejemplo.uy');
+  await open(page, 'Flota');
+  await expect(page.getByRole('alert').filter({ hasText: 'No se pudieron leer' })).toContainText('No se pudieron leer los kilómetros de los viajes: lo que depende de eso se ve con «—».');
+  // The Volvo's brakes were due two days ago; its filters go by kilometres, which are not known now.
+  await expect(trucks(page).filter({ hasText: 'Volvo FH 460' })).toContainText('Vencido Frenos');
+  await trucks(page).getByRole('link', { name: 'Volvo FH 460 · ABC1234' }).click();
+  const services = card(page, 'Services');
+  await expect(services.getByRole('listitem').filter({ hasText: 'Frenos' })).toContainText('Vencido');
+  await expect(services.getByRole('listitem').filter({ hasText: 'Cambio de filtros' })).toContainText('sin kilometraje para estimar cuánto falta');
+});
+
+test('si las fichas o los papeles dejan de responder después de leerse, avisa que se ve lo último que se leyó', async ({ page }) => {
+  await signIn(page, 'dueno@ejemplo.uy');
+  await open(page, 'Flota');
+  const volvo = trucks(page).filter({ hasText: 'Volvo FH 460' });
+  await expect(volvo).toContainText('Semirremolque Randon · REM1001');
+
+  // The cards stop answering: «Actualizar» keeps what was read, and says so; the truck's card too.
+  await page.route('**/rest/v1/trf_fleet_units*', (route) => route.fulfill({ status: 500, json: { message: 'Falla de prueba' } }));
+  await page.getByRole('button', { name: 'Actualizar' }).click();
+  const note = page.getByRole('alert').filter({ hasText: 'No se pudo actualizar' });
+  await expect(note).toHaveText(/No se pudo actualizar: las fichas de la flota\. Se ve lo último que se leyó\./);
+  await expect(volvo).toContainText('Semirremolque Randon · REM1001');
+  await trucks(page).getByRole('link', { name: 'Volvo FH 460 · ABC1234' }).click();
+  await expect(note).toHaveText(/No se pudo actualizar: las fichas de la flota\. Se ve lo último que se leyó\./);
+
+  // The trailer's card says it too, also for its papers, and «Reintentar» reads them again once they answer.
+  await card(page, 'Acoplado').getByRole('link', { name: 'Semirremolque Randon · REM1001' }).click();
+  await expect(page.getByRole('heading', { name: 'Semirremolque Randon · REM1001', level: 1 })).toBeVisible();
+  await expect(note).toHaveText(/No se pudo actualizar: la ficha\. Se ve lo último que se leyó\./);
+  await page.route('**/rest/v1/trf_documents*', (route) => route.fulfill({ status: 500, json: { message: 'Falla de prueba' } }));
+  await page.getByRole('button', { name: 'Actualizar' }).click();
+  await expect(note).toHaveText(/No se pudo actualizar: la ficha y los papeles\. Se ve lo último que se leyó\./);
+  await expect(card(page, 'Papeles')).toContainText('Todavía no tiene papeles.');
+  await page.unroute('**/rest/v1/trf_fleet_units*');
+  await page.unroute('**/rest/v1/trf_documents*');
+  await note.getByRole('button', { name: 'Reintentar' }).click();
+  await expect(note).toHaveCount(0);
+});
+
 test('un camión sin ficha la ofrece, y los acoplados se eligen para sus papeles en Documentación', async ({ page }) => {
   await signIn(page, 'dueno@ejemplo.uy');
   await open(page, 'Flota');

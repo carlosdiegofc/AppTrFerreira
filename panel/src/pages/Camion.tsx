@@ -365,6 +365,7 @@ function TruckPage({ t, now }: { t: TruckView; now: number }) {
           taken={taken}
           today={today}
           hitched={history.current ? { what: `Lleva ${trailer ? `el ${trailerLabel(trailer)}` : 'un acoplado'}`, fromOn: history.current.fromOn } : null}
+          history={history}
           onClose={() => setEditing(null)}
           onDone={done}
           onConflict={conflict}

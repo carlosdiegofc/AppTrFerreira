@@ -512,6 +512,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           deleted_at: string | null
+          ended_by_leave: string | null
           from_on: string
           id: string
           notes: string
@@ -525,6 +526,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
+          ended_by_leave?: string | null
           from_on: string
           id?: string
           notes?: string
@@ -538,6 +540,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
+          ended_by_leave?: string | null
           from_on?: string
           id?: string
           notes?: string
@@ -1077,6 +1080,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           deleted_at: string | null
+          ended_by_leave: string | null
           from_on: string
           id: string
           notes: string

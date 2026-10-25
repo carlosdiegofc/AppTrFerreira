@@ -12,8 +12,11 @@ import { decimal } from '../lib/format';
 import { photoJpeg } from '../lib/photo';
 import {
   dayBefore,
+  endedBySale,
   type Hitch,
   hitchDays,
+  type HitchHistory,
+  lastHitchFrom,
   TRAILER_BODIES,
   trailerLabel,
   trailerTrucks,
@@ -197,6 +200,8 @@ export function VehicleThumb({ path, title, onOpen }: { path: string | null; tit
 
 // ---- The card ----
 
+const NO_HITCHES: HitchHistory = { current: null, past: [] };
+
 export function VehicleFormDialog({
   vehicle,
   kind,
@@ -209,6 +214,7 @@ export function VehicleFormDialog({
   onConflict,
   onCreated,
   hitched = null,
+  history = NO_HITCHES,
 }: Common & {
   /** The card to change; null makes a new one. */
   vehicle: Vehicle | null;
@@ -222,6 +228,8 @@ export function VehicleFormDialog({
   onCreated?: (saved: VehicleRow) => void;
   /** What it goes with now («Lleva el Semirremolque Randon · REM1001», «Va en el Volvo FH 460 · ABC1234») and since when. */
   hitched?: { what: string; fromOn: string } | null;
+  /** Its hitches: a new day of its sale has to come after the last one started, and ends some the day before. */
+  history?: HitchHistory;
 }) {
   const save = useSaveVehicle();
   const [newId] = useState(() => crypto.randomUUID());
@@ -230,12 +238,16 @@ export function VehicleFormDialog({
   // Giving it away unhitches it from that day (the database closes the hitch the day before); one given away already has
   // nothing to close.
   const [hitch] = useState(() => (base && !base.leftOn ? hitched : null));
+  const [hitches] = useState(history);
   const [initial] = useState(() => vehicleFormValues(base, kind === 'truck' ? truck : null));
   const [photo, setPhoto] = useState<PhotoState>({ status: 'keep' });
   const [viewing, setViewing] = useState<Photo | null>(null);
   const photoChanged = photo.status === 'ready' || photo.status === 'removed';
   const f = useForm<VehicleFormValues>(initial, save.isPending, onClose, photoChanged);
   const v = f.values;
+  // What the day of its sale does to its hitches, as the database will do it.
+  const newSaleDay = v.gone && v.leftOn !== (base?.leftOn ?? '');
+  const moved = base && newSaleDay ? endedBySale(v.leftOn, kind, base.leftOn, hitches) : [];
   const id = base?.id ?? newId;
   const current = base?.photoPath ?? null;
   const thumb = usePhotoUrl('trf-fleet-photos', photo.status === 'keep' ? current : null);
@@ -269,7 +281,7 @@ export function VehicleFormDialog({
       f.setFormError('Esperá a que termine de prepararse la foto.');
       return;
     }
-    const { row, errors } = validateVehicle(v, kind, today, kind === 'truck' ? truckIdentity(base, truck) : null, taken, hitch?.fromOn ?? null);
+    const { row, errors } = validateVehicle(v, kind, today, kind === 'truck' ? truckIdentity(base, truck) : null, taken, newSaleDay ? lastHitchFrom(hitches) : null);
     if (!f.check(errors) || !row) return;
     if (base && !f.dirty) return onClose();
     const upload = photo.status === 'ready' ? { path: `${id}/${photo.fileId}.jpg`, jpeg: photo.jpeg } : null;
@@ -300,8 +312,15 @@ export function VehicleFormDialog({
         return;
       }
       // A new day of the sale moves the end of the hitch it closed: the database says when it cannot.
-      if (err instanceof DataError && (err.code === '23514' || err.code === '23P01') && row.left_on && row.left_on !== (base?.leftOn ?? null)) {
-        f.check({ leftOn: err.code === '23P01' ? 'Con ese día, su último enganche se pisa con otro posterior: revisá el historial.' : 'Tiene que ser posterior al día en que se enganchó.' });
+      if (err instanceof DataError && (err.code === '23514' || err.code === '23P01' || err.code === '55000') && row.left_on && row.left_on !== (base?.leftOn ?? null)) {
+        f.check({
+          leftOn:
+            err.code === '23P01'
+              ? 'Con ese día, su último enganche se pisa con otro posterior: revisá el historial.'
+              : err.code === '55000'
+                ? 'Con ese día, su último enganche seguiría después de la baja del otro vehículo: revisá el historial.'
+                : 'Tiene que ser posterior al día en que se enganchó.',
+        });
         return;
       }
       console.error(err);
@@ -436,8 +455,8 @@ export function VehicleFormDialog({
               <input {...f.props('leftOn')} type="date" value={v.leftOn} max={today} onChange={(e) => f.set('leftOn', e.target.value)} />,
               hitch
                 ? `${hitch.what} desde el ${formatDay(hitch.fromOn)}: queda desenganchado desde este día.`
-                : base?.leftOn && v.leftOn !== base.leftOn
-                  ? 'El enganche que terminó con la baja pasa a terminar el día anterior a este.'
+                : moved[0]
+                  ? `Su enganche ${hitchDays(moved[0]).toLowerCase()} pasa a terminar el día anterior a este.`
                   : undefined,
             )}
             {f.field(

@@ -72,6 +72,9 @@ create table public.trf_fleet_hitches (
   from_on date not null,
   to_on date,
   notes text not null default '',
+  -- Si su último día lo puso la baja del camión ('truck') o la del acoplado ('trailer'): corregir el día de esa baja lo
+  -- mueve. Uno que terminó por otra razón (se desenganchó, o se cambió el acoplado) no se alarga.
+  ended_by_leave text,
   -- Un enganche mal cargado se anula: queda guardado, pero no cuenta.
   deleted_at timestamptz,
   created_at timestamptz not null default now(),
@@ -80,7 +83,8 @@ create table public.trf_fleet_hitches (
   updated_by uuid default auth.uid(),
   constraint trf_fleet_hitches_truck check (truck_key ~ '^(plate|model):.+$' and length(truck_key) <= 200),
   constraint trf_fleet_hitches_dates check (from_on >= date '1950-01-01' and (to_on is null or to_on >= from_on)),
-  constraint trf_fleet_hitches_notes check (length(notes) <= 500)
+  constraint trf_fleet_hitches_notes check (length(notes) <= 500),
+  constraint trf_fleet_hitches_ended_by_leave check (ended_by_leave is null or (ended_by_leave in ('truck', 'trailer') and to_on is not null))
 );
 
 -- Ahora, un acoplado va en un solo camión y un camión lleva un solo acoplado.
@@ -90,7 +94,9 @@ create index trf_fleet_hitches_truck on public.trf_fleet_hitches (truck_key, fro
 
 -- Cada guardado anota cuándo y quién, y deja fijos quién y cuándo lo creó. Una ficha sigue siendo de su clase, y la de un
 -- camión, de su camión del catálogo. Un enganche sigue siendo del mismo acoplado y del mismo camión: uno equivocado se
--- anula y se carga de nuevo. Un respaldo se restaura con los disparadores apagados, así conserva lo que tenía.
+-- anula y se carga de nuevo. Solo una baja anota que le puso el último día a un enganche (lo hace su disparador,
+-- trf_private.fleet_leave); cualquier otro cambio de ese día lo borra. Un respaldo se restaura con los disparadores
+-- apagados, así conserva lo que tenía.
 create function trf_private.fleet_touch()
 returns trigger
 language plpgsql
@@ -104,6 +110,9 @@ begin
   if tg_op = 'INSERT' then
     new.created_at := ts;
     new.created_by := auth.uid();
+    if tg_table_name = 'trf_fleet_hitches' then
+      new.ended_by_leave := null;
+    end if;
   else
     new.id := old.id;
     new.created_at := old.created_at;
@@ -117,6 +126,10 @@ begin
     else
       new.trailer_id := old.trailer_id;
       new.truck_key := old.truck_key;
+      -- Lo que guarda la baja llega desde su disparador; lo demás, directo o desde trf_fleet_hitch.
+      if pg_trigger_depth() < 2 then
+        new.ended_by_leave := case when new.to_on is not distinct from old.to_on then old.ended_by_leave end;
+      end if;
     end if;
   end if;
   return new;
@@ -130,8 +143,8 @@ create trigger trf_fleet_hitches_touch before insert or update on public.trf_fle
   for each row execute function trf_private.fleet_touch();
 
 -- Un enganche es de un acoplado, y sus días no se pisan con otro del mismo acoplado ni con otro del mismo camión (los
--- anulados no cuentan). Un camión o un acoplado dado de baja no queda enganchado. Los cambios que pueden pisar a otro
--- enganche se hacen de a uno, con un solo turno para todos: así dos cambios nunca se esperan entre sí.
+-- anulados no cuentan). Ninguno sigue desde el día en que su camión o su acoplado se dio de baja. Los cambios que pueden
+-- pisar a otro enganche se hacen de a uno, con un solo turno para todos: así dos cambios nunca se esperan entre sí.
 create function trf_private.fleet_hitch_check()
 returns trigger
 language plpgsql
@@ -152,12 +165,12 @@ begin
     raise exception 'Solo se engancha un acoplado' using errcode = '23514';
   end if;
   perform pg_advisory_xact_lock(hashtextextended('trf_fleet_hitches', 0));
-  if new.to_on is null and exists (
+  if exists (
     select 1 from public.trf_fleet_units u
-    where u.left_on is not null
+    where u.left_on is not null and (new.to_on is null or new.to_on >= u.left_on)
       and ((u.kind = 'trailer' and u.id = new.trailer_id) or (u.kind = 'truck' and u.vehicle_key = new.truck_key))
   ) then
-    raise exception 'Ese camión o ese acoplado está dado de baja' using errcode = '55000';
+    raise exception 'Ese camión o ese acoplado está dado de baja en esos días' using errcode = '55000';
   end if;
   if exists (
     select 1 from public.trf_fleet_hitches h
@@ -177,10 +190,12 @@ create trigger trf_fleet_hitches_verify before insert or update on public.trf_fl
   for each row execute function trf_private.fleet_hitch_check();
 
 -- Un camión o un acoplado que se da de baja deja de llevar su acoplado, o de ir en su camión, desde ese día: el enganche
--- de ahora queda hasta el día anterior, en el historial de los dos. Si después se corrige el día de la baja, el enganche
--- que terminó con ella pasa a terminar el día anterior al nuevo. Por eso la baja tiene que ser posterior al día en que se
--- enganchó, y no puede alargar ese enganche sobre otro. Volver a ponerlo en uso no lo engancha de nuevo. Espera el mismo
--- turno que los cambios de enganche, así nadie lo engancha mientras tanto. Corre con los permisos de quien guarda la baja.
+-- de ahora queda hasta el día anterior, en el historial de los dos, anotado como cerrado por la baja. Si después se
+-- corrige el día de la baja, ese enganche pasa a terminar el día anterior al nuevo, sin pisar otro; uno que terminó por
+-- otra razón no se alarga. Ninguno sigue desde el día de la baja: el que pasaría de ese día queda hasta el anterior, y la
+-- baja tiene que ser posterior al día en que empezó cada uno (uno mal cargado se anula antes). Volver a ponerlo en uso
+-- no lo engancha de nuevo. Espera el mismo turno que los cambios de enganche, así nadie lo engancha mientras tanto. Corre
+-- con los permisos de quien guarda la baja.
 create function trf_private.fleet_leave()
 returns trigger
 language plpgsql
@@ -188,19 +203,21 @@ set search_path = ''
 as $$
 begin
   perform pg_advisory_xact_lock(hashtextextended('trf_fleet_hitches', 0));
-  -- El enganche que termina con la baja: el de ahora, o el que terminó con la baja que se corrige.
   if exists (
     select 1 from public.trf_fleet_hitches h
     where h.deleted_at is null and h.from_on >= new.left_on
-      and (case when old.left_on is null then h.to_on is null else h.to_on = old.left_on - 1 end)
       and (case when new.kind = 'trailer' then h.trailer_id = new.id else h.truck_key = new.vehicle_key end)
   ) then
     raise exception 'La baja tiene que ser posterior al día en que se enganchó' using errcode = '23514';
   end if;
-  update public.trf_fleet_hitches h set to_on = new.left_on - 1
+  -- Terminan el día anterior: el de ahora, uno que pasaría de ese día y el que cerró la baja que se corrige. Quedan
+  -- anotados como cerrados por esta baja el de ahora y el que ya lo estaba; uno cerrado por otra razón, no.
+  update public.trf_fleet_hitches h
+  set to_on = new.left_on - 1,
+      ended_by_leave = case when h.to_on is null or (h.ended_by_leave = new.kind and h.to_on = old.left_on - 1) then new.kind end
   where h.deleted_at is null
-    and (case when old.left_on is null then h.to_on is null else h.to_on = old.left_on - 1 end)
-    and (case when new.kind = 'trailer' then h.trailer_id = new.id else h.truck_key = new.vehicle_key end);
+    and (case when new.kind = 'trailer' then h.trailer_id = new.id else h.truck_key = new.vehicle_key end)
+    and (h.to_on is null or h.to_on >= new.left_on or (h.ended_by_leave = new.kind and h.to_on = old.left_on - 1));
   return null;
 end;
 $$;

@@ -82,13 +82,25 @@ export interface Hitch {
   fromOn: string;
   toOn: string | null;
   notes: string;
+  /** Whose sale gave it its last day, the truck's or the trailer's: a new day of that sale moves it. */
+  endedByLeave: VehicleKind | null;
   /** Annulled: it does not count. */
   deleted: boolean;
   updatedAt: string;
 }
 
 export function hitchFromRow(r: HitchRow): Hitch {
-  return { id: r.id, trailerId: r.trailer_id, truckKey: r.truck_key, fromOn: r.from_on, toOn: r.to_on, notes: clean(r.notes), deleted: r.deleted_at !== null, updatedAt: r.updated_at };
+  return {
+    id: r.id,
+    trailerId: r.trailer_id,
+    truckKey: r.truck_key,
+    fromOn: r.from_on,
+    toOn: r.to_on,
+    notes: clean(r.notes),
+    endedByLeave: r.ended_by_leave === 'truck' || r.ended_by_leave === 'trailer' ? r.ended_by_leave : null,
+    deleted: r.deleted_at !== null,
+    updatedAt: r.updated_at,
+  };
 }
 
 /** The key of a catalog truck: the same as its tank's and its account's in GPS. */
@@ -237,6 +249,28 @@ export function validateUnhitch(toOn: string, current: Pick<Hitch, 'fromOn'>, to
 /** The day before: where the trailer a truck had stays when another one goes on. */
 export const dayBefore = (day: string) => addDays(day, -1);
 
+/** The hitches of a truck or a trailer, as truckTrailers and trailerTrucks give them. */
+export interface HitchHistory {
+  current: Hitch | null;
+  past: readonly Hitch[];
+}
+
+/** The day its last hitch started: a sale has to come after it. */
+export const lastHitchFrom = (history: HitchHistory): string | null => (history.current ?? history.past[0])?.fromOn ?? null;
+
+/**
+ * The hitches a sale on that day ends the day before, as the database does (leftOn: the day of its sale now, for a new
+ * day of it): the one of now, one that would go past that day, and the one its sale closed, which moves with it. One that
+ * ended otherwise (unhitched, or another trailer went on) is never lengthened.
+ */
+export function endedBySale(day: string, kind: VehicleKind, leftOn: string | null, history: HitchHistory): Hitch[] {
+  if (!isDay(day) || day === leftOn) return [];
+  const closed = leftOn === null ? null : dayBefore(leftOn);
+  return [...(history.current ? [history.current] : []), ...history.past].filter(
+    (h) => h.toOn === null || h.toOn >= day || (h.endedByLeave === kind && h.toOn === closed),
+  );
+}
+
 // ---- The card ----
 
 export interface VehicleFormValues {
@@ -313,7 +347,7 @@ export function validateVehicle(
   today: string,
   identity: TruckIdentity | null,
   taken: ReadonlySet<string>,
-  /** The day its hitch of now started, for a card not given away yet: the database closes it the day before the sale. */
+  /** The day its last hitch started, for a new day of its sale: nothing goes on after the sale (lastHitchFrom). */
   hitchedFrom: string | null = null,
 ): { row: VehicleCardRow | null; errors: Partial<Record<VehicleField, string>> } {
   const errors: Partial<Record<VehicleField, string>> = {};

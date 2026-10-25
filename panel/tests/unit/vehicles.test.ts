@@ -5,8 +5,11 @@ import {
   byAttention,
   capacityText,
   driversByMonth,
+  endedBySale,
   type Hitch,
   hitchDays,
+  hitchFromRow,
+  lastHitchFrom,
   makeLine,
   normalPlate,
   ofTruck,
@@ -25,6 +28,7 @@ import {
   type Vehicle,
   vehicleFormValues,
   vehicleFromRow,
+  type VehicleKind,
 } from '../../src/lib/vehicles';
 
 const TODAY = '2026-10-24';
@@ -60,6 +64,7 @@ const hitch = (extra: Partial<Hitch> = {}): Hitch => ({
   fromOn: '2025-03-01',
   toOn: null,
   notes: '',
+  endedByLeave: null,
   deleted: false,
   updatedAt: '2026-10-01T00:00:00Z',
   ...extra,
@@ -187,6 +192,56 @@ describe('flota: qué acoplado lleva cada camión', () => {
       'Tiene que ser posterior al 01/01/2026, cuando lo engancharon al camión en el que va.',
     );
     expect(validateHitch({ trailerId: 't3', fromOn: '2026-10-01', notes: 'x'.repeat(501) }, TODAY, null, null).errors.notes).toBe('Hasta 500 caracteres.');
+  });
+
+  it('lee el enganche como lo guardó la base', () => {
+    const row = {
+      id: 'h9',
+      trailer_id: 't1',
+      truck_key: 'plate:abc1234',
+      from_on: '2026-10-08',
+      to_on: '2026-10-19',
+      notes: ' Hasta la venta ',
+      ended_by_leave: 'trailer',
+      deleted_at: null,
+      created_at: '',
+      created_by: null,
+      updated_at: '2026-10-20T00:00:00Z',
+      updated_by: null,
+    };
+    expect(hitchFromRow(row)).toEqual(hitch({ id: 'h9', fromOn: '2026-10-08', toOn: '2026-10-19', notes: 'Hasta la venta', endedByLeave: 'trailer', updatedAt: '2026-10-20T00:00:00Z' }));
+    expect(hitchFromRow({ ...row, ended_by_leave: 'otro', deleted_at: '2026-10-21T00:00:00Z' })).toMatchObject({ endedByLeave: null, deleted: true });
+  });
+
+  it('una baja termina el día anterior el enganche de ahora, el que pasaría de ese día y el que cerró ella misma', () => {
+    // The tipper went on the Volvo until September 30, unhitched by hand, and on the Scania from October 8 until its sale
+    // of the 20th closed it.
+    const sold = trailerTrucks('t5', [
+      hitch({ id: 'a', trailerId: 't5', fromOn: '2026-09-01', toOn: '2026-09-30' }),
+      hitch({ id: 'b', trailerId: 't5', truckKey: 'plate:def5678', fromOn: '2026-10-08', toOn: '2026-10-19', endedByLeave: 'trailer' }),
+    ]);
+    expect(lastHitchFrom(sold)).toBe('2026-10-08');
+    const moved = (day: string, kind: VehicleKind = 'trailer') => endedBySale(day, kind, '2026-10-20', sold).map((h) => h.id);
+    // A new day of its sale moves the hitch it closed, later or earlier; the one unhitched by hand stays.
+    expect(moved('2026-10-25')).toEqual(['b']);
+    expect(moved('2026-10-15')).toEqual(['b']);
+    // Before September 30, the one unhitched by hand would go past it too.
+    expect(moved('2026-09-20')).toEqual(['b', 'a']);
+    // The same day changes nothing, and what is not a day says nothing.
+    expect(moved('2026-10-20')).toEqual([]);
+    expect(moved('')).toEqual([]);
+    // What a truck's sale closed is not moved by the trailer's.
+    expect(moved('2026-10-25', 'truck')).toEqual([]);
+    // Not given away yet: the one of now, and one unhitched by hand after the day of the sale.
+    const inUse = trailerTrucks('t6', [
+      hitch({ id: 'c', trailerId: 't6', fromOn: '2026-10-12' }),
+      hitch({ id: 'd', trailerId: 't6', fromOn: '2026-10-01', toOn: '2026-10-10' }),
+      hitch({ id: 'e', trailerId: 't6', fromOn: '2026-09-01', toOn: '2026-09-25' }),
+    ]);
+    expect(lastHitchFrom(inUse)).toBe('2026-10-12');
+    expect(endedBySale('2026-10-20', 'trailer', null, inUse).map((h) => h.id)).toEqual(['c']);
+    expect(endedBySale('2026-10-05', 'trailer', null, { current: null, past: inUse.past }).map((h) => h.id)).toEqual(['d']);
+    expect(lastHitchFrom({ current: null, past: [] })).toBeNull();
   });
 
   it('desenganchar: hasta un día entre el enganche y hoy', () => {

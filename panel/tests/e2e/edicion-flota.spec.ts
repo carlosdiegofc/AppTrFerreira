@@ -179,6 +179,17 @@ test('un acoplado nuevo lleva su propia matrícula, se da de baja y queda con su
   const truck = card(page, 'Camión');
   await expect(truck).toContainText('Se dio de baja: ya no va en ningún camión.');
   await expect(truck.getByRole('list', { name: 'Camiones en los que fue antes' })).toContainText('Iveco Stralis · MNO7890Del 12/10/2026 al 14/10/2026');
+
+  // It was sold on the 13th: correcting the day moves the end of the hitch its sale closed.
+  await page.getByRole('button', { name: 'Editar ficha' }).click();
+  const fix = page.getByRole('dialog', { name: 'Acoplado VOL5005' });
+  await fix.getByLabel('Desde el').fill('2026-10-13');
+  await expect(fix).toContainText('Su enganche del 12/10/2026 al 14/10/2026 pasa a terminar el día anterior a este.');
+  await fix.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(fix).toBeHidden();
+  await expect(page.getByRole('status')).toContainText('Ficha guardada.');
+  await expect(card(page, 'Datos')).toContainText('Se dio de baja el 13/10/2026 (vendido)');
+  await expect(truck.getByRole('list', { name: 'Camiones en los que fue antes' })).toContainText('Iveco Stralis · MNO7890Del 12/10/2026 al 12/10/2026');
   await page.getByRole('button', { name: 'Flota' }).click();
   await expect(card(page, 'Acoplado')).toContainText('No lleva acoplado.');
   await expect(card(page, 'Acoplado').getByRole('list', { name: 'Acoplados que llevó antes' })).toContainText('Volcadora Randon · VOL5005');
@@ -187,7 +198,7 @@ test('un acoplado nuevo lleva su propia matrícula, se da de baja y queda con su
   const views = page.getByRole('group', { name: 'Vista' });
   await views.getByRole('button', { name: /De baja/ }).click();
   const gone = page.getByRole('list', { name: 'De baja' }).getByRole('listitem');
-  await expect(gone.filter({ hasText: 'Volcadora Randon · VOL5005' })).toContainText('Desde el 15/10/2026 · Vendido');
+  await expect(gone.filter({ hasText: 'Volcadora Randon · VOL5005' })).toContainText('Desde el 13/10/2026 · Vendido');
   await views.getByRole('button', { name: /Acoplados/ }).click();
   await expect(page.getByRole('list', { name: 'Acoplados' })).not.toContainText('VOL5005');
 });

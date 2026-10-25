@@ -51,11 +51,11 @@ export function useFleetViews(now: number) {
   const known: FleetKnown = {
     live: !fleet.isLoading && !fleet.error,
     lastTrip: fleet.lastTrips.data !== undefined,
-    // Without the trips the kilometres are not known, as in Mantenimiento.
+    // Without the trips the kilometres are not known, as in Mantenimiento; the services still say what their dates say.
     km: maintenance.query.data !== undefined && !maintenance.kmMissing,
     tank: tanks.rows !== null,
     papers: docs.query.data !== undefined,
-    services: maintenance.query.data !== undefined && !maintenance.kmMissing,
+    services: maintenance.query.data !== undefined,
     month: tripList.query.data !== undefined,
   };
   const entries = useMemo(() => (catalog.data && cards.query.data ? truckEntries(catalog.data, cards.vehicles, cards.hitches) : null), [catalog.data, cards.query.data, cards.vehicles, cards.hitches]);
@@ -90,7 +90,10 @@ export function useFleetViews(now: number) {
   }, [entries, docs.papers, maintenance.services, maintenance.kms, tanks.rows, fleet.units, monthRows, today, known.papers, known.services, known.tank]);
 
   // The page waits for the cards and the catalog; every other read that failed leaves «—» where it counts and says so.
+  // A read that answered before and fails to refresh says that what shows is the last one read.
   const reads = [
+    { query: cards.query, failed: false, stale: cards.query.data !== undefined && !!cards.query.error, what: 'las fichas de la flota' },
+    { query: catalog, failed: false, stale: catalog.data !== undefined && !!catalog.error, what: 'la lista de camiones de la app' },
     { query: fleet, failed: !!fleet.error && !fleet.isLoading, stale: false, what: 'dónde está cada camión' },
     { query: fleet.lastTrips, failed: fleet.lastTrips.data === undefined && !!fleet.lastTrips.error, stale: fleet.lastTrips.data !== undefined && !!fleet.lastTrips.error, what: 'los últimos viajes de cada camión' },
     { query: maintenance.query, failed: maintenance.query.data === undefined && !!maintenance.query.error, stale: maintenance.query.data !== undefined && !!maintenance.query.error, what: 'los services' },

@@ -233,15 +233,16 @@ begin
     raise exception 'baja: la baja rechazada cambió la ficha o el enganche';
   end if;
   update public.trf_fleet_units set left_on = date '2026-10-20', left_reason = 'Vendido' where id = 'a3000000-0000-4000-8000-000000000002';
-  if (select to_on from public.trf_fleet_hitches where id = 'a3000000-0000-4000-8000-000000000017') is distinct from date '2026-10-19' then
-    raise exception 'baja: el acoplado vendido tendría que quedar en el Scania hasta el día anterior';
+  if (select (to_on, ended_by_leave) from public.trf_fleet_hitches where id = 'a3000000-0000-4000-8000-000000000017')
+    is distinct from (date '2026-10-19', 'trailer'::text) then
+    raise exception 'baja: el acoplado vendido tendría que quedar en el Scania hasta el día anterior, cerrado por su baja';
   end if;
   begin
     perform public.trf_fleet_hitch('a3000000-0000-4000-8000-000000000018', 'plate:def5678', 'a3000000-0000-4000-8000-000000000002', date '2026-10-21', null, null, '');
     raise exception 'baja: enganchó un acoplado vendido';
   exception when object_not_in_prerequisite_state then null;
   end;
-  -- Back in use, it is hitched again; changing the day of a sale already saved touches no hitch.
+  -- Back in use, it is hitched again; that touches no earlier hitch.
   update public.trf_fleet_units set left_on = null, left_reason = '' where id = 'a3000000-0000-4000-8000-000000000002';
   perform public.trf_fleet_hitch('a3000000-0000-4000-8000-000000000019', 'plate:def5678', 'a3000000-0000-4000-8000-000000000002', date '2026-10-21', null, null, '');
   if (select to_on from public.trf_fleet_hitches where id = 'a3000000-0000-4000-8000-000000000017') <> date '2026-10-19' then
@@ -250,8 +251,16 @@ begin
 
   -- The Scania is sold: the tipper stops going on it the day before, and nothing is hitched to it any more.
   update public.trf_fleet_units set left_on = date '2026-10-23', left_reason = 'Vendido' where id = 'a3000000-0000-4000-8000-000000000001' returning * into u;
-  if (select to_on from public.trf_fleet_hitches where id = 'a3000000-0000-4000-8000-000000000019') is distinct from date '2026-10-22' then
-    raise exception 'baja: el camión vendido tendría que dejar su acoplado el día anterior';
+  if (select (to_on, ended_by_leave) from public.trf_fleet_hitches where id = 'a3000000-0000-4000-8000-000000000019')
+    is distinct from (date '2026-10-22', 'truck'::text) then
+    raise exception 'baja: el camión vendido tendría que dejar su acoplado el día anterior, cerrado por su baja';
+  end if;
+  -- Only a sale marks the hitch it closed: a correction keeps the mark unless it changes the last day, which clears it.
+  update public.trf_fleet_hitches set ended_by_leave = null, notes = 'Lo llevó hasta la venta' where id = 'a3000000-0000-4000-8000-000000000019';
+  update public.trf_fleet_hitches set ended_by_leave = 'truck', to_on = date '2026-10-18' where id = 'a3000000-0000-4000-8000-000000000017';
+  if (select ended_by_leave from public.trf_fleet_hitches where id = 'a3000000-0000-4000-8000-000000000019') is distinct from 'truck'
+    or (select ended_by_leave from public.trf_fleet_hitches where id = 'a3000000-0000-4000-8000-000000000017') is not null then
+    raise exception 'baja: una corrección cambió qué enganche cerró la baja';
   end if;
   -- A corrected sale day moves the end of the hitch the sale closed, to the day before the new one; never to the day it
   -- started, nor over another hitch.
@@ -284,6 +293,81 @@ begin
   end;
   if (select to_on from public.trf_fleet_hitches where id = 'a3000000-0000-4000-8000-000000000011') is not null then
     raise exception 'baja: el enganche rechazado sacó al cisterna del Volvo';
+  end if;
+end $$;
+
+-- Only the hitch a sale closed moves with a new day of it: one unhitched by hand, or closed by a change of trailer, keeps
+-- its last day. Nothing goes on after the day of a sale: a hitch that would ends the day before, and none is saved so.
+do $$
+declare
+  h public.trf_fleet_hitches;
+begin
+  insert into public.trf_fleet_units (id, kind, vehicle_key, plate, body) values
+    ('a3000000-0000-4000-8000-000000000003', 'trailer', 'plate:pru0001', 'PRU0001', 'Playo'),
+    ('a3000000-0000-4000-8000-000000000004', 'trailer', 'plate:pru0002', 'PRU0002', 'Playo'),
+    ('a3000000-0000-4000-8000-000000000005', 'trailer', 'plate:pru0003', 'PRU0003', 'Playo');
+  -- A flatbed goes on the Iveco from October 2, leaves it by hand on the 10th and is sold the next day. Moving the sale to
+  -- the 15th leaves the 10th; moving it to the 8th ends it on the 7th, and moving it back to the 20th leaves it there.
+  perform public.trf_fleet_hitch('a3000000-0000-4000-8000-000000000031', 'plate:mno7890', 'a3000000-0000-4000-8000-000000000003', date '2026-10-02', null, null, '');
+  update public.trf_fleet_hitches set to_on = date '2026-10-10' where id = 'a3000000-0000-4000-8000-000000000031';
+  update public.trf_fleet_units set left_on = date '2026-10-11', left_reason = 'Vendido' where id = 'a3000000-0000-4000-8000-000000000003';
+  update public.trf_fleet_units set left_on = date '2026-10-15' where id = 'a3000000-0000-4000-8000-000000000003';
+  if (select (to_on, ended_by_leave) from public.trf_fleet_hitches where id = 'a3000000-0000-4000-8000-000000000031') is distinct from (date '2026-10-10', null::text) then
+    raise exception 'baja corregida: alargó un enganche que se había desenganchado a mano';
+  end if;
+  update public.trf_fleet_units set left_on = date '2026-10-08' where id = 'a3000000-0000-4000-8000-000000000003';
+  if (select (to_on, ended_by_leave) from public.trf_fleet_hitches where id = 'a3000000-0000-4000-8000-000000000031') is distinct from (date '2026-10-07', null::text) then
+    raise exception 'baja corregida: el enganche que pasaba del día de la baja tendría que terminar el día anterior';
+  end if;
+  update public.trf_fleet_units set left_on = date '2026-10-20' where id = 'a3000000-0000-4000-8000-000000000003';
+  if (select to_on from public.trf_fleet_hitches where id = 'a3000000-0000-4000-8000-000000000031') <> date '2026-10-07' then
+    raise exception 'baja corregida: volvió a alargar el enganche recortado';
+  end if;
+
+  -- Another flatbed goes on the Iveco from the 11th until the 15th, when a third one goes on, and is sold on the 16th.
+  -- Moving its sale to the 20th leaves that hitch as it was, without stepping on the third one.
+  perform public.trf_fleet_hitch('a3000000-0000-4000-8000-000000000032', 'plate:mno7890', 'a3000000-0000-4000-8000-000000000004', date '2026-10-11', null, null, '');
+  perform public.trf_fleet_hitch('a3000000-0000-4000-8000-000000000033', 'plate:mno7890', 'a3000000-0000-4000-8000-000000000005', date '2026-10-16',
+                                 'a3000000-0000-4000-8000-000000000032', null, '');
+  update public.trf_fleet_units set left_on = date '2026-10-16', left_reason = 'Vendido' where id = 'a3000000-0000-4000-8000-000000000004';
+  update public.trf_fleet_units set left_on = date '2026-10-20' where id = 'a3000000-0000-4000-8000-000000000004';
+  if (select to_on from public.trf_fleet_hitches where id = 'a3000000-0000-4000-8000-000000000032') <> date '2026-10-15' then
+    raise exception 'baja corregida: alargó un enganche que cerró un cambio de acoplado';
+  end if;
+
+  -- The third one leaves the Iveco by hand on the 18th and its sale is saved as of the 17th: its hitch ends on the 16th.
+  update public.trf_fleet_hitches set to_on = date '2026-10-18' where id = 'a3000000-0000-4000-8000-000000000033';
+  update public.trf_fleet_units set left_on = date '2026-10-17', left_reason = 'Vendido' where id = 'a3000000-0000-4000-8000-000000000005';
+  if (select (to_on, ended_by_leave) from public.trf_fleet_hitches where id = 'a3000000-0000-4000-8000-000000000033') is distinct from (date '2026-10-16', null::text) then
+    raise exception 'baja: el enganche que pasaba del día de la baja tendría que terminar el día anterior';
+  end if;
+
+  -- A past hitch can be saved for something sold, but not on or after the day of its sale; a new one is never marked as
+  -- closed by a sale.
+  insert into public.trf_fleet_hitches (id, trailer_id, truck_key, from_on, to_on, ended_by_leave)
+  values ('a3000000-0000-4000-8000-000000000034', 'a3000000-0000-4000-8000-000000000004', 'plate:zzz0002', date '2026-10-17', date '2026-10-18', 'trailer')
+  returning * into h;
+  if h.ended_by_leave is not null then raise exception 'baja: un enganche nuevo quedó como cerrado por una baja'; end if;
+  begin
+    insert into public.trf_fleet_hitches (trailer_id, truck_key, from_on, to_on) values ('a3000000-0000-4000-8000-000000000004', 'plate:zzz0002', date '2026-10-19', date '2026-10-21');
+    raise exception 'baja: guardó un enganche que sigue después de la baja';
+  exception when object_not_in_prerequisite_state then null;
+  end;
+
+  -- A truck sold before the day a trailer's sale is moved to: the hitch the trailer's sale closed cannot reach that day.
+  insert into public.trf_fleet_units (id, kind, vehicle_key, plate) values ('a3000000-0000-4000-8000-000000000006', 'truck', 'plate:jkl3456', 'JKL3456');
+  insert into public.trf_fleet_units (id, kind, vehicle_key, plate, body) values ('a3000000-0000-4000-8000-000000000007', 'trailer', 'plate:pru0004', 'PRU0004', 'Playo');
+  perform public.trf_fleet_hitch('a3000000-0000-4000-8000-000000000035', 'plate:jkl3456', 'a3000000-0000-4000-8000-000000000007', date '2026-10-01', null, null, '');
+  update public.trf_fleet_units set left_on = date '2026-10-10', left_reason = 'Vendido' where id = 'a3000000-0000-4000-8000-000000000007';
+  update public.trf_fleet_units set left_on = date '2026-10-12', left_reason = 'Vendido' where id = 'a3000000-0000-4000-8000-000000000006';
+  begin
+    update public.trf_fleet_units set left_on = date '2026-10-20' where id = 'a3000000-0000-4000-8000-000000000007';
+    raise exception 'baja corregida: alargó un enganche más allá de la baja del camión';
+  exception when object_not_in_prerequisite_state then null;
+  end;
+  update public.trf_fleet_units set left_on = date '2026-10-12' where id = 'a3000000-0000-4000-8000-000000000007';
+  if (select (to_on, ended_by_leave) from public.trf_fleet_hitches where id = 'a3000000-0000-4000-8000-000000000035') is distinct from (date '2026-10-11', 'trailer'::text) then
+    raise exception 'baja corregida: el enganche tendría que llegar hasta el día anterior a la baja del camión';
   end if;
 end $$;
 

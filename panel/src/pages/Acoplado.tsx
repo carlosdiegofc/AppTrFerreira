@@ -4,13 +4,13 @@ import { useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { Icon } from '../components/Icon';
 import { type Photo, PhotoDialog } from '../components/PhotoDialog';
-import { Card, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton } from '../components/ui';
+import { Card, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote } from '../components/ui';
 import { AnnulHitchDialog, VehicleFormDialog, VehicleThumb } from '../components/VehicleDialogs';
 import { useCatalog, useDocuments, useNow, useVehicles } from '../data/hooks';
 import { dayInZone, formatDay, inDays } from '../lib/dates';
 import { paperViews } from '../lib/documents';
 import { truckLabel } from '../lib/fleet';
-import { number } from '../lib/format';
+import { andList, number } from '../lib/format';
 import { capacityText, cardTruckLabel, type Hitch, hitchDays, makeLine, samePlate, takenKeys, trailerLabel, trailerTrucks, truckKey, type Vehicle } from '../lib/vehicles';
 import { type Notice, noticeOf, PapersPill, truckPath } from './Flota';
 import { PAPER_STATE } from './states';
@@ -53,6 +53,12 @@ function TrailerPage({ v, now }: { v: Vehicle; now: number }) {
     today,
   );
   const capacity = capacityText(v, number);
+  // A read that answered before and fails to refresh: what shows is the last one read.
+  const stale = [
+    { query, what: 'la ficha', stale: query.data !== undefined && !!query.error },
+    { query: docs.query, what: 'los papeles', stale: docs.query.data !== undefined && !!docs.query.error },
+    { query: catalog, what: 'la lista de camiones de la app', stale: catalog.data !== undefined && !!catalog.error },
+  ].filter((r) => r.stale);
 
   const done = (text: string, tone: 'ok' | 'warn' = 'ok') => {
     setEditing(null);
@@ -75,8 +81,9 @@ function TrailerPage({ v, now }: { v: Vehicle; now: number }) {
               onClick={() => {
                 void query.refetch();
                 void docs.query.refetch();
+                void catalog.refetch();
               }}
-              busy={query.isFetching || docs.query.isFetching}
+              busy={query.isFetching || docs.query.isFetching || catalog.isFetching}
             />
             <button
               type="button"
@@ -96,6 +103,7 @@ function TrailerPage({ v, now }: { v: Vehicle; now: number }) {
           <Icon name={notice.tone === 'ok' ? 'check' : 'warning'} size={18} /> {notice.text}
         </p>
       )}
+      {stale.length > 0 && <StaleNote onRetry={() => stale.forEach((r) => void r.query.refetch())}>No se pudo actualizar: {andList(stale.map((r) => r.what))}. Se ve lo último que se leyó.</StaleNote>}
 
       <div className="driver-grid">
         <Card title="Datos">
@@ -206,6 +214,7 @@ function TrailerPage({ v, now }: { v: Vehicle; now: number }) {
           taken={taken}
           today={today}
           hitched={history.current ? { what: `Va en el ${nameOf(history.current.truckKey)}`, fromOn: history.current.fromOn } : null}
+          history={history}
           onClose={() => setEditing(null)}
           onDone={done}
           onConflict={conflict}
