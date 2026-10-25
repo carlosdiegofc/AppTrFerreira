@@ -84,6 +84,19 @@ begin
     raise exception 'lectura: aceptó un acoplado con clave de modelo';
   exception when check_violation then null;
   end;
+  -- No two cards have the same plate, written in any way: a truck of the app's list «XYZ-9876» and a trailer «XYZ9876».
+  insert into public.trf_fleet_units (kind, vehicle_key, plate) values ('truck', 'plate:xyz-9876', 'XYZ-9876');
+  begin
+    insert into public.trf_fleet_units (kind, vehicle_key, plate) values ('trailer', 'plate:xyz9876', 'XYZ9876');
+    raise exception 'lectura: aceptó un acoplado con la matrícula de un camión escrita de otra manera';
+  exception when unique_violation then null;
+  end;
+  insert into public.trf_fleet_units (kind, vehicle_key, plate) values ('trailer', 'plate:qrs5555', 'QRS5555');
+  begin
+    insert into public.trf_fleet_units (kind, vehicle_key, plate) values ('truck', 'plate:qrs-5555', 'QRS-5555');
+    raise exception 'lectura: aceptó un camión con la matrícula de un acoplado escrita de otra manera';
+  exception when unique_violation then null;
+  end;
   -- Only a truck keeps the name the app's list gives it.
   begin
     insert into public.trf_fleet_units (kind, vehicle_key, plate, catalog_name) values ('trailer', 'plate:cat0001', 'CAT0001', 'Volvo FH 460 · CAT0001');

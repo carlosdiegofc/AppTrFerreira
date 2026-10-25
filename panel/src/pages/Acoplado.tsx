@@ -46,7 +46,6 @@ function TrailerPage({ v, now }: { v: Vehicle; now: number }) {
     return out;
   }, [catalog.data, vehicles]);
   const nameOf = (key: string) => names.get(key) ?? key.replace(/^(plate|model):/, '').toUpperCase();
-  const taken = useMemo(() => takenKeys(vehicles, catalog.data ?? [], v.id), [vehicles, catalog.data, v.id]);
   const history = trailerTrucks(v.id, hitches);
   const papers = paperViews(
     docs.papers.filter((p) => p.scope === 'vehicle' && samePlate(p.vehicle, v.plate)),
@@ -211,7 +210,7 @@ function TrailerPage({ v, now }: { v: Vehicle; now: number }) {
           kind="trailer"
           truck={null}
           label={v.plate}
-          taken={taken}
+          taken={(except) => takenKeys(vehicles, catalog.data ?? [], except)}
           today={today}
           hitched={history.current ? { what: `Va en el ${nameOf(history.current.truckKey)}`, fromOn: history.current.fromOn } : null}
           history={history}

@@ -131,6 +131,13 @@ describe('flota: la ficha', () => {
     const plateOnly = { model: '', plate: 'PLA1234' };
     expect(truckIdentity(null, plateOnly)).toEqual({ plate: 'PLA1234', key: 'model:pla1234', name: 'PLA1234' });
     expect(validateVehicle(vehicleFormValues(null, plateOnly), 'truck', TODAY, truckIdentity(null, plateOnly), new Set()).row).toMatchObject({ vehicle_key: 'model:pla1234', plate: 'PLA1234' });
+    // No other card may have its plate, written in any way: a trailer «ABC1234» and a truck of the list «ABC-1234».
+    const dashed = { model: 'Volvo FH 460', plate: 'ABC-1234' };
+    const trailer = vehicle({ id: 't1', kind: 'trailer', key: 'plate:abc1234', plate: 'ABC1234', catalogName: '', brand: '', model: '' });
+    expect(validateVehicle(vehicleFormValues(null, dashed), 'truck', TODAY, truckIdentity(null, dashed), takenKeys([trailer], [])).errors.plate).toBe(
+      'Ya hay otra ficha con la matrícula ABC1234: corregí la de esa ficha, o la de este camión en la lista de camiones de la app.',
+    );
+    expect(validateVehicle(vehicleFormValues(null, dashed), 'truck', TODAY, truckIdentity(null, dashed), takenKeys([], [])).errors).toEqual({});
   });
 
   it('valida un acoplado: matrícula propia, año, capacidad y baja', () => {

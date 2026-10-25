@@ -14,7 +14,7 @@ import { STATE_LABEL } from '../lib/fleet';
 import { andList, count, decimal, money, number } from '../lib/format';
 import { monthLabel } from '../lib/drivers';
 import { litersPer100, monthsBefore, summarize } from '../lib/metrics';
-import { capacityText, driversByMonth, type Hitch, hitchDays, makeLine, trailerLabel, truckKey, truckTrailers, type Vehicle } from '../lib/vehicles';
+import { capacityText, driversByMonth, type Hitch, hitchDays, makeLine, takenKeys, trailerLabel, truckTrailers, type Vehicle } from '../lib/vehicles';
 import { type Notice, noticeOf, TankFact, trailerPath } from './Flota';
 import { PAPER_STATE, STATE_TONE } from './states';
 
@@ -35,7 +35,7 @@ type Editing = { kind: 'card' } | { kind: 'hitch' } | { kind: 'unhitch'; hitch: 
 const fact = (value: string | null | undefined) => (value ? value : <span className="muted">Sin cargar</span>);
 
 function TruckPage({ t, now }: { t: TruckView; now: number }) {
-  const { views, known, cards, catalog, docs, reads, refetch, isFetching, today } = useFleetViews(now);
+  const { views, known, cards, docs, reads, refetch, isFetching, today } = useFleetViews(now);
   const fuel = useFuel();
   const month = firstOfMonth(today);
   // Who drove it, by its trips of the last twelve months (this one too).
@@ -48,7 +48,6 @@ function TruckPage({ t, now }: { t: TruckView; now: number }) {
   const trailers = useMemo(() => cards.vehicles.filter((v) => v.kind === 'trailer'), [cards.vehicles]);
   const byId = useMemo(() => new Map(trailers.map((v) => [v.id, v])), [trailers]);
   const names = useMemo(() => new Map((views ? [...views.current, ...views.gone] : []).map((x) => [x.key, x.label])), [views]);
-  const taken = useMemo(() => new Set([...cards.vehicles.filter((v) => v.id !== t.card?.id).map((v) => v.key), ...(catalog.data ?? []).map(truckKey).filter((k) => k !== t.key)]), [cards.vehicles, catalog.data, t.card?.id, t.key]);
   const history = truckTrailers(t.key, cards.hitches);
 
   // This month's trips by their day in Uruguay, as Viajes and Métricas count them.
@@ -362,7 +361,7 @@ function TruckPage({ t, now }: { t: TruckView; now: number }) {
           kind="truck"
           truck={t.truck}
           label={t.label}
-          taken={taken}
+          taken={(except) => takenKeys(cards.vehicles, [], except)}
           today={today}
           hitched={history.current ? { what: `Lleva ${trailer ? `el ${trailerLabel(trailer)}` : 'un acoplado'}`, fromOn: history.current.fromOn } : null}
           history={history}

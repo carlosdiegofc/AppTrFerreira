@@ -63,6 +63,10 @@ create table public.trf_fleet_units (
   constraint trf_fleet_units_left_reason check (left_on is not null or left_reason = '')
 );
 
+-- Dos fichas no tienen la misma matrícula, aunque esté escrita de otra manera («ABC-1234» y «ABC1234»): la de un camión
+-- es la de la lista de la app tal como está escrita, y la de un acoplado va sin espacios ni guiones.
+create unique index trf_fleet_units_plate on public.trf_fleet_units (upper(regexp_replace(plate, '[[:space:]-]+', '', 'g'))) where plate <> '';
+
 -- Qué acoplado llevó cada camión, del primer al último día. Sin último día, lo lleva ahora. El camión va con su clave
 -- (la del catálogo y la de su ficha, si la tiene).
 create table public.trf_fleet_hitches (

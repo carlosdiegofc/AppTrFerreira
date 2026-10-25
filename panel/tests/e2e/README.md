@@ -37,7 +37,7 @@ Las pruebas corren con «reducir movimiento», así los mapas no animan y los ca
 `db/fleet.sql` revisa en la base las fichas y los enganches:
 - solo las cuentas del panel los leen y los cargan, y nadie los borra;
 - una ficha sigue siendo de su clase, y la de un camión, de su camión;
-- la clave de un acoplado es su matrícula, y hay una ficha por clave;
+- la clave de un acoplado es su matrícula, hay una ficha por clave, y dos fichas no tienen la misma matrícula, aunque esté escrita de otra manera;
 - los controles de año, capacidad, foto y baja;
 - el cambio de acoplado en un solo paso, que no guarda nada si otra persona lo cambió y que un pedido repetido no duplica;
 - los días de un camión o de un acoplado no se pisan, también en una corrección que intenta cambiarle el camión, y un enganche se anula sin borrarlo;

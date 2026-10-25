@@ -21,6 +21,7 @@ import {
   trailerLabel,
   trailerTrucks,
   truckIdentity,
+  truckPlateTaken,
   validateHitch,
   validateUnhitch,
   validateVehicle,
@@ -223,8 +224,11 @@ export function VehicleFormDialog({
   truck: CatalogTruck | null;
   /** How the truck is named (the catalog's name), or the trailer's plate. */
   label: string;
-  /** The keys of every other truck and trailer: a trailer's plate is its own. */
-  taken: ReadonlySet<string>;
+  /**
+   * The keys no card may share with this one (takenKeys), leaving out the card with that id: the one being saved, also
+   * when a try whose answer was cut already saved it.
+   */
+  taken: (except: string) => ReadonlySet<string>;
   onCreated?: (saved: VehicleRow) => void;
   /** What it goes with now («Lleva el Semirremolque Randon · REM1001», «Va en el Volvo FH 460 · ABC1234») and since when. */
   hitched?: { what: string; fromOn: string } | null;
@@ -281,7 +285,14 @@ export function VehicleFormDialog({
       f.setFormError('Esperá a que termine de prepararse la foto.');
       return;
     }
-    const { row, errors } = validateVehicle(v, kind, today, kind === 'truck' ? truckIdentity(base, truck) : null, taken, newSaleDay ? lastHitchFrom(hitches) : null);
+    const { row, errors } = validateVehicle(v, kind, today, kind === 'truck' ? truckIdentity(base, truck) : null, taken(id), newSaleDay ? lastHitchFrom(hitches) : null);
+    // A truck's plate comes from the app's list, out of the form: what is wrong with it goes for the whole form.
+    if (kind === 'truck' && errors.plate) {
+      const { plate, ...rest } = errors;
+      f.check(rest);
+      f.setFormError(plate);
+      return;
+    }
     if (!f.check(errors) || !row) return;
     if (base && !f.dirty) return onClose();
     const upload = photo.status === 'ready' ? { path: `${id}/${photo.fileId}.jpg`, jpeg: photo.jpeg } : null;
@@ -305,10 +316,11 @@ export function VehicleFormDialog({
       if (!base) onCreated?.(saved);
     } catch (err) {
       if (err instanceof ConflictError) return onConflict();
-      // Someone else made the card of this truck meanwhile, or a card with this plate.
+      // Someone else made the card of this truck meanwhile, or a card with this plate (trf_fleet_units_plate).
       if (err instanceof DataError && err.code === '23505') {
-        if (kind === 'truck') return onConflict();
-        f.check({ plate: 'Ya hay un camión o un acoplado con esa matrícula.' });
+        if (kind === 'trailer') f.check({ plate: 'Ya hay un camión o un acoplado con esa matrícula.' });
+        else if (err.message.includes('trf_fleet_units_plate')) f.setFormError(truckPlateTaken(row.plate ?? ''));
+        else onConflict();
         return;
       }
       // A new day of the sale moves the end of the hitch it closed: the database says when it cannot.

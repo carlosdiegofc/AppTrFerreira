@@ -337,9 +337,14 @@ export const truckIdentity = (card: Pick<Vehicle, 'plate' | 'key' | 'catalogName
 export const cardTruckLabel = (card: Pick<Vehicle, 'catalogName' | 'brand' | 'model' | 'plate' | 'key'>) =>
   card.catalogName || [[card.brand, card.model].filter(Boolean).join(' '), card.plate].filter(Boolean).join(' · ') || card.key.replace(/^(plate|model):/, '').toUpperCase();
 
+/** A truck whose plate, from the app's list, another card already has. */
+export const truckPlateTaken = (plate: string) =>
+  `Ya hay otra ficha con la matrícula ${normalPlate(plate)}: corregí la de esa ficha, o la de este camión en la lista de camiones de la app.`;
+
 /**
  * The card to save, or what is wrong with each field. A truck's card goes with its truck (identity: its key and plate);
- * a trailer's with the plate typed, which no other truck or trailer may have (taken: their keys).
+ * a trailer's with the plate typed. No other card may have its plate, written in any way (taken: the keys of the other
+ * cards, as takenKeys gives them, and for a trailer also those of the trucks of the catalog).
  */
 export function validateVehicle(
   v: VehicleFormValues,
@@ -356,7 +361,10 @@ export function validateVehicle(
   let name = '';
   if (kind === 'truck') {
     if (!identity) errors.plate = 'Elegí el camión.';
-    else ({ plate, key, name } = identity);
+    else {
+      ({ plate, key, name } = identity);
+      if (normalPlate(plate) !== '' && taken.has(plateKey(normalPlate(plate)))) errors.plate = truckPlateTaken(plate);
+    }
   } else {
     plate = normalPlate(v.plate);
     key = plateKey(plate);

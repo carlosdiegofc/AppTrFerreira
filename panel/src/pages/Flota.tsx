@@ -170,8 +170,8 @@ export function Flota() {
   const goneTrailers = useMemo(() => cards.vehicles.filter((v) => v.kind === 'trailer' && v.leftOn), [cards.vehicles]);
   // How each truck is named, by its key: where each trailer goes.
   const names = useMemo(() => new Map((views ? [...views.current, ...views.gone] : []).map((t) => [t.key, t.label])), [views]);
-  // Every key in use: a new trailer's plate has to be its own.
-  const taken = useMemo(() => takenKeys(cards.vehicles, catalog.data ?? []), [cards.vehicles, catalog.data]);
+  // Every key in use: a new trailer's plate has to be its own, also against the trucks of the app's list. A truck's,
+  // from that list, no other card may have.
   // A trailer's papers are the ones with its plate, as Documentación loads them.
   const papersOf = (v: Vehicle) => (known.papers ? paperViews(docs.papers.filter((p) => p.scope === 'vehicle' && samePlate(p.vehicle, v.plate)), today) : null);
 
@@ -311,7 +311,7 @@ export function Flota() {
           kind={creating.kind}
           truck={creating.kind === 'truck' ? creating.t.truck : null}
           label={creating.kind === 'truck' ? creating.t.label : ''}
-          taken={taken}
+          taken={(except) => takenKeys(cards.vehicles, creating.kind === 'truck' ? [] : (catalog.data ?? []), except)}
           today={today}
           onClose={() => setCreating(null)}
           onDone={(text, tone = 'ok') => {
