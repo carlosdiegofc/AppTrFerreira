@@ -177,9 +177,10 @@ create trigger trf_fleet_hitches_verify before insert or update on public.trf_fl
   for each row execute function trf_private.fleet_hitch_check();
 
 -- Un camión o un acoplado que se da de baja deja de llevar su acoplado, o de ir en su camión, desde ese día: el enganche
--- de ahora queda hasta el día anterior, en el historial de los dos. Por eso la baja tiene que ser posterior al día en
--- que se enganchó. Espera el mismo turno que los cambios de enganche, así nadie lo engancha mientras tanto. Corre con los
--- permisos de quien guarda la baja.
+-- de ahora queda hasta el día anterior, en el historial de los dos. Si después se corrige el día de la baja, el enganche
+-- que terminó con ella pasa a terminar el día anterior al nuevo. Por eso la baja tiene que ser posterior al día en que se
+-- enganchó, y no puede alargar ese enganche sobre otro. Volver a ponerlo en uso no lo engancha de nuevo. Espera el mismo
+-- turno que los cambios de enganche, así nadie lo engancha mientras tanto. Corre con los permisos de quien guarda la baja.
 create function trf_private.fleet_leave()
 returns trigger
 language plpgsql
@@ -187,15 +188,18 @@ set search_path = ''
 as $$
 begin
   perform pg_advisory_xact_lock(hashtextextended('trf_fleet_hitches', 0));
+  -- El enganche que termina con la baja: el de ahora, o el que terminó con la baja que se corrige.
   if exists (
     select 1 from public.trf_fleet_hitches h
-    where h.to_on is null and h.deleted_at is null and h.from_on >= new.left_on
+    where h.deleted_at is null and h.from_on >= new.left_on
+      and (case when old.left_on is null then h.to_on is null else h.to_on = old.left_on - 1 end)
       and (case when new.kind = 'trailer' then h.trailer_id = new.id else h.truck_key = new.vehicle_key end)
   ) then
     raise exception 'La baja tiene que ser posterior al día en que se enganchó' using errcode = '23514';
   end if;
   update public.trf_fleet_hitches h set to_on = new.left_on - 1
-  where h.to_on is null and h.deleted_at is null
+  where h.deleted_at is null
+    and (case when old.left_on is null then h.to_on is null else h.to_on = old.left_on - 1 end)
     and (case when new.kind = 'trailer' then h.trailer_id = new.id else h.truck_key = new.vehicle_key end);
   return null;
 end;
@@ -203,7 +207,7 @@ $$;
 revoke all on function trf_private.fleet_leave() from public, anon, authenticated;
 
 create trigger trf_fleet_units_leave after update on public.trf_fleet_units
-  for each row when (old.left_on is null and new.left_on is not null) execute function trf_private.fleet_leave();
+  for each row when (new.left_on is not null and old.left_on is distinct from new.left_on) execute function trf_private.fleet_leave();
 
 -- El mismo historial privado que el tanque de cada camión (migración 0009): cada alta y cada cambio, con quién lo hizo y
 -- cómo quedó antes y después.

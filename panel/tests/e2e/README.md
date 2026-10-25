@@ -39,7 +39,7 @@ Las pruebas corren con «reducir movimiento», así los mapas no animan y los ca
 - los controles de año, capacidad, foto y baja;
 - el cambio de acoplado en un solo paso, que no guarda nada si otra persona lo cambió y que un pedido repetido no duplica;
 - los días de un camión o de un acoplado no se pisan, también en una corrección que intenta cambiarle el camión, y un enganche se anula sin borrarlo;
-- la baja de un acoplado o de un camión enganchado lo desengancha el día anterior, tiene que ser posterior al enganche, y lo dado de baja no se engancha;
+- la baja de un acoplado o de un camión enganchado lo desengancha el día anterior, tiene que ser posterior al enganche, y lo dado de baja no se engancha; corregir el día de la baja mueve el final de ese enganche, sin pisar otro;
 - las fotos las suben y las ven solo las cuentas del panel, y nadie las borra;
 - cada cambio queda en el historial privado.
 
@@ -53,7 +53,7 @@ En flota:
 - el semirremolque que pasa del Volvo al Scania y queda en el historial del Volvo;
 - un acoplado nuevo, que no acepta la matrícula de un camión, enganchado al Iveco y dado de baja: no acepta una baja del mismo día del enganche, y al guardarla deja de ir en el Iveco;
 - dos pestañas que cambian la misma ficha;
-- una ficha y un enganche cuya respuesta se corta: el reintento los da por guardados una sola vez.
+- una ficha y un enganche cuya respuesta se corta: el reintento los da por guardados una sola vez, y si el enganche se reintenta con otro día, avisa que quedó el del primer intento.
 
 Para correrlas en una computadora:
 ```bash

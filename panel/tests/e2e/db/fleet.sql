@@ -253,9 +253,28 @@ begin
   if (select to_on from public.trf_fleet_hitches where id = 'a3000000-0000-4000-8000-000000000019') is distinct from date '2026-10-22' then
     raise exception 'baja: el camión vendido tendría que dejar su acoplado el día anterior';
   end if;
+  -- A corrected sale day moves the end of the hitch the sale closed, to the day before the new one; never to the day it
+  -- started, nor over another hitch.
   update public.trf_fleet_units set left_on = date '2026-10-22' where id = u.id;
-  if (select to_on from public.trf_fleet_hitches where id = 'a3000000-0000-4000-8000-000000000019') <> date '2026-10-22' then
-    raise exception 'baja: corregir el día de la baja cambió el enganche';
+  if (select to_on from public.trf_fleet_hitches where id = 'a3000000-0000-4000-8000-000000000019') is distinct from date '2026-10-21' then
+    raise exception 'baja: corregir el día de la baja no movió el final del enganche';
+  end if;
+  begin
+    update public.trf_fleet_units set left_on = date '2026-10-21' where id = u.id;
+    raise exception 'baja: aceptó una baja corregida al día en que se enganchó';
+  exception when check_violation then null;
+  end;
+  -- The tipper goes on the Mercedes from the 23rd: the Scania's sale can no longer be moved past that day.
+  perform public.trf_fleet_hitch('a3000000-0000-4000-8000-000000000021', 'plate:ghi9012', 'a3000000-0000-4000-8000-000000000002', date '2026-10-23',
+                                 'a3000000-0000-4000-8000-000000000015', null, '');
+  begin
+    update public.trf_fleet_units set left_on = date '2026-10-26' where id = u.id;
+    raise exception 'baja: la baja corregida alargó un enganche sobre otro';
+  exception when exclusion_violation then null;
+  end;
+  if (select to_on from public.trf_fleet_hitches where id = 'a3000000-0000-4000-8000-000000000019') <> date '2026-10-21'
+    or (select left_on from public.trf_fleet_units where id = u.id) <> date '2026-10-22' then
+    raise exception 'baja: una corrección rechazada cambió la ficha o el enganche';
   end if;
   begin
     perform public.trf_fleet_hitch('a3000000-0000-4000-8000-000000000020', 'plate:def5678', 'a0000000-0000-4000-8000-000000000003', date '2026-10-24',

@@ -94,7 +94,7 @@ export function useFleetViews(now: number) {
     { query: fleet, failed: !!fleet.error && !fleet.isLoading, stale: false, what: 'dónde está cada camión' },
     { query: fleet.lastTrips, failed: fleet.lastTrips.data === undefined && !!fleet.lastTrips.error, stale: fleet.lastTrips.data !== undefined && !!fleet.lastTrips.error, what: 'los últimos viajes de cada camión' },
     { query: maintenance.query, failed: maintenance.query.data === undefined && !!maintenance.query.error, stale: maintenance.query.data !== undefined && !!maintenance.query.error, what: 'los services' },
-    { query: maintenance.trips, failed: maintenance.kmMissing && !!maintenance.trips.error, stale: false, what: 'los kilómetros de los viajes' },
+    { query: maintenance.trips, failed: maintenance.kmMissing && !!maintenance.trips.error, stale: maintenance.trips.data !== undefined && !!maintenance.trips.error, what: 'los kilómetros de los viajes' },
     { query: docs.query, failed: docs.query.data === undefined && !!docs.query.error, stale: docs.query.data !== undefined && !!docs.query.error, what: 'los papeles' },
     { query: { refetch: tanks.refetch }, failed: !!tanks.error, stale: tanks.stale, what: 'los tanques' },
     { query: tripList.query, failed: tripList.query.data === undefined && !!tripList.query.error, stale: tripList.query.data !== undefined && !!tripList.query.error, what: 'los viajes del mes' },

@@ -238,9 +238,12 @@ test('una ficha y un enganche cuya respuesta se corta se guardan una sola vez', 
   await hitch.getByLabel('Acoplado').selectOption({ label: 'Cisterna Facchini · CIS2002' });
   await hitch.getByRole('button', { name: 'Guardar', exact: true }).click();
   await expect(hitch.getByRole('alert')).toContainText('Sin conexión con el servidor.');
+  // Trying again with another day finds the hitch of the first try, and says so instead of the day typed now.
+  await hitch.getByLabel('Desde el').fill('2026-10-14');
   await hitch.getByRole('button', { name: 'Guardar', exact: true }).click();
-  await expect(page.getByRole('status')).toContainText('Cisterna Facchini · CIS2002 enganchado al Ford Cargo 1722 · JKL3456 desde el 15/10/2026.');
+  await expect(page.getByRole('alert')).toContainText('Ese enganche ya se había guardado en el intento anterior, con lo que tenía entonces');
   await expect(trailer.getByRole('link', { name: 'Cisterna Facchini · CIS2002' })).toBeVisible();
+  await expect(trailer).toContainText('Desde el 15/10/2026');
   await expect(trailer.getByRole('list', { name: 'Acoplados que llevó antes' })).toHaveCount(0);
 
   // One card and one hitch: the list says so.

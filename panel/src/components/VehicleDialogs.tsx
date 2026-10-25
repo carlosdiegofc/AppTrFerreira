@@ -299,6 +299,11 @@ export function VehicleFormDialog({
         f.check({ plate: 'Ya hay un camión o un acoplado con esa matrícula.' });
         return;
       }
+      // A new day of the sale moves the end of the hitch it closed: the database says when it cannot.
+      if (err instanceof DataError && (err.code === '23514' || err.code === '23P01') && row.left_on && row.left_on !== (base?.leftOn ?? null)) {
+        f.check({ leftOn: err.code === '23P01' ? 'Con ese día, su último enganche se pisa con otro posterior: revisá el historial.' : 'Tiene que ser posterior al día en que se enganchó.' });
+        return;
+      }
       console.error(err);
       f.setFormError(describeWriteError(err, 'fichas'));
     }
@@ -429,7 +434,11 @@ export function VehicleFormDialog({
               'leftOn',
               'Desde el',
               <input {...f.props('leftOn')} type="date" value={v.leftOn} max={today} onChange={(e) => f.set('leftOn', e.target.value)} />,
-              hitch ? `${hitch.what} desde el ${formatDay(hitch.fromOn)}: queda desenganchado desde este día.` : undefined,
+              hitch
+                ? `${hitch.what} desde el ${formatDay(hitch.fromOn)}: queda desenganchado desde este día.`
+                : base?.leftOn && v.leftOn !== base.leftOn
+                  ? 'El enganche que terminó con la baja pasa a terminar el día anterior a este.'
+                  : undefined,
             )}
             {f.field(
               'leftReason',
@@ -493,7 +502,13 @@ export function HitchDialog({
     const { errors, ok } = validateHitch(v, today, current, chosenNow);
     if (!f.check(errors) || !ok || !chosen) return;
     try {
-      await hitch.mutateAsync({ id: newId, truckKey: truck.key, trailerId: chosen.id, fromOn: v.fromOn, truckNow: current?.id ?? null, trailerNow: chosenNow?.id ?? null, notes: v.notes.trim() });
+      const notes = v.notes.trim();
+      const saved = await hitch.mutateAsync({ id: newId, truckKey: truck.key, trailerId: chosen.id, fromOn: v.fromOn, truckNow: current?.id ?? null, trailerNow: chosenNow?.id ?? null, notes });
+      // A save tried again after its answer was cut finds the hitch of the first try, which may say something else.
+      if (saved.trailer_id !== chosen.id || saved.from_on !== v.fromOn || saved.notes !== notes) {
+        onDone('Ese enganche ya se había guardado en el intento anterior, con lo que tenía entonces: revisalo y, si hace falta, corregilo.', 'warn');
+        return;
+      }
       onDone(`${trailerLabel(chosen)} enganchado al ${truck.label} desde el ${formatDay(v.fromOn)}.`);
     } catch (err) {
       if (err instanceof ConflictError) return onConflict();
