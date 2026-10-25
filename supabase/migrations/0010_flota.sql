@@ -227,12 +227,13 @@ as $$
 declare
   saved public.trf_fleet_hitches;
 begin
+  perform pg_advisory_xact_lock(hashtextextended('trf_fleet_hitches truck ' || p_truck_key, 0));
+  perform pg_advisory_xact_lock(hashtextextended('trf_fleet_hitches trailer ' || p_trailer_id::text, 0));
+  -- Después de esperar su turno: un pedido repetido mientras el primero todavía se guardaba también lo encuentra.
   select * into saved from public.trf_fleet_hitches where id = p_id;
   if found then
     return saved;
   end if;
-  perform pg_advisory_xact_lock(hashtextextended('trf_fleet_hitches truck ' || p_truck_key, 0));
-  perform pg_advisory_xact_lock(hashtextextended('trf_fleet_hitches trailer ' || p_trailer_id::text, 0));
   if (select h.id from public.trf_fleet_hitches h where h.truck_key = p_truck_key and h.to_on is null and h.deleted_at is null) is distinct from p_truck_current
     or (select h.id from public.trf_fleet_hitches h where h.trailer_id = p_trailer_id and h.to_on is null and h.deleted_at is null) is distinct from p_trailer_current then
     raise exception 'Otra persona cambió el acoplado mientras se elegía' using errcode = '40001';

@@ -95,6 +95,21 @@ export const normalPlate = (raw: string) => raw.toUpperCase().replace(/[\s-]+/g,
 /** The key of a trailer: its plate, as the database checks. */
 export const plateKey = (plate: string) => 'plate:' + plate.toLowerCase();
 
+/**
+ * The keys a trailer's plate cannot take: those of every other card and of every truck of the catalog, also with the
+ * plate written as a trailer's (a catalog plate «ABC-1234» is the trailer plate «ABC1234»).
+ */
+export function takenKeys(vehicles: readonly Vehicle[], catalog: readonly CatalogTruck[], except: string | null = null): Set<string> {
+  const keys = new Set<string>();
+  const add = (key: string, plate: string) => {
+    keys.add(key);
+    if (normalPlate(plate) !== '') keys.add(plateKey(normalPlate(plate)));
+  };
+  for (const v of vehicles) if (v.id !== except) add(v.key, v.plate);
+  for (const t of catalog) add(truckKey(t), t.plate);
+  return keys;
+}
+
 /** A trailer as lists and its papers name it: «Semirremolque Randon · REM1001». */
 export function trailerLabel(v: Pick<Vehicle, 'body' | 'brand' | 'plate'>): string {
   return `${[v.body || 'Acoplado', v.brand].filter(Boolean).join(' ')} · ${v.plate}`;
@@ -356,6 +371,8 @@ export interface TruckEntry {
   key: string;
   /** As the catalog names it («Volvo FH 460 · ABC1234»), or as its card does when it is no longer in the catalog. */
   label: string;
+  /** Its plate, or empty when the catalog has none. */
+  plate: string;
   truck: CatalogTruck | null;
   card: Vehicle | null;
   /** The trailer it takes now, and since when. */
@@ -372,7 +389,8 @@ export function truckEntries(catalog: readonly CatalogTruck[], vehicles: readonl
   const trailers = new Map(vehicles.filter((v) => v.kind === 'trailer').map((v) => [v.id, v]));
   const entry = (key: string, label: string, truck: CatalogTruck | null): TruckEntry => {
     const hitch = truckTrailers(key, hitches).current;
-    return { key, label, truck, card: cards.get(key) ?? null, trailer: hitch ? (trailers.get(hitch.trailerId) ?? null) : null, hitch };
+    const card = cards.get(key) ?? null;
+    return { key, label, plate: truck ? truck.plate.trim() : (card?.plate ?? ''), truck, card, trailer: hitch ? (trailers.get(hitch.trailerId) ?? null) : null, hitch };
   };
   const seen = new Set<string>();
   const all: TruckEntry[] = [];
@@ -412,6 +430,12 @@ export function samePlate(label: string, plate: string): boolean {
   const squash = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
   return plate !== '' && cut >= 0 && squash(label.slice(cut + 3)) === squash(plate);
 }
+
+/**
+ * Whether a paper or a service saved with this name is of this truck: by its name, or by its plate when it has one. A
+ * truck no longer in the app's list is named by its card, and what was saved with the catalog's name keeps the plate.
+ */
+export const ofTruck = (name: string | null, truck: Pick<TruckEntry, 'label' | 'plate'>) => name !== null && (name === truck.label || samePlate(name, truck.plate));
 
 // ---- Who drove it ----
 

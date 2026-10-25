@@ -29,7 +29,8 @@ Las pruebas corren con «reducir movimiento», así los mapas no animan y los ca
 - la lista de camiones del catálogo, primero los que tienen algo para atender, con su acoplado, el tanque, los kilómetros, el service, los papeles y el mes;
 - la foto del Volvo, los acoplados y los de baja;
 - la ficha del camión, con sus datos, su acoplado y los anteriores, cómo está, el mes, los services, los papeles y quién lo manejó cada mes;
-- la ficha del acoplado, un camión sin ficha y los acoplados entre los vehículos de Documentación.
+- la ficha del acoplado, un camión sin ficha y los acoplados entre los vehículos de Documentación;
+- que si no se puede leer el último viaje de cada camión, lo dice en vez de darlo por sabido.
 
 `db/fleet.sql` revisa en la base las fichas y los enganches:
 - solo las cuentas del panel los leen y los cargan, y nadie los borra;

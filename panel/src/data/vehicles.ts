@@ -7,7 +7,7 @@ import { type FleetUnit, truckLabel } from '../lib/fleet';
 import { type PaperView, paperViews } from '../lib/documents';
 import { type ServiceView, serviceViews, type TruckKm } from '../lib/maintenance';
 import { type MetricsRow, summarize } from '../lib/metrics';
-import { attention, type Attention, byAttention, type TruckEntry, truckEntries } from '../lib/vehicles';
+import { attention, type Attention, byAttention, ofTruck, type TruckEntry, truckEntries } from '../lib/vehicles';
 import { useCatalog, useDocuments, useFleet, useMaintenance, useTripList, useVehicles } from './hooks';
 import { type TankRow, useTanks } from './tanks';
 
@@ -28,6 +28,8 @@ export interface TruckView extends TruckEntry {
 /** What could be read: a truck shows «—» for what could not, never a zero or «Al día» it does not know. */
 export interface FleetKnown {
   live: boolean;
+  /** The last trip of each truck, further back than the live list: without it, «no trips» is not known. */
+  lastTrip: boolean;
   km: boolean;
   tank: boolean;
   papers: boolean;
@@ -48,6 +50,7 @@ export function useFleetViews(now: number) {
 
   const known: FleetKnown = {
     live: !fleet.isLoading && !fleet.error,
+    lastTrip: fleet.lastTrips.data !== undefined,
     // Without the trips the kilometres are not known, as in Mantenimiento.
     km: maintenance.query.data !== undefined && !maintenance.kmMissing,
     tank: tanks.rows !== null,
@@ -61,11 +64,11 @@ export function useFleetViews(now: number) {
     if (!entries) return null;
     const view = (e: TruckEntry): TruckView => {
       const papers = paperViews(
-        docs.papers.filter((p) => p.scope === 'vehicle' && p.vehicle === e.label),
+        docs.papers.filter((p) => p.scope === 'vehicle' && ofTruck(p.vehicle, e)),
         today,
       );
       const services = serviceViews(
-        maintenance.services.filter((s) => s.vehicle === e.label && s.doneOn === null),
+        maintenance.services.filter((s) => ofTruck(s.vehicle, e) && s.doneOn === null),
         maintenance.kms,
         today,
       );
@@ -89,6 +92,7 @@ export function useFleetViews(now: number) {
   // The page waits for the cards and the catalog; every other read that failed leaves «—» where it counts and says so.
   const reads = [
     { query: fleet, failed: !!fleet.error && !fleet.isLoading, stale: false, what: 'dónde está cada camión' },
+    { query: fleet.lastTrips, failed: fleet.lastTrips.data === undefined && !!fleet.lastTrips.error, stale: fleet.lastTrips.data !== undefined && !!fleet.lastTrips.error, what: 'los últimos viajes de cada camión' },
     { query: maintenance.query, failed: maintenance.query.data === undefined && !!maintenance.query.error, stale: maintenance.query.data !== undefined && !!maintenance.query.error, what: 'los services' },
     { query: maintenance.trips, failed: maintenance.kmMissing && !!maintenance.trips.error, stale: false, what: 'los kilómetros de los viajes' },
     { query: docs.query, failed: docs.query.data === undefined && !!docs.query.error, stale: docs.query.data !== undefined && !!docs.query.error, what: 'los papeles' },
@@ -97,6 +101,7 @@ export function useFleetViews(now: number) {
   ];
   const waiting =
     fleet.isLoading ||
+    (fleet.lastTrips.data === undefined && !fleet.lastTrips.error) ||
     (maintenance.query.data === undefined && !maintenance.query.error) ||
     (maintenance.kmMissing && !maintenance.trips.error) ||
     (docs.query.data === undefined && !docs.query.error) ||

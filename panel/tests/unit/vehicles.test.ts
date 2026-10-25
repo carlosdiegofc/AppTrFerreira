@@ -9,8 +9,10 @@ import {
   hitchDays,
   makeLine,
   normalPlate,
+  ofTruck,
   samePlate,
   splitMake,
+  takenKeys,
   trailerLabel,
   trailerTrucks,
   truckEntries,
@@ -198,9 +200,30 @@ describe('flota: la lista', () => {
     const volvo = current.find((e) => e.key === 'plate:abc1234');
     expect(volvo?.card?.id).toBe('v1');
     expect(volvo?.trailer?.plate).toBe('REM1001');
-    expect(current.find((e) => e.key === 'plate:def5678')).toMatchObject({ card: null, trailer: null, hitch: null });
-    expect(current.find((e) => e.key === 'plate:out0001')?.truck).toBeNull();
+    expect(current.find((e) => e.key === 'plate:def5678')).toMatchObject({ card: null, trailer: null, hitch: null, plate: 'DEF5678' });
+    expect(current.find((e) => e.key === 'plate:out0001')).toMatchObject({ truck: null, plate: 'OUT0001' });
     expect(sold.map((e) => e.label)).toEqual(['Leyland Roadtrain · XYZ0001']);
+  });
+
+  it('un papel o un service guardado con otro nombre del mismo camión es de ese camión', () => {
+    // A truck no longer in the app's list, named by its card: what was saved with the catalog's name keeps its plate.
+    const truck = { label: 'Volvo FH 500 · ABC1234', plate: 'ABC1234' };
+    expect(ofTruck('Volvo FH 500 · ABC1234', truck)).toBe(true);
+    expect(ofTruck('Volvo FH 460 · ABC-1234', truck)).toBe(true);
+    expect(ofTruck('Scania R450 · DEF5678', truck)).toBe(false);
+    expect(ofTruck(null, truck)).toBe(false);
+    // Without a plate, only by its name.
+    expect(ofTruck('Iveco · ABC1234', { label: 'Iveco', plate: '' })).toBe(false);
+    expect(ofTruck('Iveco', { label: 'Iveco', plate: '' })).toBe(true);
+  });
+
+  it('un acoplado no toma la matrícula de un camión del catálogo escrita de otra manera', () => {
+    const taken = takenKeys([vehicle()], [SCANIA, { model: 'Fiat 619', plate: 'OUT-0001' }]);
+    expect([...taken].sort()).toEqual(['plate:abc1234', 'plate:def5678', 'plate:out-0001', 'plate:out0001']);
+    const form = { ...vehicleFormValues(null), plate: 'out 0001' };
+    expect(validateVehicle(form, 'trailer', TODAY, null, taken).errors.plate).toBe('Ya hay un camión o un acoplado con esa matrícula.');
+    // A card does not take its own plate from itself.
+    expect(takenKeys([vehicle()], [], 'v1').size).toBe(0);
   });
 
   it('primero lo vencido y el combustible bajo, después lo que viene', () => {

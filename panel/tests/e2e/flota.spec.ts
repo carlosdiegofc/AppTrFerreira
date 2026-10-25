@@ -123,6 +123,20 @@ test('la ficha del camión junta sus datos, su acoplado, cómo está, el mes, lo
   await shot(page, 'flota-acoplado');
 });
 
+test('si no se puede leer el último viaje de cada camión, lo dice en vez de darlo por sabido', async ({ page }) => {
+  // The live list reads the newest finished trips at once; the last trip of each truck, further back, pages with an offset.
+  await page.route('**/rest/v1/trf_driver_tracking_sessions*', (route) => {
+    const url = route.request().url();
+    return url.includes('arrival_lat') && url.includes('offset=') ? route.fulfill({ status: 500, json: { message: 'Falla de prueba' } }) : route.fallback();
+  });
+  await signIn(page, 'dueno@ejemplo.uy');
+  await open(page, 'Flota');
+  await expect(page.getByRole('alert')).toContainText('No se pudieron leer los últimos viajes de cada camión: lo que depende de eso se ve con «—».');
+  await expect(trucks(page)).toHaveCount(5);
+  await trucks(page).getByRole('link', { name: 'Iveco Stralis · MNO7890' }).click();
+  await expect(page.getByRole('alert')).toContainText('No se pudieron leer los últimos viajes de cada camión');
+});
+
 test('un camión sin ficha la ofrece, y los acoplados se eligen para sus papeles en Documentación', async ({ page }) => {
   await signIn(page, 'dueno@ejemplo.uy');
   await open(page, 'Flota');

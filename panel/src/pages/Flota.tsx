@@ -13,7 +13,7 @@ import { ago, formatDay } from '../lib/dates';
 import { paperViews } from '../lib/documents';
 import { STATE_LABEL } from '../lib/fleet';
 import { andList, count, decimal, number } from '../lib/format';
-import { capacityText, hitchDays, makeLine, samePlate, trailerLabel, trailerTrucks, truckKey, type Vehicle } from '../lib/vehicles';
+import { capacityText, hitchDays, makeLine, samePlate, takenKeys, trailerLabel, trailerTrucks, type Vehicle } from '../lib/vehicles';
 import { PAPER_STATE, STATE_TONE } from './states';
 
 type View = 'camiones' | 'acoplados' | 'baja';
@@ -171,7 +171,7 @@ export function Flota() {
   // How each truck is named, by its key: where each trailer goes.
   const names = useMemo(() => new Map((views ? [...views.current, ...views.gone] : []).map((t) => [t.key, t.label])), [views]);
   // Every key in use: a new trailer's plate has to be its own.
-  const taken = useMemo(() => new Set([...cards.vehicles.map((v) => v.key), ...(catalog.data ?? []).map(truckKey)]), [cards.vehicles, catalog.data]);
+  const taken = useMemo(() => takenKeys(cards.vehicles, catalog.data ?? []), [cards.vehicles, catalog.data]);
   // A trailer's papers are the ones with its plate, as Documentación loads them.
   const papersOf = (v: Vehicle) => (known.papers ? paperViews(docs.papers.filter((p) => p.scope === 'vehicle' && samePlate(p.vehicle, v.plate)), today) : null);
 

@@ -11,7 +11,7 @@ import { dayInZone, formatDay, inDays } from '../lib/dates';
 import { paperViews } from '../lib/documents';
 import { truckLabel } from '../lib/fleet';
 import { number } from '../lib/format';
-import { capacityText, type Hitch, hitchDays, makeLine, samePlate, trailerLabel, trailerTrucks, truckKey, type Vehicle } from '../lib/vehicles';
+import { capacityText, type Hitch, hitchDays, makeLine, samePlate, takenKeys, trailerLabel, trailerTrucks, truckKey, type Vehicle } from '../lib/vehicles';
 import { type Notice, noticeOf, PapersPill, truckPath } from './Flota';
 import { PAPER_STATE } from './states';
 
@@ -46,7 +46,7 @@ function TrailerPage({ v, now }: { v: Vehicle; now: number }) {
     return out;
   }, [catalog.data, vehicles]);
   const nameOf = (key: string) => names.get(key) ?? key.replace(/^(plate|model):/, '').toUpperCase();
-  const taken = useMemo(() => new Set([...vehicles.filter((x) => x.id !== v.id).map((x) => x.key), ...(catalog.data ?? []).map(truckKey)]), [vehicles, catalog.data, v.id]);
+  const taken = useMemo(() => takenKeys(vehicles, catalog.data ?? [], v.id), [vehicles, catalog.data, v.id]);
   const history = trailerTrucks(v.id, hitches);
   const papers = paperViews(
     docs.papers.filter((p) => p.scope === 'vehicle' && samePlate(p.vehicle, v.plate)),

@@ -117,6 +117,8 @@ export function useFleet(now: number) {
     fetchedAt: live.dataUpdatedAt || fleet.data?.fetchedAt || null,
     isLoading: fleet.isLoading || catalog.isLoading || live.isLoading,
     error: fleet.error ?? catalog.error ?? live.error,
+    /** The last trip of each truck, further back: until it is read, a truck without recent trips may have older ones. */
+    lastTrips: last,
     refetch: () => Promise.all([fleet.refetch(), live.refetch(), catalog.refetch(), last.refetch()]),
     // The position refresh every few seconds does not turn the refresh button.
     isFetching: fleet.isFetching || catalog.isFetching,

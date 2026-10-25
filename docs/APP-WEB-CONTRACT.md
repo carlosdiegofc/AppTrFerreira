@@ -83,9 +83,11 @@ Decisión del 24/10/2026. La lista de camiones sigue siendo la del catálogo que
 - `trf_fleet_hitch()` engancha un acoplado a un camión desde un día, en un solo paso.
   - El acoplado que llevaba el camión, y el camión en el que iba el acoplado, quedan hasta el día anterior.
   - Recibe el enganche actual del camión y el del acoplado tal como los vio la oficina. Si cambiaron, no guarda nada (código 40001). Si mientras tanto se dio de baja alguno de los dos, tampoco (código 55000).
-  - Un pedido repetido con el mismo id devuelve el enganche ya guardado.
+  - Un pedido repetido con el mismo id devuelve el enganche ya guardado, también si llega mientras el primero todavía se guarda: lo busca después de esperar su turno.
 - Solo las cuentas del panel leen y escriben (`trf_is_panel_admin()`), y nadie borra. Cada alta y cada cambio queda en `trf_private.road_audit`, con quién lo hizo.
   - Los disparadores dejan fijos el id, quién creó la fila y cuándo, y la clase de la ficha.
   - En la ficha de un camión dejan fijas su clave y su matrícula; en un enganche, el acoplado y el camión.
 - Los papeles de un acoplado van en `trf_documents` como los de un camión (`scope` `vehicle`), con el nombre del acoplado en `vehicle` («Semirremolque Randon · REM1001»). La ficha los encuentra por la matrícula.
 - Lo que la ficha del camión muestra de las demás secciones sale de las mismas lecturas de esas secciones, sin datos nuevos: la posición, los kilómetros, el tanque, los services, los papeles, los viajes y el combustible del mes, y los choferes de cada mes.
+  - Los papeles y los services se le asignan por el nombre del camión o por su matrícula. Así, un camión que ya no está en la lista de la app conserva los que se guardaron con su nombre anterior.
+  - Un acoplado no puede tener la matrícula de un camión del catálogo, aunque esté escrita de otra manera («ABC-1234» y «ABC1234» son la misma).

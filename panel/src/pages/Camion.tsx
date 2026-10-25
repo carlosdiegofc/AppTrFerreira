@@ -218,8 +218,10 @@ function TruckPage({ t, now }: { t: TruckView; now: number }) {
                       Ver en el GPS
                     </Link>
                   </>
-                ) : (
+                ) : known.lastTrip ? (
                   <span className="muted">Sin viajes con la app</span>
+                ) : (
+                  '—'
                 )}
               </dd>
             </div>
