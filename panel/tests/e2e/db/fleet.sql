@@ -71,6 +71,19 @@ begin
     raise exception 'lectura: aceptó un acoplado sin matrícula';
   exception when check_violation then null;
   end;
+  -- A catalog truck with a plate but no model is named by its plate alone: its key, like its tank's, is «model:» and the
+  -- plate, and its card keeps the plate. Only that key goes with that plate, and never for a trailer.
+  insert into public.trf_fleet_units (kind, vehicle_key, plate) values ('truck', 'model:pla1234', 'PLA1234');
+  begin
+    insert into public.trf_fleet_units (kind, vehicle_key, plate) values ('truck', 'model:otro', 'PLA5678');
+    raise exception 'lectura: aceptó un camión con la clave de otra matrícula';
+  exception when check_violation then null;
+  end;
+  begin
+    insert into public.trf_fleet_units (kind, vehicle_key, plate) values ('trailer', 'model:pla9999', 'PLA9999');
+    raise exception 'lectura: aceptó un acoplado con clave de modelo';
+  exception when check_violation then null;
+  end;
   begin
     insert into public.trf_fleet_units (kind, vehicle_key, plate, body) values ('truck', 'plate:ghi9012', 'GHI9012', 'Cisterna');
     raise exception 'lectura: aceptó un camión con tipo de acoplado';

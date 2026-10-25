@@ -70,7 +70,7 @@ Decisión del 22/10/2026. En Combustible («Tanques»), en Inicio y en la cuenta
 Decisión del 24/10/2026. La lista de camiones sigue siendo la del catálogo que lee la app (`trf_mobile_catalog`, `equipos`), y el panel no la cambia. Las tablas nuevas no las usa la app:
 
 - `trf_fleet_units`: la ficha de un camión del catálogo o de un acoplado (`kind`: `truck` o `trailer`). Guarda marca, modelo, matrícula, año, números de chasis y de motor, la capacidad de carga (`capacity`, con `capacity_unit` `kg` o `m3`), notas y foto, y el tipo de acoplado en `body`.
-  - La ficha de un camión se une a su camión del catálogo por `vehicle_key`, la misma clave del tanque y de las cuentas de ruta: `plate:<matrícula en minúsculas>`, o `model:<modelo>` si no tiene matrícula.
+  - La ficha de un camión se une a su camión del catálogo por `vehicle_key`, la misma clave del tanque y de las cuentas de ruta: `plate:<matrícula en minúsculas>`, o `model:<modelo>` si no tiene matrícula. Si tiene matrícula pero no modelo, su nombre es la matrícula sola y la clave es `model:<matrícula en minúsculas>`; la ficha guarda igual la matrícula.
   - Un acoplado va con su matrícula (`plate:<matrícula>`), que ningún otro camión ni acoplado puede tener. Hay una ficha por clave.
   - Baja: `left_on` y `left_reason`. La ficha queda con su historial, fuera de las listas de uso.
   - Al guardar la baja (`left_on` pasa de vacío a un día), el enganche de ahora de ese camión o acoplado queda hasta el día anterior (disparador `trf_fleet_units_leave`). Por eso la baja tiene que ser posterior al día en que se enganchó (código 23514). Corregir después el día de la baja no cambia los enganches.

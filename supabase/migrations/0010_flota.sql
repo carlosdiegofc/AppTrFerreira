@@ -11,7 +11,8 @@ create table public.trf_fleet_units (
   id uuid primary key default gen_random_uuid(),
   kind text not null,
   -- Como en el tanque y en las cuentas de ruta: «plate:» y la matrícula en minúsculas, o «model:» y el modelo si el
-  -- camión del catálogo no tiene matrícula. Un acoplado va siempre con su matrícula.
+  -- camión del catálogo no tiene matrícula («model:» y la matrícula si tiene matrícula pero no modelo). Un acoplado va
+  -- siempre con su matrícula.
   vehicle_key text not null unique,
   plate text not null default '',
   brand text not null default '',
@@ -38,7 +39,7 @@ create table public.trf_fleet_units (
   constraint trf_fleet_units_kind check (kind in ('truck', 'trailer')),
   constraint trf_fleet_units_key check (
     (plate <> '' and vehicle_key = 'plate:' || lower(plate))
-    or (kind = 'truck' and plate = '' and vehicle_key ~ '^model:.+$')
+    or (kind = 'truck' and vehicle_key ~ '^model:.+$' and (plate = '' or vehicle_key = 'model:' || lower(plate)))
   ),
   constraint trf_fleet_units_texts check (
     plate = trim(plate) and length(plate) <= 20 and length(vehicle_key) <= 200 and length(brand) <= 60

@@ -118,6 +118,10 @@ describe('flota: la ficha', () => {
     expect(validateVehicle(values, 'truck', TODAY, null, new Set()).errors.plate).toBe('Elegí el camión.');
     // A card already saved keeps its own truck, even if the catalog no longer has it.
     expect(truckIdentity(vehicle(), null)).toEqual({ plate: 'ABC1234', key: 'plate:abc1234' });
+    // A catalog truck with a plate and no model is named by its plate alone: its key, like its tank's, is «model:».
+    const plateOnly = { model: '', plate: 'PLA1234' };
+    expect(truckIdentity(null, plateOnly)).toEqual({ plate: 'PLA1234', key: 'model:pla1234' });
+    expect(validateVehicle(vehicleFormValues(null, plateOnly), 'truck', TODAY, truckIdentity(null, plateOnly), new Set()).row).toMatchObject({ vehicle_key: 'model:pla1234', plate: 'PLA1234' });
   });
 
   it('valida un acoplado: matrícula propia, año, capacidad y baja', () => {
