@@ -92,7 +92,7 @@ Va armándose al costado del panel actual y lo reemplaza sección por sección.
    - [x] La lista: cada camión del catálogo con su foto, si está en viaje, su acoplado, los kilómetros estimados, el combustible del tanque, el próximo service, los papeles y el mes (viajes y kilómetros). Primero van los que tienen algo para atender.
    - [x] La ficha del camión: marca, modelo, matrícula, año, chasis, motor, capacidad de carga (kilos, o metros cúbicos si es cisterna), foto y notas; su acoplado y los que tuvo antes; sus viajes, combustible, services, papeles y tanque, con enlace a cada sección; y quién lo manejó cada mes, según los viajes.
    - [x] Los acoplados: su ficha con los mismos datos y el tipo, y a qué camión estuvo enganchado y desde cuándo. Sus papeles se cargan en Documentación, como los de los camiones.
-   - [x] Nada se borra: un camión o un acoplado que se vende queda con su fecha de baja y su historial, y un enganche mal cargado se anula.
+   - [x] Nada se borra: un camión o un acoplado que se vende queda con su fecha de baja y su historial, y deja de llevar su acoplado, o de ir en su camión, desde ese día. Un enganche mal cargado se anula.
    - [ ] Publicación: respaldo completo antes, 0010 en producción y panel publicado. La app no cambia.
 
 ### App: juegos para las esperas

@@ -183,11 +183,70 @@ begin
   update public.trf_fleet_hitches set deleted_at = now() where id = 'a3000000-0000-4000-8000-000000000012';
   h := public.trf_fleet_hitch('a3000000-0000-4000-8000-000000000015', 'plate:ghi9012', 'a0000000-0000-4000-8000-000000000002', date '2026-10-05', null, null, '');
   if h.truck_key <> 'plate:ghi9012' then raise exception 'enganche: el anulado siguió contando'; end if;
+  -- A correction that also tries to move a hitch to another truck is checked as it is saved: on its own truck.
+  begin
+    update public.trf_fleet_hitches set to_on = date '2026-10-03', truck_key = 'plate:otro' where id = 'a2000000-0000-4000-8000-000000000001';
+    raise exception 'enganche: el Volvo quedó con dos acoplados a la vez por una corrección';
+  exception when exclusion_violation then null;
+  end;
   begin
     delete from public.trf_fleet_hitches;
     raise exception 'enganche: pudo borrar un enganche';
   exception when insufficient_privilege then null;
   end;
+end $$;
+
+-- A truck or a trailer given away stops taking its trailer, or going on its truck, from that day: its hitch stays until
+-- the day before. The day has to be after the one it was hitched, and nothing given away is hitched again.
+do $$
+declare
+  u public.trf_fleet_units;
+begin
+  -- The new tipper goes on the Scania from October 8.
+  perform public.trf_fleet_hitch('a3000000-0000-4000-8000-000000000017', 'plate:def5678', 'a3000000-0000-4000-8000-000000000002', date '2026-10-08', null, null, '');
+  begin
+    update public.trf_fleet_units set left_on = date '2026-10-08', left_reason = 'Vendido' where id = 'a3000000-0000-4000-8000-000000000002';
+    raise exception 'baja: aceptó una baja del mismo día en que se enganchó';
+  exception when check_violation then null;
+  end;
+  if (select left_on from public.trf_fleet_units where id = 'a3000000-0000-4000-8000-000000000002') is not null
+    or (select to_on from public.trf_fleet_hitches where id = 'a3000000-0000-4000-8000-000000000017') is not null then
+    raise exception 'baja: la baja rechazada cambió la ficha o el enganche';
+  end if;
+  update public.trf_fleet_units set left_on = date '2026-10-20', left_reason = 'Vendido' where id = 'a3000000-0000-4000-8000-000000000002';
+  if (select to_on from public.trf_fleet_hitches where id = 'a3000000-0000-4000-8000-000000000017') is distinct from date '2026-10-19' then
+    raise exception 'baja: el acoplado vendido tendría que quedar en el Scania hasta el día anterior';
+  end if;
+  begin
+    perform public.trf_fleet_hitch('a3000000-0000-4000-8000-000000000018', 'plate:def5678', 'a3000000-0000-4000-8000-000000000002', date '2026-10-21', null, null, '');
+    raise exception 'baja: enganchó un acoplado vendido';
+  exception when object_not_in_prerequisite_state then null;
+  end;
+  -- Back in use, it is hitched again; changing the day of a sale already saved touches no hitch.
+  update public.trf_fleet_units set left_on = null, left_reason = '' where id = 'a3000000-0000-4000-8000-000000000002';
+  perform public.trf_fleet_hitch('a3000000-0000-4000-8000-000000000019', 'plate:def5678', 'a3000000-0000-4000-8000-000000000002', date '2026-10-21', null, null, '');
+  if (select to_on from public.trf_fleet_hitches where id = 'a3000000-0000-4000-8000-000000000017') <> date '2026-10-19' then
+    raise exception 'baja: volver a usarlo cambió su enganche anterior';
+  end if;
+
+  -- The Scania is sold: the tipper stops going on it the day before, and nothing is hitched to it any more.
+  update public.trf_fleet_units set left_on = date '2026-10-23', left_reason = 'Vendido' where id = 'a3000000-0000-4000-8000-000000000001' returning * into u;
+  if (select to_on from public.trf_fleet_hitches where id = 'a3000000-0000-4000-8000-000000000019') is distinct from date '2026-10-22' then
+    raise exception 'baja: el camión vendido tendría que dejar su acoplado el día anterior';
+  end if;
+  update public.trf_fleet_units set left_on = date '2026-10-22' where id = u.id;
+  if (select to_on from public.trf_fleet_hitches where id = 'a3000000-0000-4000-8000-000000000019') <> date '2026-10-22' then
+    raise exception 'baja: corregir el día de la baja cambió el enganche';
+  end if;
+  begin
+    perform public.trf_fleet_hitch('a3000000-0000-4000-8000-000000000020', 'plate:def5678', 'a0000000-0000-4000-8000-000000000003', date '2026-10-24',
+                                   null, 'a3000000-0000-4000-8000-000000000011', '');
+    raise exception 'baja: enganchó un acoplado a un camión vendido';
+  exception when object_not_in_prerequisite_state then null;
+  end;
+  if (select to_on from public.trf_fleet_hitches where id = 'a3000000-0000-4000-8000-000000000011') is not null then
+    raise exception 'baja: el enganche rechazado sacó al cisterna del Volvo';
+  end if;
 end $$;
 
 -- A full administrator outside the panel list sees nothing; without signing in nothing is reachable.
@@ -215,15 +274,18 @@ begin
 end $$;
 reset role;
 
--- Every save is in the private history: the Scania's card was created, corrected and given its photo; the Volvo's
--- trailers changed.
+-- Every save is in the private history: the Scania's card was created, corrected, given its photo, sold and its day
+-- corrected; the Volvo's trailers changed; the sale closed the tipper's hitch.
 do $$
 begin
-  if (select count(*) from trf_private.road_audit where entity = 'trf_fleet_units' and after_row->>'vehicle_key' = 'plate:def5678') <> 3 then
-    raise exception 'el historial tendría que tener el alta, la corrección y la foto de la ficha del Scania';
+  if (select count(*) from trf_private.road_audit where entity = 'trf_fleet_units' and after_row->>'vehicle_key' = 'plate:def5678') <> 5 then
+    raise exception 'el historial tendría que tener el alta, la corrección, la foto, la baja y su corrección de la ficha del Scania';
   end if;
   if (select count(*) from trf_private.road_audit where entity = 'trf_fleet_hitches' and after_row->>'truck_key' = 'plate:abc1234') < 2 then
     raise exception 'el historial tendría que tener el cambio de acoplado del Volvo';
+  end if;
+  if not exists (select 1 from trf_private.road_audit where entity = 'trf_fleet_hitches' and after_row->>'id' = 'a3000000-0000-4000-8000-000000000019' and after_row->>'to_on' = '2026-10-22') then
+    raise exception 'el historial tendría que tener el enganche que cerró la baja del Scania';
   end if;
 end $$;
 rollback;

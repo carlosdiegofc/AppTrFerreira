@@ -73,14 +73,16 @@ Decisión del 24/10/2026. La lista de camiones sigue siendo la del catálogo que
   - La ficha de un camión se une a su camión del catálogo por `vehicle_key`, la misma clave del tanque y de las cuentas de ruta: `plate:<matrícula en minúsculas>`, o `model:<modelo>` si no tiene matrícula.
   - Un acoplado va con su matrícula (`plate:<matrícula>`), que ningún otro camión ni acoplado puede tener. Hay una ficha por clave.
   - Baja: `left_on` y `left_reason`. La ficha queda con su historial, fuera de las listas de uso.
+  - Al guardar la baja (`left_on` pasa de vacío a un día), el enganche de ahora de ese camión o acoplado queda hasta el día anterior (disparador `trf_fleet_units_leave`). Por eso la baja tiene que ser posterior al día en que se enganchó (código 23514). Corregir después el día de la baja no cambia los enganches.
 - La foto va en la carpeta privada `trf-fleet-photos` como `<id de la ficha>/<id de la foto>.jpg`: un JPEG de hasta 10 MB, achicado como las fotos de las boletas. Una foto nueva va con otro nombre y la anterior queda en la carpeta; nadie las borra.
 - `trf_fleet_hitches`: qué acoplado llevó cada camión (`trailer_id`, `truck_key`), del primer al último día inclusive (`from_on`, `to_on`). Sin `to_on`, lo lleva ahora.
   - Los días de un acoplado no se pisan entre sí, ni los de un camión.
   - Un acoplado va en un solo camión a la vez, y un camión lleva uno solo.
+  - Un camión o un acoplado dado de baja no queda enganchado: un enganche abierto suyo se rechaza (código 55000).
   - Un enganche mal cargado se anula con `deleted_at` y deja de contar.
 - `trf_fleet_hitch()` engancha un acoplado a un camión desde un día, en un solo paso.
   - El acoplado que llevaba el camión, y el camión en el que iba el acoplado, quedan hasta el día anterior.
-  - Recibe el enganche actual del camión y el del acoplado tal como los vio la oficina. Si cambiaron, no guarda nada (código 40001).
+  - Recibe el enganche actual del camión y el del acoplado tal como los vio la oficina. Si cambiaron, no guarda nada (código 40001). Si mientras tanto se dio de baja alguno de los dos, tampoco (código 55000).
   - Un pedido repetido con el mismo id devuelve el enganche ya guardado.
 - Solo las cuentas del panel leen y escriben (`trf_is_panel_admin()`), y nadie borra. Cada alta y cada cambio queda en `trf_private.road_audit`, con quién lo hizo.
   - Los disparadores dejan fijos el id, quién creó la fila y cuándo, y la clase de la ficha.

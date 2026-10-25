@@ -139,6 +139,11 @@ describe('flota: la ficha', () => {
     expect(validateVehicle({ ...base, gone: true, leftOn: '2026-10-01', leftReason: ' Vendido ' }, 'trailer', TODAY, null, new Set()).row).toMatchObject({ left_on: '2026-10-01', left_reason: 'Vendido' });
     // The reason of a card that is not sold is not kept.
     expect(validateVehicle({ ...base, gone: false, leftOn: '2026-10-01', leftReason: 'Vendido' }, 'trailer', TODAY, null, new Set()).row).toMatchObject({ left_on: null, left_reason: '' });
+    // Hitched since October 1, it goes on its truck until the day before the sale: the sale is after that day.
+    const sold = (leftOn: string) => validateVehicle({ ...base, gone: true, leftOn }, 'trailer', TODAY, null, new Set(), '2026-10-01');
+    expect(sold('2026-10-01').errors.leftOn).toBe('Tiene que ser posterior al 01/10/2026, cuando se enganchó. Si ese enganche fue un error, anulalo.');
+    expect(sold('2026-09-15').errors.leftOn).toBe('Tiene que ser posterior al 01/10/2026, cuando se enganchó. Si ese enganche fue un error, anulalo.');
+    expect(sold('2026-10-02').row).toMatchObject({ left_on: '2026-10-02' });
   });
 });
 

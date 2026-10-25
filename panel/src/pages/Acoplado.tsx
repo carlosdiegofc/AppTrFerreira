@@ -145,6 +145,8 @@ function TrailerPage({ v, now }: { v: Vehicle; now: number }) {
                 </button>
               </p>
             </>
+          ) : v.leftOn ? (
+            <p className="note">Se dio de baja: ya no va en ningún camión.</p>
           ) : (
             <p className="note">No va en ningún camión. Se engancha desde la ficha del camión.</p>
           )}
@@ -195,7 +197,20 @@ function TrailerPage({ v, now }: { v: Vehicle; now: number }) {
       </div>
 
       <PhotoDialog photo={photo} onClose={() => setPhoto(null)} />
-      {editing?.kind === 'card' && <VehicleFormDialog vehicle={v} kind="trailer" truck={null} label={v.plate} taken={taken} today={today} onClose={() => setEditing(null)} onDone={done} onConflict={conflict} />}
+      {editing?.kind === 'card' && (
+        <VehicleFormDialog
+          vehicle={v}
+          kind="trailer"
+          truck={null}
+          label={v.plate}
+          taken={taken}
+          today={today}
+          hitched={history.current ? { what: `Va en el ${nameOf(history.current.truckKey)}`, fromOn: history.current.fromOn } : null}
+          onClose={() => setEditing(null)}
+          onDone={done}
+          onConflict={conflict}
+        />
+      )}
       {editing?.kind === 'annul' && <AnnulHitchDialog hitch={editing.hitch} what={`${title} en el ${nameOf(editing.hitch.truckKey)}`} onClose={() => setEditing(null)} onDone={done} onConflict={conflict} />}
     </div>
   );

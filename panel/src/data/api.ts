@@ -701,7 +701,7 @@ export interface HitchRequest {
 
 /**
  * A trailer on a truck from a day, in one step: the trailer the truck had and the truck the trailer was on stay until the
- * day before. If someone changed either meanwhile, nothing is saved (ConflictError).
+ * day before. If someone changed either meanwhile, or gave either away (55000), nothing is saved (ConflictError).
  */
 export async function hitchTrailer(r: HitchRequest): Promise<HitchRow> {
   const result = await supabase.rpc('trf_fleet_hitch', {
@@ -713,7 +713,7 @@ export async function hitchTrailer(r: HitchRequest): Promise<HitchRow> {
     p_trailer_current: r.trailerNow,
     p_notes: r.notes,
   });
-  if (result.error?.code === '40001') throw new ConflictError(result.error.message, result.error.code);
+  if (result.error?.code === '40001' || result.error?.code === '55000') throw new ConflictError(result.error.message, result.error.code);
   return rows(result);
 }
 

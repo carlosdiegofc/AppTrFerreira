@@ -147,16 +147,41 @@ test('un acoplado nuevo lleva su propia matrícula, se da de baja y queda con su
   await expect(card(page, 'Datos')).toContainText('Capacidad de carga20 m³');
   await expect(card(page, 'Camión')).toContainText('No va en ningún camión.');
 
-  // Sold: the card stays, out of the trailers in use.
+  // It goes on the Iveco since the 12th.
+  await open(page, 'Flota');
+  await trucks(page).getByRole('link', { name: 'Iveco Stralis · MNO7890' }).click();
+  await card(page, 'Acoplado').getByRole('button', { name: 'Enganchar' }).click();
+  const hitch = page.getByRole('dialog', { name: 'Enganchar un acoplado al Iveco Stralis · MNO7890' });
+  await hitch.getByLabel('Acoplado').selectOption({ label: 'Volcadora Randon · VOL5005' });
+  await hitch.getByLabel('Desde el').fill('2026-10-12');
+  await hitch.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Volcadora Randon · VOL5005 enganchado al Iveco Stralis · MNO7890 desde el 12/10/2026.');
+  await card(page, 'Acoplado').getByRole('link', { name: 'Volcadora Randon · VOL5005' }).click();
+  await expect(page.getByRole('heading', { name: 'Volcadora Randon · VOL5005', level: 1 })).toBeVisible();
+
+  // Sold: it stops going on the Iveco from that day, and the card stays, out of the trailers in use.
   await page.getByRole('button', { name: 'Editar ficha' }).click();
   const edit = page.getByRole('dialog', { name: 'Acoplado VOL5005' });
   await edit.getByLabel('Se vendió o dejó de usarse (la ficha queda guardada, con su historial)').check();
   await expect(edit.getByLabel('Desde el')).toHaveValue('2026-10-15');
+  await expect(edit).toContainText('Va en el Iveco Stralis · MNO7890 desde el 12/10/2026: queda desenganchado desde este día.');
+  await edit.getByText('queda desenganchado desde este día').scrollIntoViewIfNeeded();
+  await shot(page, 'flota-baja');
+  await edit.getByLabel('Desde el').fill('2026-10-12');
   await edit.getByLabel('Motivo').fill('Vendido');
   await edit.getByRole('button', { name: 'Guardar', exact: true }).click();
-  await expect(page.getByRole('status')).toContainText('Ficha guardada.');
+  await expect(edit).toContainText('Tiene que ser posterior al 12/10/2026, cuando se enganchó. Si ese enganche fue un error, anulalo.');
+  await edit.getByLabel('Desde el').fill('2026-10-15');
+  await edit.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Ficha guardada. Quedó desenganchado desde el 15/10/2026.');
   await expect(page.locator('.page-sub')).toContainText('Dado de baja el 15/10/2026');
   await expect(card(page, 'Datos')).toContainText('Se dio de baja el 15/10/2026 (vendido)');
+  const truck = card(page, 'Camión');
+  await expect(truck).toContainText('Se dio de baja: ya no va en ningún camión.');
+  await expect(truck.getByRole('list', { name: 'Camiones en los que fue antes' })).toContainText('Iveco Stralis · MNO7890Del 12/10/2026 al 14/10/2026');
+  await page.getByRole('button', { name: 'Flota' }).click();
+  await expect(card(page, 'Acoplado')).toContainText('No lleva acoplado.');
+  await expect(card(page, 'Acoplado').getByRole('list', { name: 'Acoplados que llevó antes' })).toContainText('Volcadora Randon · VOL5005');
 
   await open(page, 'Flota');
   const views = page.getByRole('group', { name: 'Vista' });

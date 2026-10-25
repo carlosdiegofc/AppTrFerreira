@@ -280,6 +280,8 @@ export function validateVehicle(
   today: string,
   identity: { plate: string; key: string } | null,
   taken: ReadonlySet<string>,
+  /** The day its hitch of now started, for a card not given away yet: the database closes it the day before the sale. */
+  hitchedFrom: string | null = null,
 ): { row: VehicleCardRow | null; errors: Partial<Record<VehicleField, string>> } {
   const errors: Partial<Record<VehicleField, string>> = {};
   let plate = '';
@@ -324,6 +326,7 @@ export function validateVehicle(
   if (v.gone) {
     if (!isDay(v.leftOn)) errors.leftOn = 'Elegí el día en que se vendió o dejó de usarse.';
     else if (v.leftOn > today) errors.leftOn = 'No puede ser posterior a hoy.';
+    else if (hitchedFrom !== null && v.leftOn <= hitchedFrom) errors.leftOn = `Tiene que ser posterior al ${formatDay(hitchedFrom)}, cuando se enganchó. Si ese enganche fue un error, anulalo.`;
   }
   if (Object.keys(errors).length > 0) return { row: null, errors };
   return {

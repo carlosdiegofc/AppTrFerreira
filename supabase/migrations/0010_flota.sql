@@ -4,7 +4,7 @@
 -- existentes. La lista de camiones sigue siendo la del catálogo que usa la app (trf_mobile_catalog): la ficha se une a su
 -- camión por la matrícula, con la misma clave que el tanque (trf_tank_settings). Las ven y las cargan solo las cuentas del
 -- panel. Nada se borra: un camión o un acoplado que se vende queda con su fecha de baja, y un enganche mal cargado se
--- anula.
+-- anula. Al darlo de baja deja de llevar su acoplado, o de ir en su camión, desde ese día.
 
 -- La ficha de un camión del catálogo o de un acoplado.
 create table public.trf_fleet_units (
@@ -125,7 +125,8 @@ create trigger trf_fleet_hitches_touch before insert or update on public.trf_fle
   for each row execute function trf_private.fleet_touch();
 
 -- Un enganche es de un acoplado, y sus días no se pisan con otro del mismo acoplado ni con otro del mismo camión (los
--- anulados no cuentan). Dos cambios a la vez del mismo camión o del mismo acoplado se hacen uno después del otro.
+-- anulados no cuentan). Un camión o un acoplado dado de baja no queda enganchado. Dos cambios a la vez del mismo camión
+-- o del mismo acoplado se hacen uno después del otro.
 create function trf_private.fleet_hitch_check()
 returns trigger
 language plpgsql
@@ -142,6 +143,13 @@ begin
   end if;
   perform pg_advisory_xact_lock(hashtextextended('trf_fleet_hitches truck ' || new.truck_key, 0));
   perform pg_advisory_xact_lock(hashtextextended('trf_fleet_hitches trailer ' || new.trailer_id::text, 0));
+  if new.to_on is null and exists (
+    select 1 from public.trf_fleet_units u
+    where u.left_on is not null
+      and ((u.kind = 'trailer' and u.id = new.trailer_id) or (u.kind = 'truck' and u.vehicle_key = new.truck_key))
+  ) then
+    raise exception 'Ese camión o ese acoplado está dado de baja' using errcode = '55000';
+  end if;
   if exists (
     select 1 from public.trf_fleet_hitches h
     where h.id <> new.id and h.deleted_at is null
@@ -155,8 +163,41 @@ end;
 $$;
 revoke all on function trf_private.fleet_hitch_check() from public, anon, authenticated;
 
-create trigger trf_fleet_hitches_check before insert or update on public.trf_fleet_hitches
+-- Después de trf_fleet_hitches_touch (los disparadores corren por orden alfabético): revisa el enganche como queda.
+create trigger trf_fleet_hitches_verify before insert or update on public.trf_fleet_hitches
   for each row execute function trf_private.fleet_hitch_check();
+
+-- Un camión o un acoplado que se da de baja deja de llevar su acoplado, o de ir en su camión, desde ese día: el enganche
+-- de ahora queda hasta el día anterior, en el historial de los dos. Por eso la baja tiene que ser posterior al día en
+-- que se enganchó. Corre con los permisos de quien guarda la baja.
+create function trf_private.fleet_leave()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if new.kind = 'trailer' then
+    perform pg_advisory_xact_lock(hashtextextended('trf_fleet_hitches trailer ' || new.id::text, 0));
+  else
+    perform pg_advisory_xact_lock(hashtextextended('trf_fleet_hitches truck ' || new.vehicle_key, 0));
+  end if;
+  if exists (
+    select 1 from public.trf_fleet_hitches h
+    where h.to_on is null and h.deleted_at is null and h.from_on >= new.left_on
+      and (case when new.kind = 'trailer' then h.trailer_id = new.id else h.truck_key = new.vehicle_key end)
+  ) then
+    raise exception 'La baja tiene que ser posterior al día en que se enganchó' using errcode = '23514';
+  end if;
+  update public.trf_fleet_hitches h set to_on = new.left_on - 1
+  where h.to_on is null and h.deleted_at is null
+    and (case when new.kind = 'trailer' then h.trailer_id = new.id else h.truck_key = new.vehicle_key end);
+  return null;
+end;
+$$;
+revoke all on function trf_private.fleet_leave() from public, anon, authenticated;
+
+create trigger trf_fleet_units_leave after update on public.trf_fleet_units
+  for each row when (old.left_on is null and new.left_on is not null) execute function trf_private.fleet_leave();
 
 -- El mismo historial privado que el tanque de cada camión (migración 0009): cada alta y cada cambio, con quién lo hizo y
 -- cómo quedó antes y después.

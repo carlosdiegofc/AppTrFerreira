@@ -152,9 +152,12 @@ function TruckPage({ t, now }: { t: TruckView; now: number }) {
         <Card
           title="Acoplado"
           action={
-            <button type="button" className="btn" onClick={() => open({ kind: 'hitch' })}>
-              <Icon name={history.current ? 'edit' : 'plus'} size={18} /> {history.current ? 'Cambiar' : 'Enganchar'}
-            </button>
+            // One given away takes no trailer.
+            card?.leftOn ? undefined : (
+              <button type="button" className="btn" onClick={() => open({ kind: 'hitch' })}>
+                <Icon name={history.current ? 'edit' : 'plus'} size={18} /> {history.current ? 'Cambiar' : 'Enganchar'}
+              </button>
+            )
           }
         >
           {history.current ? (
@@ -174,6 +177,8 @@ function TruckPage({ t, now }: { t: TruckView; now: number }) {
                 </button>
               </p>
             </>
+          ) : card?.leftOn ? (
+            <p className="note">Se dio de baja: ya no lleva acoplado.</p>
           ) : (
             <p className="note">No lleva acoplado. Engancháselo cuando lo tenga: se anota desde qué día lo lleva.</p>
           )}
@@ -349,7 +354,18 @@ function TruckPage({ t, now }: { t: TruckView; now: number }) {
 
       <PhotoDialog photo={photo} onClose={() => setPhoto(null)} />
       {editing?.kind === 'card' && (
-        <VehicleFormDialog vehicle={card} kind="truck" truck={t.truck} label={t.label} taken={taken} today={today} onClose={() => setEditing(null)} onDone={done} onConflict={conflict} />
+        <VehicleFormDialog
+          vehicle={card}
+          kind="truck"
+          truck={t.truck}
+          label={t.label}
+          taken={taken}
+          today={today}
+          hitched={history.current ? { what: `Lleva ${trailer ? `el ${trailerLabel(trailer)}` : 'un acoplado'}`, fromOn: history.current.fromOn } : null}
+          onClose={() => setEditing(null)}
+          onDone={done}
+          onConflict={conflict}
+        />
       )}
       {editing?.kind === 'hitch' && (
         <HitchDialog

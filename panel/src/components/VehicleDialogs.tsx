@@ -208,6 +208,7 @@ export function VehicleFormDialog({
   onDone,
   onConflict,
   onCreated,
+  hitched = null,
 }: Common & {
   /** The card to change; null makes a new one. */
   vehicle: Vehicle | null;
@@ -219,11 +220,16 @@ export function VehicleFormDialog({
   /** The keys of every other truck and trailer: a trailer's plate is its own. */
   taken: ReadonlySet<string>;
   onCreated?: (saved: VehicleRow) => void;
+  /** What it goes with now («Lleva el Semirremolque Randon · REM1001», «Va en el Volvo FH 460 · ABC1234») and since when. */
+  hitched?: { what: string; fromOn: string } | null;
 }) {
   const save = useSaveVehicle();
   const [newId] = useState(() => crypto.randomUUID());
   // The card as it was when the form opened: a read meanwhile must not hand a newer version to the stale values.
   const [base] = useState(vehicle);
+  // Giving it away unhitches it from that day (the database closes the hitch the day before); one given away already has
+  // nothing to close.
+  const [hitch] = useState(() => (base && !base.leftOn ? hitched : null));
   const [initial] = useState(() => vehicleFormValues(base, kind === 'truck' ? truck : null));
   const [photo, setPhoto] = useState<PhotoState>({ status: 'keep' });
   const [viewing, setViewing] = useState<Photo | null>(null);
@@ -263,7 +269,7 @@ export function VehicleFormDialog({
       f.setFormError('Esperá a que termine de prepararse la foto.');
       return;
     }
-    const { row, errors } = validateVehicle(v, kind, today, kind === 'truck' ? truckIdentity(base, truck) : null, taken);
+    const { row, errors } = validateVehicle(v, kind, today, kind === 'truck' ? truckIdentity(base, truck) : null, taken, hitch?.fromOn ?? null);
     if (!f.check(errors) || !row) return;
     if (base && !f.dirty) return onClose();
     const upload = photo.status === 'ready' ? { path: `${id}/${photo.fileId}.jpg`, jpeg: photo.jpeg } : null;
@@ -275,7 +281,15 @@ export function VehicleFormDialog({
         onCreated?.(saved);
         return;
       }
-      onDone(base ? 'Ficha guardada.' : kind === 'truck' ? `Ficha de ${label} creada.` : `Acoplado ${row.plate} cargado.`);
+      onDone(
+        !base
+          ? kind === 'truck'
+            ? `Ficha de ${label} creada.`
+            : `Acoplado ${row.plate} cargado.`
+          : hitch && row.left_on
+            ? `Ficha guardada. Quedó desenganchado desde el ${formatDay(row.left_on)}.`
+            : 'Ficha guardada.',
+      );
       if (!base) onCreated?.(saved);
     } catch (err) {
       if (err instanceof ConflictError) return onConflict();
@@ -411,7 +425,12 @@ export function VehicleFormDialog({
         )}
         {base && v.gone && (
           <div className="form-grid">
-            {f.field('leftOn', 'Desde el', <input {...f.props('leftOn')} type="date" value={v.leftOn} max={today} onChange={(e) => f.set('leftOn', e.target.value)} />)}
+            {f.field(
+              'leftOn',
+              'Desde el',
+              <input {...f.props('leftOn')} type="date" value={v.leftOn} max={today} onChange={(e) => f.set('leftOn', e.target.value)} />,
+              hitch ? `${hitch.what} desde el ${formatDay(hitch.fromOn)}: queda desenganchado desde este día.` : undefined,
+            )}
             {f.field(
               'leftReason',
               'Motivo',
