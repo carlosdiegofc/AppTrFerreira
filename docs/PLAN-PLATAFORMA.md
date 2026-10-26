@@ -17,7 +17,7 @@ El diagnóstico completo, el esquema de la base (unas 50 tablas), las funciones 
 - **Supabase como núcleo:** Postgres con RLS por empresa, Auth, Storage, Realtime y funciones del servidor (Edge Functions, TypeScript) para todo lo que necesita claves secretas: WhatsApp, IA, lectura de boletas, pagos, exportaciones y licencias.
 - **Multiempresa:** cada fila de negocio lleva `empresa_id`, y `usuarios_empresa` asigna el rol de cada persona en cada empresa (dueño, administrador, operador de tráfico, contable, taller, chofer, solo lectura). El superadministrador de la plataforma va aparte.
 - **Auditoría y papelera:** un trigger registra quién cambió qué y cuándo; borrar manda a la papelera, nunca elimina.
-- **Panel web nuevo** en React + TypeScript, sección por sección. El panel actual (`web/`) sigue en uso hasta que cada sección tenga reemplazo.
+- **Panel web nuevo** en React + TypeScript, sección por sección. Desde el 26/10/2026 está en la dirección principal del panel, y el actual (`web/`) sigue en `/anterior/` hasta que cada sección tenga reemplazo.
 - **App Android:** sigue en Kotlin; pasa de a poco a una base local Room y a módulos, sin cambiar lo que ve el chofer salvo cuando se decida.
 - **Mapas y rutas:** proveedor comercial; los servidores públicos de OpenStreetMap y OSRM no admiten uso comercial.
 
@@ -95,10 +95,11 @@ Va armándose al costado del panel actual y lo reemplaza sección por sección.
    - [x] Nada se borra: un camión o un acoplado que se vende queda con su fecha de baja y su historial, y deja de llevar su acoplado, o de ir en su camión, desde ese día. Un enganche mal cargado se anula.
    - [x] Publicación el 25/10/2026: respaldo completo de estructura y datos (02:29 UTC), probado restaurándolo y con la 0010 final aplicada sobre esa copia, y entregado al dueño fuera del repositorio; 0010 aplicada en producción (18:45 UTC), con los datos que ya estaban sin cambios; panel publicado (despliegue #15, commit 6a581dc). La app no cambia.
 12. [ ] Gastos y finanzas (aprobado el 26/10/2026, etapa 7), en dos partes, cada una con su respaldo y su publicación. Lo ven y lo cargan solo las cuentas del panel, como Choferes, y la app no cambia:
-   - 12a. [ ] Gastos, y el panel nuevo en la dirección principal:
-     - Cada gasto con fecha, tipo (reparación y repuestos, cubiertas, service, seguro, patente e impuestos, peajes en efectivo, multas, lavado, viáticos, otros, o uno escrito a mano), monto en pesos o en dólares, a qué va (un camión, un acoplado, un chofer, un viaje o la empresa), proveedor, forma de pago y la foto o el PDF de la factura, en una carpeta privada. Lo mal cargado se corrige o se anula; no se borra.
-     - El costo de un service hecho se anota como gasto, desde Mantenimiento.
-     - El panel nuevo pasa a la dirección principal: el actual queda en `/anterior/`, y `/nuevo/` lleva a la principal para que no se rompan los enlaces guardados.
+   - 12a. [x] Gastos, y el panel nuevo en la dirección principal:
+     - [x] Cada gasto con fecha, tipo (reparación y repuestos, cubiertas, service, seguro, patente e impuestos, peajes en efectivo, multas, lavado, viáticos, otros, o uno escrito a mano), monto en pesos o en dólares, a qué va (un camión, un acoplado, un chofer, un viaje o la empresa), proveedor, forma de pago y la foto o el PDF de la factura, en una carpeta privada. Lo mal cargado se corrige o se anula; no se borra.
+     - [x] El costo de un service hecho se anota como gasto, desde Mantenimiento.
+     - [x] El panel nuevo pasa a la dirección principal: el actual queda en `/anterior/`, y `/nuevo/` lleva a la principal para que no se rompan los enlaces guardados.
+     - [x] Publicación el 26/10/2026: respaldo completo de estructura y datos (00:52 UTC), probado restaurándolo y con la 0011 aplicada sobre esa copia, y entregado al dueño fuera del repositorio; migración [`0011_gastos.sql`](../supabase/migrations/0011_gastos.sql) aplicada en producción (01:05 UTC), con los datos que ya estaban sin cambios; panel publicado en la dirección principal, con el anterior en `/anterior/` (despliegue #16, commit 9e15a62). La app no cambia.
    - 12b. [ ] Cobros, ganancia y simulador de fletes:
      - La cuenta de cada cliente, como la de cada estación de combustible: lo facturado en sus viajes suma, los cobros restan, con un saldo inicial con fecha. Los clientes salen del nombre escrito en los viajes.
      - La ganancia de cada viaje, de cada camión por mes y de la empresa por mes: lo facturado menos el combustible, los peajes y los gastos, y los sueldos solo en el total de la empresa. Pesos y dólares por separado, y la pantalla dice qué es medido, declarado o estimado.
