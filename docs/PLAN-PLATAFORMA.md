@@ -104,6 +104,12 @@ Va armándose al costado del panel actual y lo reemplaza sección por sección.
      - La cuenta de cada cliente, como la de cada estación de combustible: lo facturado en sus viajes suma, los cobros restan, con un saldo inicial con fecha. Los clientes salen del nombre escrito en los viajes.
      - La ganancia de cada viaje, de cada camión por mes y de la empresa por mes: lo facturado menos el combustible, los peajes y los gastos, y los sueldos solo en el total de la empresa. Pesos y dólares por separado, y la pantalla dice qué es medido, declarado o estimado.
      - El simulador de fletes: con el camión, los kilómetros con carga y de vuelta y los peajes de la ruta, calcula el costo y el precio con el margen que se elija. No guarda las cotizaciones.
+13. [ ] Diseño «vidrio» (aprobado el 26/10/2026, a pedido del dueño con un video de ejemplo; va antes de la parte 12b): todo el panel con tarjetas de vidrio esmerilado sobre un fondo desenfocado. La base y la app no cambian:
+   - [ ] El fondo: una imagen desenfocada de tonos cálidos con luces suaves, hecha para el panel, sin foto. Si el dueño manda una foto suya, se usa esa. En el modo oscuro, el mismo fondo más oscuro.
+   - [ ] El vidrio: tarjetas translúcidas con bordes redondeados y sombra suave, títulos grandes, números grandes con su variación, botones en forma de píldora, y gráficos con curvas suaves, barras redondeadas y anillos. Los colores: el azul de TR Ferreira, y verde, ámbar y rojo para los avisos, como hasta ahora.
+   - [ ] Arriba, una barra flotante con el nombre de quien ingresó (ahí van el tema y «Salir»), un buscador de secciones, camiones, acoplados y choferes, y una campana con los avisos de Inicio. A la izquierda, el menú pasa a una columna de íconos que muestran su nombre al pasar el mouse.
+   - [ ] Sigue todo lo que hay: las 12 secciones con lo que hacen, los modos claro y oscuro y el uso desde el celular. Si la computadora no muestra el vidrio o pide menos transparencias, las tarjetas quedan opacas.
+   - [ ] Se publica con el visto bueno del dueño, sobre capturas de cada sección.
 
 ### App: juegos para las esperas
 Para pasar el rato mientras se espera la carga (aprobado el 21/10/2026). Se juega con el camión parado, y los juegos los ven todas las cuentas.
@@ -129,6 +135,11 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 26/10/2026: Diseño del panel.
+  - El panel toma el estilo «vidrio» del video que mandó el dueño: tarjetas translúcidas sobre un fondo desenfocado, una barra flotante arriba y el menú de íconos a la izquierda.
+  - El fondo es una imagen hecha para el panel, sin foto: desde el entorno de desarrollo no se pueden bajar fotos de bancos de imágenes. Si el dueño manda una foto suya, se usa esa, sabiendo que el panel y el repositorio son públicos.
+  - Los colores son el azul de TR Ferreira, no los del video.
+  - Se hace antes de la parte 12b de Gastos y finanzas.
 - 26/10/2026: Gastos y finanzas.
   - Los cobros a clientes se llevan como la cuenta de cada estación de combustible: lo facturado en los viajes suma, los cobros restan, y hay un saldo inicial con fecha. No se cargan facturas aparte; la factura electrónica de DGI queda para más adelante.
   - En la ganancia de cada camión no se reparten los sueldos: se restan solo en el total del mes de la empresa.
