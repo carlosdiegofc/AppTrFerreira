@@ -6,20 +6,38 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.annotation.SuppressLint
 import android.view.MotionEvent
+import android.view.View
 import org.json.JSONArray
 object TripMap {
+ /** A map on screen: the view that goes in the page, and what frees it when the page changes. */
+ interface Shown{val view:View;fun destroy()}
+ /** The map of the trip in progress: new readings are pushed to it as they are recorded. */
+ interface Live:Shown{fun push(points:List<DoubleArray>)}
+ /** The owner's map of the fleet: new positions every few seconds. */
+ interface Fleet:Shown{fun setMarks(marks:JSONArray)}
+ // Google's map when the build has its key and the phone has Google Play services (decision of 26/10/2026); otherwise
+ // the app's own map below, with OpenStreetMap's streets, as before.
+ fun live(c:Context,destLat:Double,destLng:Double):Live=if(GoogleMaps.usable(c))GoogleMaps.live(c,destLat,destLng) else webLive(c,destLat,destLng)
+ fun view(c:Context,points:JSONArray):Shown=if(GoogleMaps.usable(c))GoogleMaps.view(c,points) else WebShown(webView(c,points))
+ fun fleet(c:Context,marks:JSONArray,glideMs:Long):Fleet=if(GoogleMaps.usable(c))GoogleMaps.fleet(c,marks,glideMs) else WebFleet(webFleet(c,marks,glideMs))
+ private class WebShown(val web:WebView):Shown{override val view:View get()=web;override fun destroy()=web.destroy()}
+ private class WebFleet(val web:WebView):Fleet{
+  override val view:View get()=web;override fun destroy()=web.destroy()
+  override fun setMarks(marks:JSONArray)=web.evaluateJavascript("window.setMarks&&setMarks(${marks.toString().replace("<","\\u003c")})",null)
+ }
  private const val TILES_JS="""const osm='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
   const styles={streets:['https://tile.openstreetmap.org/{z}/{x}/{y}.png',19,osm],terrain:['https://a.tile.opentopomap.org/{z}/{x}/{y}.png',17,osm+' · SRTM · OpenTopoMap (CC-BY-SA)'],satellite:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',19,'Tiles © Esri · Vantor · Earthstar Geographics · GIS User Community']};let base;let references=[];
   function changeStyle(){if(base)map.removeLayer(base);references.forEach(layer=>map.removeLayer(layer));references=[];const v=styles[document.getElementById('style').value];document.getElementById('notice').textContent='';base=L.tileLayer(v[0],{maxNativeZoom:v[1],maxZoom:19,referrerPolicy:'strict-origin-when-cross-origin',attribution:v[2]}).on('tileerror',()=>{document.getElementById('notice').textContent='Vista no disponible. Probá Rutas y ciudades.'}).addTo(map);base.bringToBack();if(document.getElementById('style').value==='satellite')references=['World_Transportation','World_Boundaries_and_Places'].map((name,index)=>L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/'+name+'/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,zIndex:2+index,referrerPolicy:'strict-origin-when-cross-origin',attribution:'References © Esri, HERE, Garmin, OpenStreetMap contributors'}).on('tileerror',()=>{document.getElementById('notice').textContent='No se pudieron cargar algunas rutas o nombres. Probá Rutas y ciudades.'}).addTo(map))}document.getElementById('style').onchange=changeStyle;changeStyle();"""
 
  /** Map of the trip in progress: draws the recorded route, follows the truck and, when a destination exists, the road route to it. */
- class Live(val web:WebView){
+ private class WebLive(val web:WebView):Live{
   private var ready=false;private val queue=mutableListOf<String>()
+  override val view:View get()=web;override fun destroy()=web.destroy()
   fun onReady(){ready=true;queue.forEach{web.evaluateJavascript(it,null)};queue.clear()}
   private fun run(js:String){if(ready)web.evaluateJavascript(js,null) else queue.add(js)}
-  fun push(points:List<DoubleArray>){points.chunked(1500).forEach{run("addPoints("+JSONArray(it.map{p->JSONArray(p.toList())}).toString()+")")}}
+  override fun push(points:List<DoubleArray>){points.chunked(1500).forEach{run("addPoints("+JSONArray(it.map{p->JSONArray(p.toList())}).toString()+")")}}
  }
- @SuppressLint("SetJavaScriptEnabled","ClickableViewAccessibility") fun live(c:Context,destLat:Double,destLng:Double):Live{
+ @SuppressLint("SetJavaScriptEnabled","ClickableViewAccessibility") private fun webLive(c:Context,destLat:Double,destLng:Double):Live{
   val js=c.assets.open("map/leaflet.js").bufferedReader().use{it.readText()};val css=c.assets.open("map/leaflet.css").bufferedReader().use{it.readText()}
   val dest=if(destLat.isFinite()&&destLng.isFinite()&&destLat in -90.0..90.0&&destLng in -180.0..180.0)"[$destLat,$destLng]" else "null"
   val html="""<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="strict-origin-when-cross-origin"><style>$css html,body{height:100%;margin:0}body{display:flex;flex-direction:column;font-family:sans-serif}#map{flex:1;min-height:0}header{padding:6px 8px;background:white;color:#172b45;display:flex;gap:6px;align-items:center}select{font-size:14px;padding:6px;border:1px solid #bbb;border-radius:6px;flex:1;min-width:0}#notice{font-size:12px;color:#9a3010;padding:0 8px}#eta{font-size:13px;font-weight:bold;color:#172b45;padding:4px 8px;background:#eef4ff}.ctl{position:absolute;right:8px;bottom:28px;z-index:1000;display:flex;flex-direction:column;gap:6px}.ctl button{font-size:14px;padding:10px 12px;border:0;border-radius:10px;background:#1c64f2;color:white;box-shadow:0 1px 4px rgba(0,0,0,.4)}</style></head><body><header><select id="style" aria-label="Vista del mapa"><option value="streets">Rutas y ciudades</option><option value="terrain">Relieve</option><option value="satellite">Satélite + rutas</option></select></header><div id="eta" style="display:none"></div><div id="notice" role="status"></div><div id="map"></div><div class="ctl"><button id="center" style="display:none">Centrar</button><button id="whole">Ver todo</button></div><script>$js</script><script>
@@ -41,12 +59,12 @@ object TripMap {
   </script></body></html>"""
   val web=WebView(c).apply{settings.javaScriptEnabled=true;settings.allowFileAccess=false;settings.allowContentAccess=false;settings.mixedContentMode=WebSettings.MIXED_CONTENT_NEVER_ALLOW
    setOnTouchListener{v,e->if(e.action==MotionEvent.ACTION_DOWN||e.action==MotionEvent.ACTION_MOVE)v.parent?.requestDisallowInterceptTouchEvent(true);false}}
-  val map=Live(web)
+  val map=WebLive(web)
   web.webViewClient=object:WebViewClient(){override fun shouldOverrideUrlLoading(view:WebView?,request:WebResourceRequest?)=true;override fun onPageFinished(view:WebView?,url:String?){map.onReady()}}
   web.loadDataWithBaseURL("https://transportes-ferreira-gestion.carlosdiegofc2001.chatgpt.site/",html,"text/html","UTF-8",null)
   return map
  }
- @Suppress("SetJavaScriptEnabled") fun view(c:Context,points:JSONArray):WebView{
+ @Suppress("SetJavaScriptEnabled") private fun webView(c:Context,points:JSONArray):WebView{
   val safe=JSONArray();for(i in 0 until points.length()){val p=points.getJSONObject(i);val lat=p.optDouble("latitude");val lng=p.optDouble("longitude");if(FleetStats.validPosition(lat,lng))safe.put(JSONArray().put(lat).put(lng).put(p.optInt("segment")).put(p.optString("recorded_at")))}
   val js=c.assets.open("map/leaflet.js").bufferedReader().use{it.readText()};val css=c.assets.open("map/leaflet.css").bufferedReader().use{it.readText()}
   val html="""<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="strict-origin-when-cross-origin"><style>$css html,body{height:100%;margin:0}body{display:flex;flex-direction:column;font-family:sans-serif}#map{flex:1;min-height:0}header{padding:8px;background:white;color:#172b45}select{font-size:16px;padding:8px;border:1px solid #bbb;border-radius:6px;max-width:100%}#notice{font-size:12px;color:#9a3010}</style></head><body><header><select id="style" aria-label="Vista del mapa"><option value="streets">Rutas y ciudades</option><option value="terrain">Relieve</option><option value="satellite">Satélite + rutas</option></select><div id="notice" role="status"></div></header><div id="map"></div><script>$js</script><script>
@@ -63,7 +81,7 @@ object TripMap {
   * a trip is, moved in place by setMarks(). Labels are inserted as text, never as HTML.
   * A truck glides to its new position over glideMs, about the time until the next one, instead of jumping.
   */
- @SuppressLint("SetJavaScriptEnabled","ClickableViewAccessibility") fun fleet(c:Context,marks:JSONArray,glideMs:Long):WebView{
+ @SuppressLint("SetJavaScriptEnabled","ClickableViewAccessibility") private fun webFleet(c:Context,marks:JSONArray,glideMs:Long):WebView{
   val js=c.assets.open("map/leaflet.js").bufferedReader().use{it.readText()};val css=c.assets.open("map/leaflet.css").bufferedReader().use{it.readText()}
   val html="""<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="strict-origin-when-cross-origin"><style>$css html,body{height:100%;margin:0}body{display:flex;flex-direction:column;font-family:sans-serif}#map{flex:1;min-height:0}header{padding:6px 8px;background:white;color:#172b45}select{font-size:14px;padding:6px;border:1px solid #bbb;border-radius:6px;max-width:100%}#notice{font-size:12px;color:#9a3010}.tag{font:600 11px sans-serif;color:#111c2e;background:#fff;border:1px solid #cbd3df;border-radius:6px;padding:2px 6px;box-shadow:none}.tag:before{display:none}</style></head><body><header><select id="style" aria-label="Vista del mapa"><option value="streets">Rutas y ciudades</option><option value="terrain">Relieve</option><option value="satellite">Satélite + rutas</option></select><div id="notice" role="status"></div></header><div id="map"></div><script>$js</script><script>
   const marks=${marks.toString().replace("<","\\u003c")};const map=L.map('map').setView([-30.9,-57.3],8);

@@ -233,6 +233,20 @@ La app de Google Play es una app nueva para Android (nombre de paquete `com.tran
 
 Cada versión nueva lleva un número de versión más alto, y GitHub Actions arma su `.aab` solo. En Play Console: *Prueba interna › Crear versión* › subí el `.aab` nuevo › **Lanzar**. Los teléfonos se actualizan desde Google Play sin hacer nada más.
 
+Versión `0.21.0` (código de versión 33). Los mapas de la app pasan a ser de **Google Maps** (su SDK para Android, sin costo), con calles, satélite y tráfico. No cambian los permisos. Antes de subirla:
+- **La clave:** el secreto `GOOGLE_MAPS_ANDROID_KEY` tiene que estar en GitHub antes de armar el `.aab` ([GOOGLE-MAPS.md](../GOOGLE-MAPS.md)). Sin él, la versión sale con el mapa de siempre.
+- **La política de privacidad** ya dice que los mapas son de Google (actualizada el 26/10/2026). El enlace de la ficha la muestra actualizada, y la app la lleva adentro desde esta versión.
+- **Seguridad de los datos:**
+  - Según Google, el SDK de mapas recopila datos técnicos: metadatos del teléfono y de los pedidos, informes de fallas, la dirección de internet y un identificador del SDK.
+  - En la tabla corresponde sumar, por lo menos, *Información y rendimiento de la app › Registros de fallas* y *Diagnóstico*, y *Dispositivo u otros IDs*.
+  - Antes de completar el formulario, revisá cómo los clasifica Google en [su página para Play](https://developers.google.com/maps/documentation/android-sdk/play-data-disclosure?hl=es-419) y marcalos así. Esa página refleja la última versión del SDK.
+
+```text
+<es-419>
+• Mapas de Google: calles, satélite y tráfico en el viaje, en el recorrido y en la flota.
+</es-419>
+```
+
 Versión `0.19.0` (código de versión 31). Suma el **truco uruguayo** en Juegos: contra el teléfono, con flor y a 30 (15 malas y 15 buenas), con las mismas reglas del ajedrez para jugar (con el camión parado) y la partida solo en el teléfono. No cambian los permisos, los datos recopilados ni la política de privacidad. El truco se juega por puntos, sin dinero, fichas, premios ni compras, y sin otros usuarios: la clasificación de contenido no debería cambiar. Si la 0.18.0 no llegó a subirse, se sube directamente esta, que la incluye (y con ella lo de las versiones anteriores, como dice la 0.18.0). Antes de lanzarla, probala en un teléfono: **Juegos › Truco**, una mano entera contra el teléfono con algún canto, **Siguiente mano**, y salir y volver a entrar (la partida sigue donde quedó). Notas de la versión si ya está subida la 0.18.0:
 
 ```text
