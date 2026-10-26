@@ -4,7 +4,7 @@
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { type RefObject, useEffect, useRef } from 'react';
-import { DEFAULT_CENTER, DEFAULT_ZOOM, LIVE_REFRESH_MS, TILE_ATTRIBUTION, TILE_URL } from '../config';
+import { DEFAULT_CENTER, DEFAULT_ZOOM, LIVE_REFRESH_MS } from '../config';
 import { mapView } from './mapView';
 import type { RoutePoint } from '../data/api';
 import { type FleetUnit, STATE_LABEL, unitTitle } from '../lib/fleet';
@@ -157,8 +157,8 @@ export function FleetMap({
       fadeAnimation: !still,
       markerZoomAnimation: !still,
     }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-    const undoView = tools ? mapView(m, { full: () => fullTarget?.current ?? null }) : null;
-    if (!tools) L.tileLayer(TILE_URL, { maxZoom: 18, attribution: TILE_ATTRIBUTION }).addTo(m);
+    // Inicio's small map has only the base: Google's streets with a key, without the switch or the full screen.
+    const undoView = tools ? mapView(m, { full: () => fullTarget?.current ?? null }) : mapView(m, { controls: false });
     routeLayer.current = L.layerGroup().addTo(m);
     map.current = m;
     const resize = new ResizeObserver(() => m.invalidateSize());
@@ -169,7 +169,7 @@ export function FleetMap({
       frame.current = 0;
       resize.disconnect();
       known.clear();
-      undoView?.();
+      undoView();
       m.remove();
       map.current = null;
     };

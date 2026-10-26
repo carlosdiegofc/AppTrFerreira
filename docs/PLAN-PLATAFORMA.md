@@ -110,7 +110,7 @@ Va armándose al costado del panel actual y lo reemplaza sección por sección.
    - [ ] La variación de los números grandes contra el período anterior, como en el video («↑ 6 % más que el mes pasado»): quedó fuera de lo publicado y va con la parte 12b.
    - [x] Arriba, una barra flotante con el nombre de quien ingresó (ahí van el tema y «Salir»), un buscador de secciones, camiones, acoplados y choferes, y una campana con los avisos de Inicio. A la izquierda, el menú pasa a una columna de íconos que muestran su nombre al pasar el mouse.
    - [x] Sigue todo lo que hay: las 12 secciones con lo que hacen, los modos claro y oscuro y el uso desde el celular. Si la computadora no muestra el vidrio o pide menos transparencias, las tarjetas quedan opacas.
-   - [ ] Se publica con el visto bueno del dueño, sobre capturas de cada sección. El dueño lo aprobó el 26/10/2026.
+   - [x] Publicación el 26/10/2026: el dueño lo aprobó sobre las capturas de cada sección; panel publicado (despliegue #17, commit 2e26ec3). La base y la app no cambian.
 
 ### App: juegos para las esperas
 Para pasar el rato mientras se espera la carga (aprobado el 21/10/2026). Se juega con el camión parado, y los juegos los ven todas las cuentas.
@@ -136,6 +136,11 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 26/10/2026: Mapa de Google.
+  - El panel y la app pasan al mapa de Google: calles, satélite y tráfico en vivo. Las condiciones de Google no permiten mostrar su satélite ni su tráfico junto a un mapa de otra empresa, así que OpenStreetMap queda solo de respaldo: sin la clave o cuando Google no responde.
+  - El panel usa la Map Tiles API: 100.000 imágenes gratis por mes y después US$ 0,60 cada 1.000. El tope es de unos US$ 10 por mes, con una cuota diaria y una alerta de presupuesto.
+  - La app usa el mapa de Google para Android, que no tiene costo.
+  - La cuenta de Google Cloud y las claves las crea el dueño. Las claves van como secretos de GitHub, nunca en el repositorio.
 - 26/10/2026: Diseño del panel.
   - El panel toma el estilo «vidrio» del video que mandó el dueño: tarjetas translúcidas sobre un fondo desenfocado, una barra flotante arriba y el menú de íconos a la izquierda.
   - El fondo es una imagen hecha para el panel, sin foto: desde el entorno de desarrollo no se pueden bajar fotos de bancos de imágenes. Si el dueño manda una foto suya, se usa esa, sabiendo que el panel y el repositorio son públicos.
@@ -208,7 +213,7 @@ Antes de tocar datos reales:
 - Entorno de pruebas: un segundo proyecto gratis de Supabase.
 - Rol de cada cuenta actual: dueños, choferes y la cuenta de revisión de Google, que iría a una empresa de demostración.
 
-Más adelante: proveedor de mapas, método de lectura de boletas, modelo de IA y cupo por plan, transcripción de audios, medio de pago, facturación electrónica (CFE), monedas, nombre comercial, cuánto tiempo se guarda el GPS en el plan FREE y publicidad.
+Más adelante: método de lectura de boletas, modelo de IA y cupo por plan, transcripción de audios, medio de pago, facturación electrónica (CFE), monedas, nombre comercial, cuánto tiempo se guarda el GPS en el plan FREE y publicidad.
 
 ### Para presentar más adelante
 - **Viajes de vinasa automáticos** (pedido del 19/10/2026; se presenta como etapa antes de programarla):
@@ -239,9 +244,17 @@ Más adelante: proveedor de mapas, método de lectura de boletas, modelo de IA y
 ### GPS: mapa satelital, pantalla completa, peajes y balanzas (aprobado el 22/10/2026)
 - [x] Pantalla completa en el mapa de GPS en vivo (con «Ver todos») y en el de cada viaje; Esc o el mismo botón la cierran. El mapa de Inicio queda igual.
 - [x] Vista satelital de Google Maps (Map Tiles API) en esos dos mapas: las fotos con las rutas, calles y nombres encima, debajo de los camiones, los recorridos y los puntos, con el logo y los créditos de Google. Aparece cuando el panel tiene la clave de Google Maps (secreto `GOOGLE_MAPS_KEY`); los pasos para crearla están en [panel/README.md](../panel/README.md).
-- [ ] La clave de Google Maps: la crea el dueño en Google Cloud, con una cuenta de facturación.
+- [ ] La clave de Google Maps: la crea el dueño en Google Cloud, con una cuenta de facturación. Sigue en «Mapa de Google en el panel y la app».
 - [x] Los 15 peajes de las rutas nacionales, los 2 de los puentes a Argentina y los 24 puestos de balanza del MTOP, con la ubicación del Geoportal del MTOP comparada con OpenStreetMap y revisada en la foto satelital (migración 0006, solo agrega; detalle en [GPS-CONTROL-RUTA.md](GPS-CONTROL-RUTA.md)). Los 3 peajes ya cargados estaban en el lugar justo y no se tocan.
 - [x] El logo oficial de Google Maps y su enlace a los términos en los créditos de la vista satelital, como piden las condiciones de la Map Tiles API.
 - [x] Los 122 radares del MTOP (pedido el 22/10/2026), con la ubicación del Geoportal comparada con las calles y los radares de OpenStreetMap (migración 0007, solo agrega; detalle en [GPS-CONTROL-RUTA.md](GPS-CONTROL-RUTA.md)). Van sin velocidad máxima: se carga en cada uno desde el panel.
 - [x] Publicación el 22/10/2026: respaldo completo de estructura y datos (04:02 UTC), probado restaurándolo y entregado al dueño fuera del repositorio; 0006 aplicada en producción, con 14 peajes y 24 balanzas nuevos, y los 3 peajes y los puntos propios sin cambios; panel publicado (despliegue #12, commit 2f5e1ba).
 - [x] Publicación de los radares el 23/10/2026, junto con Choferes (mismo respaldo): 0007 aplicada en producción, con los 122 radares iguales a los del archivo y los 49 puntos que ya estaban sin cambios; panel publicado (despliegue #13, commit fd4495e).
+
+### Mapa de Google en el panel y la app (aprobado el 26/10/2026)
+Pedido del dueño: un mejor mapa. Todo el mapa pasa a ser de Google, con calles, satélite y tráfico en vivo; OpenStreetMap queda solo de respaldo (ver decisiones).
+- [ ] La cuenta de Google Cloud con facturación y dos claves, una para el panel y otra para la app, con un tope de unos US$ 10 por mes: una cuota diaria de la Map Tiles API y una alerta de presupuesto. La crea el dueño, con la guía de [GOOGLE-MAPS.md](GOOGLE-MAPS.md).
+- [x] Panel: calles, satélite y tráfico de Google (Map Tiles API) en GPS en vivo, en cada viaje y en el mapa de Inicio, con el logo y los créditos de Google. Sin clave, o si Google no responde (por ejemplo, al llegar al tope del día), el mapa vuelve a OpenStreetMap y lo dice.
+- [ ] App 0.21.0: el mapa de Google para Android (Maps SDK, sin costo) en el viaje en curso, en el recorrido de cada viaje y en la flota, con calles, satélite y tráfico. La clave entra al compilar, desde un secreto de GitHub; sin ella sigue el mapa de ahora.
+- [ ] La política de privacidad y la sección de seguridad de los datos de Google Play dicen que la app muestra mapas de Google.
+- [ ] Publicación: el panel cuando estén las claves, y la app en una versión nueva para Google Play.

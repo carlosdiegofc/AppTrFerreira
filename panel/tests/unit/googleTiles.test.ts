@@ -1,10 +1,35 @@
 import { describe, expect, it } from 'vitest';
-import { keptSession, maxZoomAt, readSession, readViewport, SESSION_REQUEST, sessionUrl, tileUrl, viewportUrl } from '../../src/lib/googleTiles';
+import { keptSession, maxZoomAt, NIGHT_STYLES, readSession, readViewport, sessionName, sessionRequest, sessionUrl, tileUrl, viewportUrl } from '../../src/lib/googleTiles';
 
-describe('vista satelital de Google (Map Tiles API)', () => {
-  it('pide satélite con las rutas y los nombres, en español, desde Uruguay', () => {
-    expect(SESSION_REQUEST).toEqual({ mapType: 'satellite', language: 'es-419', region: 'UY', layerTypes: ['layerRoadmap'] });
+describe('el mapa de Google (Map Tiles API)', () => {
+  const day = { sharp: false, dark: false };
+  it('pide las calles, el satélite con las rutas y los nombres, o el tráfico solo, en español, desde Uruguay', () => {
+    expect(sessionRequest('roadmap', day)).toEqual({ mapType: 'roadmap', language: 'es-419', region: 'UY' });
+    expect(sessionRequest('satellite', day)).toEqual({ mapType: 'satellite', language: 'es-419', region: 'UY', layerTypes: ['layerRoadmap'] });
+    expect(sessionRequest('traffic', day)).toEqual({ mapType: 'roadmap', language: 'es-419', region: 'UY', layerTypes: ['layerTraffic'], overlay: true, imageFormat: 'png' });
     expect(sessionUrl('a b')).toBe('https://tile.googleapis.com/v1/createSession?key=a%20b');
+  });
+
+  it('de noche, las calles con los colores nocturnos de Google; el satélite y el tráfico no cambian', () => {
+    const night = { sharp: false, dark: true };
+    expect(sessionRequest('roadmap', night)).toEqual({ mapType: 'roadmap', language: 'es-419', region: 'UY', styles: NIGHT_STYLES });
+    expect(sessionRequest('satellite', night)).toEqual(sessionRequest('satellite', day));
+    expect(sessionRequest('traffic', night)).toEqual(sessionRequest('traffic', day));
+  });
+
+  it('en una pantalla de alta densidad, imágenes de 512 píxeles con los nombres del tamaño de siempre', () => {
+    const sharp = { sharp: true, dark: false };
+    expect(sessionRequest('roadmap', sharp)).toEqual({ mapType: 'roadmap', language: 'es-419', region: 'UY', scale: 'scaleFactor2x', highDpi: true });
+    expect(sessionRequest('traffic', sharp)).toMatchObject({ layerTypes: ['layerTraffic'], overlay: true, scale: 'scaleFactor2x', highDpi: true });
+  });
+
+  it('guarda una sesión por cada pedido distinto', () => {
+    const names = ['roadmap', 'satellite', 'traffic'].flatMap((layer) =>
+      [false, true].flatMap((sharp) => [false, true].map((dark) => sessionName(layer as 'roadmap', { sharp, dark }))),
+    );
+    expect(new Set(names)).toEqual(
+      new Set(['trf-google-roadmap', 'trf-google-roadmap-2x', 'trf-google-roadmap-noche', 'trf-google-roadmap-noche-2x', 'trf-google-satellite', 'trf-google-satellite-2x', 'trf-google-traffic', 'trf-google-traffic-2x']),
+    );
   });
 
   it('lee la sesión que devuelve Google: el vencimiento viene en segundos, como texto', () => {

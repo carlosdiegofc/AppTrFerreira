@@ -70,16 +70,17 @@ El workflow *Publicar panel web* (Actions → Run workflow, desde `main`) public
 ## Pruebas de punta a punta
 Corren en un navegador real contra PostgREST y una base local creada con todas las migraciones de [`supabase/migrations`](../supabase/migrations) y datos inventados (`tests/e2e/db/seed.sql`). Nunca tocan producción. Detalle en [tests/e2e/README.md](tests/e2e/README.md). GitHub las corre en cada cambio del panel o de la base (workflow *Probar panel nuevo y base*) y guarda las capturas de pantalla.
 
-## Vista satelital y pantalla completa
-El mapa de GPS en vivo y el de cada viaje tienen un botón de pantalla completa (Esc o el mismo botón la cierran) y, cuando el panel tiene una clave de Google Maps, la opción «Satélite»: las fotos satelitales de Google con sus rutas, calles y nombres, en el mismo mapa y debajo de los camiones, los recorridos y los puntos (decisión del 22/10/2026). Llegan por la Map Tiles API de Google, con su logo y sus créditos, y la elección queda guardada en ese navegador. Sin la clave, los mapas se ven como siempre. El mapa chico de Inicio queda igual.
+## Mapa de Google y pantalla completa
+Con la clave de Google Maps, los mapas del panel son de Google (decisiones del 22/10/2026 y del 26/10/2026):
+- «Mapa»: las calles de Google; de noche, con sus colores nocturnos.
+- «Satélite»: las fotos satelitales con las rutas, las calles y los nombres encima.
+- «Tráfico»: el tránsito de ahora, encima de cualquiera de los dos; se actualiza cada 15 minutos mientras se ve.
 
-Para activarla, una sola vez:
-1. En [Google Cloud Console](https://console.cloud.google.com/), con la cuenta de la empresa: crear un proyecto, asociarle una cuenta de facturación (Google la pide aunque el uso entre en lo gratuito) y habilitar **Map Tiles API**.
-2. En *APIs y servicios › Credenciales*, crear una **clave de API** y restringirla: en *Restricciones de aplicaciones*, *Sitios web* con `https://carlosdiegofc.github.io/*`; en *Restricciones de API*, solo **Map Tiles API**.
-3. En GitHub, *Settings › Secrets and variables › Actions › New repository secret*: nombre `GOOGLE_MAPS_KEY`, y la clave como valor.
-4. Publicar el panel (*Actions › Publicar panel web › Run workflow*).
+Van en GPS en vivo, en cada viaje y en el mapa chico de Inicio, que muestra solo las calles. Llegan por la Map Tiles API, con el logo y los créditos de Google, debajo de los camiones, los recorridos y los puntos. La elección queda guardada en ese navegador. GPS en vivo y cada viaje tienen además pantalla completa: Esc o el mismo botón la cierran.
 
-La clave queda dentro del panel publicado, como la de Supabase: es una clave de navegador, por eso se limita a este sitio y a esa API. Google da 100.000 pedidos por mes sin costo y cobra lo que pase de ahí; cada vez que se abre la vista satelital se piden algunas decenas de imágenes. En la misma consola se ve el uso y se puede poner un tope diario (*Cuotas*).
+Las condiciones de Google no permiten su mapa junto a otro. Por eso OpenStreetMap aparece solo sin la clave, o mientras Google no responde (por ejemplo, al llegar al tope del día): el mapa lo dice y prueba otra vez con Google cada 10 minutos.
+
+La cuenta, las claves y el tope de gasto están en [docs/GOOGLE-MAPS.md](../docs/GOOGLE-MAPS.md). La clave del panel va en el secreto `GOOGLE_MAPS_KEY` y entra al publicar el panel (*Actions › Publicar panel web › Run workflow*). Queda dentro del panel publicado, como la de Supabase: es una clave de navegador, y por eso se limita a este sitio y a la Map Tiles API. Google da 100.000 imágenes por mes sin costo; abrir un mapa pide algunas decenas, y el tráfico, otras tantas cada vez que se actualiza.
 
 ## GPS: control de ruta (migración 0005)
 Tres vistas del mismo mapa, puntos editables, peajes por camión con tarifas históricas y combustible estimado. Desde la migración 0006 ya vienen cargados los 17 peajes y los 24 puestos de balanza del MTOP de las rutas nacionales, y desde la 0007, sus 122 radares. Guía de uso, limitaciones y orden de publicación: [GPS-CONTROL-RUTA.md](../docs/GPS-CONTROL-RUTA.md). Los avisos sonoros del teléfono se implementan en la etapa Android posterior.
