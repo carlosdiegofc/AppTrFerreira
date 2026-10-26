@@ -1465,12 +1465,20 @@ a.trip-line:hover {
   }
 }
 
-/* Satellite (decision of 22/10/2026): Google's pictures as they are, without the darkening of the street map at night. */
-:root .fleet-map.is-satellite .leaflet-tile-pane {
+/* Google's map (decisions of 22/10/2026 and 26/10/2026) as Google draws it: at night its streets come with Google's night
+   colors, never darkened here. Only OpenStreetMap, the stand-in, is darkened. */
+:root .leaflet-container.is-google .leaflet-tile-pane {
   filter: none;
 }
 
-/* The base switch, Mapa or Satélite, above the credits. */
+/* The base switch, Mapa or Satélite, and the traffic next to it, above the credits. */
+.map-switch-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .map-switch {
   display: flex;
   overflow: hidden;
@@ -1525,7 +1533,7 @@ a.trip-line:hover {
 }
 
 /* Google's credits never cover its logo: on a narrow map they wrap to its right. */
-.is-satellite .leaflet-bottom.leaflet-right {
+.is-google .leaflet-bottom.leaflet-right {
   max-width: calc(100% - 110px);
 }
 

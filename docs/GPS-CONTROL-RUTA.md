@@ -8,9 +8,9 @@ GPS tiene Seguimiento, Peajes/balanzas/radares y Mis puntos. Conserva camión, r
 
 Cada tarifa nueva conserva la anterior; los pasos guardan el nombre, precio, límite y máxima velocidad observada. Las recargas y correcciones son movimientos nuevos: no se borran cobros. Se identifica la cuenta por matrícula normalizada, o por modelo completo cuando no hay matrícula; los nombres antiguos no se unen automáticamente a una cuenta con matrícula.
 
-## Mapa satelital y pantalla completa
+## Mapa de Google y pantalla completa
 
-Desde el 22/10/2026 el mapa de GPS (y el de cada viaje) se abre en pantalla completa con el botón de abajo del zoom; Esc o el mismo botón la cierran, y «Ver todos» sigue a mano. Con la clave de Google Maps, «Satélite» (abajo a la derecha) muestra las fotos de Google con sus rutas, calles y nombres, debajo de los camiones, los recorridos y los puntos de peajes, balanzas y radares, que se siguen tocando y editando igual. Cómo crear la clave: [panel/README.md](../panel/README.md).
+Desde el 22/10/2026 el mapa de GPS (y el de cada viaje) se abre en pantalla completa con el botón de abajo del zoom; Esc o el mismo botón la cierran, y «Ver todos» sigue a mano. Desde el 26/10/2026, con la clave de Google Maps, el mapa es de Google: abajo a la derecha se elige «Mapa» (las calles) o «Satélite» (las fotos con sus rutas, calles y nombres), y «Tráfico» muestra el tránsito de ahora encima. Todo va debajo de los camiones, los recorridos y los puntos de peajes, balanzas y radares, que se siguen tocando y editando igual. OpenStreetMap queda solo de respaldo, sin la clave o mientras Google no responde. Cómo crear las claves: [GOOGLE-MAPS.md](GOOGLE-MAPS.md).
 
 ## Peajes y balanzas cargados (migración 0006)
 
