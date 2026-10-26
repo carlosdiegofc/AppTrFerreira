@@ -13,6 +13,7 @@ import { ago, calendarDay, firstOfMonth, firstOfNextMonth, formatDay, inDays, st
 import { STATE_LABEL } from '../lib/fleet';
 import { andList, count, decimal, money, number } from '../lib/format';
 import { monthLabel } from '../lib/drivers';
+import { expensesLink } from '../lib/expenses';
 import { litersPer100, monthsBefore, summarize } from '../lib/metrics';
 import { capacityText, driversByMonth, type Hitch, hitchDays, makeLine, takenKeys, trailerLabel, truckTrailers, type Vehicle } from '../lib/vehicles';
 import { type Notice, noticeOf, TankFact, trailerPath } from './Flota';
@@ -95,6 +96,9 @@ function TruckPage({ t, now }: { t: TruckView; now: number }) {
               }}
               busy={isFetching || fuel.query.isFetching || year.query.isFetching}
             />
+            <Link className="btn" to={expensesLink(`camion:${t.key}`)}>
+              <Icon name="money" size={18} /> Ver sus gastos
+            </Link>
             <button type="button" className={`btn${card ? '' : ' btn-primary'}`} onClick={() => open({ kind: 'card' })}>
               <Icon name={card ? 'edit' : 'plus'} size={18} /> {card ? 'Editar ficha' : 'Crear ficha'}
             </button>

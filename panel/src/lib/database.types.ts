@@ -507,6 +507,93 @@ export type Database = {
         }
         Relationships: []
       }
+      trf_expenses: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          deleted_at: string | null
+          driver_id: string | null
+          file_path: string | null
+          id: string
+          method: string
+          notes: string
+          service_id: string | null
+          spent_on: string
+          supplier: string
+          target: string
+          target_name: string
+          trailer_id: string | null
+          trip_key: string | null
+          updated_at: string
+          updated_by: string | null
+          vehicle_key: string | null
+        }
+        Insert: {
+          amount: number
+          category: string
+          created_at?: string
+          created_by?: string | null
+          currency: string
+          deleted_at?: string | null
+          driver_id?: string | null
+          file_path?: string | null
+          id?: string
+          method: string
+          notes?: string
+          service_id?: string | null
+          spent_on: string
+          supplier?: string
+          target: string
+          target_name?: string
+          trailer_id?: string | null
+          trip_key?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vehicle_key?: string | null
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          deleted_at?: string | null
+          driver_id?: string | null
+          file_path?: string | null
+          id?: string
+          method?: string
+          notes?: string
+          service_id?: string | null
+          spent_on?: string
+          supplier?: string
+          target?: string
+          target_name?: string
+          trailer_id?: string | null
+          trip_key?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vehicle_key?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trf_expenses_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "trf_drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trf_expenses_trailer_id_fkey"
+            columns: ["trailer_id"]
+            isOneToOne: false
+            referencedRelation: "trf_fleet_units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trf_fleet_hitches: {
         Row: {
           created_at: string

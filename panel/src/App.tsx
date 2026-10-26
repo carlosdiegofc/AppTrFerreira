@@ -21,6 +21,7 @@ const Chofer = lazy(() => import('./pages/Chofer').then((m) => ({ default: m.Cho
 const Flota = lazy(() => import('./pages/Flota').then((m) => ({ default: m.Flota })));
 const Camion = lazy(() => import('./pages/Camion').then((m) => ({ default: m.Camion })));
 const Acoplado = lazy(() => import('./pages/Acoplado').then((m) => ({ default: m.Acoplado })));
+const Finanzas = lazy(() => import('./pages/Finanzas').then((m) => ({ default: m.Finanzas })));
 
 const loading = (
   <div className="page">
@@ -48,6 +49,7 @@ export function App() {
           <Route path="flota" element={<Suspense fallback={loading}><Flota /></Suspense>} />
           <Route path="flota/camion/:key" element={<Suspense fallback={loading}><Camion /></Suspense>} />
           <Route path="flota/acoplado/:id" element={<Suspense fallback={loading}><Acoplado /></Suspense>} />
+          <Route path="finanzas" element={<Suspense fallback={loading}><Finanzas /></Suspense>} />
           {SECTIONS.filter((s) => !s.ready).map((s) => (
             <Route key={s.path} path={s.path} element={<Proximamente section={s} />} />
           ))}

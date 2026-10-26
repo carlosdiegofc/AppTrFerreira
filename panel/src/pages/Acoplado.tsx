@@ -9,6 +9,7 @@ import { AnnulHitchDialog, VehicleFormDialog, VehicleThumb } from '../components
 import { useCatalog, useDocuments, useNow, useVehicles } from '../data/hooks';
 import { dayInZone, formatDay, inDays } from '../lib/dates';
 import { paperViews } from '../lib/documents';
+import { expensesLink } from '../lib/expenses';
 import { truckLabel } from '../lib/fleet';
 import { andList, number } from '../lib/format';
 import { capacityText, cardTruckLabel, type Hitch, hitchDays, makeLine, samePlate, takenKeys, trailerLabel, trailerTrucks, truckKey, type Vehicle } from '../lib/vehicles';
@@ -84,6 +85,9 @@ function TrailerPage({ v, now }: { v: Vehicle; now: number }) {
               }}
               busy={query.isFetching || docs.query.isFetching || catalog.isFetching}
             />
+            <Link className="btn" to={expensesLink(`acoplado:${v.id}`)}>
+              <Icon name="money" size={18} /> Ver sus gastos
+            </Link>
             <button
               type="button"
               className="btn"

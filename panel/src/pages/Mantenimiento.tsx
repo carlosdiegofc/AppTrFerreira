@@ -1,14 +1,18 @@
-import { useMemo, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
+import { ExpenseFormDialog, type ExpenseOrigin } from '../components/ExpenseFormDialog';
 import { Icon } from '../components/Icon';
 import { ServiceFormDialog } from '../components/ServiceFormDialog';
 import { CatalogNote, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote, Stat, type Tone } from '../components/ui';
 import { TOO_MANY } from '../data/api';
-import { useMaintenance, useNow } from '../data/hooks';
+import { useExpenses, useMaintenance, useNow } from '../data/hooks';
 import { addDays, ago, dayInZone, formatDay } from '../lib/dates';
+import { type Expense, NO_CHOICES, NO_NAMES, serviceCategory, serviceCosts } from '../lib/expenses';
 import { truckParts } from '../lib/fleet';
-import { count, number } from '../lib/format';
+import { count, money, number } from '../lib/format';
 import { filterServices, type Service, type ServiceListView, serviceVehicles, type ServiceView, serviceViews, type TruckKm } from '../lib/maintenance';
+import { fold } from '../lib/numbers';
 import type { ServiceState } from '../lib/papers';
+import { roadVehicleKey } from '../lib/road';
 import { useAddressFilters } from './addressFilters';
 
 const VIEWS: { value: ServiceListView; label: string }[] = [
@@ -58,7 +62,7 @@ function TruckKmCard({ vehicle, km, missing, failed, todo, chosen, onPick }: { v
   );
 }
 
-function ServiceRow({ service, showTruck, onOpen }: { service: ServiceView; showTruck: boolean; onOpen: () => void }) {
+function ServiceRow({ service, showTruck, onOpen, cost }: { service: ServiceView; showTruck: boolean; onOpen: () => void; cost?: ReactNode }) {
   const { status } = service;
   const state = SERVICE_STATE[status.state];
   const done = status.state === 'done';
@@ -68,7 +72,7 @@ function ServiceRow({ service, showTruck, onOpen }: { service: ServiceView; show
     [service.intervalKm !== null ? `Cada ${number(service.intervalKm)} km` : null, !done && service.dueKm === null && service.odometerKm !== null ? `Kilometraje anotado: ${number(service.odometerKm)} km` : null].filter(Boolean).join(' · '),
   ].filter(Boolean);
   return (
-    <li>
+    <li className="service-item">
       <button type="button" className="service-row" onClick={onOpen} aria-label={`${service.kind}, ${service.vehicle}: ${state.label}`}>
         <span className={`sv-icon tone-${state.tone}`}>
           <Icon name="wrench" size={18} />
@@ -85,7 +89,28 @@ function ServiceRow({ service, showTruck, onOpen }: { service: ServiceView; show
         </span>
         <Pill tone={state.tone}>{state.label}</Pill>
       </button>
+      {cost}
     </li>
+  );
+}
+
+/** The cost of a service done, in Gastos: what was noted, or the button to note it. */
+function ServiceCost({ cost, onNote, onOpen }: { cost: Expense | null; onNote: () => void; onOpen: (e: Expense) => void }) {
+  return (
+    <span className="sv-cost">
+      {cost ? (
+        <>
+          <small>Costo</small>
+          <button type="button" className="link-button" onClick={() => onOpen(cost)} title="Corregir el costo">
+            {money(cost.amount, cost.currency)}
+          </button>
+        </>
+      ) : (
+        <button type="button" className="btn btn-quiet" onClick={onNote}>
+          <Icon name="money" size={18} /> Anotar el costo
+        </button>
+      )}
+    </span>
   );
 }
 
@@ -97,6 +122,18 @@ export function Mantenimiento() {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Service | null>(null);
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null);
+  // The cost of a service done goes in Gastos: one per service, of its truck.
+  const { query: costsQuery, expenses } = useExpenses();
+  const costs = useMemo(() => serviceCosts(expenses), [expenses]);
+  const [costing, setCosting] = useState<{ expense: Expense | null; origin: ExpenseOrigin } | null>(null);
+  const noteCost = (s: Service) => {
+    const category = serviceCategory(s.kind);
+    setNotice(null);
+    setCosting({
+      expense: null,
+      origin: { target: 'truck', ref: roadVehicleKey(s.vehicle), spentOn: s.doneOn ?? today, category, notes: fold(category) === fold(s.kind) ? '' : s.kind, serviceId: s.id, fixedName: s.vehicle },
+    });
+  };
 
   const view = VIEWS.find((v) => v.value === params.get('vista')) ?? VIEWS[0]!;
   const vehicle = params.get('camion') ?? '';
@@ -113,6 +150,7 @@ export function Mantenimiento() {
   const done = (text: string, tone: 'ok' | 'warn' = 'ok') => {
     setAdding(false);
     setEditing(null);
+    setCosting(null);
     setNotice({ tone, text });
   };
   const conflict = () => {
@@ -152,6 +190,11 @@ export function Mantenimiento() {
 
       {query.error && query.data !== undefined && <StaleNote onRetry={() => void query.refetch()} />}
       {catalog.error && <CatalogNote onRetry={() => void catalog.refetch()} />}
+      {costsQuery.error && (
+        <StaleNote onRetry={() => void costsQuery.refetch()}>
+          {costsQuery.data === undefined ? 'No se pudieron leer los gastos: el costo de cada service hecho no se ve ahora.' : 'No se pudieron actualizar los gastos: los costos son los de la última lectura.'}
+        </StaleNote>
+      )}
       {trips.error && (
         <StaleNote onRetry={() => void refetchTrips()}>
           {kmMissing ? 'No se pudieron leer los viajes: los kilómetros de los camiones no se pueden estimar ahora.' : 'No se pudieron actualizar los viajes: los kilómetros son los de la última lectura.'}
@@ -213,7 +256,7 @@ export function Mantenimiento() {
             </div>
             <div className="list-info">
               {loadedAt !== null && <span className="updated">actualizado {ago(loadedAt, now)}</span>}
-              <RefreshButton onClick={() => void Promise.all([query.refetch(), refetchTrips()])} busy={query.isFetching || trips.isFetching} />
+              <RefreshButton onClick={() => void Promise.all([query.refetch(), refetchTrips(), costsQuery.refetch()])} busy={query.isFetching || trips.isFetching} />
             </div>
           </div>
 
@@ -234,11 +277,23 @@ export function Mantenimiento() {
                     setNotice(null);
                     setEditing(s);
                   }}
+                  cost={
+                    s.status.state === 'done' && s.vehicle && costsQuery.data !== undefined ? (
+                      <ServiceCost
+                        cost={costs.get(s.id) ?? null}
+                        onNote={() => noteCost(s)}
+                        onOpen={(e) => {
+                          setNotice(null);
+                          setCosting({ expense: e, origin: { fixedName: s.vehicle } });
+                        }}
+                      />
+                    ) : undefined
+                  }
                 />
               ))}
             </ul>
           )}
-          <p className="note">Un service por hacer se marca como próximo 15 días antes de la fecha o 1.000 km antes del kilometraje, como en la app.</p>
+          <p className="note">Un service por hacer se marca como próximo 15 días antes de la fecha o 1.000 km antes del kilometraje, como en la app. El costo de un service hecho se anota en Gastos y finanzas.</p>
         </>
       )}
 
@@ -256,6 +311,22 @@ export function Mantenimiento() {
           }}
           onDone={done}
           onConflict={conflict}
+        />
+      )}
+      {costing && (
+        <ExpenseFormDialog
+          expense={costing.expense}
+          origin={costing.origin}
+          today={today}
+          choices={NO_CHOICES}
+          names={NO_NAMES}
+          expenses={expenses}
+          onClose={() => setCosting(null)}
+          onDone={done}
+          onConflict={() => {
+            setCosting(null);
+            setNotice({ tone: 'warn', text: 'Otra persona cambió ese costo mientras lo tenías abierto, y no se guardó nada: ya se ven sus datos nuevos. Revisalo y, si hace falta, volvé a corregirlo.' });
+          }}
         />
       )}
     </div>

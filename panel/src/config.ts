@@ -1,7 +1,7 @@
 export const PANEL_VERSION = '0.1.0';
 
-/** The panel in use until every section of this one is ready. */
-export const CURRENT_PANEL_URL = 'https://carlosdiegofc.github.io/AppTrFerreira/';
+/** The previous panel, kept at /anterior/ for a while since this one took the main address (decision of 26/10/2026). */
+export const CURRENT_PANEL_URL = 'https://carlosdiegofc.github.io/AppTrFerreira/anterior/';
 
 /** Street map tiles. Allowed by the Content-Security-Policy of index.html. */
 export const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';

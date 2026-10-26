@@ -5,13 +5,14 @@ import type { TablesInsert, TablesUpdate } from '../lib/database.types';
 import { startOfDay } from '../lib/dates';
 import { type FileType, type Paper, type PaperDocRow, paperFromRow, samePaper } from '../lib/documents';
 import { type Driver, driverFromRow, type Payment, paymentFromRow, type Salary, salaryFromRow } from '../lib/drivers';
+import { type Expense, expenseFromRow, targetChoices } from '../lib/expenses';
 import { type ActiveTrip, type CatalogTruck, fleetUnits, truckLabel, withLivePositions } from '../lib/fleet';
 import { groupStations, type Movement, movementFromRow, type Receipt, receiptFromRow } from '../lib/fuel';
 import { kmReferences, kmSince, type MaintenanceRow, sameService, type Service, serviceFromRow, type TruckKm, truckKms } from '../lib/maintenance';
 import { appendReadings } from '../lib/route';
 import type { TripPayload } from '../lib/tripForm';
 import { mergeTrips, type Trip, tripFromPanel, tripFromSession } from '../lib/trips';
-import { hitchFromRow, type Hitch, type Vehicle, vehicleFromRow } from '../lib/vehicles';
+import { hitchFromRow, type Hitch, truckEntries, type Vehicle, vehicleFromRow } from '../lib/vehicles';
 import {
   ConflictError,
   createReceipt,
@@ -24,6 +25,7 @@ import {
   fetchDocuments,
   fetchDriverNames,
   fetchDrivers,
+  fetchExpenses,
   fetchFleet,
   fetchFuel,
   fetchKmTrips,
@@ -46,6 +48,7 @@ import {
   type RoutePoint,
   saveDocument,
   saveDriver,
+  saveExpense,
   saveMovement,
   savePayment,
   saveSalary,
@@ -54,12 +57,14 @@ import {
   saveTrip,
   saveVehicle,
   serviceRow,
+  setExpenseDeleted,
   setMovementDeleted,
   setPaymentDeleted,
   setSalaryDeleted,
   setTripDeleted,
   updateReceipt,
   uploadDocumentFile,
+  uploadExpenseFile,
   uploadReceiptPhoto,
   uploadVehiclePhoto,
 } from './api';
@@ -540,6 +545,58 @@ export function useHitchTrailer() {
 export function useSaveHitch() {
   const changed = useVehiclesChanged();
   return useMutation({ mutationFn: ({ hitch, row }: { hitch: Hitch; row: TablesUpdate<'trf_fleet_hitches'> }) => saveHitch(hitch, row), onSettled: changed });
+}
+
+/** Every expense, the annulled ones too (only the panel accounts read them); read again every 5 minutes. */
+export function useExpenses(enabled = true) {
+  const query = useQuery({ queryKey: ['expenses'], queryFn: fetchExpenses, staleTime: 30_000, refetchInterval: 5 * 60_000, enabled });
+  const expenses = useMemo(() => (query.data ?? []).map(expenseFromRow), [query.data]);
+  return { query, expenses };
+}
+
+/**
+ * What an expense can go to and how each is named now: the trucks of the catalog and of the cards, the trailers and the
+ * drivers. reads are the queries behind them, for the screens to say when one failed.
+ */
+export function useExpenseTargets(enabled = true) {
+  const catalog = useCatalog();
+  const { query: vehicles, vehicles: units, hitches } = useVehicles(enabled);
+  const { query: drivers, drivers: cards } = useDrivers(enabled);
+  const value = useMemo(() => targetChoices(truckEntries(catalog.data ?? [], units, hitches), units, cards), [catalog.data, units, hitches, cards]);
+  return { ...value, reads: { catalog, vehicles, drivers } };
+}
+
+function useExpensesChanged() {
+  const client = useQueryClient();
+  return () => client.invalidateQueries({ queryKey: ['expenses'] });
+}
+
+export interface ExpenseFileUpload {
+  path: string;
+  blob: Blob;
+  type: FileType;
+}
+
+/**
+ * An expense, new or changed, with its new invoice when one was chosen: the file goes first, so an expense never points
+ * to a file that is not there. A save tried again finds the file already uploaded. Nobody deletes invoices: one replaced,
+ * or of a save that was refused, stays in the private folder.
+ */
+export function useSaveExpense() {
+  const changed = useExpensesChanged();
+  return useMutation({
+    mutationFn: async ({ expense, row, upload }: { expense: Expense | null; row: TablesInsert<'trf_expenses'> | TablesUpdate<'trf_expenses'>; upload: ExpenseFileUpload | null }) => {
+      if (upload) await uploadExpenseFile(upload.path, upload.blob, upload.type);
+      return saveExpense(expense, row);
+    },
+    onSettled: changed,
+  });
+}
+
+/** Annuls an expense, or brings it back: nothing is deleted. */
+export function useSetExpenseDeleted() {
+  const changed = useExpensesChanged();
+  return useMutation({ mutationFn: ({ expense, deleted }: { expense: Expense; deleted: boolean }) => setExpenseDeleted(expense, deleted), onSettled: changed });
 }
 
 /** A link to a private photo for a list or a card: read once and kept nine minutes, as each link lasts ten. */

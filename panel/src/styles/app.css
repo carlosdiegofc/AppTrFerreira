@@ -3710,3 +3710,168 @@ button.vehicle-thumb {
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* ---------- Gastos y finanzas ---------- */
+.expense-list {
+  margin: 0;
+  padding: 4px 6px;
+  list-style: none;
+}
+
+.expense-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.expense-list li:last-child {
+  border-bottom: 0;
+}
+
+.ex-open {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 100px minmax(0, 1.6fr) minmax(110px, 0.8fr) 80px;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 12px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+button.ex-open {
+  cursor: pointer;
+}
+
+button.ex-open:hover {
+  background: var(--grey-bg);
+  border-radius: 10px;
+}
+
+.ex-open > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ex-open strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ex-open small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ex-date strong,
+.ex-amount strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.ex-amount {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.ex-open > .ex-flags {
+  flex-direction: row;
+  justify-content: flex-end;
+}
+
+.ex-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  padding-right: 8px;
+}
+
+.expense-sums td .link-button {
+  text-align: left;
+}
+
+/* The cost of a service done, next to it in Mantenimiento. */
+.service-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.service-list li.service-item:last-child {
+  border-bottom: 0;
+}
+
+.service-item > .service-row {
+  flex: 1;
+  min-width: 0;
+  border-bottom: 0;
+}
+
+.sv-cost {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding-right: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sv-cost small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .ex-open {
+    grid-template-columns: 90px minmax(0, 1fr) 110px;
+  }
+
+  .ex-open > .ex-flags {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .expense-row,
+  .service-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .ex-open {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 12px;
+  }
+
+  .ex-main {
+    grid-column: 1 / 3;
+    grid-row: 2;
+  }
+
+  .ex-actions {
+    padding: 0 12px 10px;
+  }
+
+  .sv-cost {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px 10px 60px;
+  }
+}

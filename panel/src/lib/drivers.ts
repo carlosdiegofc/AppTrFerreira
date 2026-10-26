@@ -499,7 +499,7 @@ export function validateDriver(
 }
 
 /** An amount as typed in Uruguay, above zero and with cents at most. */
-function amount(raw: string): { value: number | null; error: string | null } {
+export function amount(raw: string): { value: number | null; error: string | null } {
   const parsed = parseNumber(raw);
   if (!parsed.ok) return { value: null, error: parsed.error };
   if (parsed.value === null) return { value: null, error: 'Escribí el importe.' };

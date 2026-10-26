@@ -26,6 +26,7 @@ import {
   seniority,
   yearMonths,
 } from '../lib/drivers';
+import { expensesLink } from '../lib/expenses';
 import { andList, count, decimal, money, number } from '../lib/format';
 import { PAYMENT_METHODS } from '../lib/fuel';
 import { litersPer100, summarize } from '../lib/metrics';
@@ -210,6 +211,9 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
         actions={
           <>
             <RefreshButton onClick={refresh} busy={reads.some((r) => r.isFetching)} />
+            <Link className="btn" to={expensesLink(`chofer:${driver.id}`)}>
+              <Icon name="money" size={18} /> Ver sus gastos
+            </Link>
             <button type="button" className="btn" onClick={() => open({ kind: 'card' })}>
               <Icon name="edit" size={18} /> Editar ficha
             </button>

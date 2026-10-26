@@ -3,6 +3,7 @@
 import type { Tables, TablesInsert, TablesUpdate } from '../lib/database.types';
 import { type DriverChoice, driverChoices, type FileType, type Paper, type PaperDocRow } from '../lib/documents';
 import { type Driver, type DriverRow, type Payment, type PaymentRow, type Salary, type SalaryRow, savedAsSent } from '../lib/drivers';
+import type { Expense, ExpenseRow } from '../lib/expenses';
 import { type ActiveTrip, type CatalogTruck, catalogTrucks, type FinishedTrip, lastTripByTruck, type LivePosition, text, truckLabel } from '../lib/fleet';
 import { type CatalogStation, catalogStations, type Movement, type MovementRow, type Receipt } from '../lib/fuel';
 import { type KmTrip, kmTripsAsCorrected, type MaintenanceRow, type Service } from '../lib/maintenance';
@@ -581,9 +582,9 @@ export const savePayment = (payment: Pick<Payment, 'id' | 'updatedAt'> | null, r
 export const setSalaryDeleted = (salary: Salary, deleted: boolean) => saveSalary(salary, { deleted_at: deleted ? new Date().toISOString() : null });
 export const setPaymentDeleted = (payment: Payment, deleted: boolean) => savePayment(payment, { deleted_at: deleted ? new Date().toISOString() : null });
 
-export type PhotoBucket = 'trf-trip-documents' | 'trf-fuel-receipts' | 'trf-documents' | 'trf-fleet-photos';
+export type PhotoBucket = 'trf-trip-documents' | 'trf-fuel-receipts' | 'trf-documents' | 'trf-fleet-photos' | 'trf-expense-files';
 
-/** A link that opens a photo (or the PDF of a paper) of the private buckets for ten minutes; the storage rules decide who can open it. */
+/** A link that opens a photo (or the PDF of a paper or an invoice) of the private buckets for ten minutes; the storage rules decide who can open it. */
 export async function photoUrl(bucket: PhotoBucket, path: string): Promise<string> {
   const result = await supabase.storage.from(bucket).createSignedUrl(path, 600);
   if (result.error) throw new DataError(result.error.message);
@@ -726,3 +727,34 @@ export const saveHitch = (hitch: Pick<Hitch, 'id' | 'updatedAt'>, row: TablesUpd
     find: (id) => supabase.from('trf_fleet_hitches').select('*').eq('id', id).limit(1),
     update: (id, at) => supabase.from('trf_fleet_hitches').update(row).eq('id', id).eq('updated_at', at).select(),
   });
+
+/** Every expense, the annulled ones too: the sums of any period use them all (only the panel accounts read them). */
+export async function fetchExpenses(): Promise<ExpenseRow[]> {
+  return all((from, to) => supabase.from('trf_expenses').select('*').order('spent_on', { ascending: false }).order('id').range(from, to), 50_000, true);
+}
+
+/**
+ * An expense, new or changed, as saveOnce saves: a change only applies if nobody saved it meanwhile. A second cost of the
+ * same service done is refused with the code of a duplicate (23505).
+ */
+export const saveExpense = (expense: Pick<Expense, 'id' | 'updatedAt'> | null, row: TablesInsert<'trf_expenses'> | TablesUpdate<'trf_expenses'>) =>
+  saveOnce<ExpenseRow>(expense, row, {
+    insert: () => supabase.from('trf_expenses').insert(row as TablesInsert<'trf_expenses'>).select(),
+    find: (id) => supabase.from('trf_expenses').select('*').eq('id', id).limit(1),
+    update: (id, at) => supabase.from('trf_expenses').update(row).eq('id', id).eq('updated_at', at).select(),
+  });
+
+/** Annuls an expense, or brings it back: nothing is deleted. */
+export const setExpenseDeleted = (expense: Expense, deleted: boolean) => saveExpense(expense, { deleted_at: deleted ? new Date().toISOString() : null });
+
+/** The invoice of an expense: a JPEG photo or a PDF. One already uploaded (a save tried again) counts as uploaded. */
+export async function uploadExpenseFile(path: string, file: Blob, type: FileType): Promise<void> {
+  const contentType = type === 'pdf' ? 'application/pdf' : 'image/jpeg';
+  // The storage takes the type of the file itself, which a PDF may not bring.
+  const body = file.type === contentType ? file : new Blob([file], { type: contentType });
+  const result = await supabase.storage.from('trf-expense-files').upload(path, body, { contentType, upsert: false });
+  if (!result.error) return;
+  const e = result.error as { message: string; statusCode?: string; status?: number };
+  if (e.statusCode === '409' || e.status === 409 || /already exists|duplicate/i.test(e.message)) return;
+  throw new DataError(e.message, e.statusCode ?? (e.status === undefined ? undefined : String(e.status)));
+}

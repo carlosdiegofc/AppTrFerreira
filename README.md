@@ -1,9 +1,9 @@
 Plan de trabajo de la plataforma (etapas, reglas y decisiones): [docs/PLAN-PLATAFORMA.md](docs/PLAN-PLATAFORMA.md).
 
-Panel web nuevo (React + TypeScript), en construcción al lado del actual: [panel/README.md](panel/README.md).
+Panel web nuevo (React + TypeScript), en la dirección principal del panel desde el 26/10/2026: [panel/README.md](panel/README.md).
 
-# Panel web (nuevo)
-La carpeta [`web/`](web/README.md) tiene el panel web centralizado: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
+# Panel web (anterior)
+La carpeta [`web/`](web/README.md) tiene el panel web anterior, que queda en `/anterior/` de la misma dirección un tiempo: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
 
 # Transportes Ferreira GPS — v0.20.0
 
