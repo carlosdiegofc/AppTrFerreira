@@ -110,7 +110,7 @@ Va armándose al costado del panel actual y lo reemplaza sección por sección.
    - [ ] La variación de los números grandes contra el período anterior, como en el video («↑ 6 % más que el mes pasado»): quedó fuera de lo publicado y va con la parte 12b.
    - [x] Arriba, una barra flotante con el nombre de quien ingresó (ahí van el tema y «Salir»), un buscador de secciones, camiones, acoplados y choferes, y una campana con los avisos de Inicio. A la izquierda, el menú pasa a una columna de íconos que muestran su nombre al pasar el mouse.
    - [x] Sigue todo lo que hay: las 12 secciones con lo que hacen, los modos claro y oscuro y el uso desde el celular. Si la computadora no muestra el vidrio o pide menos transparencias, las tarjetas quedan opacas.
-   - [ ] Se publica con el visto bueno del dueño, sobre capturas de cada sección. El dueño lo aprobó el 26/10/2026.
+   - [x] Publicación el 26/10/2026: el dueño lo aprobó sobre las capturas de cada sección; panel publicado (despliegue #17, commit 2e26ec3). La base y la app no cambian.
 
 ### App: juegos para las esperas
 Para pasar el rato mientras se espera la carga (aprobado el 21/10/2026). Se juega con el camión parado, y los juegos los ven todas las cuentas.
