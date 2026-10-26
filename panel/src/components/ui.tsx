@@ -29,9 +29,10 @@ export function Card({ title, action, children, className = '', padded = true }:
 
 export type Tone = 'green' | 'amber' | 'red' | 'blue' | 'grey';
 
-export function Stat({ label, value, detail, tone, icon }: { label: string; value: ReactNode; detail?: ReactNode; tone: Tone; icon: IconName }) {
+/** A number of the page; featured, the main one, on the logo's blue (one per page at most). */
+export function Stat({ label, value, detail, tone, icon, featured = false }: { label: string; value: ReactNode; detail?: ReactNode; tone: Tone; icon: IconName; featured?: boolean }) {
   return (
-    <div className={`stat tone-${tone}`}>
+    <div className={`stat tone-${tone}${featured ? ' is-featured' : ''}`}>
       <span className="stat-icon"><Icon name={icon} size={22} /></span>
       <div className="stat-text">
         <span className="stat-value">{value}</span>
@@ -39,6 +40,19 @@ export function Stat({ label, value, detail, tone, icon }: { label: string; valu
         {detail && <span className="stat-detail">{detail}</span>}
       </div>
     </div>
+  );
+}
+
+/** A share between 0 and 1 as a ring (decision of 26/10/2026), for the number written beside it. */
+export function Ring({ share, size = 38 }: { share: number; size?: number }) {
+  const r = 15;
+  const length = 2 * Math.PI * r;
+  const filled = Math.min(1, Math.max(0, share)) * length;
+  return (
+    <svg className="ring" width={size} height={size} viewBox="0 0 38 38" aria-hidden="true" focusable="false">
+      <circle className="ring-track" cx="19" cy="19" r={r} strokeWidth="5" />
+      {filled > 0 && <circle className="ring-fill" cx="19" cy="19" r={r} strokeWidth="5" strokeDasharray={`${filled} ${length}`} />}
+    </svg>
   );
 }
 

@@ -32,6 +32,11 @@ export interface TankRow {
   measured: MeasuredConsumption | null;
 }
 
+/** The trucks low on fuel now, for an alert outside the list: Inicio, Combustible and the notices of the top bar. */
+export function lowTanks(rows: readonly TankRow[] | null): Extract<TankState, { status: 'known' }>[] {
+  return (rows ?? []).flatMap((r) => (r.state.status === 'known' && r.state.low ? [r.state] : []));
+}
+
 const RANK: Record<TankState['status'], number> = { known: 2, unknown: 1, waiting: 3, unset: 4 };
 
 /** Low first, then the ones to check, then by how full they are; the ones without a tank last. */

@@ -40,3 +40,14 @@ export function money(value: number, currency: 'UYU' | 'USD'): string {
   const decimals = Number.isInteger(value) ? 0 : 2;
   return `${currency === 'USD' ? 'US$' : '$'} ${number(value, decimals)}`;
 }
+
+/** The round initials of a name in the top bar: the first letters of its first two words, leaving out «de», «la»… */
+export function initials(name: string): string {
+  const words = name.split(/\s+/).filter((w) => w.length > 2 || /^[A-ZÁÉÍÓÚÑ]/.test(w));
+  return (
+    words
+      .slice(0, 2)
+      .map((w) => w[0]!.toUpperCase())
+      .join('') || '·'
+  );
+}

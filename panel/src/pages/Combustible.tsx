@@ -11,9 +11,9 @@ import { ago, dayInZone, formatDay } from '../lib/dates';
 import { count, decimal, money } from '../lib/format';
 import { balances, filterReceipts, isFuture, NO_STATION, type Receipt, receiptVehicles, type Station, totals } from '../lib/fuel';
 import { type PeriodKind, periodRange } from '../lib/trips';
-import { useTanks } from '../data/tanks';
+import { lowTanks, useTanks } from '../data/tanks';
 import { amountParts, amounts, balanceText, balanceTone, fuelReadError, NO_LIST, stationPath } from './fuelText';
-import { lowTanks, TanksView } from './Tanques';
+import { TanksView } from './Tanques';
 
 // The filters live in the address (?vista=boletas&periodo=mes…): going back from a station, reloading or sharing the
 // link keeps them.
@@ -281,7 +281,7 @@ export function Combustible() {
 
       {ready && (
         <div className="stats stats-money">
-          <Stat label="Cargado en el período" value={badRange ? '—' : <Lines parts={amountParts(periodTotals.amounts, '$ 0')} />} detail={badRange ? 'Revisá las fechas' : `${count(periodTotals.receipts)} boleta${periodTotals.receipts === 1 ? '' : 's'}`} tone="blue" icon="fuel" />
+          <Stat featured label="Cargado en el período" value={badRange ? '—' : <Lines parts={amountParts(periodTotals.amounts, '$ 0')} />} detail={badRange ? 'Revisá las fechas' : `${count(periodTotals.receipts)} boleta${periodTotals.receipts === 1 ? '' : 's'}`} tone="blue" icon="fuel" />
           <Stat label="Litros en el período" value={badRange ? '—' : decimal(periodTotals.liters, 1)} tone="grey" icon="chart" />
           <Stat label="Saldo con las estaciones" value={<Lines parts={amountParts(owed, '$ 0')} />} detail={credit.UYU > 0 || credit.USD > 0 ? `Lo que se les debe · a favor: ${amounts(credit)}` : 'Lo que se les debe'} tone={owed.UYU > 0 || owed.USD > 0 ? 'amber' : 'green'} icon="money" />
           <Stat label="Boletas sin importe" value={count(missing)} detail={missing > 0 ? 'Completalas para que sumen' : 'Todas tienen importe'} tone={missing > 0 ? 'red' : 'green'} icon="warning" />

@@ -141,8 +141,3 @@ export function TanksView() {
     </>
   );
 }
-
-/** The trucks low on fuel now, for an alert outside the list. */
-export function lowTanks(rows: readonly TankRow[] | null): Extract<TankState, { status: 'known' }>[] {
-  return (rows ?? []).flatMap((r) => (r.state.status === 'known' && r.state.low ? [r.state] : []));
-}

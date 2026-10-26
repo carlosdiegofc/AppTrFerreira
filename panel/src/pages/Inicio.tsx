@@ -3,17 +3,15 @@ import { Link, useNavigate } from 'react-router';
 import { usePanelUser } from '../auth/AuthProvider';
 import { FleetMap } from '../components/FleetMap';
 import { Icon } from '../components/Icon';
-import { Card, Dot, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote, Stat } from '../components/ui';
+import { NoticeList } from '../components/NoticeLines';
+import { Card, Dot, Empty, ErrorNote, PageHead, Pill, RefreshButton, Ring, Skeleton, StaleNote, Stat } from '../components/ui';
 import type { TripRow } from '../data/api';
-import { useCatalog, useDocuments, useFleet, useMaintenance, useNow, useTrips } from '../data/hooks';
-import { useTanks } from '../data/tanks';
+import { useCatalog, useFleet, useNow, useTrips } from '../data/hooks';
+import { useNotices } from '../data/notices';
 import { addDays, ago, dayInZone, firstOfMonth, firstOfNextMonth, formatTime, greeting, longDate, startOfDay } from '../lib/dates';
 import { type CatalogTruck, canonical, fleetCounts, truckParts } from '../lib/fleet';
-import { count, decimal, km, percent } from '../lib/format';
+import { count, km, percent } from '../lib/format';
 import { monthTotals } from '../lib/month';
-import { type Alert, alerts } from '../lib/papers';
-import type { TankState } from '../lib/tanks';
-import { lowTanks } from './Tanques';
 
 function TripLine({ trip, catalog }: { trip: TripRow; catalog: readonly CatalogTruck[] }) {
   const { model, plate } = truckParts(canonical(trip.vehicle, catalog) ?? '');
@@ -45,45 +43,6 @@ function TripLine({ trip, catalog }: { trip: TripRow; catalog: readonly CatalogT
   );
 }
 
-function AlertLine({ alert }: { alert: Alert }) {
-  const late = alert.state === 'late';
-  const paper = alert.type === 'paper';
-  return (
-    <li>
-      <Link className="alert-line" to={paper ? '/documentacion' : '/mantenimiento'} title={paper ? 'Ver en Documentación' : 'Ver en Mantenimiento'}>
-        <span className={`alert-icon tone-${late ? 'red' : 'amber'}`}>
-          <Icon name={paper ? 'doc' : 'wrench'} size={18} />
-        </span>
-        <span className="alert-main">
-          <strong>{[alert.kind, alert.owner].filter(Boolean).join(' · ')}</strong>
-          <span>{alert.detail}</span>
-        </span>
-        <Pill tone={late ? 'red' : 'amber'}>{late ? 'Vencido' : paper ? 'Por vencer' : 'Próximo'}</Pill>
-      </Link>
-    </li>
-  );
-}
-
-/** A truck low on fuel, by the tank's estimate. */
-function FuelLine({ tank }: { tank: Extract<TankState, { status: 'known' }> }) {
-  return (
-    <li>
-      <Link className="alert-line" to="/combustible?vista=tanques" title="Ver los tanques en Combustible">
-        <span className="alert-icon tone-red">
-          <Icon name="fuel" size={18} />
-        </span>
-        <span className="alert-main">
-          <strong>{tank.settings.name}</strong>
-          <span>
-            ≈ {decimal(tank.liters, 0)} L · rinde ≈ {count(Math.round(tank.autonomyKm))} km
-          </span>
-        </span>
-        <Pill tone="red">Combustible bajo</Pill>
-      </Link>
-    </li>
-  );
-}
-
 export function Inicio() {
   const { user } = usePanelUser();
   const navigate = useNavigate();
@@ -93,29 +52,16 @@ export function Inicio() {
   const catalog = useCatalog();
   const todays = useTrips(startOfDay(today), startOfDay(addDays(today, 1)), 60_000);
   const month = useTrips(startOfDay(firstOfMonth(today)), startOfDay(firstOfNextMonth(today)));
-  const documents = useDocuments();
-  const maintenance = useMaintenance();
-  const tanks = useTanks();
-  const low = lowTanks(tanks.rows);
+  const notices = useNotices(today);
+  const { documents, maintenance, tanks } = notices;
 
   const counts = fleetCounts(fleet.units);
-  // The warnings by kilometres need the trips: until they arrive (or fail), the list is not complete.
-  const kmWaiting = maintenance.kmMissing && !maintenance.trips.error;
-  const papersLoaded = documents.query.data !== undefined && maintenance.query.data !== undefined && !kmWaiting;
-  const papersError = documents.query.error ?? maintenance.query.error;
-  const pending = useMemo(() => {
-    if (!papersLoaded) return [];
-    const papers = documents.papers.map((p) => ({ id: p.id, scope: p.scope, driver_name: p.driverName, vehicle: p.vehicle, kind: p.kind, expires_on: p.expiresOn }));
-    const services = maintenance.services.map((s) => ({ id: s.id, vehicle: s.vehicle, kind: s.kind, due_on: s.dueOn, done_on: s.doneOn, due_km: s.dueKm }));
-    return alerts(papers, services, today, (vehicle) => maintenance.kms.get(vehicle)?.estimate ?? null);
-  }, [papersLoaded, documents.papers, maintenance.services, maintenance.kms, today]);
   const totals = useMemo(() => (month.data ? monthTotals(month.data, catalog.data ?? []) : null), [month.data, catalog.data]);
   const running = todays.data?.filter((t) => t.active).length ?? 0;
   const refreshing = fleet.isFetching || todays.isFetching || documents.query.isFetching || maintenance.query.isFetching;
-  const refreshPapers = () => Promise.all([documents.query.refetch(), maintenance.query.refetch(), maintenance.refetchTrips()]);
   const refresh = () => {
     tanks.refetch();
-    void Promise.all([fleet.refetch(), todays.refetch(), month.refetch(), refreshPapers()]);
+    void Promise.all([fleet.refetch(), todays.refetch(), month.refetch(), notices.refreshPapers()]);
   };
   const firstName = user.name.split(' ')[0] ?? user.name;
 
@@ -138,7 +84,7 @@ export function Inicio() {
         <Stat tone="green" icon="truck" label="En ruta" value={fleet.isLoading ? '…' : count(counts.moving)} />
         <Stat tone="amber" icon="pause" label="Detenidos" value={fleet.isLoading ? '…' : count(counts.halted)} detail={counts.noSignal > 0 ? `${counts.noSignal} sin señal` : undefined} />
         <Stat tone="grey" icon="clock" label="Sin viaje" value={fleet.isLoading ? '…' : count(counts.idle)} />
-        <Stat tone="blue" icon="route" label="Viajes hoy" value={todays.isLoading ? '…' : count(todays.data?.length ?? 0)} detail={running > 0 ? `${running} en curso` : undefined} />
+        <Stat featured tone="blue" icon="route" label="Viajes hoy" value={todays.isLoading ? '…' : count(todays.data?.length ?? 0)} detail={running > 0 ? `${running} en curso` : undefined} />
       </div>
 
       <div className="grid-2">
@@ -160,38 +106,7 @@ export function Inicio() {
         </Card>
 
         <Card title="Para tener en cuenta">
-          {papersError && papersLoaded && <StaleNote onRetry={() => void refreshPapers()} />}
-          {maintenance.trips.error && papersLoaded && (
-            <StaleNote onRetry={() => void maintenance.refetchTrips()}>
-              {maintenance.kmMissing ? 'No se pudieron leer los viajes: los avisos por kilómetros no se ven ahora.' : 'No se pudieron actualizar los viajes: los avisos por kilómetros son de la última lectura.'}
-            </StaleNote>
-          )}
-          {tanks.error && (
-            <StaleNote onRetry={tanks.refetch}>No se pudo leer el combustible de los camiones: los avisos de combustible bajo no se ven ahora.</StaleNote>
-          )}
-          {low.length > 0 && (
-            <ul className="alert-list" aria-label="Combustible bajo">
-              {low.map((t) => (
-                <FuelLine key={t.settings.key} tank={t} />
-              ))}
-            </ul>
-          )}
-          {papersError && !papersLoaded ? (
-            <ErrorNote onRetry={() => void refreshPapers()} />
-          ) : !papersLoaded ? (
-            <Skeleton />
-          ) : pending.length === 0 && low.length > 0 ? null : pending.length === 0 ? (
-            <Empty icon="check" title="Todo en orden">
-              No hay papeles vencidos ni por vencer en 30 días, ni services atrasados o próximos (15 días o 1.000 km).
-            </Empty>
-          ) : (
-            <ul className="alert-list">
-              {pending.slice(0, 6).map((a) => (
-                <AlertLine key={a.id} alert={a} />
-              ))}
-              {pending.length > 6 && <li className="more">Y {pending.length - 6} más.</li>}
-            </ul>
-          )}
+          <NoticeList notices={notices} limit={6} />
         </Card>
       </div>
 
@@ -226,7 +141,13 @@ export function Inicio() {
               <dl className="facts">
                 <div><dt>Viajes</dt><dd>{count(totals.trips)}</dd></div>
                 <div><dt>Kilómetros GPS</dt><dd>{km(totals.meters)}</dd></div>
-                <div><dt>Con carga</dt><dd>{totals.loadedShare === null ? '—' : percent(totals.loadedShare)}</dd></div>
+                <div>
+                  <dt>Con carga</dt>
+                  <dd className="ring-fact">
+                    {totals.loadedShare !== null && <Ring share={totals.loadedShare} />}
+                    {totals.loadedShare === null ? '—' : percent(totals.loadedShare)}
+                  </dd>
+                </div>
                 <div><dt>Camiones con viajes</dt><dd>{count(totals.trucks)}</dd></div>
               </dl>
               <p className="note">

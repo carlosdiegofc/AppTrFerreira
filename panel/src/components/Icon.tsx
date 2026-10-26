@@ -34,6 +34,8 @@ const ICONS = {
   trash: <><path d="M4 7h16" /><path d="M9 7V4h6v3" /><path d="M6 7l1 13h10l1-13" /><path d="M10 11v6M14 11v6" /></>,
   plus: <path d="M12 5v14M5 12h14" />,
   undo: <><path d="M9 14 4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 0 10h-3" /></>,
+  search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-3.6-3.6" /></>,
+  bell: <><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0" /></>,
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof ICONS;

@@ -157,8 +157,10 @@ test('las secciones que faltan dicen qué van a hacer y la sesión se cierra', a
   await expect(page.getByText('Consultas por WhatsApp sobre la flota, respondidas con los datos del sistema.')).toBeVisible();
   await shot(page, 'proximamente');
 
+  // «Salir» is in the menu on a phone, and in the account of the top bar on a computer.
   const menu = page.getByRole('button', { name: 'Abrir el menú' });
   if (await menu.isVisible()) await menu.click();
+  else await page.getByRole('button', { name: /^Tu cuenta/ }).click();
   await page.getByRole('button', { name: 'Salir' }).click();
   await expect(page.getByLabel('Correo')).toBeVisible();
 });

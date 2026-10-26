@@ -13,6 +13,7 @@ import { ago, formatDay } from '../lib/dates';
 import { paperViews } from '../lib/documents';
 import { STATE_LABEL } from '../lib/fleet';
 import { andList, count, decimal, number } from '../lib/format';
+import { trailerPath, truckPath } from '../lib/paths';
 import { capacityText, hitchDays, makeLine, samePlate, takenKeys, trailerLabel, trailerTrucks, type Vehicle } from '../lib/vehicles';
 import { PAPER_STATE, STATE_TONE } from './states';
 
@@ -23,15 +24,12 @@ const VIEWS: { value: View; label: string }[] = [
   { value: 'baja', label: 'De baja' },
 ];
 
-export const truckPath = (key: string) => `/flota/camion/${encodeURIComponent(key)}`;
-
 export interface Notice {
   tone: 'ok' | 'warn';
   text: string;
 }
 /** What a card opened right after it was created says first: «Ficha … creada.» */
 export const noticeOf = (state: unknown): Notice | null => (state && typeof state === 'object' && 'notice' in state ? ((state as { notice: Notice | null }).notice ?? null) : null);
-export const trailerPath = (id: string) => `/flota/acoplado/${id}`;
 
 /** The papers in one pill: how many are expired or close, or «Al día». */
 export function PapersPill({ papers }: { papers: readonly { state: keyof typeof PAPER_STATE }[] }) {
@@ -205,7 +203,7 @@ export function Flota() {
       {ready && stale.length > 0 && <StaleNote onRetry={() => stale.forEach((r) => void r.query.refetch())}>No se pudo actualizar: {andList(stale.map((r) => r.what))}. Se ve lo último que se leyó.</StaleNote>}
       {ready && views && (
         <div className="stats">
-          <Stat tone="blue" icon="truck" label="Camiones" value={count(views.current.length)} detail={`${count(views.current.filter((t) => t.card).length)} con ficha`} />
+          <Stat featured tone="blue" icon="truck" label="Camiones" value={count(views.current.length)} detail={`${count(views.current.filter((t) => t.card).length)} con ficha`} />
           <Stat tone="green" icon="route" label="En viaje ahora" value={known.live ? count(travelling) : '—'} />
           <Stat tone={urgent > 0 ? 'amber' : 'green'} icon="warning" label="Para atender" value={count(urgent)} detail="Papeles, services o combustible" />
           <Stat tone="grey" icon="box" label="Acoplados" value={count(trailers.length)} />

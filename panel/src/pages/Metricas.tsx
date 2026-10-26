@@ -3,7 +3,7 @@
 // office and the drivers (declared), and the consumption is a calculation (estimated): the page says which is which.
 import { type ReactNode, useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { BarRows, type BarRow, ChartData, type Column, Columns, Legend, TipLine } from '../components/Charts';
+import { BarRows, type BarRow, ChartData, type Column, Columns, Curve, type CurvePoint, Legend, TipLine } from '../components/Charts';
 import { Icon } from '../components/Icon';
 import { CatalogNote, Empty, ErrorNote, PageHead, RefreshButton, Skeleton, StaleNote, Stat } from '../components/ui';
 import { useBilledTrips, useFuel, useNow, useTripList } from '../data/hooks';
@@ -202,11 +202,11 @@ function Billing({ months }: { months: ReturnType<typeof billingByMonth> }) {
       {currencies.map((c) => {
         const values = months.map((m) => m.billed[c]);
         const last = values.length - 1;
-        const columns: Column[] = months.map((m, i) => ({
+        const points: CurvePoint[] = months.map((m, i) => ({
           key: m.month,
           label: monthShort.format(atNoon(m.month)).replace('.', ''),
           major: i % 2 === last % 2,
-          parts: [{ value: m.billed[c], series: 1 }],
+          value: m.billed[c],
           tip: (
             <>
               <strong className="cap">{monthLong.format(atNoon(m.month))}</strong>
@@ -218,7 +218,7 @@ function Billing({ months }: { months: ReturnType<typeof billingByMonth> }) {
         return (
           <div key={c} className="viz-currency">
             <h3 className="viz-subtitle">{c === 'USD' ? 'En dólares' : 'En pesos'}</h3>
-            <Columns label={`Facturado por mes ${c === 'USD' ? 'en dólares' : 'en pesos'}`} columns={columns} ticks={niceTicks(Math.max(...values))} tick={compact} valueLabel={{ index: last, text: money(values[last] ?? 0, c) }} />
+            <Curve label={`Facturado por mes ${c === 'USD' ? 'en dólares' : 'en pesos'}`} points={points} ticks={niceTicks(Math.max(...values))} tick={compact} valueLabel={{ index: last, text: money(values[last] ?? 0, c) }} />
           </div>
         );
       })}
@@ -376,7 +376,7 @@ export function Metricas() {
       ) : (
         <>
           <div className="stats stats-money metrics-stats">
-            <Stat label="Kilómetros del GPS" value={km(total.gpsKm)} detail={`${plural(total.trips, 'viaje', 'viajes')}${share === null ? '' : ` · ${percent(share)} con carga`}`} tone="blue" icon="route" />
+            <Stat featured label="Kilómetros del GPS" value={km(total.gpsKm)} detail={`${plural(total.trips, 'viaje', 'viajes')}${share === null ? '' : ` · ${percent(share)} con carga`}`} tone="blue" icon="route" />
             <Stat
               label="Facturado"
               value={<Lines parts={moneyParts(total.billed)} empty="$ 0" />}

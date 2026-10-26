@@ -17,7 +17,7 @@ El diagnóstico completo, el esquema de la base (unas 50 tablas), las funciones 
 - **Supabase como núcleo:** Postgres con RLS por empresa, Auth, Storage, Realtime y funciones del servidor (Edge Functions, TypeScript) para todo lo que necesita claves secretas: WhatsApp, IA, lectura de boletas, pagos, exportaciones y licencias.
 - **Multiempresa:** cada fila de negocio lleva `empresa_id`, y `usuarios_empresa` asigna el rol de cada persona en cada empresa (dueño, administrador, operador de tráfico, contable, taller, chofer, solo lectura). El superadministrador de la plataforma va aparte.
 - **Auditoría y papelera:** un trigger registra quién cambió qué y cuándo; borrar manda a la papelera, nunca elimina.
-- **Panel web nuevo** en React + TypeScript, sección por sección. El panel actual (`web/`) sigue en uso hasta que cada sección tenga reemplazo.
+- **Panel web nuevo** en React + TypeScript, sección por sección. Desde el 26/10/2026 está en la dirección principal del panel, y el actual (`web/`) sigue en `/anterior/` hasta que cada sección tenga reemplazo.
 - **App Android:** sigue en Kotlin; pasa de a poco a una base local Room y a módulos, sin cambiar lo que ve el chofer salvo cuando se decida.
 - **Mapas y rutas:** proveedor comercial; los servidores públicos de OpenStreetMap y OSRM no admiten uso comercial.
 
@@ -95,14 +95,22 @@ Va armándose al costado del panel actual y lo reemplaza sección por sección.
    - [x] Nada se borra: un camión o un acoplado que se vende queda con su fecha de baja y su historial, y deja de llevar su acoplado, o de ir en su camión, desde ese día. Un enganche mal cargado se anula.
    - [x] Publicación el 25/10/2026: respaldo completo de estructura y datos (02:29 UTC), probado restaurándolo y con la 0010 final aplicada sobre esa copia, y entregado al dueño fuera del repositorio; 0010 aplicada en producción (18:45 UTC), con los datos que ya estaban sin cambios; panel publicado (despliegue #15, commit 6a581dc). La app no cambia.
 12. [ ] Gastos y finanzas (aprobado el 26/10/2026, etapa 7), en dos partes, cada una con su respaldo y su publicación. Lo ven y lo cargan solo las cuentas del panel, como Choferes, y la app no cambia:
-   - 12a. [ ] Gastos, y el panel nuevo en la dirección principal:
-     - Cada gasto con fecha, tipo (reparación y repuestos, cubiertas, service, seguro, patente e impuestos, peajes en efectivo, multas, lavado, viáticos, otros, o uno escrito a mano), monto en pesos o en dólares, a qué va (un camión, un acoplado, un chofer, un viaje o la empresa), proveedor, forma de pago y la foto o el PDF de la factura, en una carpeta privada. Lo mal cargado se corrige o se anula; no se borra.
-     - El costo de un service hecho se anota como gasto, desde Mantenimiento.
-     - El panel nuevo pasa a la dirección principal: el actual queda en `/anterior/`, y `/nuevo/` lleva a la principal para que no se rompan los enlaces guardados.
+   - 12a. [x] Gastos, y el panel nuevo en la dirección principal:
+     - [x] Cada gasto con fecha, tipo (reparación y repuestos, cubiertas, service, seguro, patente e impuestos, peajes en efectivo, multas, lavado, viáticos, otros, o uno escrito a mano), monto en pesos o en dólares, a qué va (un camión, un acoplado, un chofer, un viaje o la empresa), proveedor, forma de pago y la foto o el PDF de la factura, en una carpeta privada. Lo mal cargado se corrige o se anula; no se borra.
+     - [x] El costo de un service hecho se anota como gasto, desde Mantenimiento.
+     - [x] El panel nuevo pasa a la dirección principal: el actual queda en `/anterior/`, y `/nuevo/` lleva a la principal para que no se rompan los enlaces guardados.
+     - [x] Publicación el 26/10/2026: respaldo completo de estructura y datos (00:52 UTC), probado restaurándolo y con la 0011 aplicada sobre esa copia, y entregado al dueño fuera del repositorio; migración [`0011_gastos.sql`](../supabase/migrations/0011_gastos.sql) aplicada en producción (01:05 UTC), con los datos que ya estaban sin cambios; panel publicado en la dirección principal, con el anterior en `/anterior/` (despliegue #16, commit 9e15a62). La app no cambia.
    - 12b. [ ] Cobros, ganancia y simulador de fletes:
      - La cuenta de cada cliente, como la de cada estación de combustible: lo facturado en sus viajes suma, los cobros restan, con un saldo inicial con fecha. Los clientes salen del nombre escrito en los viajes.
      - La ganancia de cada viaje, de cada camión por mes y de la empresa por mes: lo facturado menos el combustible, los peajes y los gastos, y los sueldos solo en el total de la empresa. Pesos y dólares por separado, y la pantalla dice qué es medido, declarado o estimado.
      - El simulador de fletes: con el camión, los kilómetros con carga y de vuelta y los peajes de la ruta, calcula el costo y el precio con el margen que se elija. No guarda las cotizaciones.
+13. [ ] Diseño «vidrio» (aprobado el 26/10/2026, a pedido del dueño con un video de ejemplo; va antes de la parte 12b): todo el panel con tarjetas de vidrio esmerilado sobre un fondo desenfocado. La base y la app no cambian:
+   - [x] El fondo: una imagen desenfocada de tonos cálidos con luces suaves, hecha para el panel, sin foto. Si el dueño manda una foto suya, se usa esa. En el modo oscuro, el mismo fondo más oscuro.
+   - [x] El vidrio: tarjetas translúcidas con bordes redondeados y sombra suave, títulos grandes, números grandes, botones en forma de píldora, y gráficos con curvas suaves, barras redondeadas y anillos. Los colores: el azul de TR Ferreira, y verde, ámbar y rojo para los avisos, como hasta ahora.
+   - [ ] La variación de los números grandes contra el período anterior, como en el video («↑ 6 % más que el mes pasado»): quedó fuera de lo publicado y va con la parte 12b.
+   - [x] Arriba, una barra flotante con el nombre de quien ingresó (ahí van el tema y «Salir»), un buscador de secciones, camiones, acoplados y choferes, y una campana con los avisos de Inicio. A la izquierda, el menú pasa a una columna de íconos que muestran su nombre al pasar el mouse.
+   - [x] Sigue todo lo que hay: las 12 secciones con lo que hacen, los modos claro y oscuro y el uso desde el celular. Si la computadora no muestra el vidrio o pide menos transparencias, las tarjetas quedan opacas.
+   - [ ] Se publica con el visto bueno del dueño, sobre capturas de cada sección. El dueño lo aprobó el 26/10/2026.
 
 ### App: juegos para las esperas
 Para pasar el rato mientras se espera la carga (aprobado el 21/10/2026). Se juega con el camión parado, y los juegos los ven todas las cuentas.
@@ -128,6 +136,11 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 26/10/2026: Diseño del panel.
+  - El panel toma el estilo «vidrio» del video que mandó el dueño: tarjetas translúcidas sobre un fondo desenfocado, una barra flotante arriba y el menú de íconos a la izquierda.
+  - El fondo es una imagen hecha para el panel, sin foto: desde el entorno de desarrollo no se pueden bajar fotos de bancos de imágenes. Si el dueño manda una foto suya, se usa esa, sabiendo que el panel y el repositorio son públicos.
+  - Los colores son el azul de TR Ferreira, no los del video.
+  - Se hace antes de la parte 12b de Gastos y finanzas.
 - 26/10/2026: Gastos y finanzas.
   - Los cobros a clientes se llevan como la cuenta de cada estación de combustible: lo facturado en los viajes suma, los cobros restan, y hay un saldo inicial con fecha. No se cargan facturas aparte; la factura electrónica de DGI queda para más adelante.
   - En la ganancia de cada camión no se reparten los sueldos: se restan solo en el total del mes de la empresa.

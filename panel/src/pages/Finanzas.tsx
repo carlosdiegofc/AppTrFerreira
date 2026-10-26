@@ -279,7 +279,7 @@ export function Finanzas() {
 
       {ready && (
         <div className="stats stats-money">
-          <Stat label="Gastado en el período" value={badRange ? '—' : <Lines parts={amountParts(totals.amounts, '$ 0')} />} detail={badRange ? 'Revisá las fechas' : `${count(totals.count)} gasto${totals.count === 1 ? '' : 's'}`} tone="blue" icon="money" />
+          <Stat featured label="Gastado en el período" value={badRange ? '—' : <Lines parts={amountParts(totals.amounts, '$ 0')} />} detail={badRange ? 'Revisá las fechas' : `${count(totals.count)} gasto${totals.count === 1 ? '' : 's'}`} tone="blue" icon="money" />
           <Stat label="Lo que más pesó" value={top ? <Lines parts={amountParts(top.amounts)} /> : '—'} detail={top ? top.label : 'Sin gastos en el período'} tone="grey" icon="chart" />
           <Stat label="En camiones y acoplados" value={badRange ? '—' : <Lines parts={amountParts(fleet.amounts, '$ 0')} />} detail={`${count(fleet.count)} gasto${fleet.count === 1 ? '' : 's'}`} tone="grey" icon="truck" />
           <Stat label="Sin factura" value={count(totals.withoutFile)} detail={totals.withoutFile > 0 ? 'Sumales la foto o el PDF' : 'Todos tienen su factura'} tone={totals.withoutFile > 0 ? 'amber' : 'green'} icon="doc" />
