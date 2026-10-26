@@ -31,7 +31,7 @@ El diagnóstico completo, el esquema de la base (unas 50 tablas), las funciones 
 | 4 | Combustible con lectura automática de la boleta y control de litros × precio | Pendiente |
 | 5 | Mantenimiento preventivo y correctivo con avisos por km y por fecha; documentación con archivos y vencimientos | Pendiente |
 | 6 | GPS en tiempo real | Pendiente |
-| 7 | Gastos, finanzas y simulador de fletes | Pendiente |
+| 7 | Gastos, finanzas y simulador de fletes | En curso |
 | 8 | Asistente IA por WhatsApp: primero solo consultas, con audios y registro de costos | Pendiente |
 | 9 | Planes FREE (US$ 0) y PRO (US$ 13 por mes), pagos y panel comercial | Pendiente |
 | 10 | Licencia permanente (US$ 1.300) | Pendiente |
@@ -94,6 +94,15 @@ Va armándose al costado del panel actual y lo reemplaza sección por sección.
    - [x] Los acoplados: su ficha con los mismos datos y el tipo, y a qué camión estuvo enganchado y desde cuándo. Sus papeles se cargan en Documentación, como los de los camiones.
    - [x] Nada se borra: un camión o un acoplado que se vende queda con su fecha de baja y su historial, y deja de llevar su acoplado, o de ir en su camión, desde ese día. Un enganche mal cargado se anula.
    - [x] Publicación el 25/10/2026: respaldo completo de estructura y datos (02:29 UTC), probado restaurándolo y con la 0010 final aplicada sobre esa copia, y entregado al dueño fuera del repositorio; 0010 aplicada en producción (18:45 UTC), con los datos que ya estaban sin cambios; panel publicado (despliegue #15, commit 6a581dc). La app no cambia.
+12. [ ] Gastos y finanzas (aprobado el 26/10/2026, etapa 7), en dos partes, cada una con su respaldo y su publicación. Lo ven y lo cargan solo las cuentas del panel, como Choferes, y la app no cambia:
+   - 12a. [ ] Gastos, y el panel nuevo en la dirección principal:
+     - Cada gasto con fecha, tipo (reparación y repuestos, cubiertas, service, seguro, patente e impuestos, peajes en efectivo, multas, lavado, viáticos, otros, o uno escrito a mano), monto en pesos o en dólares, a qué va (un camión, un acoplado, un chofer, un viaje o la empresa), proveedor, forma de pago y la foto o el PDF de la factura, en una carpeta privada. Lo mal cargado se corrige o se anula; no se borra.
+     - El costo de un service hecho se anota como gasto, desde Mantenimiento.
+     - El panel nuevo pasa a la dirección principal: el actual queda en `/anterior/`, y `/nuevo/` lleva a la principal para que no se rompan los enlaces guardados.
+   - 12b. [ ] Cobros, ganancia y simulador de fletes:
+     - La cuenta de cada cliente, como la de cada estación de combustible: lo facturado en sus viajes suma, los cobros restan, con un saldo inicial con fecha. Los clientes salen del nombre escrito en los viajes.
+     - La ganancia de cada viaje, de cada camión por mes y de la empresa por mes: lo facturado menos el combustible, los peajes y los gastos, y los sueldos solo en el total de la empresa. Pesos y dólares por separado, y la pantalla dice qué es medido, declarado o estimado.
+     - El simulador de fletes: con el camión, los kilómetros con carga y de vuelta y los peajes de la ruta, calcula el costo y el precio con el margen que se elija. No guarda las cotizaciones.
 
 ### App: juegos para las esperas
 Para pasar el rato mientras se espera la carga (aprobado el 21/10/2026). Se juega con el camión parado, y los juegos los ven todas las cuentas.
@@ -119,6 +128,12 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 26/10/2026: Gastos y finanzas.
+  - Los cobros a clientes se llevan como la cuenta de cada estación de combustible: lo facturado en los viajes suma, los cobros restan, y hay un saldo inicial con fecha. No se cargan facturas aparte; la factura electrónica de DGI queda para más adelante.
+  - En la ganancia de cada camión no se reparten los sueldos: se restan solo en el total del mes de la empresa.
+  - Los gastos los carga solo el panel: la app no cambia en esta etapa.
+  - El simulador de fletes solo calcula: no guarda las cotizaciones.
+  - El panel nuevo pasa a la dirección principal del panel, y el actual queda en `/anterior/` un tiempo.
 - 24/10/2026: Flota.
   - La lista de camiones sigue siendo la del catálogo que usa la app: la ficha le agrega los datos y la foto, unida por la matrícula. Agregar o sacar camiones de la lista sigue como hoy, y pasa al panel con Configuración.
   - Cada camión lleva siempre el mismo acoplado: figura en su ficha y se cambia solo si se vende o se reemplaza, y el cambio queda en el historial.
