@@ -105,11 +105,12 @@ Va armándose al costado del panel actual y lo reemplaza sección por sección.
      - La ganancia de cada viaje, de cada camión por mes y de la empresa por mes: lo facturado menos el combustible, los peajes y los gastos, y los sueldos solo en el total de la empresa. Pesos y dólares por separado, y la pantalla dice qué es medido, declarado o estimado.
      - El simulador de fletes: con el camión, los kilómetros con carga y de vuelta y los peajes de la ruta, calcula el costo y el precio con el margen que se elija. No guarda las cotizaciones.
 13. [ ] Diseño «vidrio» (aprobado el 26/10/2026, a pedido del dueño con un video de ejemplo; va antes de la parte 12b): todo el panel con tarjetas de vidrio esmerilado sobre un fondo desenfocado. La base y la app no cambian:
-   - [ ] El fondo: una imagen desenfocada de tonos cálidos con luces suaves, hecha para el panel, sin foto. Si el dueño manda una foto suya, se usa esa. En el modo oscuro, el mismo fondo más oscuro.
-   - [ ] El vidrio: tarjetas translúcidas con bordes redondeados y sombra suave, títulos grandes, números grandes con su variación, botones en forma de píldora, y gráficos con curvas suaves, barras redondeadas y anillos. Los colores: el azul de TR Ferreira, y verde, ámbar y rojo para los avisos, como hasta ahora.
-   - [ ] Arriba, una barra flotante con el nombre de quien ingresó (ahí van el tema y «Salir»), un buscador de secciones, camiones, acoplados y choferes, y una campana con los avisos de Inicio. A la izquierda, el menú pasa a una columna de íconos que muestran su nombre al pasar el mouse.
-   - [ ] Sigue todo lo que hay: las 12 secciones con lo que hacen, los modos claro y oscuro y el uso desde el celular. Si la computadora no muestra el vidrio o pide menos transparencias, las tarjetas quedan opacas.
-   - [ ] Se publica con el visto bueno del dueño, sobre capturas de cada sección.
+   - [x] El fondo: una imagen desenfocada de tonos cálidos con luces suaves, hecha para el panel, sin foto. Si el dueño manda una foto suya, se usa esa. En el modo oscuro, el mismo fondo más oscuro.
+   - [x] El vidrio: tarjetas translúcidas con bordes redondeados y sombra suave, títulos grandes, números grandes, botones en forma de píldora, y gráficos con curvas suaves, barras redondeadas y anillos. Los colores: el azul de TR Ferreira, y verde, ámbar y rojo para los avisos, como hasta ahora.
+   - [ ] La variación de los números grandes contra el período anterior, como en el video («↑ 6 % más que el mes pasado»): quedó fuera de lo publicado y va con la parte 12b.
+   - [x] Arriba, una barra flotante con el nombre de quien ingresó (ahí van el tema y «Salir»), un buscador de secciones, camiones, acoplados y choferes, y una campana con los avisos de Inicio. A la izquierda, el menú pasa a una columna de íconos que muestran su nombre al pasar el mouse.
+   - [x] Sigue todo lo que hay: las 12 secciones con lo que hacen, los modos claro y oscuro y el uso desde el celular. Si la computadora no muestra el vidrio o pide menos transparencias, las tarjetas quedan opacas.
+   - [ ] Se publica con el visto bueno del dueño, sobre capturas de cada sección. El dueño lo aprobó el 26/10/2026.
 
 ### App: juegos para las esperas
 Para pasar el rato mientras se espera la carga (aprobado el 21/10/2026). Se juega con el camión parado, y los juegos los ven todas las cuentas.
