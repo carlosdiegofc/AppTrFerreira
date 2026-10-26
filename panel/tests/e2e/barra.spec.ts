@@ -35,10 +35,10 @@ test('el buscador lleva a una sección, a un camión, a un chofer o a buscar el 
   await expect(options(page).first()).toContainText('Con Semirremolque Randon · REM1001');
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Volvo FH 460 · ABC1234');
-  await expect(box).toHaveValue('');
 
-  // A driver's card without the accent, and the trailers that left too.
+  // Opened again, the box is empty. A driver's card without the accent, and the trailers that left too.
   box = await search(page);
+  await expect(box).toHaveValue('');
   await box.fill('nunez');
   await expect(options(page).first()).toContainText('Eduardo Núñez');
   await box.fill('pastrana');
@@ -101,8 +101,8 @@ test('la cuenta de la barra tiene el tema y «Salir»', async ({ page }) => {
   await menu.getByRole('button', { name: 'Oscuro' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await shot(page, 'cuenta-oscuro');
-  // A click outside closes it; the choice stays.
-  await page.getByRole('heading', { level: 1 }).click();
+  // A click outside it (on the date, left of the menu) closes it; the choice stays.
+  await page.locator('.page-sub').click({ position: { x: 4, y: 4 } });
   await expect(menu).toBeHidden();
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');

@@ -9,7 +9,7 @@
   --glass: blur(18px) saturate(150%);
   --panel: rgb(255 255 255 / 34%);
   --panel-line: rgb(255 255 255 / 58%);
-  --float: rgb(255 255 255 / 70%);
+  --float: rgb(255 255 255 / 78%);
   --card: rgb(255 255 255 / 64%);
   --card-line: rgb(255 255 255 / 72%);
   /* Above the glass: menus, dialogs and the chosen icon of the menu, nearly solid; fields and buttons. */
@@ -62,7 +62,7 @@
     --page: #1d1a1e;
     --panel: rgb(14 18 28 / 46%);
     --panel-line: rgb(255 255 255 / 9%);
-    --float: rgb(18 22 34 / 74%);
+    --float: rgb(18 22 34 / 80%);
     --card: rgb(30 37 54 / 52%);
     --card-line: rgb(255 255 255 / 9%);
     --raised: rgb(27 33 49 / 96%);
@@ -105,7 +105,7 @@
   --page: #1d1a1e;
   --panel: rgb(14 18 28 / 46%);
   --panel-line: rgb(255 255 255 / 9%);
-  --float: rgb(18 22 34 / 74%);
+  --float: rgb(18 22 34 / 80%);
   --card: rgb(30 37 54 / 52%);
   --card-line: rgb(255 255 255 / 9%);
   --raised: rgb(27 33 49 / 96%);
