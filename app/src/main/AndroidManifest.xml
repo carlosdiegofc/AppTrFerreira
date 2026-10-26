@@ -11,5 +11,8 @@
         </activity>
         <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.files" android:exported="false" android:grantUriPermissions="true"><meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths"/></provider>
         <service android:name=".GpsService" android:foregroundServiceType="location" android:exported="false"/>
+        <!-- Google's map (decision of 26/10/2026): the key comes from the GOOGLE_MAPS_ANDROID_KEY secret when the app is built, never from the repository. Without it the app keeps its own map. -->
+        <meta-data android:name="com.google.android.geo.API_KEY" android:value="${mapsApiKey}"/>
+        <uses-library android:name="org.apache.http.legacy" android:required="false"/>
     </application>
 </manifest>

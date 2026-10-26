@@ -54,7 +54,10 @@ jobs:
           echo "TRF_UPLOAD_KEYSTORE=$key" >> "$GITHUB_ENV"
           echo "TRF_UPLOAD_PASSWORD=$password" >> "$GITHUB_ENV"
       # La versión release (el .aab y su APK) sale optimizada y ofuscada por R8; las dos llevan el mismo código.
+      # La clave del mapa de Google para Android entra al compilar (docs/GOOGLE-MAPS.md); sin ella la app usa su mapa de siempre.
       - run: gradle --no-daemon :app:assembleDebug :app:testDebugUnitTest :app:bundleRelease :app:assembleRelease
+        env:
+          GOOGLE_MAPS_ANDROID_KEY: ${{ secrets.GOOGLE_MAPS_ANDROID_KEY }}
       - name: Borrar la llave del equipo de compilación
         if: always()
         run: rm -f "$RUNNER_TEMP/upload.p12"

@@ -255,6 +255,6 @@ Más adelante: método de lectura de boletas, modelo de IA y cupo por plan, tran
 Pedido del dueño: un mejor mapa. Todo el mapa pasa a ser de Google, con calles, satélite y tráfico en vivo; OpenStreetMap queda solo de respaldo (ver decisiones).
 - [ ] La cuenta de Google Cloud con facturación y dos claves, una para el panel y otra para la app, con un tope de unos US$ 10 por mes: una cuota diaria de la Map Tiles API y una alerta de presupuesto. La crea el dueño, con la guía de [GOOGLE-MAPS.md](GOOGLE-MAPS.md).
 - [x] Panel: calles, satélite y tráfico de Google (Map Tiles API) en GPS en vivo, en cada viaje y en el mapa de Inicio, con el logo y los créditos de Google. Sin clave, o si Google no responde (por ejemplo, al llegar al tope del día), el mapa vuelve a OpenStreetMap y lo dice.
-- [ ] App 0.21.0: el mapa de Google para Android (Maps SDK, sin costo) en el viaje en curso, en el recorrido de cada viaje y en la flota, con calles, satélite y tráfico. La clave entra al compilar, desde un secreto de GitHub; sin ella sigue el mapa de ahora.
+- [x] App 0.21.0: el mapa de Google para Android (Maps SDK, sin costo) en el viaje en curso, en el recorrido de cada viaje y en la flota, con calles, satélite y tráfico. La clave entra al compilar, desde un secreto de GitHub; sin ella sigue el mapa de ahora.
 - [ ] La política de privacidad y la sección de seguridad de los datos de Google Play dicen que la app muestra mapas de Google.
 - [ ] Publicación: el panel cuando estén las claves, y la app en una versión nueva para Google Play.

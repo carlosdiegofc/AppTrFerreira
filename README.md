@@ -5,7 +5,15 @@ Panel web nuevo (React + TypeScript), en la dirección principal del panel desde
 # Panel web (anterior)
 La carpeta [`web/`](web/README.md) tiene el panel web anterior, que queda en `/anterior/` de la misma dirección un tiempo: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
 
-# Transportes Ferreira GPS — v0.20.0
+# Transportes Ferreira GPS — v0.21.0
+
+## Nuevo en v0.21.0 (el mapa de Google; versionCode 33)
+- **Los mapas de la app son de Google** (decisión del 26/10/2026): el del viaje en curso, el recorrido de cada viaje (también en pantalla completa) y el de la flota del dueño.
+  - Arriba de cada mapa se elige «Mapa» (las calles de Google) o «Satélite» (las fotos con las rutas y los nombres), y «Tráfico» muestra el tránsito de ahora. La elección queda guardada en el teléfono.
+  - De noche, con el teléfono en modo oscuro, las calles vienen con los colores nocturnos de Google.
+  - Lo que se ve es lo mismo que antes: el recorrido por tramos, el camión que sigue el mapa con «Seguir el camión» y «Ver todo», el camino al destino con cuánto falta, y los camiones del dueño que se deslizan a su posición nueva.
+- **Sin costo:** el mapa de Google para Android no se paga.
+- **La clave** entra al compilar, desde el secreto `GOOGLE_MAPS_ANDROID_KEY` de GitHub ([docs/GOOGLE-MAPS.md](docs/GOOGLE-MAPS.md)). Sin la clave, o en un teléfono sin Google Play services, la app sigue con su mapa de siempre.
 
 ## Nuevo en v0.20.0 (combustible: «¿Llenaste el tanque?»; versionCode 32)
 - **Cargar combustible** pregunta si llenaste el tanque. Las opciones son «No, cargué una parte», que viene marcada, y «Sí, lo llené». La respuesta llega al panel con el resto de la boleta.

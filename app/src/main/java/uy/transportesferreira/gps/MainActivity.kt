@@ -126,7 +126,7 @@ class MainActivity:AppCompatActivity(){
  // Truco against the phone (decisions of 21 and 22/10/2026): the person is player 0. trucoPick is the card chosen to play.
  private var trucoMatch:Truco.Match?=null;private var trucoUi:TrucoViews?=null;private var trucoPick:Truco.Card?=null;private var trucoJob=0;private var trucoThinking=false
  private val serviceKinds=listOf("Cambio de aceite","Cambio de filtros","Revisión de frenos","Alineación y balanceo","Cubiertas","Revisión general")
- private var activeMap:android.webkit.WebView?=null;private var liveMap:TripMap.Live?=null;private var trackOffset=0L
+ private var activeMap:TripMap.Shown?=null;private var liveMap:TripMap.Live?=null;private var fleetMap:TripMap.Fleet?=null;private var trackOffset=0L
  private val trucks=listOf("Ford Cargo 1722","Mercedes-Benz 1618","Leyland","Mercedes-Benz 1630")
  private fun account()=api.session()?.optJSONObject("user")?.optString("email")?:""
  // Owners see the whole fleet. The company account opens on the fleet panel; an owner who also drives starts like any driver and opens the owner menu from there.
@@ -173,7 +173,7 @@ class MainActivity:AppCompatActivity(){
   b.putBoolean("fleetView",fleetView);b.putInt("tripFilter",tripFilter);b.putString("historyQuery",historyQuery);b.putInt("historyLimit",historyLimit);b.putBoolean("fuelMonth",fuelMonth);b.putString("detailFrom",detailFrom);b.putString("perfMonth",perfMonth.toString());b.putBoolean("perfDrivers",perfDrivers)
   if(screen=="chessnew")b.putString("chessPick","$newVsPhone|${newLevel.name}|$newSide")}
  override fun onStart(){super.onStart();Presence.opened();presenceAt=null;handler.post(tick)}
- override fun onDestroy(){photoJob++;chessJob++;trucoJob++;sheet?.dismiss();sheet=null;activeMap?.destroy();activeMap=null;super.onDestroy()}
+ override fun onDestroy(){photoJob++;chessJob++;trucoJob++;sheet?.dismiss();sheet=null;activeMap?.destroy();activeMap=null;liveMap=null;fleetMap=null;super.onDestroy()}
  override fun onStop(){handler.removeCallbacks(tick);Presence.closed();super.onStop()}
  // Screens where back stays inside the app; on the rest the system back gesture leaves it.
  private val innerScreens=setOf("fuel","document","prepare","newtrip","trip","triphistory","fuelhistory","settings","privacy","tripdetail","maintenance","documents","maintform","docform","performance","games","chessnew","chess","truco")
@@ -340,7 +340,7 @@ class MainActivity:AppCompatActivity(){
 
  // ---------- Page frame: navy header, scrolling content, optional bottom dock and navigation ----------
  private fun page(key:String,header:Boolean=true){
-  activeMap?.destroy();activeMap=null;liveMap=null;screen=key;back.isEnabled=key in innerScreens;fleetStats=null;fleetCard=null;fleetNote=null;peopleCard=null
+  activeMap?.destroy();activeMap=null;liveMap=null;fleetMap=null;screen=key;back.isEnabled=key in innerScreens;fleetStats=null;fleetCard=null;fleetNote=null;peopleCard=null
   distance=null;speed=null;limit=null;status=null;statusBox=null;elapsed=null;sync=null;gps=null;count=null;pauseLabel=null;pauseIcon=null
   // Leaving the board drops the phone's move on its way.
   board=null;chessTop=null;chessBottom=null;chessStatus=null;undoButton=null;if(key!="chess"){chessJob++;thinking=false}
@@ -553,7 +553,7 @@ class MainActivity:AppCompatActivity(){
   root.addView(clock,LinearLayout.LayoutParams(-1,dp(66)).apply{topMargin=dp(14)});elapsed=clock
   text(root,"Tiempo de viaje",14.5f,muted,0,4).gravity=Gravity.CENTER
   val mc=card(top=14);trackOffset=0L
-  val live=TripMap.live(this,Double.NaN,Double.NaN);liveMap=live;activeMap=live.web;mc.addView(live.web,LinearLayout.LayoutParams(-1,dp(230)))
+  val live=TripMap.live(this,Double.NaN,Double.NaN);liveMap=live;activeMap=live;mc.addView(live.view,LinearLayout.LayoutParams(-1,dp(230)))
   val st=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL};root.addView(st,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12)})
   speed=bigStat(st,"Velocidad","—","km/h",0);distance=bigStat(st,"Distancia",km(t.optDouble("distance_meters",0.0)),null,1)
   gps=note("",top=10).apply{gravity=Gravity.CENTER}
@@ -740,7 +740,7 @@ class MainActivity:AppCompatActivity(){
   val details=store.details().firstOrNull{it.second.optString("trip_id")==t.getString("id")}?.second?.optJSONObject("data")
   val mc=card();trackOffset=0L
   val live=TripMap.live(this,details?.optDouble("destination_lat",Double.NaN)?:Double.NaN,details?.optDouble("destination_lng",Double.NaN)?:Double.NaN)
-  liveMap=live;activeMap=live.web;mc.addView(live.web,LinearLayout.LayoutParams(-1,dp(300)))
+  liveMap=live;activeMap=live;mc.addView(live.view,LinearLayout.LayoutParams(-1,dp(300)))
   val sc=card();val sr=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(16),dp(12),dp(16),dp(12))}
   sr.addView(square(R.drawable.ic_speed,blue,blueSoft))
   val scol=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),0,dp(8),0)}
@@ -1014,7 +1014,7 @@ class MainActivity:AppCompatActivity(){
   if(t.optString("driver_id").ifBlank{uid()}==uid())button(root,"Agregar remito",Kind.LINE,R.drawable.ic_plus){openDocument(t,"tripdetail","arrival")}
   section("Recorrido")
   val points=mobile.route(t)
-  if(points.length()>0){val mc=card();val web=TripMap.view(this,points);activeMap=web;mc.addView(web,LinearLayout.LayoutParams(-1,dp(300)));button(root,"Ver mapa en pantalla completa",Kind.LINE,R.drawable.ic_map){fullMap(points)};note("Las líneas unen lecturas GPS; los tramos sin señal o pausados quedan abiertos.")}
+  if(points.length()>0){val mc=card();val map=TripMap.view(this,points);activeMap=map;mc.addView(map.view,LinearLayout.LayoutParams(-1,dp(300)));button(root,"Ver mapa en pantalla completa",Kind.LINE,R.drawable.ic_map){fullMap(points)};note("Las líneas unen lecturas GPS; los tramos sin señal o pausados quedan abiertos.")}
   else note("Sin recorrido disponible. Actualizá para consultar el GPS guardado.",top=8)
   link(root,"Actualizar desde el panel",top=10){detail(t,true)}
   if(refresh)thread{try{mobile.detail(t,true);mobile.route(t,true);runOnUiThread{if(screen=="tripdetail"&&historyTrip?.optString("id")==t.optString("id"))detail(t)}}catch(_:Exception){runOnUiThread{if(screen=="tripdetail")toast("No se pudo actualizar. Se mantienen los datos guardados.")}}}
@@ -1037,8 +1037,8 @@ class MainActivity:AppCompatActivity(){
   val dialog=android.app.Dialog(this,android.R.style.Theme_Material_Light_NoActionBar)
   val layout=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(12),dp(12),dp(12),dp(12));setBackgroundColor(appBg)}
   button(layout,"Cerrar mapa",Kind.LINE,R.drawable.ic_close,top=0){dialog.dismiss()}
-  val web=TripMap.view(this,points);layout.addView(web,LinearLayout.LayoutParams(-1,0,1f).apply{topMargin=dp(12)});dialog.setContentView(layout)
-  dialog.setOnDismissListener{web.destroy()};dialog.show();dialog.window?.setLayout(-1,-1)
+  val map=TripMap.view(this,points);layout.addView(map.view,LinearLayout.LayoutParams(-1,0,1f).apply{topMargin=dp(12)});dialog.setContentView(layout)
+  dialog.setOnDismissListener{map.destroy()};dialog.show();dialog.window?.setLayout(-1,-1)
   ViewCompat.setOnApplyWindowInsetsListener(layout){v,i->val insets=i.getInsets(WindowInsetsCompat.Type.systemBars());v.setPadding(insets.left+dp(12),insets.top+dp(12),insets.right+dp(12),insets.bottom+dp(12));i}
  }
 
@@ -1460,7 +1460,7 @@ class MainActivity:AppCompatActivity(){
   fleetStats=k;fleetStatsInto(k,items)
   alerts()
   val marks=fleetMarks(items,f);fleetShape=shapeOf(f,items,marks)
-  val mc=card();val web=TripMap.fleet(this,marks,LIVE_MS);activeMap=web;mc.addView(web,LinearLayout.LayoutParams(-1,dp(260)))
+  val mc=card();val map=TripMap.fleet(this,marks,LIVE_MS);activeMap=map;fleetMap=map;mc.addView(map.view,LinearLayout.LayoutParams(-1,dp(260)))
   if(marks.length()==0)note(if(fetched==0L)"Buscando posiciones…" else "Todavía no hay posiciones GPS para mostrar.",mc,0).setPadding(dp(16),dp(10),dp(16),dp(12))
   section("Camiones")
   if(items.isEmpty())emptyCard(R.drawable.ic_truck,"Sin camiones cargados","Los equipos del catálogo aparecen acá.") else {val c=card();fleetCard=c;items.forEach{fleetRow(c,it)}}
@@ -1505,7 +1505,7 @@ class MainActivity:AppCompatActivity(){
   val f=mobile.fleet();val items=fleetItems(f);val marks=fleetMarks(items,f);val k=fleetStats
   if(k==null||fleetShape!=shapeOf(f,items,marks))return false
   fleetStatsInto(k,items);fleetCard?.let{c->c.removeAllViews();items.forEach{fleetRow(c,it)}}
-  activeMap?.evaluateJavascript("window.setMarks&&setMarks(${marks.toString().replace("<","\\u003c")})",null)
+  fleetMap?.setMarks(marks)
   fleetNote?.text=fleetNoteText(f);peopleCard?.let{peopleInto(it,f)}
   return true
  }

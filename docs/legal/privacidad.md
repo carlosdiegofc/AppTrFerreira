@@ -1,6 +1,6 @@
 # Política de privacidad de Transportes Ferreira GPS
 
-Última actualización: 19 de octubre de 2026
+Última actualización: 26 de octubre de 2026
 
 Transportes Ferreira GPS es la aplicación interna de Transportes Ferreira (Uruguay) para sus choferes y su administración. Sirve para registrar los viajes de los camiones de la empresa, las cargas de combustible, los remitos, el mantenimiento de la flota y los vencimientos de documentos. Solo pueden usarla las personas a las que la empresa les entregó una cuenta.
 
@@ -39,7 +39,9 @@ Los datos no se venden ni se usan con fines publicitarios.
 - Cada chofer ve sus propios registros.
 - La administración de Transportes Ferreira ve los registros de toda la flota.
 - Los datos se guardan en Supabase, el servicio de base de datos que usa la empresa, en servidores ubicados en Brasil. Supabase los guarda por cuenta de la empresa y no los usa para otros fines.
-- Para dibujar los mapas, la aplicación descarga imágenes de OpenStreetMap, OpenTopoMap y Esri. Para trazar la ruta hasta el destino envía la posición del camión y la del destino al servicio de rutas OSRM. Estos servicios reciben la zona del mapa que se muestra y la dirección de internet del teléfono, pero no tu nombre ni tu cuenta.
+- Los mapas son de Google Maps, por su SDK para Android. Para dibujarlos, Google recibe la zona del mapa que se muestra, la dirección de internet del teléfono, datos técnicos del teléfono y de la aplicación (por ejemplo, informes de fallas) y un identificador del SDK, y los trata según su [política de privacidad](https://policies.google.com/privacy). No recibe tu nombre ni tu cuenta de la aplicación.
+- En un teléfono sin los servicios de Google Play, la aplicación dibuja los mapas con imágenes de OpenStreetMap, OpenTopoMap y Esri, que reciben la zona del mapa que se muestra y la dirección de internet del teléfono, pero no tu nombre ni tu cuenta.
+- Para trazar la ruta hasta el destino, la aplicación envía la posición del camión y la del destino al servicio de rutas OSRM, que recibe además la dirección de internet del teléfono, pero no tu nombre ni tu cuenta.
 - Si buscás un destino por su nombre, el texto de la búsqueda lo procesa el servicio de direcciones del propio teléfono (Google).
 
 La empresa no comparte los datos con otras empresas, salvo que una ley o una autoridad competente lo exija.
