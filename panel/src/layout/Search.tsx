@@ -1,8 +1,10 @@
 // The search in the middle of the top bar: a section, a truck, a trailer or a driver by name, plate or phone, or the text
-// itself in Viajes and in Gastos. Empty, it offers the sections. The lists are read the first time it opens.
+// itself in Viajes and in Gastos. Empty, it offers the sections. The lists are read the first time it opens; one that
+// could not be read is said, so a missing truck or driver does not look like a search with nothing.
 import { type KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Icon } from '../components/Icon';
+import { ErrorNote } from '../components/ui';
 import { useCatalog, useDrivers, useVehicles } from '../data/hooks';
 import { driverPath, trailerPath, truckPath } from '../lib/paths';
 import { SEARCH_GROUPS, type SearchItem, searchIn, searchItem, searchItems } from '../lib/search';
@@ -29,8 +31,16 @@ export function Search() {
   const [active, setActive] = useState(0);
   const [wanted, setWanted] = useState(false);
   const catalog = useCatalog();
-  const { vehicles, hitches } = useVehicles(wanted);
-  const { drivers } = useDrivers(wanted);
+  const { query: vehiclesRead, vehicles, hitches } = useVehicles(wanted);
+  const { query: driversRead, drivers } = useDrivers(wanted);
+  const reads = [
+    { read: catalog, what: 'los camiones y los acoplados' },
+    { read: vehiclesRead, what: 'los camiones y los acoplados' },
+    { read: driversRead, what: 'los choferes' },
+  ];
+  const failed = reads.filter(({ read }) => read.error && read.data === undefined);
+  const missing = [...new Set(failed.map((f) => f.what))];
+  const reading = reads.some(({ read }) => read.isLoading);
 
   const items = useMemo(() => {
     const { current, gone } = truckEntries(catalog.data ?? [], vehicles, hitches);
@@ -50,7 +60,11 @@ export function Search() {
 
   const found = useMemo(() => searchItems(q, items), [q, items]);
   // Empty, the sections; with text, what has it and then the text itself in Viajes and in Gastos.
-  const results = q.trim() === '' ? SECTION_ITEMS : [...found, ...searchIn(q)];
+  const typed = q.trim();
+  const results = typed === '' ? SECTION_ITEMS : [...found, ...searchIn(q)];
+  // «No hay…» only once every list answered: before, it says it is reading; a list that failed has its own note.
+  const status =
+    typed === '' || found.length > 0 || failed.length > 0 ? '' : reading ? 'Leyendo los camiones y los choferes…' : `No hay camiones, acoplados, choferes ni secciones con «${typed}».`;
 
   const close = () => {
     setOpen(false);
@@ -119,37 +133,45 @@ export function Search() {
         )}
       </div>
       {open && (
-        <div className="popover search-results" id={listId} role="listbox" aria-label="Resultados">
-          {q.trim() !== '' && found.length === 0 && <p className="search-none">No hay camiones, acoplados, choferes ni secciones con «{q.trim()}».</p>}
-          {SEARCH_GROUPS.map((group) => {
-            const inGroup = results.map((r, i) => ({ r, i })).filter(({ r }) => r.group === group);
-            if (inGroup.length === 0) return null;
-            return (
-              <div key={group} role="group" aria-label={group}>
-                <h3 aria-hidden="true">{group}</h3>
-                {inGroup.map(({ r, i }) => (
-                  <div
-                    key={r.id}
-                    id={optionId(i)}
-                    role="option"
-                    aria-selected={i === active}
-                    className="search-option"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onMouseEnter={() => setActive(i)}
-                    onClick={() => go(r)}
-                  >
-                    <span className="search-icon">
-                      <Icon name={r.icon} size={17} />
-                    </span>
-                    <span>
-                      <strong>{r.title}</strong>
-                      {r.detail && <small>{r.detail}</small>}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            );
-          })}
+        <div className="popover search-results">
+          {typed !== '' && failed.length > 0 && (
+            // A click on «Reintentar» leaves the box focused, like a click on an option.
+            <div onMouseDown={(e) => e.preventDefault()}>
+              <ErrorNote onRetry={() => failed.forEach(({ read }) => void read.refetch())}>No se pudieron leer {missing.join(' ni ')}: puede faltar alguno en los resultados.</ErrorNote>
+            </div>
+          )}
+          <div role="status">{status && <p className="search-none">{status}</p>}</div>
+          <div id={listId} role="listbox" aria-label="Resultados">
+            {SEARCH_GROUPS.map((group) => {
+              const inGroup = results.map((r, i) => ({ r, i })).filter(({ r }) => r.group === group);
+              if (inGroup.length === 0) return null;
+              return (
+                <div key={group} role="group" aria-label={group}>
+                  <h3 aria-hidden="true">{group}</h3>
+                  {inGroup.map(({ r, i }) => (
+                    <div
+                      key={r.id}
+                      id={optionId(i)}
+                      role="option"
+                      aria-selected={i === active}
+                      className="search-option"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onMouseEnter={() => setActive(i)}
+                      onClick={() => go(r)}
+                    >
+                      <span className="search-icon">
+                        <Icon name={r.icon} size={17} />
+                      </span>
+                      <span>
+                        <strong>{r.title}</strong>
+                        {r.detail && <small>{r.detail}</small>}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

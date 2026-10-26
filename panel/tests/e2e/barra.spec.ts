@@ -59,11 +59,31 @@ test('el buscador lleva a una sección, a un camión, a un chofer o a buscar el 
   // Esc empties the box first, and then closes it.
   box = await search(page);
   await box.fill('xyz');
-  await expect(page.getByRole('listbox', { name: 'Resultados' })).toContainText('No hay camiones, acoplados, choferes ni secciones con «xyz».');
+  await expect(page.getByRole('search').getByRole('status')).toHaveText('No hay camiones, acoplados, choferes ni secciones con «xyz».');
   await page.keyboard.press('Escape');
   await expect(box).toHaveValue('');
   await page.keyboard.press('Escape');
   await expect(page.getByRole('listbox', { name: 'Resultados' })).toBeHidden();
+});
+
+test('si no se pueden leer los choferes, el buscador lo dice en vez de «No hay…» y deja reintentar', async ({ page }) => {
+  await signIn(page, 'dueno@ejemplo.uy');
+  await page.route('**/rest/v1/trf_drivers*', (route) => route.fulfill({ status: 500, json: { message: 'Falla de prueba' } }));
+  const box = await search(page);
+  await box.fill('nunez');
+  const note = page.getByRole('search').getByRole('alert');
+  await expect(note).toContainText('No se pudieron leer los choferes: puede faltar alguno en los resultados.');
+  await expect(page.getByRole('search').getByRole('status')).toHaveText('');
+  // The trucks did answer: a plate still finds its truck.
+  await box.fill('abc1234');
+  await expect(options(page).first()).toContainText('Volvo FH 460 · ABC1234');
+  // Once they answer, «Reintentar» brings the driver, and the box keeps the focus.
+  await page.unroute('**/rest/v1/trf_drivers*');
+  await box.fill('nunez');
+  await note.getByRole('button', { name: 'Reintentar' }).click();
+  await expect(note).toHaveCount(0);
+  await expect(options(page).first()).toContainText('Eduardo Núñez');
+  await expect(box).toBeFocused();
 });
 
 test('la campana cuenta los avisos de Inicio en cualquier sección y lleva a cada uno', async ({ page }) => {

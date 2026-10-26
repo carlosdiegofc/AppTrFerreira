@@ -70,7 +70,9 @@ test('los números del mes por camión, como «Rendimiento» de la app', async (
   await expect(billing.locator('.viz-subtitle')).toHaveText(['En pesos', 'En dólares']);
   await expect(billing.locator('.curve-value')).toHaveText(['$ 38.500', 'US$ 1.250,50']);
   await expect(billing.locator('.curve-steps').first().locator('.curve-step')).toHaveCount(12);
-  // Month by month with the keyboard, like the columns: the last month is October.
+  // Month by month with the keyboard, like the columns: the last month is October. The focus scrolls the chart up to
+  // where the pointer was left on «Ver los datos», right on its first month, which would take it: out of the way first.
+  await page.mouse.move(0, 0);
   await billing.getByRole('group', { name: 'Facturado por mes en pesos' }).focus();
   await page.keyboard.press('End');
   await expect(billing.getByRole('status')).toContainText('octubre de 2026');

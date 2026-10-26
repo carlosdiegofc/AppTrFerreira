@@ -51,3 +51,28 @@ test('Inicio avisa de los camiones con poco combustible', async ({ page }) => {
   await expect(page).toHaveURL(/combustible\?vista=tanques/);
   await expect(page.getByRole('list', { name: 'Tanques' })).toBeVisible();
 });
+
+test('si el combustible no se puede actualizar, Inicio y la campana dicen que el aviso es de la última lectura', async ({ page }) => {
+  await signIn(page, 'dueno@ejemplo.uy');
+  const low = page.getByRole('list', { name: 'Combustible bajo' });
+  await expect(low).toContainText('Ford Cargo 1722 · JKL3456');
+
+  // The tanks stop answering: «Actualizar» keeps the Ford, and says so.
+  await page.route('**/rest/v1/trf_tank_settings*', (route) => route.fulfill({ status: 500, json: { message: 'Falla de prueba' } }));
+  await page.getByRole('button', { name: 'Actualizar' }).click();
+  const text = 'No se pudo actualizar el combustible de los camiones: los avisos de combustible bajo son de la última lectura.';
+  await expect(page.getByRole('alert').filter({ hasText: text })).toBeVisible();
+  await expect(low).toContainText('Ford Cargo 1722 · JKL3456');
+
+  // The bell, in another section, says it too; «Reintentar» reads them again once they answer.
+  await open(page, 'Viajes');
+  await page.getByRole('button', { name: /^Avisos/ }).click();
+  const notices = page.locator('#avisos');
+  const note = notices.getByRole('alert').filter({ hasText: text });
+  await expect(note).toBeVisible();
+  await expect(notices.getByRole('list', { name: 'Combustible bajo' })).toContainText('Ford Cargo 1722 · JKL3456');
+  await page.unroute('**/rest/v1/trf_tank_settings*');
+  await note.getByRole('button', { name: 'Reintentar' }).click();
+  await expect(note).toHaveCount(0);
+  await expect(notices.getByRole('list', { name: 'Combustible bajo' })).toContainText('Ford Cargo 1722 · JKL3456');
+});

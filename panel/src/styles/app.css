@@ -575,6 +575,11 @@ button {
   font-size: 14px;
 }
 
+.search-results .error-note {
+  margin: 4px 4px 6px;
+  font-size: 14px;
+}
+
 /* The menu: a column of round icons that say their name on hover, under the bar. */
 .side {
   grid-column: 1;

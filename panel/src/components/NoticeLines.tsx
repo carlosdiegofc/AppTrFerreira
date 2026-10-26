@@ -60,6 +60,9 @@ export function NoticeList({ notices, limit }: { notices: ReturnType<typeof useN
         </StaleNote>
       )}
       {tanks.error && <StaleNote onRetry={tanks.refetch}>No se pudo leer el combustible de los camiones: los avisos de combustible bajo no se ven ahora.</StaleNote>}
+      {tanks.stale && tanks.rows && (
+        <StaleNote onRetry={tanks.refetch}>No se pudo actualizar el combustible de los camiones: los avisos de combustible bajo son de la última lectura.</StaleNote>
+      )}
       {low.length > 0 && (
         <ul className="alert-list" aria-label="Combustible bajo">
           {low.map((t) => (

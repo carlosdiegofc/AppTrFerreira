@@ -23,8 +23,8 @@ Desde el 26/10/2026, el panel tiene el estilo «vidrio» del video que mandó el
   - Si el dueño manda una foto suya, se reemplazan `src/assets/fondo-claro.webp` y `fondo-oscuro.webp`.
 - **Barra de arriba,** flotante:
   - quién ingresó, que abre el tema y «Salir»;
-  - un buscador de secciones, camiones, acoplados y choferes por nombre, matrícula o teléfono, sin importar tildes ni mayúsculas, que también busca el texto en Viajes y en Gastos;
-  - la campana, con los mismos avisos de «Para tener en cuenta» de Inicio y cuántos son.
+  - un buscador de secciones, camiones, acoplados y choferes por nombre, matrícula o teléfono, sin importar tildes ni mayúsculas, que también busca el texto en Viajes y en Gastos. Si no puede leer los camiones o los choferes, lo dice con «Reintentar» en vez de «No hay…»;
+  - la campana, con los mismos avisos de «Para tener en cuenta» de Inicio y cuántos son, y lo que no se pudo leer o actualizar.
 - **Menú:** a la izquierda, una columna de íconos que dicen su nombre al pasar el mouse. En el celular se abre con el botón de menú, con los nombres, el tema y «Salir».
 - **Vidrio:**
   - Las tarjetas son translúcidas.
