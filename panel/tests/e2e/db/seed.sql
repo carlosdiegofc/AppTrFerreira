@@ -202,3 +202,26 @@ insert into public.trf_fleet_hitches (id, trailer_id, truck_key, from_on, to_on,
   ('a2000000-0000-4000-8000-000000000002', 'a0000000-0000-4000-8000-000000000004', 'plate:abc1234', date '2023-01-10', date '2025-02-28', 'Lo llevó hasta que se vendió.');
 insert into storage.objects (bucket_id, name) values
   ('trf-fleet-photos', 'a0000000-0000-4000-8000-000000000001/a1000000-0000-4000-8000-000000000001.jpg');
+
+-- Gastos (migration 0011). This month: the Volvo's repair with its invoice, last month's tyres of the Ford as the cost of
+-- its service, the insurance in dollars, the cash tolls of Diego's trip, Bruno's travel money, the washing of the grain
+-- semi-trailer and the Scania's fine, annulled. Last month: the Mercedes' road tax. In October they add up to
+-- UYU 21.120 and USD 950.
+insert into public.trf_expenses (id, spent_on, category, amount, currency, target, vehicle_key, trailer_id, driver_id, trip_key, target_name, service_id, supplier, method, notes, file_path, deleted_at) values
+  ('b0000000-0000-4000-8000-000000000001', (select today from t0) - 3, 'Reparación y repuestos', 18500, 'UYU', 'truck', 'plate:abc1234', null, null, null, 'Volvo FH 460 · ABC1234', null,
+   'Taller El Ruso', 'transferencia', 'Embrague y crucetas.', 'b0000000-0000-4000-8000-000000000001/b1000000-0000-4000-8000-000000000001.jpg', null),
+  ('b0000000-0000-4000-8000-000000000002', (select today from t0) - 18, 'Cubiertas', 2400, 'USD', 'truck', 'plate:jkl3456', null, null, null, 'Ford Cargo 1722 · JKL3456',
+   '70000000-0000-4000-8000-000000000003', 'Taller Salto', 'transferencia', '', null, null),
+  ('b0000000-0000-4000-8000-000000000003', (select today from t0) - 10, 'Seguro', 950, 'USD', 'company', null, null, null, null, '', null, 'BSE', 'transferencia', 'Cuota de octubre de la flota.', null, null),
+  ('b0000000-0000-4000-8000-000000000004', (select today from t0), 'Peajes en efectivo', 520, 'UYU', 'trip', null, null, null, 'app:10000000-0000-4000-8000-00000000000d',
+   'Orden de carga 24129 · Paysandú → Salto', null, '', 'efectivo', '', null, null),
+  ('b0000000-0000-4000-8000-000000000005', (select today from t0) - 5, 'Viáticos', 1200, 'UYU', 'driver', null, null, '70000000-0000-4000-8000-000000000002', null, 'Bruno Díaz', null,
+   '', 'efectivo', '', null, null),
+  ('b0000000-0000-4000-8000-000000000006', (select today from t0) - 7, 'Lavado', 900, 'UYU', 'trailer', null, 'a0000000-0000-4000-8000-000000000002', null, null,
+   'Semirremolque Randon · REM1001', null, 'Lavadero Ruta 1', 'efectivo', '', null, null),
+  ('b0000000-0000-4000-8000-000000000007', (select today from t0) - 12, 'Multas', 3000, 'UYU', 'truck', 'plate:def5678', null, null, null, 'Scania R450 · DEF5678', null,
+   'Intendencia', 'efectivo', 'Era de otro camión.', null, (select now from t0) - interval '2 days'),
+  ('b0000000-0000-4000-8000-000000000008', (select today from t0) - 24, 'Patente e impuestos', 15600, 'UYU', 'truck', 'plate:ghi9012', null, null, null, 'Mercedes Benz Actros · GHI9012', null,
+   'SUCIVE', 'transferencia', '', null, null);
+insert into storage.objects (bucket_id, name) values
+  ('trf-expense-files', 'b0000000-0000-4000-8000-000000000001/b1000000-0000-4000-8000-000000000001.jpg');

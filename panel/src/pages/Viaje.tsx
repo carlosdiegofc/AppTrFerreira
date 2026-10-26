@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { ExpenseFormDialog } from '../components/ExpenseFormDialog';
 import { Icon } from '../components/Icon';
 import { type Photo, PhotoDialog } from '../components/PhotoDialog';
 import { TripFormDialog } from '../components/TripFormDialog';
@@ -8,11 +9,13 @@ import { TripMap } from '../components/TripMap';
 import { CatalogNote, Card, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote } from '../components/ui';
 import { ROUTE_REFRESH_MS } from '../config';
 import { ConflictError, describeWriteError } from '../data/api';
-import { useRoute, useSetTripDeleted, useTripDetail } from '../data/hooks';
-import { calendarDay, formatDay, formatDayTime, formatDuration } from '../lib/dates';
+import { useExpenses, useRoute, useSetTripDeleted, useTripDetail } from '../data/hooks';
+import { calendarDay, dayInZone, formatDay, formatDayTime, formatDuration } from '../lib/dates';
+import { type Expense, expensesLink, expenseTotals, NO_CHOICES, NO_NAMES, tripTargetName } from '../lib/expenses';
 import { count, money, number } from '../lib/format';
 import { documentLabel, sourceLabel, tripFacts } from '../lib/tripTable';
 import { fuelFromReceipt, type LatLng, parseTripKey, routeStats } from '../lib/trips';
+import { amounts } from './fuelText';
 import { STATUS_TONE } from './states';
 
 const samePlace = (a: LatLng | null, b: LatLng | null) => a !== null && b !== null && a[0] === b[0] && a[1] === b[1];
@@ -71,6 +74,9 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
     if (justSaved) navigate({ pathname: location.pathname, search: location.search }, { replace: true, state: null });
   }, [justSaved, location.pathname, location.search, navigate]);
   const bin = useSetTripDeleted();
+  // The trip's expenses, in Gastos: cash tolls, travel money, a repair on the road…
+  const costs = useExpenses();
+  const [costing, setCosting] = useState<{ expense: Expense | null } | null>(null);
 
   if (detail.isLoading || catalog.isLoading) {
     return (
@@ -123,6 +129,9 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
   };
 
   const live = trip.active;
+  const tripExpenses = costs.expenses.filter((e) => !e.deleted && e.tripKey === trip.key).sort((a, b) => a.spentOn.localeCompare(b.spentOn) || a.createdAt.localeCompare(b.createdAt));
+  const tripName = tripTargetName(trip);
+  const today = dayInZone(Date.now());
   const title = trip.orderNumber ? `Orden de carga ${trip.orderNumber}` : `Viaje de ${trip.driverName ?? 'chofer sin indicar'}`;
   const facts = tripFacts(trip);
   // Without an origin typed in the panel, an app trip's origin is where the GPS saw it start: that one is measured.
@@ -290,7 +299,82 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
         </div>
       )}
 
+      <Card
+        title={`Gastos del viaje (${tripExpenses.length})`}
+        action={
+          <button
+            type="button"
+            className="btn btn-quiet"
+            onClick={() => {
+              setNotice(null);
+              setCosting({ expense: null });
+            }}
+          >
+            <Icon name="plus" size={18} /> Anotar un gasto
+          </button>
+        }
+      >
+        {costs.query.data === undefined ? (
+          costs.query.error ? (
+            <ErrorNote onRetry={() => void costs.query.refetch()}>No se pudieron leer los gastos del viaje.</ErrorNote>
+          ) : (
+            <Skeleton lines={2} />
+          )
+        ) : tripExpenses.length === 0 ? (
+          <p className="note">No hay gastos anotados en este viaje: peajes en efectivo, viáticos, una reparación en el camino… El combustible va con sus boletas.</p>
+        ) : (
+          <>
+            <ul className="item-list">
+              {tripExpenses.map((e) => (
+                <li key={e.id}>
+                  <span className="item-main">
+                    <strong>{e.category}</strong>
+                    <span>{[formatDay(e.spentOn), e.supplier || null, money(e.amount, e.currency), e.file ? null : 'sin factura'].filter(Boolean).join(' · ')}</span>
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-quiet"
+                    onClick={() => {
+                      setNotice(null);
+                      setCosting({ expense: e });
+                    }}
+                    aria-label={`Corregir ${e.category.toLowerCase()} del ${formatDay(e.spentOn)}`}
+                  >
+                    Corregir
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <p className="note">
+              En total {amounts(expenseTotals(tripExpenses).amounts)}.{' '}
+              <Link className="link" to={expensesLink(`viaje:${trip.key}`)}>
+                Ver en Gastos y finanzas
+              </Link>
+            </p>
+          </>
+        )}
+      </Card>
+
       <PhotoDialog photo={photo} onClose={() => setPhoto(null)} />
+      {costing && (
+        <ExpenseFormDialog
+          expense={costing.expense}
+          origin={costing.expense ? { fixedName: tripName } : { target: 'trip', ref: trip.key, spentOn: calendarDay(trip.arrivalAt ?? trip.departureAt) ?? today, fixedName: tripName }}
+          today={today}
+          choices={NO_CHOICES}
+          names={NO_NAMES}
+          expenses={costs.expenses}
+          onClose={() => setCosting(null)}
+          onDone={(text, tone) => {
+            setCosting(null);
+            setNotice({ tone: tone ?? 'ok', text });
+          }}
+          onConflict={() => {
+            setCosting(null);
+            setNotice({ tone: 'warn', text: 'Otra persona cambió ese gasto mientras lo tenías abierto, y no se guardó nada: ya se ven sus datos nuevos. Revisalo y, si hace falta, volvé a corregirlo.' });
+          }}
+        />
+      )}
       {editing && (
         <TripFormDialog
           trip={trip}

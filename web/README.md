@@ -1,6 +1,6 @@
 # Panel web TR Ferreira
 
-Web de administración conectada a la misma base (Supabase) que la app de los choferes.
+Web de administración conectada a la misma base (Supabase) que la app de los choferes. Desde el 26/10/2026 es el panel anterior: la dirección principal es la del [panel nuevo](../panel/README.md), y este queda en `/anterior/` un tiempo.
 
 | Sección | Qué hace |
 |---|---|
@@ -21,7 +21,7 @@ Web de administración conectada a la misma base (Supabase) que la app de los ch
    Antes de ejecutarlo, en la sección *EDITÁ ESTA LISTA* poné los correos de quienes administran el panel (tienen que ser cuentas que ya existan en *Authentication → Users*). Tocá **Run**: al final aparece un informe que debe decir **OK** en cada fila.
    Se puede volver a ejecutar sin problema (por ejemplo, para agregar un administrador).
 2. **Publicar la web.** Es una carpeta de archivos estáticos (no necesita servidor propio):
-   - **GitHub Pages (gratis):** en GitHub → *Settings → Pages → Source: GitHub Actions*. Con esta carpeta en la rama principal (`main`), en *Actions* elegí **«Publicar panel web»** → *Run workflow*. La dirección queda en el resultado de esa ejecución.
+   - **GitHub Pages (gratis):** en GitHub → *Settings → Pages → Source: GitHub Actions*. Con esta carpeta en la rama principal (`main`), en *Actions* elegí **«Publicar panel web»** → *Run workflow*. Publica el panel nuevo en la dirección del resultado y este en `/anterior/` de esa misma dirección.
    - O cualquier hosting estático (Netlify, Cloudflare Pages…): subí `index.html`, `css/`, `js/`, `vendor/` y `logo.png`.
 3. **Ingresar** con el correo y la contraseña de una cuenta administradora.
 

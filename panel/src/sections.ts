@@ -22,7 +22,7 @@ export const SECTIONS: Section[] = [
   { path: 'gps', label: 'GPS en vivo', icon: 'pin', ready: true, about: 'Dónde está cada camión ahora.' },
   { path: 'mantenimiento', label: 'Mantenimiento', icon: 'wrench', ready: true, about: 'Los services preventivos y correctivos, con avisos por kilómetros y por fecha.' },
   { path: 'documentacion', label: 'Documentación', icon: 'doc', ready: true, about: 'Los papeles de camiones y choferes con el archivo y su vencimiento.' },
-  { path: 'finanzas', label: 'Gastos y finanzas', icon: 'money', ready: false, about: 'Gastos, facturas y cobros, la ganancia de cada viaje y un simulador de fletes.' },
+  { path: 'finanzas', label: 'Gastos y finanzas', icon: 'money', ready: true, about: 'Gastos, facturas y cobros, la ganancia de cada viaje y un simulador de fletes.' },
   { path: 'metricas', label: 'Métricas', icon: 'chart', ready: true, about: 'El rendimiento de cada camión y de cada chofer: kilómetros, consumo y facturación, con gráficos.' },
   { path: 'asistente', label: 'Asistente IA', icon: 'sparkle', ready: false, about: 'Consultas por WhatsApp sobre la flota, respondidas con los datos del sistema.' },
   { path: 'configuracion', label: 'Configuración', icon: 'sliders', ready: false, about: 'La empresa, los usuarios y sus permisos, los catálogos y el plan.' },

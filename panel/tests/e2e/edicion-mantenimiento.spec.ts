@@ -114,7 +114,8 @@ test('un service se borra para siempre, preguntando antes', async ({ page }) => 
   await signIn(page, 'lectura@ejemplo.uy');
   await open(page, 'Mantenimiento');
   await chip(page, 'Hechos').click();
-  await service(page, 'Revisión general').getByRole('button').click();
+  // The row itself: a service done also has the button of its cost.
+  await service(page, 'Revisión general').locator('.service-row').click();
   const form = page.getByRole('dialog', { name: 'Editar service' });
   await form.getByRole('button', { name: 'Eliminar' }).click();
   const confirm = page.getByRole('dialog', { name: '¿Eliminar este service?' });
