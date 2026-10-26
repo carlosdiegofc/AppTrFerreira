@@ -1,91 +1,144 @@
-/* Colours of the Android app (MainActivity.kt), light and dark. */
+/* The glass design (decision of 26/10/2026): each page on frosted glass over an out-of-focus room, a floating bar on top
+   and the menu as a column of icons, with the blue of the TR Ferreira logo. Light and dark, like the computer or as
+   chosen. The page's pane and its cards are translucent over a room that is already blurred; only what floats over the
+   page blurs what passes under it (the bar, the menu, what opens from them and the dialogs), and is nearly solid. */
 :root {
   color-scheme: light;
-  --bar: #0f2142;
-  --bar-ink: #ffffff;
-  --bar-soft: #c7d2e3;
-  --bar-muted: #8e9cb4;
-  --bg: #eef2f7;
-  --card: #ffffff;
-  --ink: #111c2e;
-  --ink-soft: #4f5d73;
-  --muted: #67758b;
-  --faint: #9aa5b6;
-  --line: #e5eaf1;
-  --field-line: #d5dde8;
-  --blue: #1663e8;
-  --blue-bg: #e8f0fe;
-  --green: #178a4c;
-  --green-bg: #def3e6;
-  --amber: #b06a00;
-  --amber-bg: #ffefd3;
-  --red: #e0393e;
-  --red-bg: #fde4e4;
+  --page-image: url('../assets/fondo-claro.webp');
+  --page: #e4d8ca;
+  --glass: blur(18px) saturate(150%);
+  --panel: rgb(255 255 255 / 34%);
+  --panel-line: rgb(255 255 255 / 58%);
+  --float: rgb(255 255 255 / 70%);
+  --card: rgb(255 255 255 / 64%);
+  --card-line: rgb(255 255 255 / 72%);
+  /* Above the glass: menus, dialogs and the chosen icon of the menu, nearly solid; fields and buttons. */
+  --raised: rgb(255 255 255 / 94%);
+  /* What opens from the bar sits inside its glass, which cannot blur for it: solid enough to hide the page. */
+  --menu: rgb(255 255 255 / 97%);
+  --field: rgb(255 255 255 / 66%);
+  --btn: rgb(255 255 255 / 62%);
+  --btn-hover: rgb(255 255 255 / 88%);
+  --inset: rgb(255 255 255 / 40%);
+  --rail-on: #fff;
+  --rail-on-ink: var(--brand);
+  /* Opaque, where something moves under it: map controls, map labels and the columns that stay while a table scrolls. */
+  --surface: #f7f2ec;
+  --ink: #121a2b;
+  --ink-soft: #3d4658;
+  --muted: #515b6c;
+  --faint: #8a919d;
+  --line: rgb(36 44 62 / 11%);
+  --field-line: rgb(36 44 62 / 17%);
+  /* The logo's blue: filled buttons and the chosen option. --blue is the same blue for text and lines. */
+  --brand: #133396;
+  --featured: linear-gradient(150deg, #2f58d8 0%, #133396 100%);
+  --blue: #133396;
+  --blue-bg: rgb(19 51 150 / 11%);
+  --green: #13753f;
+  --green-bg: rgb(23 138 76 / 14%);
+  --amber: #965400;
+  --amber-bg: rgb(222 140 20 / 18%);
+  --red: #c4262d;
+  --red-bg: rgb(224 57 62 / 13%);
   --grey: #8f9bad;
-  --grey-bg: #edf0f5;
-  --shadow: 0 1px 2px rgb(15 33 66 / 6%), 0 6px 20px rgb(15 33 66 / 6%);
+  --grey-bg: rgb(36 44 62 / 7%);
+  --shadow: 0 1px 2px rgb(70 50 30 / 6%), 0 12px 32px rgb(70 50 30 / 10%);
+  --card-shadow: 0 1px 1px rgb(70 50 30 / 4%), 0 8px 24px rgb(70 50 30 / 7%);
   /* Map markers use the same three colours as the fleet map of the app. */
   --marker-moving: #178a4c;
   --marker-halted: #e69a1e;
   --marker-idle: #8f9bad;
-  --login-bg: #0a1220;
-  /* Chart series (dataviz slots 1 and 2), checked with its validator on --card: colour blindness, contrast, lightness. */
-  --viz-1: #1663e8;
-  --viz-2: #eb6834;
+  /* Chart series (dataviz slots 1 and 2): the logo's blue, a step lighter, and an orange. Checked with its validator
+     on the cards as they look over the room (#ebe5df light, #262935 dark): colour blindness, contrast, lightness. */
+  --viz-1: #2347c0;
+  --viz-2: #d65a22;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
-    --bar: #0a1730;
-    --bg: #0d1422;
-    --card: #172133;
-    --ink: #e8eef7;
-    --ink-soft: #b4c0d3;
-    --muted: #9aa8be;
-    --faint: #6c7a90;
-    --line: #253047;
-    --field-line: #33415a;
-    --blue: #5b9bff;
-    --blue-bg: #1b2b4a;
-    --green: #4cc58a;
-    --green-bg: #143826;
-    --amber: #f2b25c;
-    --amber-bg: #3a2a10;
-    --red: #f0575c;
-    --red-bg: #3d1a1c;
+    --page-image: url('../assets/fondo-oscuro.webp');
+    --page: #1d1a1e;
+    --panel: rgb(14 18 28 / 46%);
+    --panel-line: rgb(255 255 255 / 9%);
+    --float: rgb(18 22 34 / 74%);
+    --card: rgb(30 37 54 / 52%);
+    --card-line: rgb(255 255 255 / 9%);
+    --raised: rgb(27 33 49 / 96%);
+    --menu: rgb(26 31 46 / 98%);
+    --field: rgb(0 0 0 / 22%);
+    --btn: rgb(255 255 255 / 8%);
+    --btn-hover: rgb(255 255 255 / 15%);
+    --inset: rgb(0 0 0 / 18%);
+    --rail-on: rgb(255 255 255 / 17%);
+    --rail-on-ink: #fff;
+    --surface: #1d2232;
+    --ink: #eef2f8;
+    --ink-soft: #c5cddb;
+    --muted: #a4aec0;
+    --faint: #77829a;
+    --line: rgb(255 255 255 / 9%);
+    --field-line: rgb(255 255 255 / 16%);
+    --brand: #3457d5;
+    --featured: linear-gradient(150deg, #3155d0 0%, #22409f 100%);
+    --blue: #92b0ff;
+    --blue-bg: rgb(120 160 255 / 16%);
+    --green: #62d39b;
+    --green-bg: rgb(76 197 138 / 16%);
+    --amber: #f4b862;
+    --amber-bg: rgb(242 178 92 / 16%);
+    --red: #ff7d82;
+    --red-bg: rgb(240 87 92 / 18%);
     --grey: #6c7a90;
-    --grey-bg: #222c3e;
-    --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 6px 20px rgb(0 0 0 / 25%);
-    --viz-1: #3987e5;
-    --viz-2: #d95926;
+    --grey-bg: rgb(255 255 255 / 7%);
+    --shadow: 0 1px 2px rgb(0 0 0 / 25%), 0 14px 36px rgb(0 0 0 / 30%);
+    --card-shadow: 0 1px 1px rgb(0 0 0 / 18%), 0 8px 24px rgb(0 0 0 / 18%);
+    --viz-1: #5b84f0;
+    --viz-2: #e0692e;
   }
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --bar: #0a1730;
-  --bg: #0d1422;
-  --card: #172133;
-  --ink: #e8eef7;
-  --ink-soft: #b4c0d3;
-  --muted: #9aa8be;
-  --faint: #6c7a90;
-  --line: #253047;
-  --field-line: #33415a;
-  --blue: #5b9bff;
-  --blue-bg: #1b2b4a;
-  --green: #4cc58a;
-  --green-bg: #143826;
-  --amber: #f2b25c;
-  --amber-bg: #3a2a10;
-  --red: #f0575c;
-  --red-bg: #3d1a1c;
+  --page-image: url('../assets/fondo-oscuro.webp');
+  --page: #1d1a1e;
+  --panel: rgb(14 18 28 / 46%);
+  --panel-line: rgb(255 255 255 / 9%);
+  --float: rgb(18 22 34 / 74%);
+  --card: rgb(30 37 54 / 52%);
+  --card-line: rgb(255 255 255 / 9%);
+  --raised: rgb(27 33 49 / 96%);
+  --menu: rgb(26 31 46 / 98%);
+  --field: rgb(0 0 0 / 22%);
+  --btn: rgb(255 255 255 / 8%);
+  --btn-hover: rgb(255 255 255 / 15%);
+  --inset: rgb(0 0 0 / 18%);
+  --rail-on: rgb(255 255 255 / 17%);
+  --rail-on-ink: #fff;
+  --surface: #1d2232;
+  --ink: #eef2f8;
+  --ink-soft: #c5cddb;
+  --muted: #a4aec0;
+  --faint: #77829a;
+  --line: rgb(255 255 255 / 9%);
+  --field-line: rgb(255 255 255 / 16%);
+  --brand: #3457d5;
+  --featured: linear-gradient(150deg, #3155d0 0%, #22409f 100%);
+  --blue: #92b0ff;
+  --blue-bg: rgb(120 160 255 / 16%);
+  --green: #62d39b;
+  --green-bg: rgb(76 197 138 / 16%);
+  --amber: #f4b862;
+  --amber-bg: rgb(242 178 92 / 16%);
+  --red: #ff7d82;
+  --red-bg: rgb(240 87 92 / 18%);
   --grey: #6c7a90;
-  --grey-bg: #222c3e;
-  --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 6px 20px rgb(0 0 0 / 25%);
-  --viz-1: #3987e5;
-  --viz-2: #d95926;
+  --grey-bg: rgb(255 255 255 / 7%);
+  --shadow: 0 1px 2px rgb(0 0 0 / 25%), 0 14px 36px rgb(0 0 0 / 30%);
+  --card-shadow: 0 1px 1px rgb(0 0 0 / 18%), 0 8px 24px rgb(0 0 0 / 18%);
+  --viz-1: #5b84f0;
+  --viz-2: #e0692e;
 }
 
 * {
@@ -99,10 +152,19 @@ body {
 }
 
 body {
-  background: var(--bg);
+  background: var(--page);
   color: var(--ink);
   font: 15px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+/* The room behind the glass stays put while the page scrolls (a fixed layer: phones ignore fixed backgrounds). */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--page-image) 32% center / cover no-repeat, var(--page);
 }
 
 h1,
@@ -136,121 +198,213 @@ button {
   z-index: 3000;
   padding: 8px 12px;
   border-radius: 8px;
-  background: var(--card);
+  background: var(--surface);
   color: var(--ink);
 }
 
-/* ---------- Shell: side menu, top bar on phones, content ---------- */
+/* ---------- Shell: the floating bar, the menu of icons and the page on glass ---------- */
 .shell {
-  --side-width: 280px;
+  --rail: 56px;
   display: grid;
-  grid-template-columns: var(--side-width) minmax(0, 1fr);
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  gap: 14px 16px;
   min-height: 100vh;
-  /* The menu column keeps its colour below the fold, where the sticky menu ends. */
-  background: linear-gradient(to right, var(--bar) var(--side-width), transparent var(--side-width));
+  padding: 12px 16px 24px;
 }
 
+.topbar,
+.side,
+.content {
+  border: 1px solid var(--panel-line);
+  box-shadow: var(--shadow);
+}
+
+.topbar,
 .side {
+  -webkit-backdrop-filter: var(--glass);
+  backdrop-filter: var(--glass);
+}
+
+.topbar {
+  grid-column: 1 / -1;
   position: sticky;
-  top: 0;
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  overflow-y: auto;
-  background: var(--bar);
-  color: var(--bar-ink);
-  z-index: 2000;
+  top: 12px;
+  z-index: 1500;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 520px) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  height: 60px;
+  padding: 0 10px 0 12px;
+  border-radius: 999px;
+  background: var(--float);
 }
 
-.side-brand {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 24px 22px 18px;
-  position: relative;
-}
-
-.side-brand img {
-  width: 168px;
-  height: auto;
-}
-
-.side-brand span {
-  color: var(--bar-muted);
-  font-size: 13px;
-  letter-spacing: 0.02em;
-}
-
-.side .side-close {
-  display: none;
-  position: absolute;
-  top: 14px;
-  right: 10px;
-  color: var(--bar-ink);
-}
-
-.side-nav ul {
-  list-style: none;
-  margin: 0;
-  padding: 4px 10px;
-}
-
-.side-link {
+.topbar-start,
+.topbar-end {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px;
-  margin: 2px 0;
-  border-radius: 10px;
-  color: var(--bar-soft);
-  text-decoration: none;
-  font-size: 14.5px;
-  font-weight: 560;
-}
-
-.side-link svg {
-  flex: none;
-}
-
-.side-link span {
-  flex: 1;
+  gap: 8px;
   min-width: 0;
+}
+
+.topbar-end {
+  justify-content: flex-end;
+}
+
+.topbar-logo {
+  flex: none;
+  width: 132px;
+  height: auto;
+  margin: 0 8px 0 6px;
+}
+
+.topbar .menu-button,
+.search .search-toggle {
+  display: none;
+}
+
+/* The round buttons of the bar: menu, search on phones, the notices. */
+.round {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid var(--card-line);
+  border-radius: 50%;
+  background: var(--btn);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.round:hover,
+.round[aria-expanded='true'] {
+  background: var(--btn-hover);
+}
+
+.badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  display: grid;
+  place-items: center;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+  background: #e0393e;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Who is in: a round initial and the name; it opens the theme and «Salir». */
+.account {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  height: 42px;
+  padding: 0 12px 0 4px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.account:hover,
+.account[aria-expanded='true'] {
+  border-color: var(--card-line);
+  background: var(--btn);
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #2b4fc4, var(--brand));
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.account-name {
   overflow: hidden;
+  font-size: 14px;
+  font-weight: 640;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.side-link:hover {
-  background: rgb(255 255 255 / 7%);
-  color: var(--bar-ink);
-}
-
-.side-link.is-active {
-  background: rgb(91 155 255 / 20%);
-  color: var(--bar-ink);
-}
-
-.side-link.is-soon {
-  color: var(--bar-muted);
-}
-
-.soon-tag {
+.account svg {
   flex: none;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: rgb(255 255 255 / 8%);
-  color: var(--bar-muted);
-  font-size: 10.5px;
-  font-weight: 600;
+  color: var(--muted);
+  transform: rotate(90deg);
 }
 
-.side-foot {
-  margin-top: auto;
+/* What opens from the bar: the account, the notices and the search results. */
+.popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  z-index: 1600;
   display: flex;
   flex-direction: column;
+  border: 1px solid var(--card-line);
+  border-radius: 20px;
+  background: var(--menu);
+  box-shadow: var(--shadow);
+}
+
+.account-wrap,
+.notices-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.account-menu {
+  left: 0;
   gap: 12px;
-  padding: 16px 22px 20px;
-  border-top: 1px solid rgb(255 255 255 / 8%);
+  width: 280px;
+  padding: 16px;
+}
+
+.notices {
+  right: 0;
+  width: min(420px, calc(100vw - 24px));
+  max-height: min(70vh, 560px);
+  padding: 8px 10px 10px;
+  overflow-y: auto;
+}
+
+.notices header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 6px 6px;
+}
+
+.notices h2 {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.notices .empty {
+  padding: 18px 10px;
+}
+
+.notices .error-note {
+  margin: 6px 0;
 }
 
 .who {
@@ -264,7 +418,7 @@ button {
 }
 
 .who span {
-  color: var(--bar-muted);
+  color: var(--muted);
   font-size: 12.5px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -274,118 +428,451 @@ button {
 .theme-switch {
   display: flex;
   gap: 4px;
-  padding: 3px;
-  border-radius: 10px;
-  background: rgb(255 255 255 / 6%);
   width: max-content;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--grey-bg);
 }
 
 .theme-switch button {
   display: grid;
   place-items: center;
-  width: 36px;
+  width: 38px;
   height: 30px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 999px;
   background: transparent;
-  color: var(--bar-muted);
+  color: var(--muted);
   cursor: pointer;
 }
 
 .theme-switch button.is-on {
-  background: rgb(255 255 255 / 14%);
-  color: var(--bar-ink);
+  background: var(--raised);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
+}
+
+.version {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+/* The search of the bar: sections, trucks, trailers and drivers, and the text in Viajes. */
+.search {
+  position: relative;
+  min-width: 0;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--card-line);
+  border-radius: 999px;
+  background: var(--field);
+  color: var(--muted);
+}
+
+.search-box:focus-within {
+  border-color: var(--blue);
+  outline: 3px solid color-mix(in srgb, var(--blue) 25%, transparent);
+}
+
+.search-box input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+}
+
+.search-box input::placeholder {
+  color: var(--muted);
+}
+
+.search-box input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.search-results {
+  left: 0;
+  right: 0;
+  max-height: min(64vh, 520px);
+  padding: 6px;
+  overflow-y: auto;
+}
+
+.search-results h3 {
+  padding: 8px 10px 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.search-results ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.search-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.search-option[aria-selected='true'] {
+  background: var(--blue-bg);
+}
+
+.search-option > span:last-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.search-option strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-option small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--grey-bg);
+  color: var(--ink-soft);
+}
+
+.search-none {
+  padding: 14px 12px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* The menu: a column of round icons that say their name on hover, under the bar. */
+.side {
+  grid-column: 1;
+  grid-row: 2;
+  align-self: start;
+  z-index: 1400;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: var(--rail);
+  padding: 8px 0;
+  border-radius: 28px;
+  background: var(--float);
+}
+
+@media (min-height: 640px) {
+  .side {
+    position: sticky;
+    top: 86px;
+  }
+}
+
+.side-brand,
+.side-foot {
+  display: none;
+}
+
+.side-nav ul {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.side-link {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: var(--ink-soft);
+  text-decoration: none;
+}
+
+.side-link:hover {
+  background: var(--btn-hover);
+  color: var(--ink);
+}
+
+.side-link.is-active {
+  background: var(--rail-on);
+  color: var(--rail-on-ink);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 14%);
+}
+
+.side-link.is-soon {
+  color: var(--faint);
+}
+
+.side-label {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 14px);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--card-line);
+  border-radius: 10px;
+  background: var(--raised);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-4px, -50%);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.side-link:hover .side-label,
+.side-link:focus-visible .side-label {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+
+.soon-tag {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--grey-bg);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
 }
 
 .side .btn-side {
   justify-content: flex-start;
-  border-color: rgb(255 255 255 / 14%);
-  background: transparent;
-  color: var(--bar-ink);
 }
 
-.side .btn-side:hover {
-  background: rgb(255 255 255 / 7%);
-}
-
-.version {
-  color: var(--bar-muted);
-  font-size: 11.5px;
-}
-
-.scrim,
-.topbar {
+.scrim {
   display: none;
 }
 
-.main {
+/* The page, on the big pane of frosted glass. */
+.content {
+  grid-column: 2;
+  grid-row: 2;
   min-width: 0;
+  min-height: calc(100vh - 110px);
+  padding: 28px 32px 40px;
+  border-radius: 30px;
+  background: var(--panel);
+  outline: none;
 }
 
-.content {
-  max-width: 1480px;
-  padding: 28px 32px 40px;
-  outline: none;
+/* Without the blur (an old browser, or the computer asks for less transparency) the glass turns solid. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .topbar,
+  .side,
+  .content,
+  .popover,
+  .login-card {
+    background-color: var(--surface);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .topbar,
+  .side,
+  .content,
+  .popover,
+  .login-card {
+    background-color: var(--surface);
+  }
 }
 
 @media (max-width: 1023px) {
   .shell {
-    grid-template-columns: minmax(0, 1fr);
-    background: none;
+    display: block;
+    padding: 8px 8px 20px;
   }
 
+  .topbar {
+    display: flex;
+    top: 8px;
+    height: 56px;
+    padding: 0 7px;
+  }
+
+  .topbar-start {
+    flex: 1;
+  }
+
+  .topbar .menu-button,
+  .search .search-toggle {
+    display: grid;
+  }
+
+  .topbar-logo {
+    width: 104px;
+  }
+
+  .account-wrap {
+    display: none;
+  }
+
+  /* On a phone the search is a button: the box opens over the bar, and the results under it. */
+  .search {
+    position: static;
+  }
+
+  .search-box {
+    display: none;
+  }
+
+  .search.is-open .search-box {
+    position: absolute;
+    inset: 6px 6px auto;
+    z-index: 2;
+    display: flex;
+    height: 44px;
+    padding-right: 4px;
+    background: var(--raised);
+  }
+
+  .search-results {
+    top: 62px;
+    left: 0;
+    right: 0;
+  }
+
+  /* The menu slides in from the left, with the names, the account and «Salir». */
   .side {
     position: fixed;
-    inset: 0 auto 0 0;
+    inset: 8px auto 8px 8px;
+    z-index: 2000;
+    align-items: stretch;
     width: min(300px, 86vw);
-    transform: translateX(-102%);
+    padding: 0;
+    overflow-y: auto;
+    border-radius: 26px;
+    background: var(--raised);
+    transform: translateX(-110%);
     transition: transform 0.2s ease;
   }
 
   .nav-open .side {
     transform: none;
-    box-shadow: 0 0 40px rgb(0 0 0 / 40%);
   }
 
-  .side .side-close {
-    display: grid;
-  }
-
-  .nav-open .scrim {
-    display: block;
-    position: fixed;
-    inset: 0;
-    background: rgb(5 10 20 / 45%);
-    z-index: 1900;
-  }
-
-  .topbar {
-    position: sticky;
-    top: 0;
-    z-index: 1500;
+  .side-brand {
+    position: relative;
     display: flex;
-    align-items: center;
-    gap: 10px;
-    height: 56px;
-    padding: 0 8px;
-    background: var(--bar);
-    color: var(--bar-ink);
+    flex-direction: column;
+    gap: 6px;
+    padding: 22px 20px 14px;
   }
 
-  .topbar-logo {
-    width: 110px;
+  .side-brand img {
+    width: 150px;
     height: auto;
   }
 
-  .topbar-title {
-    margin-left: auto;
-    padding-right: 10px;
-    color: var(--bar-soft);
+  .side-brand span {
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .side-close {
+    position: absolute;
+    top: 12px;
+    right: 10px;
+  }
+
+  .side-nav ul {
+    gap: 2px;
+    padding: 4px 10px;
+  }
+
+  .side-link {
+    display: flex;
+    gap: 12px;
+    width: auto;
+    height: auto;
+    padding: 10px 12px;
+    border-radius: 14px;
+    font-size: 14.5px;
     font-weight: 600;
   }
 
+  .side-link.is-active {
+    background: var(--blue-bg);
+    box-shadow: none;
+  }
+
+  .side-label {
+    position: static;
+    flex: 1;
+    min-width: 0;
+    justify-content: space-between;
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    opacity: 1;
+    transform: none;
+  }
+
+  .side-foot {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: auto;
+    padding: 16px 20px 20px;
+    border-top: 1px solid var(--line);
+  }
+
+  .nav-open .scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 1900;
+    display: block;
+    background: rgb(20 16 12 / 35%);
+  }
+
   .content {
-    padding: 18px 16px 32px;
+    min-height: calc(100vh - 92px);
+    margin-top: 10px;
+    padding: 20px 14px 28px;
+    border-radius: 24px;
   }
 }
 
@@ -400,10 +887,10 @@ button {
 }
 
 .page-head h1 {
-  font-size: 26px;
+  font-size: 30px;
   line-height: 1.2;
-  font-weight: 720;
-  letter-spacing: -0.01em;
+  font-weight: 680;
+  letter-spacing: -0.02em;
 }
 
 .page-sub {
@@ -432,9 +919,9 @@ button {
 
 .card {
   background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  box-shadow: var(--shadow);
+  border: 1px solid var(--card-line);
+  border-radius: 22px;
+  box-shadow: var(--card-shadow);
   overflow: hidden;
   min-width: 0;
 }
@@ -444,12 +931,13 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 16px 18px 0;
+  padding: 18px 20px 0;
 }
 
 .card-title {
-  font-size: 16px;
-  font-weight: 680;
+  font-size: 16.5px;
+  font-weight: 660;
+  letter-spacing: -0.01em;
 }
 
 .card > .card-head + :not(.card-body) {
@@ -457,7 +945,7 @@ button {
 }
 
 .card-body {
-  padding: 14px 18px 18px;
+  padding: 14px 20px 20px;
 }
 
 .grid-2 {
@@ -512,50 +1000,77 @@ button {
   --tone-bg: var(--grey-bg);
 }
 
+/* A number of the page: its name on top with its icon in a circle, the number and what it means under it. */
 .stat {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 16px 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'label icon' 'value value' 'detail detail';
+  align-content: start;
+  gap: 4px 12px;
+  padding: 16px 18px 18px;
   background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  box-shadow: var(--shadow);
+  border: 1px solid var(--card-line);
+  border-radius: 22px;
+  box-shadow: var(--card-shadow);
 }
 
 .stat-icon {
+  grid-area: icon;
   display: grid;
   place-items: center;
   flex: none;
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
   background: var(--tone-bg);
   color: var(--tone);
 }
 
 .stat-text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  display: contents;
 }
 
 .stat-value {
-  font-size: 28px;
+  grid-area: value;
+  margin-top: 2px;
+  font-size: 30px;
   line-height: 1.1;
-  font-weight: 740;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
 
 .stat-label {
+  grid-area: label;
+  align-self: center;
   color: var(--muted);
   font-size: 13.5px;
+  font-weight: 560;
 }
 
 .stat-detail {
+  grid-area: detail;
   color: var(--tone);
   font-size: 12.5px;
-  font-weight: 600;
+  font-weight: 620;
+}
+
+/* The page's main number on the logo's blue, like the coloured card of the video. */
+.stat.is-featured {
+  border-color: transparent;
+  background: var(--featured);
+  color: #fff;
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--brand) 30%, transparent);
+}
+
+.stat.is-featured .stat-label,
+.stat.is-featured .stat-detail {
+  color: rgb(255 255 255 / 84%);
+}
+
+.stat.is-featured .stat-icon {
+  background: rgb(255 255 255 / 18%);
+  color: #fff;
 }
 
 .pill {
@@ -593,12 +1108,13 @@ button {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 38px;
-  padding: 0 14px;
-  border: 1px solid var(--field-line);
-  border-radius: 10px;
-  background: var(--card);
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--card-line);
+  border-radius: 999px;
+  background: var(--btn);
   color: var(--ink);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
   font-weight: 620;
   font-size: 14px;
   cursor: pointer;
@@ -606,7 +1122,7 @@ button {
 }
 
 .btn:hover {
-  background: var(--grey-bg);
+  background: var(--btn-hover);
 }
 
 .btn:disabled {
@@ -616,28 +1132,37 @@ button {
 
 .btn-primary {
   border-color: transparent;
-  background: var(--blue);
+  background: var(--brand);
   color: #fff;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--brand) 30%, transparent);
 }
 
 .btn-primary:hover {
-  background: color-mix(in srgb, var(--blue) 88%, #000);
+  background: color-mix(in srgb, var(--brand) 86%, #000);
 }
 
 .btn-quiet {
+  border-color: var(--field-line);
   background: transparent;
+  box-shadow: none;
+}
+
+.btn-quiet:hover {
+  background: var(--btn);
 }
 
 .btn-icon {
   width: 40px;
   padding: 0;
   border: 0;
+  border-radius: 50%;
   background: transparent;
+  box-shadow: none;
   color: inherit;
 }
 
 .btn-icon:hover {
-  background: rgb(127 127 127 / 14%);
+  background: var(--grey-bg);
 }
 
 .btn.is-busy svg {
@@ -901,7 +1426,7 @@ a.trip-line:hover {
   width: 100%;
   height: 100%;
   min-height: 300px;
-  background: var(--grey-bg);
+  background: var(--surface);
   z-index: 0;
 }
 
@@ -915,13 +1440,13 @@ a.trip-line:hover {
 
 .fleet-map .leaflet-bar a,
 .fleet-map .leaflet-bar a:hover {
-  background: var(--card);
+  background: var(--surface);
   color: var(--ink);
   border-color: var(--line);
 }
 
 .leaflet-control-attribution {
-  background: color-mix(in srgb, var(--card) 85%, transparent) !important;
+  background: color-mix(in srgb, var(--surface) 85%, transparent) !important;
   color: var(--muted);
 }
 
@@ -948,7 +1473,7 @@ a.trip-line:hover {
 
 .map-switch button {
   border: 0;
-  background: var(--card);
+  background: var(--surface);
   color: var(--ink);
   font: inherit;
   font-size: 13px;
@@ -962,7 +1487,7 @@ a.trip-line:hover {
 }
 
 .map-switch button[aria-pressed='true'] {
-  background: var(--blue);
+  background: var(--brand);
   color: #fff;
 }
 
@@ -974,7 +1499,7 @@ a.trip-line:hover {
   height: 34px;
   border: 0;
   border-radius: 4px;
-  background: var(--card);
+  background: var(--surface);
   color: var(--ink);
   cursor: pointer;
 }
@@ -1008,7 +1533,7 @@ a.trip-line:hover {
   max-width: min(92%, 440px);
   padding: 8px 12px;
   border-radius: 8px;
-  background: var(--card);
+  background: var(--surface);
   color: var(--ink);
   box-shadow: var(--shadow);
   font-size: 13px;
@@ -1067,7 +1592,7 @@ body.map-full-open {
 .fm-tag {
   padding: 2px 8px;
   border-radius: 999px;
-  background: var(--card);
+  background: var(--surface);
   color: var(--ink);
   box-shadow: 0 1px 4px rgb(0 0 0 / 25%);
   font-size: 12px;
@@ -1081,7 +1606,7 @@ body.map-full-open {
 }
 
 .fm-selected .fm-tag {
-  background: var(--blue);
+  background: var(--brand);
   color: #fff;
 }
 
@@ -1091,7 +1616,7 @@ body.map-full-open {
 
 .leaflet-interactive.fm-start {
   stroke: var(--blue);
-  fill: var(--card);
+  fill: var(--surface);
   fill-opacity: 1;
 }
 
@@ -1100,7 +1625,8 @@ body.map-full-open {
   display: grid;
   grid-template-columns: 360px minmax(0, 1fr);
   gap: 16px;
-  height: calc(100vh - 160px);
+  /* The page minus the bar on top, the margins of the glass pane and the title. */
+  height: calc(100vh - 250px);
   min-height: 540px;
 }
 
@@ -1156,8 +1682,8 @@ body.map-full-open {
 }
 
 .chip.is-on {
-  border-color: var(--blue);
-  background: var(--blue);
+  border-color: transparent;
+  background: var(--brand);
   color: #fff;
 }
 
@@ -1209,9 +1735,9 @@ body.map-full-open {
   flex-direction: column;
   gap: 12px;
   padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--bg);
+  border: 1px solid var(--card-line);
+  border-radius: 18px;
+  background: var(--inset);
 }
 
 .unit-detail header {
@@ -1324,26 +1850,26 @@ body.map-full-open {
   font-weight: 620;
 }
 
-/* ---------- Sign in ---------- */
+/* ---------- Sign in: a card of glass over the same room ---------- */
 .login {
   display: grid;
   place-items: center;
   min-height: 100vh;
   padding: 16px;
-  background: radial-gradient(1200px 600px at 20% -10%, #16305c 0%, transparent 60%), var(--login-bg);
-  color: #e8eef7;
 }
 
 .login-card {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  width: min(410px, 100%);
-  padding: 34px 28px 28px;
-  border: 1px solid rgb(255 255 255 / 9%);
-  border-radius: 22px;
-  background: rgb(255 255 255 / 4%);
-  box-shadow: 0 20px 60px rgb(0 0 0 / 35%);
+  width: min(420px, 100%);
+  padding: 34px 30px 28px;
+  border: 1px solid var(--panel-line);
+  border-radius: 30px;
+  background: var(--float);
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: var(--glass);
+  backdrop-filter: var(--glass);
 }
 
 .login-logo {
@@ -1354,11 +1880,13 @@ body.map-full-open {
 }
 
 .login-card h1 {
-  font-size: 23px;
+  font-size: 26px;
+  font-weight: 680;
+  letter-spacing: -0.02em;
 }
 
 .login-sub {
-  color: #a9b6cc;
+  color: var(--muted);
 }
 
 .login-form {
@@ -1372,24 +1900,24 @@ body.map-full-open {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  color: #c7d2e3;
+  color: var(--ink-soft);
   font-size: 14px;
   font-weight: 600;
 }
 
 .login-form input {
   height: 46px;
-  padding: 0 14px;
-  border: 1px solid #33415a;
-  border-radius: 12px;
-  background: #0d1422;
-  color: #fff;
+  padding: 0 16px;
+  border: 1px solid var(--field-line);
+  border-radius: 14px;
+  background: var(--field);
+  color: var(--ink);
   font: inherit;
 }
 
 .login-form input:focus {
-  border-color: #5b9bff;
-  outline: 3px solid rgb(91 155 255 / 35%);
+  border-color: var(--blue);
+  outline: 3px solid color-mix(in srgb, var(--blue) 25%, transparent);
   outline-offset: 0;
 }
 
@@ -1397,19 +1925,18 @@ body.map-full-open {
 .login-card > .btn-primary {
   height: 46px;
   margin-top: 4px;
-  background: #1663e8;
 }
 
 .login-error {
   padding: 10px 12px;
-  border-radius: 10px;
-  background: rgb(240 87 92 / 14%);
-  color: #ff8a8e;
+  border-radius: 12px;
+  background: var(--red-bg);
+  color: var(--red);
   font-size: 14px;
 }
 
 .login-note {
-  color: #8e9cb4;
+  color: var(--muted);
   font-size: 13px;
 }
 
@@ -1419,13 +1946,13 @@ body.map-full-open {
 }
 
 .btn-ghost {
-  border-color: rgb(255 255 255 / 20%);
+  border-color: var(--field-line);
   background: transparent;
-  color: #fff;
+  color: var(--ink);
 }
 
 .btn-ghost:hover {
-  background: rgb(255 255 255 / 8%);
+  background: var(--btn);
 }
 
 /* ---------- Viajes ---------- */
@@ -1471,8 +1998,8 @@ body.map-full-open {
   height: 40px;
   padding: 0 12px;
   border: 1px solid var(--field-line);
-  border-radius: 10px;
-  background: var(--card);
+  border-radius: 12px;
+  background: var(--field);
   color: var(--ink);
   font: inherit;
   font-size: 14px;
@@ -1700,13 +2227,13 @@ body.map-full-open {
 }
 
 .leaflet-interactive.fm-end {
-  stroke: var(--card);
+  stroke: var(--surface);
   fill: var(--blue);
   fill-opacity: 1;
 }
 
 .leaflet-interactive.fm-now {
-  stroke: var(--card);
+  stroke: var(--surface);
   fill: var(--marker-moving);
   fill-opacity: 1;
 }
@@ -1797,15 +2324,19 @@ body.map-full-open {
   width: min(920px, calc(100vw - 32px));
   max-height: calc(100vh - 48px);
   padding: 16px 18px 18px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--card);
+  border: 1px solid var(--card-line);
+  border-radius: 24px;
+  background: var(--raised);
   color: var(--ink);
   box-shadow: var(--shadow);
+  -webkit-backdrop-filter: var(--glass);
+  backdrop-filter: var(--glass);
 }
 
 .photo-dialog::backdrop {
-  background: rgb(10 18 32 / 60%);
+  background: rgb(20 16 12 / 45%);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
 }
 
 .photo-dialog header {
@@ -1886,11 +2417,13 @@ body.map-full-open {
 .confirm-dialog {
   max-height: calc(100vh - 32px);
   padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--card);
+  border: 1px solid var(--card-line);
+  border-radius: 24px;
+  background: var(--raised);
   color: var(--ink);
   box-shadow: var(--shadow);
+  -webkit-backdrop-filter: var(--glass);
+  backdrop-filter: var(--glass);
 }
 
 .form-dialog {
@@ -1899,7 +2432,9 @@ body.map-full-open {
 
 .form-dialog::backdrop,
 .confirm-dialog::backdrop {
-  background: rgb(10 18 32 / 60%);
+  background: rgb(20 16 12 / 40%);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
 }
 
 .form-dialog form {
@@ -1981,8 +2516,8 @@ body.map-full-open {
   min-height: 80px;
   padding: 10px 12px;
   border: 1px solid var(--field-line);
-  border-radius: 10px;
-  background: var(--card);
+  border-radius: 12px;
+  background: var(--field);
   color: var(--ink);
   font: inherit;
   font-size: 14px;
@@ -2854,9 +3389,9 @@ button.fr-open {
   min-width: 140px;
   max-width: 240px;
   padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--card);
+  border: 1px solid var(--card-line);
+  border-radius: 12px;
+  background: var(--raised);
   box-shadow: var(--shadow);
   color: var(--ink-soft);
   font-size: 12.5px;
@@ -3074,6 +3609,119 @@ button.fr-open {
   visibility: hidden;
 }
 
+/* The smooth line (Curve): a 2 px line over a light shade of its colour; on the step under the pointer, a hairline and
+   its point, 10 px with a ring of the surface. */
+.curve {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.curve-line {
+  fill: none;
+  stroke: var(--viz-1);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.curve-shade-top {
+  stop-color: var(--viz-1);
+  stop-opacity: 0.24;
+}
+
+.curve-shade-bottom {
+  stop-color: var(--viz-1);
+  stop-opacity: 0;
+}
+
+.curve-steps {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  border-radius: 6px;
+}
+
+.curve-step {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.curve-step.is-active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  border-left: 1px solid var(--faint);
+}
+
+.curve-anchor {
+  position: absolute;
+  left: 50%;
+  width: 0;
+  height: 0;
+}
+
+.curve-dot {
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--viz-1);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+.curve-value {
+  position: absolute;
+  left: 50%;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-50%, -12px);
+}
+
+.curve-value.at-start {
+  left: 0;
+  transform: translate(0, -12px);
+}
+
+.curve-value.at-end {
+  right: 0;
+  left: auto;
+  transform: translate(0, -12px);
+}
+
+/* A share as a ring, filled in the first series colour, beside its number. */
+.ring {
+  flex: none;
+  transform: rotate(-90deg);
+}
+
+.ring-track {
+  fill: none;
+  stroke: var(--grey-bg);
+}
+
+.ring-fill {
+  fill: none;
+  stroke: var(--viz-1);
+  stroke-linecap: round;
+}
+
+.ring-fact {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .viz-pair {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3151,7 +3799,7 @@ button.fr-open {
   left: 0;
   max-width: 210px;
   overflow: hidden;
-  background: var(--card);
+  background: var(--surface);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3247,7 +3895,7 @@ button.fr-open {
 .road-point .btn { white-space: normal; }
 .road-warning { border-left: 3px solid #d78b16; padding: 10px; background: var(--blue-bg); }
 .road-marker { background: var(--blue); border: 2px solid white; border-radius: 50%; }
-.road-marker span { display: block; width: max-content; max-width: 190px; margin-left: 25px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; font-size: 12px; }
+.road-marker span { display: block; width: max-content; max-width: 190px; margin-left: 25px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; font-size: 12px; }
 .road-scale { background: #9a6700; } .road-radar { background: #be3144; } .road-place { background: #168467; }
 .points-far .road-marker span { display: none; }
 .road-fields { padding: 18px; margin: 0; overflow-y: auto; min-height: 0; }

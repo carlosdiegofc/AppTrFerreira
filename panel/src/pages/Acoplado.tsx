@@ -13,7 +13,8 @@ import { expensesLink } from '../lib/expenses';
 import { truckLabel } from '../lib/fleet';
 import { andList, number } from '../lib/format';
 import { capacityText, cardTruckLabel, type Hitch, hitchDays, makeLine, samePlate, takenKeys, trailerLabel, trailerTrucks, truckKey, type Vehicle } from '../lib/vehicles';
-import { type Notice, noticeOf, PapersPill, truckPath } from './Flota';
+import { truckPath } from '../lib/paths';
+import { type Notice, noticeOf, PapersPill } from './Flota';
 import { PAPER_STATE } from './states';
 
 function Back() {

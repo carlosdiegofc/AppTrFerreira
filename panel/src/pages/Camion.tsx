@@ -16,7 +16,8 @@ import { monthLabel } from '../lib/drivers';
 import { expensesLink } from '../lib/expenses';
 import { litersPer100, monthsBefore, summarize } from '../lib/metrics';
 import { capacityText, driversByMonth, type Hitch, hitchDays, makeLine, takenKeys, trailerLabel, truckTrailers, type Vehicle } from '../lib/vehicles';
-import { type Notice, noticeOf, TankFact, trailerPath } from './Flota';
+import { trailerPath } from '../lib/paths';
+import { type Notice, noticeOf, TankFact } from './Flota';
 import { PAPER_STATE, STATE_TONE } from './states';
 
 function Back() {

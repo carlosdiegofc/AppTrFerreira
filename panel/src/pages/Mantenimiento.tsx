@@ -183,7 +183,7 @@ export function Mantenimiento() {
         <div className="stats">
           <Stat tone={late > 0 ? 'red' : 'green'} icon="warning" label="Vencidos" value={count(late)} detail={late > 0 ? 'Por fecha o por kilómetros' : 'Ninguno atrasado'} />
           <Stat tone="amber" icon="clock" label="Próximos" value={count(soon)} detail="En 15 días o 1.000 km" />
-          <Stat tone="blue" icon="wrench" label="Por hacer" value={count(todo)} />
+          <Stat featured tone="blue" icon="wrench" label="Por hacer" value={count(todo)} />
           <Stat tone="grey" icon="check" label="Hechos en 30 días" value={count(recent)} />
         </div>
       )}

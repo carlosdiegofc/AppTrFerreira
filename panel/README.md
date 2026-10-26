@@ -16,6 +16,23 @@ Panel web de la plataforma (etapas en [docs/PLAN-PLATAFORMA.md](../docs/PLAN-PLA
 | **Gastos y finanzas** | Los gastos de la empresa con su factura (una foto, que se achica como las de las boletas, o un PDF de hasta 10 MB): fecha, tipo (reparación y repuestos, cubiertas, service, seguro, patente e impuestos, peajes en efectivo, multas, lavado, viáticos, otros, o uno escrito a mano), importe en pesos o en dólares, a qué va (un camión, un acoplado, un chofer, un viaje o la empresa), proveedor y forma de pago. Por período (este mes de entrada), con lo gastado en pesos y en dólares por separado, lo que más pesó, lo de los camiones y acoplados y los que no tienen factura; por tipo y por a qué fue cada uno, y con filtros y búsqueda. Lo mal cargado se corrige o se anula, y lo anulado se puede restaurar: nada se borra. El costo de un service hecho se anota desde Mantenimiento, uno solo por service; la página de un viaje muestra sus gastos y deja anotar uno, y las fichas de cada camión, acoplado y chofer llevan a los suyos. Los cobros, la ganancia y el simulador de fletes llegan en la segunda parte. |
 | Asistente IA, Configuración | Próximamente: cada página dice qué va a hacer. |
 
+## Diseño
+Desde el 26/10/2026, el panel tiene el estilo «vidrio» del video que mandó el dueño, con el azul del logo de TR Ferreira:
+- **Fondo:** cada página va en un panel de vidrio esmerilado sobre un fondo desenfocado: una habitación de tonos cálidos con luces suaves, en claro y en oscuro.
+  - Está hecho para el panel, sin ninguna foto: lo dibuja `tools/fondo.py` (`python3 tools/fondo.py src/assets`, con Pillow).
+  - Si el dueño manda una foto suya, se reemplazan `src/assets/fondo-claro.webp` y `fondo-oscuro.webp`.
+- **Barra de arriba,** flotante:
+  - quién ingresó, que abre el tema y «Salir»;
+  - un buscador de secciones, camiones, acoplados y choferes por nombre, matrícula o teléfono, sin importar tildes ni mayúsculas, que también busca el texto en Viajes y en Gastos;
+  - la campana, con los mismos avisos de «Para tener en cuenta» de Inicio y cuántos son.
+- **Menú:** a la izquierda, una columna de íconos que dicen su nombre al pasar el mouse. En el celular se abre con el botón de menú, con los nombres, el tema y «Salir».
+- **Vidrio:**
+  - Las tarjetas son translúcidas.
+  - Lo que flota sobre la página desenfoca lo que pasa por detrás y es casi opaco: la barra, el menú, lo que se abre de ellos y los diálogos.
+  - Si la computadora no muestra el desenfoque o pide menos transparencias, el vidrio queda opaco.
+- **Colores:** son variables de `src/styles/app.css`, en claro y en oscuro. Los de los gráficos (el azul del logo, un paso más claro, y un naranja) están revisados para daltonismo y contraste sobre el vidrio.
+- **Gráficos:** lo facturado de los últimos 12 meses es una curva suave, y la parte del mes con carga, en Inicio, un anillo.
+
 ## Quién entra
 Las mismas cuentas de la app. Igual que el panel actual, este solo se abre para las cuentas de la lista de administradores del panel (`trf_is_panel_admin()`); cualquier otra, chofer o no, ve «Esta cuenta no tiene acceso». Qué datos ve cada cuenta lo deciden los permisos de la base (seguridad por filas), no la pantalla.
 

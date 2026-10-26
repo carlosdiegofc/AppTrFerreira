@@ -1,33 +1,45 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 import logo from '../assets/logo-tr.png';
-import { useAuth, usePanelUser } from '../auth/AuthProvider';
-import { Icon, type IconName } from '../components/Icon';
+import { usePanelUser } from '../auth/AuthProvider';
+import { Icon } from '../components/Icon';
 import { PANEL_VERSION } from '../config';
 import { SECTIONS } from '../sections';
 import { applyTheme, savedTheme, type ThemeChoice } from '../theme';
+import { Account, SignOutButton, ThemeSwitch } from './Account';
+import { Notices } from './Notices';
+import { Search } from './Search';
 
-const THEMES: { value: ThemeChoice; label: string; icon: IconName }[] = [
-  { value: 'auto', label: 'Como la computadora', icon: 'monitor' },
-  { value: 'light', label: 'Claro', icon: 'sun' },
-  { value: 'dark', label: 'Oscuro', icon: 'moon' },
-];
-
+/**
+ * The frame of every page (decision of 26/10/2026): a floating bar with who is in, the search and the notices; the menu
+ * as a column of icons (on a phone it slides in, with the names, the theme and «Salir»); the page on frosted glass.
+ */
 export function AppShell() {
   const { user } = usePanelUser();
-  const { signOut } = useAuth();
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const [theme, setTheme] = useState<ThemeChoice>(savedTheme);
   useEffect(() => applyTheme(theme), [theme]);
   useEffect(() => setOpen(false), [location.pathname]);
-  const current = SECTIONS.find((s) => location.pathname === '/' + s.path || location.pathname.startsWith('/' + s.path + '/'));
 
   return (
     <div className={`shell${open ? ' nav-open' : ''}`}>
       <a className="skip" href="#contenido">
         Saltar al contenido
       </a>
+      <header className="topbar">
+        <div className="topbar-start">
+          <button type="button" className="round menu-button" aria-label="Abrir el menú" aria-expanded={open} onClick={() => setOpen(true)}>
+            <Icon name="menu" />
+          </button>
+          <img src={logo} alt="TR Ferreira" className="topbar-logo" />
+          <Account theme={theme} onTheme={setTheme} />
+        </div>
+        <Search />
+        <div className="topbar-end">
+          <Notices />
+        </div>
+      </header>
       <aside className="side" aria-label="Secciones del panel">
         <div className="side-brand">
           <img src={logo} alt="TR Ferreira" />
@@ -42,8 +54,10 @@ export function AppShell() {
               <li key={s.path}>
                 <NavLink to={'/' + s.path} className={({ isActive }) => `side-link${isActive ? ' is-active' : ''}${s.ready ? '' : ' is-soon'}`}>
                   <Icon name={s.icon} />
-                  <span>{s.label}</span>
-                  {!s.ready && <small className="soon-tag">Pronto</small>}
+                  <span className="side-label">
+                    {s.label}
+                    {!s.ready && <small className="soon-tag">Pronto</small>}
+                  </span>
                 </NavLink>
               </li>
             ))}
@@ -54,33 +68,15 @@ export function AppShell() {
             <strong>{user.name}</strong>
             <span>{user.email}</span>
           </div>
-          <div className="theme-switch" role="group" aria-label="Tema">
-            {THEMES.map((t) => (
-              <button key={t.value} type="button" className={theme === t.value ? 'is-on' : ''} aria-pressed={theme === t.value} title={t.label} aria-label={t.label} onClick={() => setTheme(t.value)}>
-                <Icon name={t.icon} size={17} />
-              </button>
-            ))}
-          </div>
-          <button type="button" className="btn btn-side" onClick={() => void signOut()}>
-            <Icon name="logout" size={18} />
-            Salir
-          </button>
-          <span className="version">Panel nuevo · v{PANEL_VERSION}</span>
+          <ThemeSwitch theme={theme} onTheme={setTheme} />
+          <SignOutButton className="btn-side" />
+          <span className="version">Panel · v{PANEL_VERSION}</span>
         </div>
       </aside>
       <div className="scrim" onClick={() => setOpen(false)} aria-hidden="true" />
-      <div className="main">
-        <header className="topbar">
-          <button type="button" className="btn btn-icon" aria-label="Abrir el menú" aria-expanded={open} onClick={() => setOpen(true)}>
-            <Icon name="menu" />
-          </button>
-          <img src={logo} alt="TR Ferreira" className="topbar-logo" />
-          <span className="topbar-title">{current?.label}</span>
-        </header>
-        <main id="contenido" className="content" tabIndex={-1}>
-          <Outlet />
-        </main>
-      </div>
+      <main id="contenido" className="content" tabIndex={-1}>
+        <Outlet />
+      </main>
     </div>
   );
 }

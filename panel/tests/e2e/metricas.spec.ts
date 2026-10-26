@@ -68,8 +68,13 @@ test('los números del mes por camión, como «Rendimiento» de la app', async (
   // The last 12 months, by the start of each trip: October has the trip billed in pesos and the one in dollars.
   const billing = chart(page, 'Facturado en los últimos 12 meses');
   await expect(billing.locator('.viz-subtitle')).toHaveText(['En pesos', 'En dólares']);
-  await expect(billing.locator('.col-value')).toHaveText(['$ 38.500', 'US$ 1.250,50']);
-  await expect(billing.locator('.cols').first().locator('.col')).toHaveCount(12);
+  await expect(billing.locator('.curve-value')).toHaveText(['$ 38.500', 'US$ 1.250,50']);
+  await expect(billing.locator('.curve-steps').first().locator('.curve-step')).toHaveCount(12);
+  // Month by month with the keyboard, like the columns: the last month is October.
+  await billing.getByRole('group', { name: 'Facturado por mes en pesos' }).focus();
+  await page.keyboard.press('End');
+  await expect(billing.getByRole('status')).toContainText('octubre de 2026');
+  await expect(billing.getByRole('status')).toContainText('$ 38.500 facturado');
   await shot(page, 'metricas');
 
   // Sorted by a column, and back.

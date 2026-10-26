@@ -166,6 +166,7 @@ export function Choferes() {
       {ready && (
         <div className="stats stats-money">
           <Stat
+            featured
             tone="blue"
             icon="person"
             label="Con ficha"

@@ -1,9 +1,10 @@
 // The charts of Métricas, drawn with the panel's own HTML (no chart library): thin bars that grow from one baseline, a
-// 2 px gap of the card's colour between the parts of a bar, round axis ticks, a legend for two series and few labels.
-// Each chart answers the pointer and the keyboard (arrows, once it has the focus) with the values of the bar it is on,
-// and every value is also in a table: the one of the page, or the one under the chart. Colours: --viz-1 and --viz-2
-// in app.css, checked for colour blindness in light and in dark.
-import { type FocusEvent, type KeyboardEvent, type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from 'react';
+// 2 px gap of the card's colour between the parts of a bar, a smooth line for one value month by month, round axis
+// ticks, a legend for two series and few labels. Each chart answers the pointer and the keyboard (arrows, once it has
+// the focus) with the values of the bar or the month it is on, and every value is also in a table: the one of the page,
+// or the one under the chart. Colours: --viz-1 and --viz-2 in app.css, checked for colour blindness in light and in dark.
+import { type FocusEvent, type KeyboardEvent, type ReactNode, type RefObject, useId, useLayoutEffect, useRef, useState } from 'react';
+import { areaPath, smoothPath } from '../lib/curve';
 
 export type Series = 1 | 2;
 
@@ -190,6 +191,83 @@ export function Columns({ label, columns, ticks, tick, valueLabel }: { label: st
         </div>
       </div>
       {active !== null && <Tip refTo={tip}>{columns[active]?.tip}</Tip>}
+    </div>
+  );
+}
+
+export interface CurvePoint {
+  key: string;
+  /** Under the point; only the major ones show on a phone. */
+  label: string;
+  major: boolean;
+  value: number;
+  tip: ReactNode;
+}
+
+/**
+ * A smooth line through one value per step (a month, say), with the area under it lightly shaded, over the same round
+ * ticks as Columns. The pointer or the keyboard on a step shows a hairline, its point and its tooltip; one value is
+ * written on its point (the last one, usually).
+ */
+export function Curve({ label, points, ticks, tick, valueLabel }: { label: string; points: readonly CurvePoint[]; ticks: readonly number[]; tick: (v: number) => string; valueLabel?: { index: number; text: string } }) {
+  const { box, tip, active, setActive, handlers } = useActive(points.length);
+  const shade = useId();
+  const top = ticks.at(-1) || 1;
+  const pct = (v: number) => Math.min(100, (Math.max(0, v) / top) * 100);
+  // Drawn on a 1000 × 100 box stretched over the plot: each point in the middle of its step, 0 at the bottom.
+  const xy = points.map((p, i) => ({ x: ((i + 0.5) * 1000) / points.length, y: 100 - pct(p.value) }));
+  const marked = new Set([active, valueLabel && points[valueLabel.index] && points[valueLabel.index]!.value > 0 ? valueLabel.index : null]);
+  return (
+    <div className="viz-box" ref={box}>
+      <div className="cols-chart">
+        <div className="cols-axis" aria-hidden="true">
+          {ticks.map((t) => (
+            <span key={t} style={{ bottom: `${pct(t)}%` }}>
+              {tick(t)}
+            </span>
+          ))}
+        </div>
+        <div className="cols-plot">
+          <div className="cols-grid" aria-hidden="true">
+            {ticks.map((t) => (
+              <span key={t} style={{ bottom: `${pct(t)}%` }} />
+            ))}
+          </div>
+          <svg className="curve" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+            <defs>
+              <linearGradient id={shade} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" className="curve-shade-top" />
+                <stop offset="1" className="curve-shade-bottom" />
+              </linearGradient>
+            </defs>
+            <path className="curve-area" d={areaPath(xy, 100)} fill={`url(#${shade})`} />
+            <path className="curve-line" d={smoothPath(xy)} vectorEffect="non-scaling-stroke" />
+          </svg>
+          <div className="curve-steps" role="group" aria-label={label} {...handlers}>
+            {points.map((p, i) => (
+              <div key={p.key} className={`curve-step${active === i ? ' is-active' : ''}`} data-mark={i} onPointerEnter={() => setActive(i)}>
+                <span className="curve-anchor" data-tip style={{ bottom: `${pct(p.value)}%` }}>
+                  {marked.has(i) && <i className="curve-dot" aria-hidden="true" />}
+                </span>
+                {/* Near an edge of the chart the label grows away from it, so it is never cut. */}
+                {valueLabel?.index === i && p.value > 0 && (
+                  <span className={`curve-value${i < 2 ? ' at-start' : i > points.length - 3 ? ' at-end' : ''}`} style={{ bottom: `${pct(p.value)}%` }}>
+                    {valueLabel.text}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className={`cols-x${points.length * Math.max(0, ...points.map((p) => p.label.length)) > 90 ? ' is-dense' : ''}`} aria-hidden="true">
+          {points.map((p) => (
+            <span key={p.key} className={p.major ? 'is-major' : undefined}>
+              {p.label}
+            </span>
+          ))}
+        </div>
+      </div>
+      {active !== null && <Tip refTo={tip}>{points[active]?.tip}</Tip>}
     </div>
   );
 }
