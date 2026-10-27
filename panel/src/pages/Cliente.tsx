@@ -207,7 +207,7 @@ function ClientPage({ clientKey }: { clientKey: string }) {
     setNotice(null);
     setEditing({ kind: 'opening', movement: null, currency: free });
   };
-  const origin = client.listed ? 'De la lista de clientes de la app' : accountable ? 'Escrito en los viajes' : 'Viajes facturados que no dicen el cliente';
+  const origin = client.listed ? 'De la lista de clientes de la app' : accountable ? 'Escrito en los viajes' : 'Viajes que no dicen el cliente';
   const subtitle = [origin, client.lastTrip ? `último viaje el ${formatDay(client.lastTrip)}` : 'sin viajes todavía', `${count(client.trips.length)} viaje${client.trips.length === 1 ? '' : 's'}`].join(' · ');
 
   return (
@@ -246,7 +246,7 @@ function ClientPage({ clientKey }: { clientKey: string }) {
           <Icon name={notice.tone === 'ok' ? 'check' : 'warning'} size={18} /> {notice.text}
         </p>
       )}
-      {!accountable && <p className="notice notice-warn">Estos viajes tienen importe pero no dicen el cliente: completá el cliente en cada viaje para que sume en su cuenta.</p>}
+      {!accountable && <p className="notice notice-warn">Estos viajes no dicen el cliente: completá en cada uno el cliente, y el importe si falta, para que sumen en su cuenta.</p>}
 
       <div className="statements">
         {currencies.map((c) => (

@@ -19,7 +19,10 @@ export function clientKey(name: unknown): string | null {
   return n === '' ? null : 'name:' + n;
 }
 
-/** The key of the trips billed without saying the client: they go to no account until the office completes them. */
+/**
+ * The key of the trips that do not say the client, billed or waiting for their amount: they go to no account until the
+ * office completes them.
+ */
 export const NO_CLIENT = 'name:';
 
 /** A name as the screens show it: without the spaces of more. */
@@ -194,7 +197,8 @@ const later = (a: string | null, b: string | null) => (a === null ? b : b === nu
 /**
  * The clients with their trips (not in the trash), collections and opening balances: every client of the app's list,
  * even without trips yet, every client written in a trip and every one with a collection or an opening balance. The
- * trips billed without a client go apart, under NO_CLIENT, without an account. Most recent activity first.
+ * trips without a client that were billed or wait for their amount go apart, under NO_CLIENT, without an account. Most
+ * recent activity first.
  */
 export function groupClients(trips: readonly Trip[], movements: readonly ClientMovement[], listed: readonly string[]): Client[] {
   const map = new Map<string, Client>();
@@ -219,7 +223,7 @@ export function groupClients(trips: readonly Trip[], movements: readonly ClientM
     if (t.deleted) continue;
     const key = clientKey(t.client);
     if (key !== null) get(key).trips.push(t);
-    else if (billedAmount(t) !== null) get(NO_CLIENT).trips.push(t);
+    else if (billedAmount(t) !== null || missingAmount(t)) get(NO_CLIENT).trips.push(t);
   }
   for (const m of movements) {
     if (m.deleted) continue;
@@ -309,8 +313,12 @@ export function clientBalances(clients: readonly Pick<Client, 'accounts'>[]): { 
   return { owed, credit, owing };
 }
 
-/** The trips in the accounts whose amount the office has to complete. */
-export const withoutAmount = (clients: readonly Pick<Client, 'accounts'>[]) => clients.reduce((n, c) => n + c.accounts.reduce((m, a) => m + a.withoutAmount, 0), 0);
+/** A client's trips whose amount the office has to complete: the ones in its accounts, or all for NO_CLIENT. */
+export const clientWithoutAmount = (c: Pick<Client, 'key' | 'trips' | 'accounts'>) =>
+  c.key === NO_CLIENT ? c.trips.filter(missingAmount).length : c.accounts.reduce((n, a) => n + a.withoutAmount, 0);
+
+/** The trips whose amount the office has to complete, of every client and of none. */
+export const withoutAmount = (clients: readonly Pick<Client, 'key' | 'trips' | 'accounts'>[]) => clients.reduce((n, c) => n + clientWithoutAmount(c), 0);
 
 /** The clients whose name holds the text, written in any way. */
 export function filterClients<C extends Pick<Client, 'name'>>(list: readonly C[], q: string): C[] {

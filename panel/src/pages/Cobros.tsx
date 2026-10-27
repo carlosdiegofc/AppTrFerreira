@@ -10,7 +10,7 @@ import { Icon } from '../components/Icon';
 import { Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote, Stat } from '../components/ui';
 import { ConflictError, DataError, describeWriteError } from '../data/api';
 import { useClients, useNow, useSetClientMovementDeleted } from '../data/hooks';
-import { billedAmount, billedInPeriod, type Client, clientBalances, type ClientMovement, collectionTotals, filterClients, filterCollections, NO_CLIENT, periodSums, withoutAmount } from '../lib/clients';
+import { billedAmount, billedInPeriod, type Client, clientBalances, clientWithoutAmount, type ClientMovement, collectionTotals, filterClients, filterCollections, NO_CLIENT, periodSums, withoutAmount } from '../lib/clients';
 import { ago, dayInZone, formatDay } from '../lib/dates';
 import { count, money } from '../lib/format';
 import { useAddressFilters } from './addressFilters';
@@ -40,9 +40,9 @@ function ClientRow({ client, from, to }: { client: Client; from?: string; to?: s
   const none = client.key === NO_CLIENT;
   const billed = billedInPeriod(client.trips, from, to);
   const paid = none ? null : periodSums([client], from, to);
-  const pending = client.accounts.reduce((n, a) => n + a.withoutAmount, 0);
+  const pending = clientWithoutAmount(client);
   const running = client.trips.filter((t) => t.active && billedAmount(t) === null).length;
-  const origin = client.listed ? 'De la lista de la app' : none ? 'Viajes facturados que no dicen el cliente' : 'Escrito en los viajes';
+  const origin = client.listed ? 'De la lista de la app' : none ? 'Viajes que no dicen el cliente' : 'Escrito en los viajes';
   return (
     <li>
       <Link className="fuel-station" to={clientPath(client.key)}>
@@ -215,7 +215,7 @@ export function Cobros() {
       {ready && loose > 0 && (
         <p className="notice notice-warn notice-with-action">
           <Icon name="warning" size={18} />
-          <span>{loose === 1 ? 'Un viaje facturado no dice el cliente: no suma en ninguna cuenta hasta que lo completes.' : `${count(loose)} viajes facturados no dicen el cliente: no suman en ninguna cuenta hasta que los completes.`}</span>
+          <span>{loose === 1 ? 'Un viaje no dice el cliente: no suma en ninguna cuenta hasta que lo completes.' : `${count(loose)} viajes no dicen el cliente: no suman en ninguna cuenta hasta que los completes.`}</span>
           <Link className="link-button notice-action" to={clientPath(NO_CLIENT)}>
             {loose === 1 ? 'Ver el viaje' : 'Ver los viajes'}
           </Link>

@@ -4,6 +4,7 @@ import {
   billedAmount,
   clientBalances,
   clientKey,
+  clientWithoutAmount,
   type ClientMovement,
   clientMovementFromRow,
   type ClientMovementRow,
@@ -101,9 +102,12 @@ describe('clientes', () => {
       trip({ day: '2026-10-11', client: 'Molino San José' }),
       trip({ day: '2026-10-12', client: 'Molino San José', deleted: true }),
       trip({ day: '2026-10-03', client: 'Cooperativa Agraria', amount: 1250.5, currency: 'USD' }),
-      // Billed without saying the client: apart, without an account. Without an amount either: nowhere.
+      // Without saying the client: apart, without an account, when billed or waiting for its amount. An empty return or
+      // a trip on the road without either: nowhere.
       trip({ day: '2026-10-08', client: null, amount: 3000 }),
+      trip({ day: '2026-10-07', client: null, amount: null }),
       trip({ day: '2026-10-08', client: null, amount: null, loadType: 'empty' }),
+      trip({ day: '2026-10-08', client: null, amount: null, active: true }),
     ];
     const clients = groupClients(trips, [move({ client_key: 'name:navios', client_name: 'Navios', happened_on: '2026-10-14', amount: 700 })], ['Cliente Uno', ' cooperativa  agraria ']);
     expect(clients.map((c) => [c.name, c.key])).toEqual([
@@ -121,7 +125,10 @@ describe('clientes', () => {
     // The app's list names its clients, even when a trip writes them another way.
     expect(clients[3]).toMatchObject({ listed: true, lastTrip: '2026-10-03' });
     expect(clients[4]).toMatchObject({ listed: true, trips: [], accounts: [], lastDay: null });
-    expect(clients[2]).toMatchObject({ trips: [expect.objectContaining({ amount: 3000 })], accounts: [] });
+    expect(clients[2]).toMatchObject({ trips: [expect.objectContaining({ amount: 3000 }), expect.objectContaining({ amount: null })], accounts: [] });
+    // The one waiting for its amount counts among the trips to complete, with the clients' ones.
+    expect(clientWithoutAmount(clients[2]!)).toBe(1);
+    expect(withoutAmount(clients)).toBe(1);
     // A client with only a collection: named by it, with an account in its favor.
     expect(clients[0]!.accounts).toEqual([expect.objectContaining({ currency: 'UYU', paid: 700, balance: -700 })]);
   });

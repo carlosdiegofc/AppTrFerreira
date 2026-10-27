@@ -128,7 +128,7 @@ Decisiones del 26/10/2026 y del 27/10/2026, segunda parte de Gastos y finanzas. 
 - La cuenta de cada cliente sale de los viajes, leídos como en Viajes y en Métricas:
   - El cliente es el que completó la oficina (`trf_panel_trips.client`) o, si no, el que escribió el chofer en la app (`cliente` de `trf_trip_details.data`). Se juntan sin importar mayúsculas, tildes ni espacios de más: «Molino San José» y «MOLINO  SAN JOSE» son el mismo cliente. Los de la lista de clientes de la app (`clientes` de `trf_mobile_catalog`) aparecen aunque no tengan viajes, con el nombre de la lista.
   - Lo facturado es el importe de cada viaje (`trf_panel_trips.amount`, en su `currency`), el día de su salida en Uruguay. Un importe vacío o en cero no suma: los viajes terminados con carga y los cargados a mano piden completarlo; los retornos vacíos y los que siguen en viaje no.
-  - Los viajes en la papelera no cuentan. Los que tienen importe pero no dicen el cliente quedan aparte, sin cuenta, hasta que se completen.
+  - Los viajes en la papelera no cuentan. Los que no dicen el cliente y tienen importe, o lo tienen que completar, quedan aparte, sin cuenta, hasta que se completen.
 - `trf_client_movements`: los cobros y el saldo inicial de cada cliente.
   - `client_key`: `name:` y el nombre del cliente sin mayúsculas, tildes ni espacios de más, como se juntan sus viajes; `client_name`: el nombre como se escribió al guardarlo, de hasta 200 caracteres.
   - `kind`: `payment`, un cobro, mayor que cero y con `method` efectivo, transferencia, cheque u otro; u `opening`, el saldo inicial, sin forma de cobro: positivo si el cliente le debía a la empresa ese día, negativo si era a favor del cliente.
