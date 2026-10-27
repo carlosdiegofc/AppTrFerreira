@@ -225,3 +225,13 @@ insert into public.trf_expenses (id, spent_on, category, amount, currency, targe
    'SUCIVE', 'transferencia', '', null, null);
 insert into storage.objects (bucket_id, name) values
   ('trf-expense-files', 'b0000000-0000-4000-8000-000000000001/b1000000-0000-4000-8000-000000000001.jpg');
+
+-- Cobros (migration 0012). Molino San José started its account in pesos ten days ago with what it owed and paid it with
+-- a cheque two days ago: it owes the trip that ended today, UYU 38.500. Cooperativa Agraria paid part of its trip in
+-- dollars yesterday: it owes USD 250,50. A transfer of Navios was annulled. Navios has its trip on the road, still
+-- without an amount, and Cliente Uno, of the app's list, has no trips.
+insert into public.trf_client_movements (id, client_key, client_name, kind, happened_on, amount, currency, method, notes, deleted_at) values
+  ('c0000000-0000-4000-8000-000000000001', 'name:molino san jose', 'Molino San José', 'opening', (select today from t0) - 10, 15000, 'UYU', null, '', null),
+  ('c0000000-0000-4000-8000-000000000002', 'name:molino san jose', 'Molino San José', 'payment', (select today from t0) - 2, 15000, 'UYU', 'cheque', 'Cheque BROU 4521', null),
+  ('c0000000-0000-4000-8000-000000000003', 'name:cooperativa agraria', 'Cooperativa Agraria', 'payment', (select today from t0) - 1, 1000, 'USD', 'transferencia', '', null),
+  ('c0000000-0000-4000-8000-000000000004', 'name:navios', 'Navios', 'payment', (select today from t0) - 4, 5000, 'UYU', 'transferencia', 'Era de otro cliente.', (select now from t0) - interval '3 days');

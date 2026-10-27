@@ -14,7 +14,7 @@ const MAX = { liters: 100_000, total: 1e9 } as const;
 const isDay = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(d + 'T00:00:00Z')) && new Date(d + 'T00:00:00Z').toISOString().startsWith(d);
 
 /** A day typed in a form: required, a real date and not after today. */
-function checkDay(day: string, today: string): string | null {
+export function checkDay(day: string, today: string): string | null {
   if (day.trim() === '') return 'Elegí la fecha.';
   if (!isDay(day)) return 'La fecha no es válida.';
   if (day > today) return 'La fecha no puede ser posterior a hoy.';
@@ -22,7 +22,7 @@ function checkDay(day: string, today: string): string | null {
 }
 
 /** A number in a form as it is typed in Uruguay ("12.500", "182,5"): the value, or why it is not valid. */
-function checkNumber(raw: string, max: number): { value: number | null; error: string | null } {
+export function checkNumber(raw: string, max: number): { value: number | null; error: string | null } {
   const parsed = parseNumber(raw);
   if (!parsed.ok) return { value: null, error: parsed.error };
   if (parsed.value !== null && parsed.value > max) return { value: null, error: 'Es demasiado grande. Revisá el número.' };

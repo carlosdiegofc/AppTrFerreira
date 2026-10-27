@@ -60,7 +60,11 @@ export async function open(page: Page, section: string) {
   await expect(page.locator('main#contenido')).toBeVisible();
   const menu = page.getByRole('button', { name: 'Abrir el menú' });
   if (await menu.isVisible()) await menu.click();
-  await page.getByRole('navigation').getByRole('link', { name: new RegExp(`^${section}`) }).click();
+  const link = page.getByRole('navigation').getByRole('link', { name: new RegExp(`^${section}`) });
+  await link.click();
+  // The router changes pages inside a transition: until the section's code arrives, the page before stays on screen,
+  // and the bell or the search opened meanwhile closes when the new page lands. The menu marks the section once it has.
+  await expect(link).toHaveAttribute('aria-current', 'page');
 }
 
 export const stat = (page: Page, label: string) => page.locator('.stat', { hasText: label });

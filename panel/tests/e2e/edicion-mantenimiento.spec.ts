@@ -37,9 +37,11 @@ test('marcar como hecho un service que se repite agenda el próximo', async ({ p
   await chip(page, 'Hechos').click();
   await expect(services(page).first()).toContainText('Hecho el 15/10/2026 · Con 412.480 km');
   await expect(services(page).first()).toContainText('Cada 10.000 km');
-  // Inicio no longer warns about it.
+  // Inicio no longer warns about it; the Ford is still low on fuel, which is another warning.
   await open(page, 'Inicio');
-  await expect(page.locator('.alert-line', { hasText: 'JKL3456' })).toHaveCount(0);
+  const serviceWarnings = page.locator('.alert-line[title="Ver en Mantenimiento"]');
+  await expect(serviceWarnings.filter({ hasText: 'Frenos · ABC1234' })).toBeVisible();
+  await expect(serviceWarnings.filter({ hasText: 'JKL3456' })).toHaveCount(0);
 });
 
 /** The first request of a kind to the services reaches the database, but its answer is lost. */

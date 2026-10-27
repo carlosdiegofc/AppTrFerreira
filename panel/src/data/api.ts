@@ -1,5 +1,6 @@
 // Every read and write the panel makes. Screens never build queries themselves; row security in the database decides
 // what each account gets back and what it may change.
+import type { ClientMovement, ClientMovementRow } from '../lib/clients';
 import type { Tables, TablesInsert, TablesUpdate } from '../lib/database.types';
 import { type DriverChoice, driverChoices, type FileType, type Paper, type PaperDocRow } from '../lib/documents';
 import { type Driver, type DriverRow, type Payment, type PaymentRow, type Salary, type SalaryRow, savedAsSent } from '../lib/drivers';
@@ -746,6 +747,39 @@ export const saveExpense = (expense: Pick<Expense, 'id' | 'updatedAt'> | null, r
 
 /** Annuls an expense, or brings it back: nothing is deleted. */
 export const setExpenseDeleted = (expense: Expense, deleted: boolean) => saveExpense(expense, { deleted_at: deleted ? new Date().toISOString() : null });
+
+/**
+ * Every trip, as fetchTripList reads a period: the app's trips with what the office completed and what the driver typed
+ * on the phone, and the trips typed in the panel, the ones in the trash too. Read whole: an account never adds up part
+ * of the trips.
+ */
+export async function fetchAllTrips(): Promise<TripListData> {
+  const [sessions, panelRows, details] = await Promise.all([
+    all((from, to) => supabase.from('trf_driver_tracking_sessions').select('*').order('started_at', { ascending: false }).order('id').range(from, to), 50_000, true),
+    all((from, to) => supabase.from('trf_panel_trips').select('*').order('id').range(from, to), 50_000, true),
+    all((from, to) => supabase.from('trf_trip_details').select('trip_id,data').order('trip_id').range(from, to), 50_000, true),
+  ]);
+  return { sessions, panelRows, details };
+}
+
+/** Every collection and opening balance of the clients, the annulled ones too (only the panel accounts read them). */
+export async function fetchClientMovements(): Promise<ClientMovementRow[]> {
+  return all((from, to) => supabase.from('trf_client_movements').select('*').order('happened_on', { ascending: false }).order('id').range(from, to), 20_000, true);
+}
+
+/**
+ * A collection or an opening balance, new or changed, as saveOnce saves: a change only applies if nobody saved it
+ * meanwhile. A second opening balance of a client in the same currency is refused with the code of a duplicate (23505).
+ */
+export const saveClientMovement = (movement: Pick<ClientMovement, 'id' | 'updatedAt'> | null, row: TablesInsert<'trf_client_movements'> | TablesUpdate<'trf_client_movements'>) =>
+  saveOnce<ClientMovementRow>(movement, row, {
+    insert: () => supabase.from('trf_client_movements').insert(row as TablesInsert<'trf_client_movements'>).select(),
+    find: (id) => supabase.from('trf_client_movements').select('*').eq('id', id).limit(1),
+    update: (id, at) => supabase.from('trf_client_movements').update(row).eq('id', id).eq('updated_at', at).select(),
+  });
+
+/** Annuls a collection or an opening balance, or brings it back: nothing is deleted. */
+export const setClientMovementDeleted = (movement: ClientMovement, deleted: boolean) => saveClientMovement(movement, { deleted_at: deleted ? new Date().toISOString() : null });
 
 /** The invoice of an expense: a JPEG photo or a PDF. One already uploaded (a save tried again) counts as uploaded. */
 export async function uploadExpenseFile(path: string, file: Blob, type: FileType): Promise<void> {

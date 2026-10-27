@@ -54,10 +54,11 @@ describe('searchItems', () => {
 });
 
 describe('searchIn', () => {
-  it('offers the text in Viajes (its longest period) and in Gastos (all dates)', () => {
+  it('offers the text in Viajes (its longest period), in Gastos (all dates) and among the clients of Cobros', () => {
     expect(searchIn(' Puerto & Co ').map((i) => [i.title, i.path])).toEqual([
       ['«Puerto & Co» en Viajes', '/viajes?periodo=90&buscar=Puerto%20%26%20Co'],
       ['«Puerto & Co» en Gastos y finanzas', '/finanzas?periodo=todo&buscar=Puerto%20%26%20Co'],
+      ['«Puerto & Co» en Cobros', '/finanzas/cobros?buscar=Puerto%20%26%20Co'],
     ]);
     expect(searchIn('  ')).toEqual([]);
   });

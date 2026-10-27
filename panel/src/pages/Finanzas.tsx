@@ -1,10 +1,11 @@
-// Gastos y finanzas (decision of 26/10/2026), first part: the expenses of the company with their invoices, by period, by
-// kind and by what they went to, pesos and dollars apart. The filters live in the address (?periodo=mes&destino=…):
-// going back, reloading or sharing the link keeps them. The collections, the profit and the freight simulator come in
-// the second part.
+// Gastos y finanzas (decision of 26/10/2026): the expenses of the company with their invoices, by period, by kind and by
+// what they went to, pesos and dollars apart; the clients' accounts are in Cobros, next to it. The filters live in the
+// address (?periodo=mes&destino=…): going back, reloading or sharing the link keeps them. The profit and the freight
+// simulator come in the second delivery of part 12b.
 import { type ReactNode, useMemo, useState } from 'react';
-import { Icon } from '../components/Icon';
 import { ExpenseFormDialog } from '../components/ExpenseFormDialog';
+import { FinanceTabs } from '../components/FinanceTabs';
+import { Icon } from '../components/Icon';
 import { type Photo, PhotoDialog } from '../components/PhotoDialog';
 import { Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote, Stat } from '../components/ui';
 import { ConflictError, DataError, describeWriteError, TOO_MANY } from '../data/api';
@@ -28,19 +29,9 @@ import {
   writtenCategories,
 } from '../lib/expenses';
 import { andList, count, money } from '../lib/format';
-import { periodRange } from '../lib/trips';
 import { useAddressFilters } from './addressFilters';
+import { PERIODS, rangeOf } from './financePeriods';
 import { amountParts, amounts } from './fuelText';
-
-const PERIODS = [
-  { value: 'mes', label: 'Este mes' },
-  { value: 'mes-anterior', label: 'Mes anterior' },
-  { value: '30', label: 'Últimos 30 días' },
-  { value: '90', label: 'Últimos 90 días' },
-  { value: 'anio', label: 'Este año' },
-  { value: 'todo', label: 'Todo' },
-  { value: 'fechas', label: 'Elegir fechas…' },
-] as const;
 
 const VIEWS = [
   { value: 'gastos', label: 'Gastos' },
@@ -48,25 +39,6 @@ const VIEWS = [
   { value: 'destinos', label: 'A qué fue' },
   { value: 'anulados', label: 'Anulados' },
 ] as const;
-
-/** The days of a period, inclusive; null for «Todo». */
-function rangeOf(period: (typeof PERIODS)[number]['value'], today: string, params: URLSearchParams): { from: string; to: string } | null {
-  switch (period) {
-    case 'todo':
-      return null;
-    case 'fechas':
-      return { from: params.get('desde') ?? today, to: params.get('hasta') ?? today };
-    case 'anio':
-      return { from: `${today.slice(0, 4)}-01-01`, to: `${today.slice(0, 4)}-12-31` };
-    case 'mes-anterior':
-      return periodRange('prev-month', today);
-    case '30':
-    case '90':
-      return periodRange(period, today);
-    default:
-      return periodRange('month', today);
-  }
-}
 
 /** Each currency on its own line. */
 const Lines = ({ parts }: { parts: string[] }) => (
@@ -271,6 +243,7 @@ export function Finanzas() {
           </button>
         }
       />
+      <FinanceTabs />
       {notice && (
         <p className={`notice notice-${notice.tone}`} role={notice.tone === 'ok' ? 'status' : 'alert'}>
           <Icon name={notice.tone === 'ok' ? 'check' : 'warning'} size={18} /> {notice.text}
@@ -450,7 +423,7 @@ export function Finanzas() {
           </ul>
         </>
       )}
-      <p className="note">El combustible está en Combustible, y los sueldos y adelantos de los choferes, en Choferes: no van acá. Los cobros a clientes, la ganancia de cada viaje y el simulador de fletes llegan en la próxima parte.</p>
+      <p className="note">El combustible está en Combustible, y los sueldos y adelantos de los choferes, en Choferes: no van acá. Lo que deben los clientes está en Cobros. La ganancia de cada viaje y el simulador de fletes llegan en la próxima entrega.</p>
 
       <PhotoDialog photo={file} onClose={() => setFile(null)} />
       {(adding || editing) && (
