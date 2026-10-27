@@ -24,6 +24,8 @@ const Acoplado = lazy(() => import('./pages/Acoplado').then((m) => ({ default: m
 const Finanzas = lazy(() => import('./pages/Finanzas').then((m) => ({ default: m.Finanzas })));
 const Cobros = lazy(() => import('./pages/Cobros').then((m) => ({ default: m.Cobros })));
 const Cliente = lazy(() => import('./pages/Cliente').then((m) => ({ default: m.Cliente })));
+const Ganancia = lazy(() => import('./pages/Ganancia').then((m) => ({ default: m.Ganancia })));
+const Simulador = lazy(() => import('./pages/Simulador').then((m) => ({ default: m.Simulador })));
 
 const loading = (
   <div className="page">
@@ -54,6 +56,8 @@ export function App() {
           <Route path="finanzas" element={<Suspense fallback={loading}><Finanzas /></Suspense>} />
           <Route path="finanzas/cobros" element={<Suspense fallback={loading}><Cobros /></Suspense>} />
           <Route path="finanzas/cobros/:key" element={<Suspense fallback={loading}><Cliente /></Suspense>} />
+          <Route path="finanzas/ganancia" element={<Suspense fallback={loading}><Ganancia /></Suspense>} />
+          <Route path="finanzas/simulador" element={<Suspense fallback={loading}><Simulador /></Suspense>} />
           {SECTIONS.filter((s) => !s.ready).map((s) => (
             <Route key={s.path} path={s.path} element={<Proximamente section={s} />} />
           ))}

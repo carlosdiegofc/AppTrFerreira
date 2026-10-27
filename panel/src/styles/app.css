@@ -1009,7 +1009,7 @@ button {
 .stat {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: 'label icon' 'value value' 'detail detail';
+  grid-template-areas: 'label icon' 'value value' 'detail detail' 'trend trend';
   align-content: start;
   gap: 4px 12px;
   padding: 16px 18px 18px;
@@ -1060,6 +1060,22 @@ button {
   font-weight: 620;
 }
 
+/* How the number moved against the period before, as in the video: green when that is good news, red when it is not. */
+.stat-trend {
+  grid-area: trend;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 620;
+}
+
+.stat-trend.is-green {
+  color: var(--green);
+}
+
+.stat-trend.is-red {
+  color: var(--red);
+}
+
 /* The page's main number on the logo's blue, like the coloured card of the video. */
 .stat.is-featured {
   border-color: transparent;
@@ -1071,6 +1087,15 @@ button {
 .stat.is-featured .stat-label,
 .stat.is-featured .stat-detail {
   color: rgb(255 255 255 / 84%);
+}
+
+/* On the blue, green and red would not read: the arrow says it, on a light band. */
+.stat.is-featured .stat-trend {
+  justify-self: start;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 16%);
+  color: #fff;
 }
 
 .stat.is-featured .stat-icon {
@@ -1740,6 +1765,14 @@ body.map-full-open {
 .section-tab:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--blue) 30%, transparent);
   outline-offset: 1px;
+}
+
+/* On a phone the four parts of Gastos y finanzas fit without scrolling. */
+@media (max-width: 560px) {
+  .section-tab {
+    padding: 7px 11px;
+    font-size: 13.5px;
+  }
 }
 
 .unit {
@@ -3878,6 +3911,161 @@ button.fr-open {
 
 .metrics-table .is-unnamed td {
   color: var(--muted);
+}
+
+/* Ganancia (second delivery of part 12b): the way to the month's profit, a loss in red, the chosen month marked. */
+.pf-steps {
+  min-width: 520px;
+}
+
+.pf-steps td:first-child {
+  max-width: none;
+  white-space: normal;
+}
+
+.pf-step {
+  display: block;
+  font-weight: 600;
+}
+
+.pf-source {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: normal;
+}
+
+.pf-steps .is-total td {
+  background: var(--grey-bg);
+  font-weight: 700;
+}
+
+.metrics-table .is-loss {
+  color: var(--red);
+}
+
+.metrics-table .is-chosen td {
+  background: var(--blue-bg);
+}
+
+.pf-month-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}
+
+/* The freight simulator: the form beside its result on a computer, one under the other on a phone. */
+.sim-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 18px;
+}
+
+@media (max-width: 900px) {
+  .sim-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.sim-grid .card-title {
+  margin-bottom: 14px;
+}
+
+.sim-truck {
+  grid-column: 1 / -1;
+}
+
+.sim-grid .field {
+  min-width: 0;
+}
+
+/* A number with its unit inside the box: «km», «$», «%». */
+.input-unit {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-unit input {
+  flex: 1;
+  min-width: 0;
+  padding-right: 52px;
+}
+
+.input-unit span {
+  position: absolute;
+  right: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 620;
+  pointer-events: none;
+}
+
+.sim-clear {
+  margin-top: 8px;
+}
+
+.sim-price {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 14px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: var(--featured);
+  color: #fff;
+}
+
+.sim-price span,
+.sim-price small {
+  color: rgb(255 255 255 / 84%);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sim-price strong {
+  font-size: 34px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.sim-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.sim-table th,
+.sim-table td {
+  padding: 9px 4px;
+  border-top: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.sim-table th {
+  font-weight: 600;
+  text-align: left;
+}
+
+.sim-table th small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.sim-table td {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sim-table .is-total th,
+.sim-table .is-total td {
+  font-weight: 700;
 }
 
 .metrics-table .sort {

@@ -101,7 +101,9 @@ export function monthBefore(month: string, today: string): Before {
  * before up to the same day, the month before against the one before it, the last 30 or 90 days against the ones before,
  * this year against the last one up to the same day, and some dates against as many days before. Null for «Todo».
  */
-export function periodBefore(kind: 'mes' | 'mes-anterior' | '30' | '90' | 'anio' | 'fechas' | 'todo', range: { from: string; to: string } | null, today: string): Before | null {
+export type PeriodName = 'mes' | 'mes-anterior' | '30' | '90' | 'anio' | 'fechas' | 'todo';
+
+export function periodBefore(kind: PeriodName, range: { from: string; to: string } | null, today: string): Before | null {
   if (kind === 'todo' || range === null || range.to < range.from) return null;
   if (kind === 'mes') return monthBefore(firstOfMonth(today), today);
   if (kind === 'mes-anterior') return monthBefore(range.from, today);

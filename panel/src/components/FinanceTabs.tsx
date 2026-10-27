@@ -1,10 +1,12 @@
-// The parts of Gastos y finanzas, as a switch under its title: the expenses and the clients' accounts. The profit and the
-// freight simulator join them in the second delivery of part 12b.
+// The parts of Gastos y finanzas, as a switch under its title: the expenses, the clients' accounts, the profit and the
+// freight simulator.
 import { NavLink } from 'react-router';
 
 const TABS = [
   { to: '/finanzas', label: 'Gastos', end: true },
   { to: '/finanzas/cobros', label: 'Cobros', end: false },
+  { to: '/finanzas/ganancia', label: 'Ganancia', end: false },
+  { to: '/finanzas/simulador', label: 'Simulador', end: false },
 ] as const;
 
 export function FinanceTabs() {
