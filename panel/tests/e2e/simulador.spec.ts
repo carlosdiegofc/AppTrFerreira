@@ -53,3 +53,19 @@ test('calcula el costo y el precio de un flete, con el margen sobre el costo', a
   await expect(page.getByLabel('Camión')).toHaveValue('');
   await expect(result).toContainText('Para calcularlo, escribí los kilómetros, el consumo y el precio del gasoil.');
 });
+
+test('un camión sin consumo no se queda con el del camión anterior, pero sí con el escrito a mano', async ({ page }) => {
+  await openSimulador(page);
+  const truck = page.getByLabel('Camión');
+  const consumption = page.getByLabel('Consumo');
+  await truck.selectOption({ label: 'Ford Cargo 1722 · JKL3456' });
+  await expect(consumption).toHaveValue('3');
+  // The Scania has no tank in Combustible yet: the Ford's consumption goes away with the Ford.
+  await truck.selectOption({ label: 'Scania R450 · DEF5678' });
+  await expect(consumption).toHaveValue('');
+  await expect(page.getByText('Todavía no tiene un consumo: escribilo abajo, o cargalo en Combustible, en «Tanques».')).toBeVisible();
+  // One typed by hand stays.
+  await consumption.fill('2,8');
+  await truck.selectOption({ label: 'Mercedes Benz Actros · GHI9012' });
+  await expect(consumption).toHaveValue('2,8');
+});

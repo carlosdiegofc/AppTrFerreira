@@ -9,6 +9,7 @@ import { CatalogNote, Empty, ErrorNote, PageHead, RefreshButton, Skeleton, Stale
 import { useBilledTrips, useFuel, useNow, useTripList } from '../data/hooks';
 import type { MetricsFormat } from '../exports/metrics';
 import { moneyTrend, type PeriodName, periodBefore, trend } from '../lib/change';
+import { tripDay } from '../lib/clients';
 import { ago, dayInZone, firstOfMonth, firstOfNextMonth, formatDay, startOfDay } from '../lib/dates';
 import { truckLabel } from '../lib/fleet';
 import { count, decimal, money, number, percent } from '../lib/format';
@@ -278,6 +279,12 @@ export function Metricas() {
     () => (before && previous.query.data !== undefined && fuel.query.data !== undefined ? summarize(previous.trips, fuelInPeriod(fuel.receipts, before.from, before.to), view.by).total : null),
     [before, previous.query.data, previous.trips, fuel.query.data, fuel.receipts, view.by],
   );
+  // A period that goes on after today compares only up to today, as the period before is cut on the same day.
+  const soFar = useMemo(
+    () => (before && before.upTo < to ? summarize(trips.filter((t) => (tripDay(t) ?? from) <= before.upTo), fuelInPeriod(fuel.receipts, from, before.upTo), view.by).total : null),
+    [before, to, trips, from, fuel.receipts, view.by],
+  );
+  const compared = soFar ?? total;
   const fleetPer100 = litersPer100(total);
   const share = loadedShare(total);
   const noFuel = fuel.query.data === undefined;
@@ -390,7 +397,7 @@ export function Metricas() {
               label="Kilómetros del GPS"
               value={km(total.gpsKm)}
               detail={`${plural(total.trips, 'viaje', 'viajes')}${share === null ? '' : ` · ${percent(share)} con carga`}`}
-              trend={before && prior ? trend(total.gpsKm, prior.gpsKm, before.than, 'neither') : null}
+              trend={before && prior ? trend(compared.gpsKm, prior.gpsKm, before.than, 'neither') : null}
               tone="blue"
               icon="route"
             />
@@ -398,7 +405,7 @@ export function Metricas() {
               label="Facturado"
               value={<Lines parts={moneyParts(total.billed)} empty="$ 0" />}
               detail={total.trips === 0 ? 'Sin viajes en el período' : total.unbilled > 0 ? `Falta el importe de ${plural(total.unbilled, 'viaje', 'viajes')}` : 'Todos los viajes con carga tienen importe'}
-              trend={before && prior ? moneyTrend(total.billed, prior.billed, before.than, 'up') : null}
+              trend={before && prior ? moneyTrend(compared.billed, prior.billed, before.than, 'up') : null}
               tone={total.unbilled > 0 ? 'amber' : 'green'}
               icon="money"
             />
@@ -406,7 +413,7 @@ export function Metricas() {
               label="Combustible"
               value={noFuel ? '—' : <Lines parts={moneyParts(total.fuel)} empty="$ 0" />}
               detail={noFuel ? 'Sin leer las boletas' : `${decimal(total.liters, 1)} litros`}
-              trend={before && prior ? moneyTrend(total.fuel, prior.fuel, before.than, 'down') : null}
+              trend={before && prior ? moneyTrend(compared.fuel, prior.fuel, before.than, 'down') : null}
               tone="grey"
               icon="fuel"
             />

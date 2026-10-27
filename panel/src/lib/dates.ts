@@ -85,6 +85,11 @@ export function daysBetween(a: string, b: string): number {
   return Math.round((utcMidnight(b) - utcMidnight(a)) / 86_400_000);
 }
 
+/** Whether a text is a real calendar day ("2026-10-15"): not "2026-02-30", nor what a wrong link brought. */
+export function isDay(text: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) && new Date(utcMidnight(text)).toISOString().slice(0, 10) === text;
+}
+
 export function firstOfMonth(day: string): string {
   return day.slice(0, 8) + '01';
 }

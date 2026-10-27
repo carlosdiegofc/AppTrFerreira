@@ -29,6 +29,8 @@ export function Simulador() {
   const tanks = useTanks();
   const [values, setValues] = useState<SimulatorValues>(EMPTY_SIMULATOR);
   const [truck, setTruck] = useState('');
+  // The consumption the chosen truck brought: choosing one without it takes it away, but not one typed by hand.
+  const [brought, setBrought] = useState<string | null>(null);
   const { quote, errors } = simulate(values);
   const set = (field: SimulatorField, value: string) => setValues((v) => ({ ...v, [field]: value }));
 
@@ -50,7 +52,15 @@ export function Simulador() {
   const chooseTruck = (key: string) => {
     setTruck(key);
     const t = trucks.find((x) => x.key === key);
-    if (t?.consumption) set('kmPerLiter', typed(t.consumption.km));
+    const value = t?.consumption ? typed(t.consumption.km) : null;
+    if (value !== null) set('kmPerLiter', value);
+    else if (brought !== null && values.kmPerLiter === brought) set('kmPerLiter', '');
+    setBrought(value);
+  };
+  const startAgain = () => {
+    setValues(EMPTY_SIMULATOR);
+    setTruck('');
+    setBrought(null);
   };
 
   const field = (name: SimulatorField, label: string, hint: ReactNode, unit?: string) => {
@@ -134,7 +144,7 @@ export function Simulador() {
             {field('driverPay', 'Lo que se le paga al chofer', 'En pesos, por este viaje.', '$')}
             {field('margin', 'Margen', 'Lo que se suma al costo: con 20 %, un costo de $ 1.000 se cobra $ 1.200.', '%')}
           </div>
-          <button type="button" className="btn btn-quiet sim-clear" onClick={() => (setValues(EMPTY_SIMULATOR), setTruck(''))}>
+          <button type="button" className="btn btn-quiet sim-clear" onClick={startAgain}>
             <Icon name="undo" size={18} /> Empezar de nuevo
           </button>
         </section>

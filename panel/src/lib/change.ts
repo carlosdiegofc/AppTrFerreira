@@ -2,7 +2,7 @@
 // part 12b): «↑ 6 % más que setiembre». The period before has the same length: a month going on is compared with the
 // same days of the month before, the last 30 days with the 30 before them. Pesos and dollars change each on its own.
 // Pure functions.
-import { addDays, daysBetween, firstOfMonth } from './dates';
+import { addDays, daysBetween, firstOfMonth, firstOfNextMonth, isDay } from './dates';
 import { monthLabel } from './drivers';
 import { count } from './format';
 
@@ -75,6 +75,11 @@ export interface Before {
   from: string;
   to: string;
   than: string;
+  /**
+   * The last day of the period shown that goes into the change: today at most, as the period before is cut on the same
+   * day. What is dated later (a receipt with a wrong date) does not count in it.
+   */
+  upTo: string;
 }
 
 /** The same day of the month before, or its last day when it is shorter (31/03 → 28/02). */
@@ -92,19 +97,21 @@ function sameDayMonthBefore(day: string): string {
 export function monthBefore(month: string, today: string): Before {
   const first = firstOfMonth(addDays(month, -1));
   const name = monthLabel(first).replace(/ de \d+$/, '');
-  if (firstOfMonth(today) === month) return { from: first, to: sameDayMonthBefore(today), than: `a esta altura de ${name}` };
-  return { from: first, to: addDays(month, -1), than: name };
+  if (firstOfMonth(today) === month) return { from: first, to: sameDayMonthBefore(today), than: `a esta altura de ${name}`, upTo: today };
+  return { from: first, to: addDays(month, -1), than: name, upTo: addDays(firstOfNextMonth(month), -1) };
 }
 
 /**
  * The period before one of Gastos y finanzas, Combustible and Métricas, of the same length: this month against the month
  * before up to the same day, the month before against the one before it, the last 30 or 90 days against the ones before,
- * this year against the last one up to the same day, and some dates against as many days before. Null for «Todo».
+ * this year against the last one up to the same day, and some dates against as many days before (up to the same day of
+ * them, while the dates go on). Null for «Todo», and for dates that are not dates or have not started yet.
  */
 export type PeriodName = 'mes' | 'mes-anterior' | '30' | '90' | 'anio' | 'fechas' | 'todo';
 
 export function periodBefore(kind: PeriodName, range: { from: string; to: string } | null, today: string): Before | null {
-  if (kind === 'todo' || range === null || range.to < range.from) return null;
+  // A link can bring anything as dates.
+  if (kind === 'todo' || range === null || !isDay(range.from) || !isDay(range.to) || range.to < range.from) return null;
   if (kind === 'mes') return monthBefore(firstOfMonth(today), today);
   if (kind === 'mes-anterior') return monthBefore(range.from, today);
   if (kind === 'anio') {
@@ -112,8 +119,12 @@ export function periodBefore(kind: PeriodName, range: { from: string; to: string
     const sameDay = `${year}${today.slice(4)}`;
     // 29/02 of a leap year goes against 28/02.
     const to = sameDay.endsWith('-02-29') ? `${year}-02-28` : sameDay;
-    return { from: `${year}-01-01`, to, than: 'a esta altura del año pasado' };
+    return { from: `${year}-01-01`, to, than: 'a esta altura del año pasado', upTo: today };
   }
   const days = daysBetween(range.from, range.to) + 1;
-  return { from: addDays(range.from, -days), to: addDays(range.from, -1), than: days === 1 ? 'el día anterior' : `los ${count(days)} días anteriores` };
+  const from = addDays(range.from, -days);
+  if (range.to <= today) return { from, to: addDays(range.from, -1), than: days === 1 ? 'el día anterior' : `los ${count(days)} días anteriores`, upTo: range.to };
+  // Dates that go on after today: up to today, against as many days of the ones before, as for the month going on.
+  if (today < range.from) return null;
+  return { from, to: addDays(from, daysBetween(range.from, today)), than: `a esta altura de los ${count(days)} días anteriores`, upTo: today };
 }

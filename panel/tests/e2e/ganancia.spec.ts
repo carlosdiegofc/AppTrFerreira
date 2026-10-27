@@ -94,6 +94,29 @@ test('lo que dejó el mes: cada camión, cada viaje y la empresa, en pesos y en 
   await expect(page.getByRole('button', { name: 'Mes siguiente' })).toBeDisabled();
 });
 
+test('una boleta sin importe no suma, y la página lo dice', async ({ page }) => {
+  // Carla's receipt of 10/10 in the Mercedes, as if it had come without its amount.
+  await page.route('**/rest/v1/trf_driver_fuel_receipts*', async (route) => {
+    const response = await route.fetch();
+    const rows = (await response.json()) as { id: string; total: number | null }[];
+    await route.fulfill({ response, json: rows.map((r) => (r.id === '40000000-0000-4000-8000-000000000004' ? { ...r, total: null } : r)) });
+  });
+  await openGanancia(page);
+  await expect(page.getByText('Una boleta de combustible del mes no tiene importe: no suma hasta completarla en Combustible.')).toBeVisible();
+  await expect(row(page, /Cómo se llega a la ganancia de octubre de 2026/, /^− ?Combustible/)).toContainText('$ 26.450');
+  await expect(row(page, /Ganancia de cada camión en octubre de 2026/, 'Mercedes Benz Actros')).toContainText('1 boleta sin importe');
+});
+
+test('el mes en curso cuenta hasta hoy: lo que tiene fecha posterior todavía no suma', async ({ page }) => {
+  // The browser two days before the seed: the receipts of 15/10 are dated after «today», like a receipt with a wrong date.
+  await page.clock.setFixedTime(new Date('2026-10-13T15:00:00Z'));
+  await openGanancia(page);
+  // Diego's receipt of the 13th and Carla's of the 10th; not Ana's nor Bruno's of the 15th.
+  const fuel = row(page, /Cómo se llega a la ganancia de octubre de 2026/, /^− ?Combustible/);
+  await expect(fuel).toContainText('$ 23.100');
+  await expect(fuel).not.toContainText('US$');
+});
+
 test('un viaje lleva a su página', async ({ page }) => {
   await openGanancia(page);
   await row(page, /Ganancia de cada viaje/, 'Orden 24129').getByRole('link').click();
@@ -109,4 +132,12 @@ test('si falta leer algo, no muestra una ganancia hecha con una parte', async ({
   await page.unroute('**/rest/v1/trf_road_events*');
   await error.getByRole('button', { name: 'Reintentar' }).click();
   await expect(tile(page, 'Ganancia del mes, hasta hoy')).toContainText('−$ 64.625,50');
+});
+
+test('sin el catálogo de la flota tampoco muestra una ganancia', async ({ page }) => {
+  // Without it, a truck written in an older way would make a row of its own.
+  await page.route('**/rest/v1/trf_mobile_catalog*', (route) => route.fulfill({ status: 500, json: { message: 'Falla de prueba' } }));
+  await openGanancia(page);
+  await expect(page.getByRole('alert').filter({ hasText: 'No se pudo leer todo lo que hace falta para la ganancia' })).toBeVisible();
+  await expect(page.locator('.stat')).toHaveCount(0);
 });

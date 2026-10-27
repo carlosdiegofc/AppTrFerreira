@@ -1,6 +1,6 @@
 // The change of the big numbers against the period before, of the same length (the «vidrio» design, with the second
-// delivery of part 12b): in Combustible, Gastos and Métricas, with dates whose period before has the seed's data.
-// Read only.
+// delivery of part 12b): in Combustible, Gastos and Métricas, with dates whose period before has the seed's data; dates
+// that go on after today compare only up to today, and dates that are not dates compare nothing. Read only.
 import { expect, type Page, test } from '@playwright/test';
 import { prepare, signIn } from './helpers';
 
@@ -23,6 +23,33 @@ test('Combustible compara lo cargado y los litros con los días anteriores', asy
   await page.goto('./#/combustible?periodo=todo');
   await expect(tile(page, 'Cargado en el período')).toContainText('$ 44.050');
   await expect(tile(page, 'Cargado en el período').locator('.stat-trend')).toHaveCount(0);
+});
+
+test('unas fechas que siguen después de hoy comparan solo hasta hoy', async ({ page }) => {
+  // The browser two days before the seed: the receipts of 15/10 are dated after «today», like a receipt with a wrong date.
+  await page.clock.setFixedTime(new Date('2026-10-13T15:00:00Z'));
+  await signIn(page, 'dueno@ejemplo.uy');
+  // 18 days from today: the period shows the receipts of the 15th, but the change takes today against the same day of
+  // the 18 days before, which had Ana's receipt of 25/09.
+  await page.goto('./#/combustible?periodo=fechas&desde=2026-10-13&hasta=2026-10-30');
+  const loaded = tile(page, 'Cargado en el período');
+  await expect(loaded).toContainText('$ 26.450');
+  await expect(loaded).toContainText('US$ 310');
+  await expect(loaded.locator('.stat-trend')).toHaveText('↑ 50 % más que a esta altura de los 18 días anteriores');
+  await expect(tile(page, 'Litros en el período').locator('.stat-trend')).toHaveText('↑ 50 % más que a esta altura de los 18 días anteriores');
+});
+
+test('unas fechas de un enlace que no son fechas no rompen la página ni comparan', async ({ page }) => {
+  await signIn(page, 'dueno@ejemplo.uy');
+  for (const [path, label] of [
+    ['combustible', 'Cargado en el período'],
+    ['finanzas', 'Gastado en el período'],
+    ['finanzas/cobros', 'Facturado en el período'],
+  ] as const) {
+    await page.goto(`./#/${path}?periodo=fechas&desde=aaa&hasta=zzz`);
+    await expect(tile(page, label)).toContainText('$ 0');
+    await expect(tile(page, label).locator('.stat-trend')).toHaveCount(0);
+  }
 });
 
 test('Gastos compara lo gastado con los días anteriores', async ({ page }) => {

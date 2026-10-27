@@ -83,11 +83,13 @@ Las pruebas corren con «reducir movimiento», así los mapas no animan y los ca
 - cómo se llega: lo facturado, el combustible, los peajes (el paso del Ford con su tarifa; el del Volvo sin tarifa no suma y se avisa), los gastos, los generales, el sueldo de Ana y su viático;
 - cada camión (el lavado del semirremolque va con el Volvo que lo lleva), cada viaje con lo que dejó (el de la papelera no está) y su página, y los últimos 12 meses con el sueldo de Ramón hasta que dejó de trabajar;
 - setiembre entero contra agosto, y volver al mes en curso;
-- que si no puede leer algo, no muestra una ganancia hecha con una parte, y se puede reintentar.
+- una boleta sin importe (la respuesta de la base cambiada en la prueba): no suma, se avisa y su camión lo dice;
+- con el navegador dos días antes, que el mes en curso cuenta hasta hoy: las boletas del 15/10 todavía no suman;
+- que si no puede leer algo, ni el catálogo de la flota, no muestra una ganancia hecha con una parte, y se puede reintentar.
 
-`simulador.spec.ts` revisa el simulador de fletes: el consumo del camión elegido, el precio de la última boleta, el costo y el precio con el margen, un dato mal escrito y empezar de nuevo.
+`simulador.spec.ts` revisa el simulador de fletes: el consumo del camión elegido, el precio de la última boleta, el costo y el precio con el margen, un dato mal escrito y empezar de nuevo; y que un camión sin consumo no se queda con el del anterior, pero sí con el escrito a mano.
 
-`variacion.spec.ts` revisa la variación de los números grandes contra el período anterior del mismo largo, en Combustible, Gastos y Métricas, y que «Todo» no tiene con qué compararse.
+`variacion.spec.ts` revisa la variación de los números grandes contra el período anterior del mismo largo, en Combustible, Gastos y Métricas, y que «Todo» no tiene con qué compararse; con el navegador dos días antes, que unas fechas que siguen después de hoy comparan solo hasta hoy; y que unas fechas de un enlace que no son fechas no rompen Combustible, Gastos ni Cobros.
 
 `barra.spec.ts` revisa la barra de arriba y el menú de íconos del diseño del 26/10/2026:
 - el buscador:

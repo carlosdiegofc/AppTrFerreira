@@ -200,6 +200,9 @@ export function Combustible() {
   // The period before, of the same length, for «↑ 6 % más que setiembre».
   const before = useMemo(() => (from && to ? periodBefore(period.value as PeriodName, { from, to }, today) : null), [period.value, from, to, today]);
   const totalsBefore = useMemo(() => (before ? totals(filterReceipts(receipts, { from: before.from, to: before.to })) : null), [receipts, before]);
+  // A period that goes on after today compares only up to today, as the period before is cut on the same day: a receipt
+  // dated later shows in the period but not in the change.
+  const totalsSoFar = useMemo(() => (before && to && before.upTo < to ? totals(filterReceipts(receipts, { from, to: before.upTo })) : null), [receipts, before, from, to]);
   const { owed, credit } = balances(stations);
   const missing = receipts.filter((r) => !r.archived && r.total === null).length;
   const future = receipts.filter((r) => !r.archived && isFuture(r, today)).length;
@@ -290,14 +293,14 @@ export function Combustible() {
             label="Cargado en el período"
             value={badRange ? '—' : <Lines parts={amountParts(periodTotals.amounts, '$ 0')} />}
             detail={badRange ? 'Revisá las fechas' : `${count(periodTotals.receipts)} boleta${periodTotals.receipts === 1 ? '' : 's'}`}
-            trend={before && totalsBefore ? moneyTrend(periodTotals.amounts, totalsBefore.amounts, before.than, 'down') : null}
+            trend={before && totalsBefore ? moneyTrend((totalsSoFar ?? periodTotals).amounts, totalsBefore.amounts, before.than, 'down') : null}
             tone="blue"
             icon="fuel"
           />
           <Stat
             label="Litros en el período"
             value={badRange ? '—' : decimal(periodTotals.liters, 1)}
-            trend={before && totalsBefore ? trend(periodTotals.liters, totalsBefore.liters, before.than, 'neither') : null}
+            trend={before && totalsBefore ? trend((totalsSoFar ?? periodTotals).liters, totalsBefore.liters, before.than, 'neither') : null}
             tone="grey"
             icon="chart"
           />

@@ -40,6 +40,9 @@ const Lines = ({ m, sign = false }: { m: Money; sign?: boolean }) => (
 const isLoss = (m: Money) => m.UYU < 0 || m.USD < 0;
 const tollMoney = (pesos: number): Money => ({ UYU: pesos, USD: 0 });
 
+/** Under the fuel: the receipts that add nothing yet. */
+const FuelMissing = ({ n }: { n: number }) => (n > 0 ? <small className="pf-source">{plural(n, 'boleta sin importe', 'boletas sin importe')}</small> : null);
+
 /** The months to choose from: the last two years, the newest first. */
 const choices = (today: string) => monthsUpTo(today, 24).reverse();
 
@@ -126,6 +129,7 @@ function TruckRow({ t, foot = false }: { t: TruckMonth; foot?: boolean }) {
       </td>
       <td className="num">
         <Lines m={t.fuel} />
+        <FuelMissing n={t.fuelMissing} />
       </td>
       <td className="num">{t.tolls === 0 ? '$ 0' : money(t.tolls, 'UYU')}</td>
       <td className="num">
@@ -236,6 +240,7 @@ function Trips({ list, month }: { list: TripProfit[]; month: string }) {
                     <td className="num">{p.missing ? <Pill tone="red">Sin importe</Pill> : p.trip.active && p.billed.UYU === 0 && p.billed.USD === 0 ? <Pill tone="blue">En curso</Pill> : <Lines m={p.billed} />}</td>
                     <td className="num">
                       <Lines m={p.fuel} />
+                      <FuelMissing n={p.fuelMissing} />
                     </td>
                     <td className="num">
                       {p.tolls === 0 ? '$ 0' : money(p.tolls, 'UYU')}
@@ -332,15 +337,17 @@ export function Ganancia() {
   const current = firstOfMonth(today);
   const before = monthBefore(month, today);
 
-  const all = [reads.trips, reads.fuel, reads.tolls, reads.expenses, reads.vehicles, reads.drivers];
-  const loading = all.some((r) => r.isLoading) || reads.catalog.isLoading;
+  // The catalog too: without it, a truck written in an older way would make a row of its own.
+  const all = [reads.trips, reads.fuel, reads.tolls, reads.expenses, reads.vehicles, reads.drivers, reads.catalog];
+  const loading = all.some((r) => r.isLoading);
   const failed = all.find((r) => r.error && r.data === undefined);
   const ready = !loading && !failed && all.every((r) => r.data !== undefined);
   const stale = all.some((r) => r.error && r.data !== undefined);
   const loadedAt = Math.min(...all.map((r) => r.dataUpdatedAt || Infinity));
   const refresh = () => void Promise.all(all.map((r) => r.refetch()));
 
-  const months = useMemo(() => (ready ? monthlyProfit(input, monthsUpTo(month, 12)) : []), [ready, input, month]);
+  // The month going on, up to today: what is dated later (a receipt with a wrong date) does not count yet.
+  const months = useMemo(() => (ready ? monthlyProfit(input, monthsUpTo(month, 12), new Map([[current, today]])) : []), [ready, input, month, current, today]);
   // The month going on goes against the same days of the month before; a past one, against the whole month before.
   const [prev] = useMemo(() => (ready ? monthlyProfit(input, [before.from], new Map([[before.from, before.to]])) : []), [ready, input, before.from, before.to]);
   const chosen = months.at(-1);
@@ -350,12 +357,12 @@ export function Ganancia() {
         ? tripProfits(
             input.trips.filter((t) => {
               const day = tripDay(t);
-              return day !== null && firstOfMonth(day) === month;
+              return day !== null && firstOfMonth(day) === month && day <= today;
             }),
             input,
           ).sort((a, b) => (a.trip.departureAt ?? '').localeCompare(b.trip.departureAt ?? ''))
         : [],
-    [ready, input, month],
+    [ready, input, month, today],
   );
 
   const choose = (m: string) => set({ mes: m === current ? null : m.slice(0, 7) });
@@ -369,6 +376,15 @@ export function Ganancia() {
     notes.push(
       <p key="missing" className="notice notice-warn">
         <Icon name="warning" size={18} /> {chosen.fleet.missing === 1 ? 'Un viaje terminado no tiene importe: lo que dejó no se sabe hasta completarlo en Viajes.' : `${count(chosen.fleet.missing)} viajes terminados no tienen importe: lo que dejaron no se sabe hasta completarlos en Viajes.`}
+      </p>,
+    );
+  if (chosen && chosen.fleet.fuelMissing > 0)
+    notes.push(
+      <p key="fuel" className="notice notice-warn">
+        <Icon name="warning" size={18} />{' '}
+        {chosen.fleet.fuelMissing === 1
+          ? 'Una boleta de combustible del mes no tiene importe: no suma hasta completarla en Combustible.'
+          : `${count(chosen.fleet.fuelMissing)} boletas de combustible del mes no tienen importe: no suman hasta completarlas en Combustible.`}
       </p>,
     );
   if (chosen && chosen.fleet.tollsWithoutRate > 0)
@@ -445,7 +461,7 @@ export function Ganancia() {
           <Trips list={trips} month={month} />
           <Months list={months} chosen={month} onChoose={choose} />
           <p className="note">
-            En el mes, cada cosa cuenta en su día: el viaje en el de su salida, la boleta en el suyo, el peaje en el del paso y el gasto en el que se hizo. El gasto de un viaje va con el camión de ese viaje, y el de un acoplado con el camión que lo llevaba ese día, según Flota. Los sueldos no se reparten entre los camiones: se restan en el total de la empresa. Los viajes en la papelera, las boletas en la papelera y los gastos anulados no cuentan.
+            En el mes, cada cosa cuenta en su día: el viaje en el de su salida, la boleta en el suyo, el peaje en el del paso y el gasto en el que se hizo. El gasto de un viaje va con el camión de ese viaje, y el de un acoplado con el camión que lo llevaba ese día, según Flota. Los sueldos no se reparten entre los camiones: se restan en el total de la empresa. En el mes en curso, lo que tiene fecha posterior a hoy todavía no cuenta. Los viajes en la papelera, las boletas en la papelera y los gastos anulados no cuentan.
           </p>
         </>
       )}

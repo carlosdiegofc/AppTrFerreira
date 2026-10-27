@@ -167,6 +167,8 @@ export function Finanzas() {
   // The same filters in the period before, of the same length, for «↑ 6 % más que setiembre».
   const before = useMemo(() => (from && to ? periodBefore(period.value, { from, to }, today) : null), [period.value, from, to, today]);
   const spentBefore = useMemo(() => (before ? expenseTotals(filterExpenses(expenses, { from: before.from, to: before.to, category, target }, names)).amounts : null), [expenses, before, category, target, names]);
+  // A period that goes on after today compares only up to today, as the period before is cut on the same day.
+  const spentSoFar = useMemo(() => (before && to && before.upTo < to ? expenseTotals(filterExpenses(expenses, { from, to: before.upTo, category, target }, names)).amounts : null), [expenses, before, from, to, category, target, names]);
   const kinds = useMemo(() => byCategory(inPeriod), [inPeriod]);
   const places = useMemo(() => byTarget(inPeriod, names), [inPeriod, names]);
   const fleet = expenseTotals(inPeriod.filter((e) => e.target === 'truck' || e.target === 'trailer'));
@@ -261,7 +263,7 @@ export function Finanzas() {
             label="Gastado en el período"
             value={badRange ? '—' : <Lines parts={amountParts(totals.amounts, '$ 0')} />}
             detail={badRange ? 'Revisá las fechas' : `${count(totals.count)} gasto${totals.count === 1 ? '' : 's'}`}
-            trend={before && spentBefore ? moneyTrend(totals.amounts, spentBefore, before.than, 'down') : null}
+            trend={before && spentBefore ? moneyTrend(spentSoFar ?? totals.amounts, spentBefore, before.than, 'down') : null}
             tone="blue"
             icon="money"
           />

@@ -50,6 +50,8 @@ export function tollPassageFromRow(r: TollRow): TollPassage | null {
 /** What a trip, a truck or the fleet spent: the fuel and the expenses as declared, the tolls as estimated. */
 export interface Costs {
   fuel: Money;
+  /** Receipts that still have no amount: they add nothing until they are completed in Combustible. */
+  fuelMissing: number;
   /** Pesos: the passages with the truck's rate. */
   tolls: number;
   /** Passages that had no rate: they add nothing until it is loaded. */
@@ -57,7 +59,7 @@ export interface Costs {
   expenses: Money;
 }
 
-const noCosts = (): Costs => ({ fuel: noMoney(), tolls: 0, tollsWithoutRate: 0, expenses: noMoney() });
+const noCosts = (): Costs => ({ fuel: noMoney(), fuelMissing: 0, tolls: 0, tollsWithoutRate: 0, expenses: noMoney() });
 
 /** Billed minus the costs, in each currency. */
 export function resultOf(billed: Money, c: Costs): Money {
@@ -91,7 +93,7 @@ export interface TripCosts {
 export function tripProfits(trips: readonly Trip[], { receipts, passages, expenses }: TripCosts): TripProfit[] {
   const fuel = new Map<string, Receipt[]>();
   for (const r of receipts) {
-    if (r.archived || r.tripId === null || !r.total) continue;
+    if (r.archived || r.tripId === null) continue;
     fuel.set(r.tripId, [...(fuel.get(r.tripId) ?? []), r]);
   }
   const tolls = new Map<string, TollPassage[]>();
@@ -108,7 +110,10 @@ export function tripProfits(trips: readonly Trip[], { receipts, passages, expens
       const amount = billedAmount(trip);
       if (amount !== null) addTo(billed, trip.currency, amount);
       const costs = noCosts();
-      for (const r of trip.appTripId ? (fuel.get(trip.appTripId) ?? []) : []) addTo(costs.fuel, r.currency, r.total as number);
+      for (const r of trip.appTripId ? (fuel.get(trip.appTripId) ?? []) : []) {
+        if (r.total === null) costs.fuelMissing++;
+        else if (r.total) addTo(costs.fuel, r.currency, r.total);
+      }
       for (const p of trip.appTripId ? (tolls.get(trip.appTripId) ?? []) : []) {
         if (p.amount === null) costs.tollsWithoutRate++;
         else costs.tolls = cents(costs.tolls + p.amount);
@@ -235,8 +240,11 @@ export function monthlyProfit(input: ProfitInput, months: readonly string[], unt
     if (missingAmount(t)) row.missing++;
   }
   for (const r of receipts) {
-    if (r.archived || !r.total || !counts(r.date)) continue;
-    addTo(truck(r.date, truckKeyOf(r.vehicle), r.vehicle).fuel, r.currency, r.total);
+    if (r.archived || !counts(r.date)) continue;
+    const row = truck(r.date, truckKeyOf(r.vehicle), r.vehicle);
+    // A receipt without its amount adds nothing, and the page says so, as Combustible does.
+    if (r.total === null) row.fuelMissing++;
+    else if (r.total) addTo(row.fuel, r.currency, r.total);
   }
   for (const p of passages) {
     if (!counts(p.day)) continue;
@@ -269,6 +277,7 @@ export function monthlyProfit(input: ProfitInput, months: readonly string[], unt
       missing: list.reduce((n, t) => n + t.missing, 0),
       billed: sumMoney(list.map((t) => t.billed)),
       fuel: sumMoney(list.map((t) => t.fuel)),
+      fuelMissing: list.reduce((n, t) => n + t.fuelMissing, 0),
       tolls: cents(list.reduce((n, t) => n + t.tolls, 0)),
       tollsWithoutRate: list.reduce((n, t) => n + t.tollsWithoutRate, 0),
       expenses: sumMoney(list.map((t) => t.expenses)),

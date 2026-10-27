@@ -153,6 +153,8 @@ export function Cobros() {
   // The period before, of the same length, for «↑ 6 % más que setiembre».
   const before = useMemo(() => (from && to ? periodBefore(period.value, { from, to }, today) : null), [period.value, from, to, today]);
   const sumsBefore = useMemo(() => (before ? periodSums(clients, before.from, before.to) : null), [clients, before]);
+  // A period that goes on after today compares only up to today, as the period before is cut on the same day.
+  const sumsSoFar = useMemo(() => (before && to && before.upTo < to ? periodSums(clients, from, before.upTo) : null), [clients, before, from, to]);
   const { owed, credit, owing } = clientBalances(clients);
   const missing = withoutAmount(clients);
   const loose = clients.find((c) => c.key === NO_CLIENT)?.trips.length ?? 0;
@@ -240,7 +242,7 @@ export function Cobros() {
             label="Facturado en el período"
             value={badRange ? '—' : <Lines parts={amountParts(sums.billed, '$ 0')} />}
             detail={badRange ? 'Revisá las fechas' : plural(sums.trips, 'viaje', 'viajes')}
-            trend={before && sumsBefore ? moneyTrend(sums.billed, sumsBefore.billed, before.than, 'up') : null}
+            trend={before && sumsBefore ? moneyTrend((sumsSoFar ?? sums).billed, sumsBefore.billed, before.than, 'up') : null}
             tone="grey"
             icon="route"
           />
@@ -248,7 +250,7 @@ export function Cobros() {
             label="Cobrado en el período"
             value={badRange ? '—' : <Lines parts={amountParts(sums.paid, '$ 0')} />}
             detail={badRange ? 'Revisá las fechas' : plural(sums.payments, 'cobro', 'cobros')}
-            trend={before && sumsBefore ? moneyTrend(sums.paid, sumsBefore.paid, before.than, 'up') : null}
+            trend={before && sumsBefore ? moneyTrend((sumsSoFar ?? sums).paid, sumsBefore.paid, before.than, 'up') : null}
             tone="grey"
             icon="check"
           />

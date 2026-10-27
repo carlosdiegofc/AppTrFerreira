@@ -293,6 +293,29 @@ describe('monthlyProfit', () => {
     expect(oct?.fleet.trips).toBe(2);
     expect(oct?.fleet.missing).toBe(1);
   });
+
+  it('counts the receipts that still need their amount, by truck and for the trip, and they add nothing', () => {
+    const t = trip({ amount: 10000 });
+    const receipts = [
+      receipt({ tripId: t.appTripId, total: null }),
+      receipt({ tripId: t.appTripId, total: 2000 }),
+      receipt({ vehicle: FORD, total: null }),
+      // In the trash, or of another month: not counted.
+      receipt({ total: null, archived: true }),
+      receipt({ date: '2026-11-02', total: null }),
+    ];
+    const [oct] = monthlyProfit(input({ trips: [t], receipts }), ['2026-10-01']);
+    expect(oct?.trucks.map((x) => [x.label, x.fuel.UYU, x.fuelMissing])).toEqual([
+      [FORD, 0, 1],
+      [VOLVO, 2000, 1],
+    ]);
+    expect(oct?.fleet.fuelMissing).toBe(2);
+    expect(oct?.result).toEqual(money(8000));
+    const [p] = tripProfits([t], { receipts, passages: [], expenses: [] });
+    expect(p?.fuel).toEqual(money(2000));
+    expect(p?.fuelMissing).toBe(1);
+    expect(p?.result).toEqual(money(8000));
+  });
 });
 
 describe('helpers', () => {
