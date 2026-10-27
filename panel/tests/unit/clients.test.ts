@@ -298,6 +298,9 @@ describe('formulario de cobros y saldos iniciales', () => {
     const bad = validateCollectionForm('payment', { ...empty, client: 'x'.repeat(201), date: '2026-10-16', amount: '0', method: 'cheque', notes: 'y'.repeat(501) }, today);
     expect(bad.errors).toEqual({ client: 'Hasta 200 letras.', date: 'La fecha no puede ser posterior a hoy.', amount: 'El cobro tiene que ser mayor que cero.', notes: 'Hasta 500 letras.' });
     expect(validateCollectionForm('payment', { ...empty, client: 'Navios', date: today, amount: '100.000.000', method: 'efectivo' }, today).errors.amount).toBe('Es demasiado grande. Revisá el número.');
+    // The database takes days from 2000 on: an older one is said in the form, not refused when saving.
+    expect(validateCollectionForm('payment', { ...empty, client: 'Navios', date: '1999-12-31', amount: '100', method: 'efectivo' }, today).errors).toEqual({ date: 'La fecha no puede ser anterior al 01/01/2000.' });
+    expect(validateCollectionForm('payment', { ...empty, client: 'Navios', date: '2000-01-01', amount: '100', method: 'efectivo' }, today).ok).toBe(true);
     // An opening balance of zero is fine: the account starts that day from nothing. It has no form of payment.
     const zero = validateCollectionForm('opening', { ...empty, client: 'Navios', date: today, amount: '0' }, today);
     expect(zero.ok && zero.payload).toMatchObject({ amount: 0, method: null });

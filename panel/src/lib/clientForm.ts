@@ -7,6 +7,8 @@ import { type Checked, checkDay, checkNumber } from './fuelForm';
 
 /** Longest text each field takes (the database checks them too). */
 export const CLIENT_LIMITS = { client: 200, notes: 500 } as const;
+/** The first day the database takes for a collection or an opening balance. */
+export const CLIENT_FIRST_DAY = '2000-01-01';
 /** The database takes amounts under a hundred million. */
 const MAX_AMOUNT = 99_999_999.99;
 
@@ -63,7 +65,7 @@ export function validateCollectionForm(kind: CollectionKind, v: CollectionFormVa
   const key = clientKey(name);
   if (key === null) errors.client = 'Elegí o escribí el cliente.';
   else if (name.length > CLIENT_LIMITS.client) errors.client = `Hasta ${CLIENT_LIMITS.client} letras.`;
-  const day = checkDay(v.date, today);
+  const day = checkDay(v.date, today) ?? (v.date < CLIENT_FIRST_DAY ? 'La fecha no puede ser anterior al 01/01/2000.' : null);
   if (day) errors.date = day;
   const amount = checkNumber(v.amount, MAX_AMOUNT);
   // The database keeps cents: what is saved is what the form said it would save.

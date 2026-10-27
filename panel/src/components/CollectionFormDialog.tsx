@@ -5,7 +5,7 @@ import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } fr
 import { ConflictError, DataError, describeWriteError } from '../data/api';
 import { useSaveClientMovement, useSetClientMovementDeleted } from '../data/hooks';
 import { type Client, clientKey, type ClientMovement, NO_CLIENT } from '../lib/clients';
-import { CLIENT_LIMITS, type CollectionField, collectionFormChanged, type CollectionFormValues, collectionFormValues, type CollectionKind, clientMovementRow, sameClientMovement, validateCollectionForm } from '../lib/clientForm';
+import { CLIENT_FIRST_DAY, CLIENT_LIMITS, type CollectionField, collectionFormChanged, type CollectionFormValues, collectionFormValues, type CollectionKind, clientMovementRow, sameClientMovement, validateCollectionForm } from '../lib/clientForm';
 import { decimal } from '../lib/format';
 import { type Currency, PAYMENT_METHODS } from '../lib/fuel';
 import { parseNumber } from '../lib/numbers';
@@ -178,7 +178,7 @@ export function CollectionFormDialog({ kind, movement: opened, client, currency,
               </>,
               clientNote,
             )}
-            {field('date', opening ? 'Saldo al día' : 'Fecha del cobro', <input {...fieldProps('date')} type="date" value={values.date} max={today} onChange={(e) => set('date', e.target.value)} />)}
+            {field('date', opening ? 'Saldo al día' : 'Fecha del cobro', <input {...fieldProps('date')} type="date" value={values.date} min={CLIENT_FIRST_DAY} max={today} onChange={(e) => set('date', e.target.value)} />)}
             {opening &&
               field(
                 'side',
