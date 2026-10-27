@@ -184,6 +184,8 @@ test('el costo de un service hecho se anota desde Mantenimiento, uno solo aunque
 
 test('un gasto del viaje desde su página', async ({ page }) => {
   await signIn(page, 'dueno@ejemplo.uy');
+  // Signed in, the panel goes to Inicio: an address typed before that would give way to it.
+  await expect(page).toHaveURL(/#\/inicio$/);
   await page.goto('./#/viajes/web:20000000-0000-4000-8000-000000000001');
   const card = page.locator('.card', { has: page.getByRole('heading', { name: /^Gastos del viaje/ }) });
   await expect(card).toContainText('No hay gastos anotados en este viaje');

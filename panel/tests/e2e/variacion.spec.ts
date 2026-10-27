@@ -8,10 +8,20 @@ test.beforeEach(async ({ page }) => prepare(page));
 
 const tile = (page: Page, label: string) => page.locator('.stat').filter({ has: page.locator('.stat-label', { hasText: new RegExp(`^${label}$`) }) });
 
-test('Combustible compara lo cargado y los litros con los días anteriores', async ({ page }) => {
+/** Signed in, the panel goes from its first address to Inicio: an address typed before that would give way to it. */
+async function signedIn(page: Page) {
   await signIn(page, 'dueno@ejemplo.uy');
+  await expect(page).toHaveURL(/#\/inicio$/);
+}
+
+async function signInAt(page: Page, address: string) {
+  await signedIn(page);
+  await page.goto(address);
+}
+
+test('Combustible compara lo cargado y los litros con los días anteriores', async ({ page }) => {
   // 20 days, against the 20 before them, which had Ana's receipt of 25/09.
-  await page.goto('./#/combustible?periodo=fechas&desde=2026-09-26&hasta=2026-10-15');
+  await signInAt(page, './#/combustible?periodo=fechas&desde=2026-09-26&hasta=2026-10-15');
   const loaded = tile(page, 'Cargado en el período');
   await expect(loaded).toContainText('$ 33.050');
   await expect(loaded.locator('.stat-trend')).toHaveText('↑ 200 % más que los 20 días anteriores, en pesos');
@@ -28,10 +38,9 @@ test('Combustible compara lo cargado y los litros con los días anteriores', asy
 test('unas fechas que siguen después de hoy comparan solo hasta hoy', async ({ page }) => {
   // The browser two days before the seed: the receipts of 15/10 are dated after «today», like a receipt with a wrong date.
   await page.clock.setFixedTime(new Date('2026-10-13T15:00:00Z'));
-  await signIn(page, 'dueno@ejemplo.uy');
   // 18 days from today: the period shows the receipts of the 15th, but the change takes today against the same day of
   // the 18 days before, which had Ana's receipt of 25/09.
-  await page.goto('./#/combustible?periodo=fechas&desde=2026-10-13&hasta=2026-10-30');
+  await signInAt(page, './#/combustible?periodo=fechas&desde=2026-10-13&hasta=2026-10-30');
   const loaded = tile(page, 'Cargado en el período');
   await expect(loaded).toContainText('$ 26.450');
   await expect(loaded).toContainText('US$ 310');
@@ -40,7 +49,7 @@ test('unas fechas que siguen después de hoy comparan solo hasta hoy', async ({ 
 });
 
 test('unas fechas de un enlace que no son fechas no rompen la página ni comparan', async ({ page }) => {
-  await signIn(page, 'dueno@ejemplo.uy');
+  await signedIn(page);
   for (const [path, label] of [
     ['combustible', 'Cargado en el período'],
     ['finanzas', 'Gastado en el período'],
@@ -53,9 +62,8 @@ test('unas fechas de un enlace que no son fechas no rompen la página ni compara
 });
 
 test('Gastos compara lo gastado con los días anteriores', async ({ page }) => {
-  await signIn(page, 'dueno@ejemplo.uy');
   // 24 days, against the 24 before them, which had the Mercedes' road tax of 21/09.
-  await page.goto('./#/finanzas?periodo=fechas&desde=2026-09-22&hasta=2026-10-15');
+  await signInAt(page, './#/finanzas?periodo=fechas&desde=2026-09-22&hasta=2026-10-15');
   const spent = tile(page, 'Gastado en el período');
   await expect(spent).toContainText('$ 21.120');
   await expect(spent).toContainText('US$ 3.350');
@@ -63,9 +71,8 @@ test('Gastos compara lo gastado con los días anteriores', async ({ page }) => {
 });
 
 test('Métricas compara lo facturado y el combustible con los días anteriores', async ({ page }) => {
-  await signIn(page, 'dueno@ejemplo.uy');
   // The last 3 days against the 3 before them: the trip typed by hand of 12/10, in dollars, and Carla's receipt.
-  await page.goto('./#/metricas?periodo=fechas&desde=2026-10-13&hasta=2026-10-15');
+  await signInAt(page, './#/metricas?periodo=fechas&desde=2026-10-13&hasta=2026-10-15');
   await expect(tile(page, 'Combustible').locator('.stat-trend')).toHaveText('↑ 301 % más que los 3 días anteriores, en pesos');
   await expect(tile(page, 'Facturado').locator('.stat-trend')).toHaveText('↓ 100 % menos que los 3 días anteriores, en dólares');
   await expect(tile(page, 'Facturado').locator('.stat-trend')).toHaveClass(/is-red/);
