@@ -100,14 +100,20 @@ Va armándose al costado del panel actual y lo reemplaza sección por sección.
      - [x] El costo de un service hecho se anota como gasto, desde Mantenimiento.
      - [x] El panel nuevo pasa a la dirección principal: el actual queda en `/anterior/`, y `/nuevo/` lleva a la principal para que no se rompan los enlaces guardados.
      - [x] Publicación el 26/10/2026: respaldo completo de estructura y datos (00:52 UTC), probado restaurándolo y con la 0011 aplicada sobre esa copia, y entregado al dueño fuera del repositorio; migración [`0011_gastos.sql`](../supabase/migrations/0011_gastos.sql) aplicada en producción (01:05 UTC), con los datos que ya estaban sin cambios; panel publicado en la dirección principal, con el anterior en `/anterior/` (despliegue #16, commit 9e15a62). La app no cambia.
-   - 12b. [ ] Cobros, ganancia y simulador de fletes:
-     - La cuenta de cada cliente, como la de cada estación de combustible: lo facturado en sus viajes suma, los cobros restan, con un saldo inicial con fecha. Los clientes salen del nombre escrito en los viajes.
-     - La ganancia de cada viaje, de cada camión por mes y de la empresa por mes: lo facturado menos el combustible, los peajes y los gastos, y los sueldos solo en el total de la empresa. Pesos y dólares por separado, y la pantalla dice qué es medido, declarado o estimado.
-     - El simulador de fletes: con el camión, los kilómetros con carga y de vuelta y los peajes de la ruta, calcula el costo y el precio con el margen que se elija. No guarda las cotizaciones.
+   - 12b. [ ] Cobros, ganancia y simulador de fletes, en dos entregas (27/10/2026):
+     - [ ] Cobros: la cuenta de cada cliente, como la de cada estación de combustible: lo facturado en sus viajes suma, los cobros restan, con un saldo inicial con fecha. Los clientes salen del nombre escrito en los viajes, sin importar mayúsculas, tildes ni espacios, y de la lista de clientes de la app. Migración [`0012_cobros.sql`](../supabase/migrations/0012_cobros.sql), que solo agrega una tabla para los cobros y los saldos iniciales, con su historial de cambios y sus permisos; los viajes no cambian. Va con su respaldo completo antes:
+       - [x] «Cobros», al lado de «Gastos» en Gastos y finanzas: lo que deben los clientes, lo facturado y lo cobrado en el período (pesos y dólares por separado) y los viajes terminados sin importe; cada cliente con su saldo, los cobros del período y los anulados, que se pueden restaurar. Los viajes facturados que no dicen el cliente quedan aparte, para completarlos.
+       - [x] La cuenta de cada cliente: el saldo inicial con su fecha y cada viaje y cada cobro desde ese día, con el saldo de cada renglón. Un viaje que sigue en ruta todavía sin importe no se pide completar. Cada viaje lleva a su página, y la página del viaje lleva a la cuenta de su cliente.
+       - [x] Registrar un cobro o el saldo inicial, también de un cliente nuevo escrito a mano; corregirlos o anularlos. Un saldo inicial por cliente y moneda.
+       - [ ] Publicación: respaldo completo, 0012 en producción y panel publicado.
+     - [ ] Ganancia, simulador y variación, sin cambios en la base:
+       - La ganancia de cada viaje, de cada camión por mes y de la empresa por mes: lo facturado menos el combustible, los peajes y los gastos. Los gastos de un acoplado van con el camión que lo llevaba ese día, según los enganches de Flota; si no iba enganchado, solo en el total de la empresa. El total de la empresa resta además el sueldo de cada mes y los viáticos de ese mes. Pesos y dólares por separado, y la pantalla dice qué es medido, declarado o estimado.
+       - El simulador de fletes: con el camión, los kilómetros con carga y de vuelta, los peajes de la ruta, el precio del gasoil, el consumo y lo que se le paga al chofer por el viaje, calcula el costo y el precio con el margen sumado al costo. No guarda las cotizaciones.
+       - La variación de los números grandes contra el período anterior («↑ 6 % más que el mes pasado»), que quedó del punto 13.
 13. [ ] Diseño «vidrio» (aprobado el 26/10/2026, a pedido del dueño con un video de ejemplo; va antes de la parte 12b): todo el panel con tarjetas de vidrio esmerilado sobre un fondo desenfocado. La base y la app no cambian:
    - [x] El fondo: una imagen desenfocada de tonos cálidos con luces suaves, hecha para el panel, sin foto. Si el dueño manda una foto suya, se usa esa. En el modo oscuro, el mismo fondo más oscuro.
    - [x] El vidrio: tarjetas translúcidas con bordes redondeados y sombra suave, títulos grandes, números grandes, botones en forma de píldora, y gráficos con curvas suaves, barras redondeadas y anillos. Los colores: el azul de TR Ferreira, y verde, ámbar y rojo para los avisos, como hasta ahora.
-   - [ ] La variación de los números grandes contra el período anterior, como en el video («↑ 6 % más que el mes pasado»): quedó fuera de lo publicado y va con la parte 12b.
+   - [ ] La variación de los números grandes contra el período anterior, como en el video («↑ 6 % más que el mes pasado»): quedó fuera de lo publicado y va con la segunda entrega de la parte 12b.
    - [x] Arriba, una barra flotante con el nombre de quien ingresó (ahí van el tema y «Salir»), un buscador de secciones, camiones, acoplados y choferes, y una campana con los avisos de Inicio. A la izquierda, el menú pasa a una columna de íconos que muestran su nombre al pasar el mouse.
    - [x] Sigue todo lo que hay: las 12 secciones con lo que hacen, los modos claro y oscuro y el uso desde el celular. Si la computadora no muestra el vidrio o pide menos transparencias, las tarjetas quedan opacas.
    - [x] Publicación el 26/10/2026: el dueño lo aprobó sobre las capturas de cada sección; panel publicado (despliegue #17, commit 2e26ec3). La base y la app no cambian.
@@ -136,6 +142,12 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 27/10/2026: Cobros, ganancia y simulador.
+  - La parte 12b va en dos entregas: primero Cobros, con su migración y su respaldo antes; después la ganancia, el simulador y la variación de los números grandes, sin cambios en la base.
+  - Los gastos de un acoplado cuentan en la ganancia del camión que lo llevaba ese día, según los enganches de Flota. Si ese día no iba enganchado, cuentan solo en el total de la empresa.
+  - La ganancia de la empresa resta el sueldo de cada mes (el que corresponde a ese mes, no lo pagado ese mes) y los viáticos de ese mes.
+  - En el simulador, el margen se suma al costo: el precio es el costo más ese porcentaje del costo.
+  - El simulador suma al costo lo que se le paga al chofer por el viaje, sin otros costos por kilómetro.
 - 26/10/2026: Mapa de Google.
   - El panel y la app pasan al mapa de Google: calles, satélite y tráfico en vivo. Las condiciones de Google no permiten mostrar su satélite ni su tráfico junto a un mapa de otra empresa, así que OpenStreetMap queda solo de respaldo: sin la clave o cuando Google no responde.
   - El panel usa la Map Tiles API: 100.000 imágenes gratis por mes y después US$ 0,60 cada 1.000. El tope es de unos US$ 10 por mes, con una cuota diaria y una alerta de presupuesto.

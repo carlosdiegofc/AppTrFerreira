@@ -1704,6 +1704,44 @@ body.map-full-open {
   color: rgb(255 255 255 / 85%);
 }
 
+/* The parts of a section (Gastos and Cobros in Gastos y finanzas): a pill switch under its title, like the theme's. */
+.section-tabs {
+  display: flex;
+  gap: 4px;
+  width: max-content;
+  max-width: 100%;
+  margin: -6px 0 18px;
+  padding: 4px;
+  overflow-x: auto;
+  border-radius: 999px;
+  background: var(--grey-bg);
+}
+
+.section-tab {
+  padding: 7px 18px;
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-size: 14px;
+  font-weight: 650;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.section-tab:hover {
+  color: var(--ink);
+}
+
+.section-tab.is-on {
+  background: var(--raised);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
+}
+
+.section-tab:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--blue) 30%, transparent);
+  outline-offset: 1px;
+}
+
 .unit {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -2582,6 +2620,7 @@ body.map-full-open {
   color: var(--blue);
   font: inherit;
   font-weight: 620;
+  text-decoration: none;
   cursor: pointer;
 }
 

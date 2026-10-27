@@ -23,7 +23,7 @@ test('el buscador lleva a una sección, a un camión, a un chofer o a buscar el 
   // Empty, it offers the twelve sections.
   await expect(options(page)).toHaveCount(12);
   await box.fill('docu');
-  await expect(options(page)).toHaveText([/^Documentación/, /«docu» en Viajes/, /«docu» en Gastos y finanzas/]);
+  await expect(options(page)).toHaveText([/^Documentación/, /«docu» en Viajes/, /«docu» en Gastos y finanzas/, /«docu» en Cobros/]);
   await shot(page, 'buscador');
   await options(page).first().click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Documentación');
@@ -47,7 +47,7 @@ test('el buscador lleva a una sección, a un camión, a un chofer o a buscar el 
 
   // The arrows move to the search of the text in Viajes, over the last 90 days.
   await box.fill('molino');
-  await expect(options(page)).toHaveText([/«molino» en Viajes/, /«molino» en Gastos y finanzas/]);
+  await expect(options(page)).toHaveText([/«molino» en Viajes/, /«molino» en Gastos y finanzas/, /«molino» en Cobros/]);
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowUp');
   await page.keyboard.press('Enter');

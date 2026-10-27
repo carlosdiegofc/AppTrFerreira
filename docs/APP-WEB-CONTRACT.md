@@ -121,3 +121,21 @@ Decisión del 26/10/2026, primera parte de Gastos y finanzas. La tabla nueva no 
 - El panel guarda como en Choferes: un gasto nuevo lleva un UUID hecho en el navegador, así un reintento después de perder la respuesta no lo duplica, y una corrección se guarda solo si `updated_at` sigue siendo el que leyó al abrir el formulario.
 - El panel lee la tabla entera, de a 1000 filas; pasadas las 50 000 muestra un error en lugar de sumas hechas con una parte. Suma pesos y dólares por separado, por período, por tipo y por a qué fue cada gasto. El combustible, el telepeaje y los sueldos no van acá: siguen en sus secciones.
 - Cada sección muestra lo suyo: Mantenimiento, el costo de cada service hecho; la página de un viaje, sus gastos; las fichas de un camión, un acoplado y un chofer, «Ver sus gastos» (`/finanzas?periodo=todo&destino=…`).
+
+## Cobros del panel (migración 0012)
+Decisiones del 26/10/2026 y del 27/10/2026, segunda parte de Gastos y finanzas. La tabla nueva no la usa la app, y lo que manda la app no cambia.
+
+- La cuenta de cada cliente sale de los viajes, leídos como en Viajes y en Métricas:
+  - El cliente es el que completó la oficina (`trf_panel_trips.client`) o, si no, el que escribió el chofer en la app (`cliente` de `trf_trip_details.data`). Se juntan sin importar mayúsculas, tildes ni espacios de más: «Molino San José» y «MOLINO  SAN JOSE» son el mismo cliente. Los de la lista de clientes de la app (`clientes` de `trf_mobile_catalog`) aparecen aunque no tengan viajes, con el nombre de la lista.
+  - Lo facturado es el importe de cada viaje (`trf_panel_trips.amount`, en su `currency`), el día de su salida en Uruguay. Un importe vacío o en cero no suma: los viajes terminados con carga y los cargados a mano piden completarlo; los retornos vacíos y los que siguen en viaje no.
+  - Los viajes en la papelera no cuentan. Los que tienen importe pero no dicen el cliente quedan aparte, sin cuenta, hasta que se completen.
+- `trf_client_movements`: los cobros y el saldo inicial de cada cliente.
+  - `client_key`: `name:` y el nombre del cliente sin mayúsculas, tildes ni espacios de más, como se juntan sus viajes; `client_name`: el nombre como se escribió al guardarlo, de hasta 200 caracteres.
+  - `kind`: `payment`, un cobro, mayor que cero y con `method` efectivo, transferencia, cheque u otro; u `opening`, el saldo inicial, sin forma de cobro: positivo si el cliente le debía a la empresa ese día, negativo si era a favor del cliente.
+  - `happened_on` (el panel no acepta días posteriores a hoy), el importe con centavos como mucho, en `currency` UYU o USD, y `notes`.
+  - Un saldo inicial por cliente y moneda (`trf_client_movements_one_opening`, código 23505). Los viajes y los cobros anteriores a su fecha quedan dentro de él; desde ese día, los viajes suman y los cobros restan.
+  - Anular: con `deleted_at` no cuenta y queda guardado, en «Anulados», de donde se puede restaurar. Nadie borra.
+- Solo las cuentas del panel leen y escriben (`trf_is_panel_admin()`); sin ingresar no se ve nada. Cada alta y cada cambio queda en `trf_private.road_audit`, con quién lo hizo. El disparador `trf_private.client_movement_touch` anota quién y cuándo, y deja fijos el id, el tipo, quién lo creó y cuándo.
+- El panel guarda como en Gastos: un cobro nuevo lleva un UUID hecho en el navegador, así un reintento después de perder la respuesta no lo duplica, y una corrección se guarda solo si `updated_at` sigue siendo el que leyó al abrir el formulario.
+- El panel lee todos los viajes, también los de la papelera, y todos los cobros, de a 1000 filas; pasadas las 50 000 filas de viajes o las 20 000 de cobros muestra un error en lugar de cuentas hechas con una parte. Pesos y dólares van por separado: lo que un cliente tiene a favor en una moneda no paga lo que debe en la otra, ni lo de un cliente paga lo de otro.
+- La página de un viaje lleva a la cuenta de su cliente (`/finanzas/cobros/<clave del cliente>`), y el buscador de arriba busca el texto entre los clientes (`/finanzas/cobros?buscar=…`).

@@ -56,7 +56,10 @@ export function searchItems(query: string, items: readonly SearchItem[], perGrou
   );
 }
 
-/** Searching the text itself where a list has its own search: Viajes (its longest period) and Gastos (all dates). */
+/**
+ * Searching the text itself where a list has its own search: Viajes (its longest period), Gastos (all dates) and the
+ * clients of Cobros.
+ */
 export function searchIn(query: string): SearchItem[] {
   const text = query.trim();
   if (text === '') return [];
@@ -64,5 +67,6 @@ export function searchIn(query: string): SearchItem[] {
   return [
     { id: 'Buscar en:viajes', group: 'Buscar en', title: `«${text}» en Viajes`, detail: 'En los últimos 90 días', path: `/viajes?periodo=90&buscar=${q}`, icon: 'route', words: '' },
     { id: 'Buscar en:gastos', group: 'Buscar en', title: `«${text}» en Gastos y finanzas`, detail: 'En todas las fechas', path: `/finanzas?periodo=todo&buscar=${q}`, icon: 'money', words: '' },
+    { id: 'Buscar en:cobros', group: 'Buscar en', title: `«${text}» en Cobros`, detail: 'Los clientes con ese nombre', path: `/finanzas/cobros?buscar=${q}`, icon: 'money', words: '' },
   ];
 }

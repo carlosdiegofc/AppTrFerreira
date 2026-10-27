@@ -1,7 +1,8 @@
 // Generated from the production database (Supabase type generator) on 2026-10-20, after migration 0004. Regenerate after
 // every migration.
-// trf_drivers, trf_driver_salaries and trf_driver_payments (migration 0008) are written by hand in the generator's format
-// until the next generation; the tables of migration 0005 are in roadDatabase.ts.
+// trf_drivers, trf_driver_salaries and trf_driver_payments (migration 0008), and the tables of the later migrations, are
+// written by hand in the generator's format until the next generation; the tables of migration 0005 are in
+// roadDatabase.ts.
 export type Json =
   | string
   | number
@@ -18,6 +19,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      trf_client_movements: {
+        Row: {
+          amount: number
+          client_key: string
+          client_name: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          deleted_at: string | null
+          happened_on: string
+          id: string
+          kind: string
+          method: string | null
+          notes: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          amount: number
+          client_key: string
+          client_name: string
+          created_at?: string
+          created_by?: string | null
+          currency: string
+          deleted_at?: string | null
+          happened_on: string
+          id?: string
+          kind: string
+          method?: string | null
+          notes?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          amount?: number
+          client_key?: string
+          client_name?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          deleted_at?: string | null
+          happened_on?: string
+          id?: string
+          kind?: string
+          method?: string | null
+          notes?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       trf_documents: {
         Row: {
           created_at: string

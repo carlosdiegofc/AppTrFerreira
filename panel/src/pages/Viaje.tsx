@@ -10,11 +10,13 @@ import { CatalogNote, Card, Empty, ErrorNote, PageHead, Pill, RefreshButton, Ske
 import { ROUTE_REFRESH_MS } from '../config';
 import { ConflictError, describeWriteError } from '../data/api';
 import { useExpenses, useRoute, useSetTripDeleted, useTripDetail } from '../data/hooks';
+import { clientKey } from '../lib/clients';
 import { calendarDay, dayInZone, formatDay, formatDayTime, formatDuration } from '../lib/dates';
 import { type Expense, expensesLink, expenseTotals, NO_CHOICES, NO_NAMES, tripTargetName } from '../lib/expenses';
 import { count, money, number } from '../lib/format';
 import { documentLabel, sourceLabel, tripFacts } from '../lib/tripTable';
 import { fuelFromReceipt, type LatLng, parseTripKey, routeStats } from '../lib/trips';
+import { clientPath } from './clientText';
 import { amounts } from './fuelText';
 import { STATUS_TONE } from './states';
 
@@ -134,6 +136,8 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
   const today = dayInZone(Date.now());
   const title = trip.orderNumber ? `Orden de carga ${trip.orderNumber}` : `Viaje de ${trip.driverName ?? 'chofer sin indicar'}`;
   const facts = tripFacts(trip);
+  // A trip in the trash is in no account.
+  const account = trip.deleted ? null : clientKey(trip.client);
   // Without an origin typed in the panel, an app trip's origin is where the GPS saw it start: that one is measured.
   const declared = { origin: samePlace(trip.origin, trip.gpsStart) ? null : trip.origin, destination: trip.destination };
   const binDay = calendarDay(trip.deletedAt);
@@ -198,7 +202,16 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
             {facts.map(([label, value]) => (
               <div key={label}>
                 <dt>{label}</dt>
-                <dd>{value}</dd>
+                <dd>
+                  {/* The client leads to its account in Cobros. */}
+                  {label === 'Cliente' && account ? (
+                    <Link className="link" to={clientPath(account)} title="Ver la cuenta del cliente en Cobros">
+                      {value}
+                    </Link>
+                  ) : (
+                    value
+                  )}
+                </dd>
               </div>
             ))}
           </dl>

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { FLEET_REFRESH_MS, LIVE_REFRESH_MS, PRESENCE_REFRESH_MS, ROUTE_REFRESH_MS } from '../config';
 import type { TablesInsert, TablesUpdate } from '../lib/database.types';
+import { type ClientMovement, clientMovementFromRow, groupClients } from '../lib/clients';
 import { startOfDay } from '../lib/dates';
 import { type FileType, type Paper, type PaperDocRow, paperFromRow, samePaper } from '../lib/documents';
 import { type Driver, driverFromRow, type Payment, paymentFromRow, type Salary, salaryFromRow } from '../lib/drivers';
@@ -19,9 +20,11 @@ import {
   deleteDocument,
   deleteService,
   documentRow,
+  fetchAllTrips,
   fetchBilledTrips,
   fetchCatalog,
   fetchCatalogLists,
+  fetchClientMovements,
   fetchDocuments,
   fetchDriverNames,
   fetchDrivers,
@@ -46,6 +49,7 @@ import {
   refused,
   removeDocumentFile,
   type RoutePoint,
+  saveClientMovement,
   saveDocument,
   saveDriver,
   saveExpense,
@@ -57,6 +61,7 @@ import {
   saveTrip,
   saveVehicle,
   serviceRow,
+  setClientMovementDeleted,
   setExpenseDeleted,
   setMovementDeleted,
   setPaymentDeleted,
@@ -337,11 +342,11 @@ export function useTripList(fromIso: string | null, toIso: string | null) {
 
 /**
  * Everything that shows trips reads them again after a change: the list, the trip's page, Inicio, the kilometres of
- * the trucks (a trip in the trash does not count) and the billing of the last months in Métricas.
+ * the trucks (a trip in the trash does not count), the billing of the last months in Métricas and the clients' accounts.
  */
 function useTripsChanged() {
   const client = useQueryClient();
-  return () => Promise.all(['tripList', 'trip', 'trips', 'kmTrips', 'billedTrips'].map((key) => client.invalidateQueries({ queryKey: [key] })));
+  return () => Promise.all(['tripList', 'trip', 'trips', 'kmTrips', 'billedTrips', 'allTrips'].map((key) => client.invalidateQueries({ queryKey: [key] })));
 }
 
 /** What the trips of the last months billed, for Métricas; read again every 5 minutes while the page is open. */
@@ -597,6 +602,51 @@ export function useSaveExpense() {
 export function useSetExpenseDeleted() {
   const changed = useExpensesChanged();
   return useMutation({ mutationFn: ({ expense, deleted }: { expense: Expense; deleted: boolean }) => setExpenseDeleted(expense, deleted), onSettled: changed });
+}
+
+/**
+ * Every trip with the office's data on top, the ones in the trash too, for the sums that need them all; read again every
+ * 5 minutes while the page is open.
+ */
+export function useAllTrips(enabled = true) {
+  const catalog = useCatalog();
+  const query = useQuery({ queryKey: ['allTrips'], queryFn: fetchAllTrips, refetchInterval: 5 * 60_000, staleTime: 60_000, enabled });
+  const trips = useMemo(() => (query.data ? mergeTrips(query.data, catalog.data ?? []) : []), [query.data, catalog.data]);
+  return { trips, query, catalog };
+}
+
+/**
+ * Every client with its account: the trips billed to it, its collections and its opening balances, and the clients of
+ * the app's list (only the panel accounts read the collections).
+ */
+export function useClients() {
+  const { trips, query: tripsQuery, catalog } = useAllTrips();
+  const lists = useCatalogLists();
+  const query = useQuery({ queryKey: ['clientMovements'], queryFn: fetchClientMovements, staleTime: 30_000, refetchInterval: 5 * 60_000 });
+  const movements = useMemo(() => (query.data ?? []).map(clientMovementFromRow), [query.data]);
+  const listed = useMemo(() => lists.data?.clients ?? [], [lists.data]);
+  const clients = useMemo(() => groupClients(trips, movements, listed), [trips, movements, listed]);
+  return { clients, trips, movements, query, tripsQuery, catalog, lists };
+}
+
+function useClientMovementsChanged() {
+  const client = useQueryClient();
+  return () => client.invalidateQueries({ queryKey: ['clientMovements'] });
+}
+
+/** A collection or an opening balance, new or changed; on a conflict the page reads them again. */
+export function useSaveClientMovement() {
+  const changed = useClientMovementsChanged();
+  return useMutation({
+    mutationFn: ({ movement, row }: { movement: ClientMovement | null; row: TablesInsert<'trf_client_movements'> | TablesUpdate<'trf_client_movements'> }) => saveClientMovement(movement, row),
+    onSettled: changed,
+  });
+}
+
+/** Annuls a collection or an opening balance, or brings it back: nothing is deleted. */
+export function useSetClientMovementDeleted() {
+  const changed = useClientMovementsChanged();
+  return useMutation({ mutationFn: ({ movement, deleted }: { movement: ClientMovement; deleted: boolean }) => setClientMovementDeleted(movement, deleted), onSettled: changed });
 }
 
 /** A link to a private photo for a list or a card: read once and kept nine minutes, as each link lasts ten. */
