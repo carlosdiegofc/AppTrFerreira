@@ -80,8 +80,11 @@ function ClientRow({ client, from, to }: { client: Client; from?: string; to?: s
   );
 }
 
-/** A collection or an annulled opening balance, as the expenses of Gastos show. */
-function CollectionRow({ movement, name, onOpen, action }: { movement: ClientMovement; name: string; onOpen?: () => void; action?: ReactNode }) {
+/**
+ * A collection or an annulled opening balance, as the expenses of Gastos show. An annulled one of a client that has
+ * nothing else (one written wrong, say) leads to no account until it is restored.
+ */
+function CollectionRow({ movement, name, linked, onOpen, action }: { movement: ClientMovement; name: string; linked: boolean; onOpen?: () => void; action?: ReactNode }) {
   const m = movement;
   const opening = m.kind === 'opening';
   const body = (
@@ -110,9 +113,11 @@ function CollectionRow({ movement, name, onOpen, action }: { movement: ClientMov
         <div className="ex-open">{body}</div>
       )}
       <span className="ex-actions">
-        <Link className="link" to={clientPath(m.clientKey)}>
-          Ver su cuenta
-        </Link>
+        {linked && (
+          <Link className="link" to={clientPath(m.clientKey)}>
+            Ver su cuenta
+          </Link>
+        )}
         {action}
       </span>
     </li>
@@ -322,6 +327,7 @@ export function Cobros() {
                 key={m.id}
                 movement={m}
                 name={names.get(m.clientKey) ?? m.clientName}
+                linked={names.has(m.clientKey)}
                 onOpen={view.value === 'anulados' ? undefined : () => open({ kind: 'payment', movement: m })}
                 action={
                   view.value === 'anulados' ? (

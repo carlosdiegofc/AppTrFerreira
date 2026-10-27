@@ -115,6 +115,7 @@ En cobros:
 - el saldo inicial corregido desde su renglón, y uno segundo en la misma moneda que no se acepta;
 - un cobro anulado, que deja de contar, y restaurado desde «Anulados»;
 - el cobro de un cliente escrito a mano, que aparece como cliente nuevo, y que al corregirlo con el nombre de otro escrito de otra manera pasa a su cuenta;
+- el cobro anulado de un cliente que no tiene nada más, que en «Anulados» no lleva a una cuenta que ya no existe, y que restaurado la vuelve a tener;
 - un cobro cuya respuesta se corta: el reintento lo da por registrado una sola vez;
 - dos pestañas que corrigen el mismo cobro.
 

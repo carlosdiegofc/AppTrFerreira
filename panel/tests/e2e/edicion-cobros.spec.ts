@@ -1,7 +1,8 @@
 // Cobros that save: a collection registered from a client's page, its opening balance corrected (a second one in the
 // same currency is not possible), a collection annulled and restored from «Anulados», the collection of a client written
-// by hand that is then moved to its client, a save whose answer is cut (the retry does not count it twice) and two tabs
-// that correct the same collection. They run in the «edicion» project, after the tests that read the seed.
+// by hand that is then moved to its client, the annulled collection of a client that has nothing else, a save whose
+// answer is cut (the retry does not count it twice) and two tabs that correct the same collection. They run in the
+// «edicion» project, after the tests that read the seed.
 import { expect, type Page, test } from '@playwright/test';
 import { open, prepare, shot, signIn } from './helpers';
 
@@ -97,6 +98,32 @@ test('el cobro de un cliente escrito a mano, que después se pasa a su cliente',
   await view(page, 'Clientes').click();
   await expect(client(page, 'Sucesores de Pérez')).toHaveCount(0);
   await expect(client(page, 'Navios').locator('.fs-balance')).toHaveText('A favor del cliente $ 2.000');
+});
+
+test('el cobro anulado de un cliente que no tiene nada más no lleva a una cuenta, y restaurado vuelve a tenerla', async ({ page }) => {
+  await openCobros(page, 'dueno@ejemplo.uy');
+  await page.getByRole('button', { name: 'Registrar cobro' }).click();
+  const pay = page.getByRole('dialog', { name: 'Registrar cobro' });
+  await pay.getByLabel('Cliente').fill('Cliente Equivocado');
+  await pay.getByLabel('Importe cobrado').fill('500');
+  await pay.getByLabel('Forma de cobro').selectOption({ label: 'Efectivo' });
+  await pay.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(client(page, 'Cliente Equivocado').locator('.fs-balance')).toHaveText('A favor del cliente $ 500');
+
+  await view(page, 'Cobros').click();
+  await page.getByRole('button', { name: /Cobro del 15\/10\/2026 de Cliente Equivocado/ }).click();
+  await page.getByRole('dialog', { name: 'Corregir cobro' }).getByRole('button', { name: 'Anular cobro' }).click();
+  await page.getByRole('dialog', { name: '¿Anular este cobro?' }).getByRole('button', { name: 'Anular cobro' }).click();
+  await expect(page.getByRole('status')).toContainText('Cobro anulado');
+
+  // Without the collection the client has nothing: its annulled collection shows, but leads to no account.
+  await view(page, 'Anulados').click();
+  const annulled = page.getByRole('list', { name: 'Anulados' }).getByRole('listitem').filter({ hasText: 'Cliente Equivocado' });
+  await expect(annulled.getByRole('link', { name: 'Ver su cuenta' })).toHaveCount(0);
+  await annulled.getByRole('button', { name: 'Restaurar' }).click();
+  await expect(page.getByRole('status')).toContainText('Cobro restaurado');
+  await view(page, 'Clientes').click();
+  await expect(client(page, 'Cliente Equivocado').locator('.fs-balance')).toHaveText('A favor del cliente $ 500');
 });
 
 test('si se pierde la respuesta al registrar un cobro, el reintento no lo cuenta dos veces', async ({ page }) => {
