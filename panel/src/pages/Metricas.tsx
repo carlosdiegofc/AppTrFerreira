@@ -8,6 +8,8 @@ import { Icon } from '../components/Icon';
 import { CatalogNote, Empty, ErrorNote, PageHead, RefreshButton, Skeleton, StaleNote, Stat } from '../components/ui';
 import { useBilledTrips, useFuel, useNow, useTripList } from '../data/hooks';
 import type { MetricsFormat } from '../exports/metrics';
+import { moneyTrend, type PeriodName, periodBefore, trend } from '../lib/change';
+import { tripDay } from '../lib/clients';
 import { ago, dayInZone, firstOfMonth, firstOfNextMonth, formatDay, startOfDay } from '../lib/dates';
 import { truckLabel } from '../lib/fleet';
 import { count, decimal, money, number, percent } from '../lib/format';
@@ -257,6 +259,10 @@ export function Metricas() {
   const [exportFailed, setExportFailed] = useState(false);
 
   const { trips, query, catalog } = useTripList(instants?.fromIso ?? null, instants?.toIso ?? null);
+  // The period before, of the same length, for «↑ 6 % más que setiembre».
+  const before = useMemo(() => (periodToIso(from, to) === null ? null : periodBefore(period.value as PeriodName, { from, to }, today)), [period.value, from, to, today]);
+  const beforeInstants = before ? periodToIso(before.from, before.to) : null;
+  const previous = useTripList(beforeInstants?.fromIso ?? null, beforeInstants?.toIso ?? null);
   const fuel = useFuel();
   const yearFrom = monthsBefore(today, 11);
   const billed = useBilledTrips(startOfDay(yearFrom), startOfDay(firstOfNextMonth(today)));
@@ -269,6 +275,16 @@ export function Metricas() {
   const months = useMemo(() => billingByMonth(billed.data ?? [], today), [billed.data, today]);
   const idle = view.by === 'vehicle' ? idleTrucks(metrics.rows, (catalog.data ?? []).map(truckLabel)) : [];
   const total = metrics.total;
+  const prior = useMemo(
+    () => (before && previous.query.data !== undefined && fuel.query.data !== undefined ? summarize(previous.trips, fuelInPeriod(fuel.receipts, before.from, before.to), view.by).total : null),
+    [before, previous.query.data, previous.trips, fuel.query.data, fuel.receipts, view.by],
+  );
+  // A period that goes on after today compares only up to today, as the period before is cut on the same day.
+  const soFar = useMemo(
+    () => (before && before.upTo < to ? summarize(trips.filter((t) => (tripDay(t) ?? from) <= before.upTo), fuelInPeriod(fuel.receipts, from, before.upTo), view.by).total : null),
+    [before, to, trips, from, fuel.receipts, view.by],
+  );
+  const compared = soFar ?? total;
   const fleetPer100 = litersPer100(total);
   const share = loadedShare(total);
   const noFuel = fuel.query.data === undefined;
@@ -279,7 +295,9 @@ export function Metricas() {
   };
   const onSort = (key: SortKey) => setSort((s) => (s.key === key ? { key, ascending: !s.ascending } : { key, ascending: key === 'name' }));
   const tripsOf = (r: MetricsRow) => `/viajes?${new URLSearchParams({ periodo: 'fechas', desde: from, hasta: to, [view.param]: r.name }).toString()}`;
-  const refresh = () => void Promise.all([query.refetch(), fuel.query.refetch(), billed.refetch()]);
+  // The days before are read again too, or the change would compare two different moments. Without them (a period that
+  // cannot be compared) that query is off, and asking it would read nothing useful.
+  const refresh = () => void Promise.all([query.refetch(), ...(beforeInstants ? [previous.query.refetch()] : []), fuel.query.refetch(), billed.refetch()]);
   const loadedAt = query.dataUpdatedAt || null;
   const what = `Del ${formatDay(from)} al ${formatDay(to)}`;
 
@@ -355,7 +373,7 @@ export function Metricas() {
         </div>
         <div className="list-info">
           {loadedAt !== null && <span className="updated">actualizado {ago(loadedAt, now)}</span>}
-          <RefreshButton onClick={refresh} busy={query.isFetching || fuel.query.isFetching || billed.isFetching} />
+          <RefreshButton onClick={refresh} busy={query.isFetching || previous.query.isFetching || fuel.query.isFetching || billed.isFetching} />
         </div>
       </div>
 
@@ -376,15 +394,31 @@ export function Metricas() {
       ) : (
         <>
           <div className="stats stats-money metrics-stats">
-            <Stat featured label="Kilómetros del GPS" value={km(total.gpsKm)} detail={`${plural(total.trips, 'viaje', 'viajes')}${share === null ? '' : ` · ${percent(share)} con carga`}`} tone="blue" icon="route" />
+            <Stat
+              featured
+              label="Kilómetros del GPS"
+              value={km(total.gpsKm)}
+              detail={`${plural(total.trips, 'viaje', 'viajes')}${share === null ? '' : ` · ${percent(share)} con carga`}`}
+              trend={before && prior ? trend(compared.gpsKm, prior.gpsKm, before.than, 'neither') : null}
+              tone="blue"
+              icon="route"
+            />
             <Stat
               label="Facturado"
               value={<Lines parts={moneyParts(total.billed)} empty="$ 0" />}
               detail={total.trips === 0 ? 'Sin viajes en el período' : total.unbilled > 0 ? `Falta el importe de ${plural(total.unbilled, 'viaje', 'viajes')}` : 'Todos los viajes con carga tienen importe'}
+              trend={before && prior ? moneyTrend(compared.billed, prior.billed, before.than, 'up') : null}
               tone={total.unbilled > 0 ? 'amber' : 'green'}
               icon="money"
             />
-            <Stat label="Combustible" value={noFuel ? '—' : <Lines parts={moneyParts(total.fuel)} empty="$ 0" />} detail={noFuel ? 'Sin leer las boletas' : `${decimal(total.liters, 1)} litros`} tone="grey" icon="fuel" />
+            <Stat
+              label="Combustible"
+              value={noFuel ? '—' : <Lines parts={moneyParts(total.fuel)} empty="$ 0" />}
+              detail={noFuel ? 'Sin leer las boletas' : `${decimal(total.liters, 1)} litros`}
+              trend={before && prior ? moneyTrend(compared.fuel, prior.fuel, before.than, 'down') : null}
+              tone="grey"
+              icon="fuel"
+            />
             <Stat
               label="Consumo estimado"
               value={

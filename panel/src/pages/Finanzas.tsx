@@ -10,6 +10,7 @@ import { type Photo, PhotoDialog } from '../components/PhotoDialog';
 import { Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote, Stat } from '../components/ui';
 import { ConflictError, DataError, describeWriteError, TOO_MANY } from '../data/api';
 import { useExpenses, useExpenseTargets, useNow, useSetExpenseDeleted } from '../data/hooks';
+import { moneyTrend, periodBefore } from '../lib/change';
 import { ago, dayInZone, formatDay } from '../lib/dates';
 import {
   byCategory,
@@ -163,6 +164,11 @@ export function Finanzas() {
     [expenses, from, to, category, target, typed, view.value, names, badRange],
   );
   const totals = expenseTotals(inPeriod);
+  // The same filters in the period before, of the same length, for «↑ 6 % más que setiembre».
+  const before = useMemo(() => (from && to ? periodBefore(period.value, { from, to }, today) : null), [period.value, from, to, today]);
+  const spentBefore = useMemo(() => (before ? expenseTotals(filterExpenses(expenses, { from: before.from, to: before.to, category, target }, names)).amounts : null), [expenses, before, category, target, names]);
+  // A period that goes on after today compares only up to today, as the period before is cut on the same day.
+  const spentSoFar = useMemo(() => (before && to && before.upTo < to ? expenseTotals(filterExpenses(expenses, { from, to: before.upTo, category, target }, names)).amounts : null), [expenses, before, from, to, category, target, names]);
   const kinds = useMemo(() => byCategory(inPeriod), [inPeriod]);
   const places = useMemo(() => byTarget(inPeriod, names), [inPeriod, names]);
   const fleet = expenseTotals(inPeriod.filter((e) => e.target === 'truck' || e.target === 'trailer'));
@@ -252,7 +258,15 @@ export function Finanzas() {
 
       {ready && (
         <div className="stats stats-money">
-          <Stat featured label="Gastado en el período" value={badRange ? '—' : <Lines parts={amountParts(totals.amounts, '$ 0')} />} detail={badRange ? 'Revisá las fechas' : `${count(totals.count)} gasto${totals.count === 1 ? '' : 's'}`} tone="blue" icon="money" />
+          <Stat
+            featured
+            label="Gastado en el período"
+            value={badRange ? '—' : <Lines parts={amountParts(totals.amounts, '$ 0')} />}
+            detail={badRange ? 'Revisá las fechas' : `${count(totals.count)} gasto${totals.count === 1 ? '' : 's'}`}
+            trend={before && spentBefore ? moneyTrend(spentSoFar ?? totals.amounts, spentBefore, before.than, 'down') : null}
+            tone="blue"
+            icon="money"
+          />
           <Stat label="Lo que más pesó" value={top ? <Lines parts={amountParts(top.amounts)} /> : '—'} detail={top ? top.label : 'Sin gastos en el período'} tone="grey" icon="chart" />
           <Stat label="En camiones y acoplados" value={badRange ? '—' : <Lines parts={amountParts(fleet.amounts, '$ 0')} />} detail={`${count(fleet.count)} gasto${fleet.count === 1 ? '' : 's'}`} tone="grey" icon="truck" />
           <Stat label="Sin factura" value={count(totals.withoutFile)} detail={totals.withoutFile > 0 ? 'Sumales la foto o el PDF' : 'Todos tienen su factura'} tone={totals.withoutFile > 0 ? 'amber' : 'green'} icon="doc" />
@@ -423,7 +437,7 @@ export function Finanzas() {
           </ul>
         </>
       )}
-      <p className="note">El combustible está en Combustible, y los sueldos y adelantos de los choferes, en Choferes: no van acá. Lo que deben los clientes está en Cobros. La ganancia de cada viaje y el simulador de fletes llegan en la próxima entrega.</p>
+      <p className="note">El combustible está en Combustible, y los sueldos y adelantos de los choferes, en Choferes: no van acá. Lo que deben los clientes está en Cobros, y lo que dejó cada mes, cada camión y cada viaje, en Ganancia.</p>
 
       <PhotoDialog photo={file} onClose={() => setFile(null)} />
       {(adding || editing) && (

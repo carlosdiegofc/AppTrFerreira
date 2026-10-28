@@ -10,6 +10,7 @@ import { type Expense, expenseFromRow, targetChoices } from '../lib/expenses';
 import { type ActiveTrip, type CatalogTruck, fleetUnits, truckLabel, withLivePositions } from '../lib/fleet';
 import { groupStations, type Movement, movementFromRow, type Receipt, receiptFromRow } from '../lib/fuel';
 import { kmReferences, kmSince, type MaintenanceRow, sameService, type Service, serviceFromRow, type TruckKm, truckKms } from '../lib/maintenance';
+import { type ProfitInput, type TollPassage, tollPassageFromRow } from '../lib/profit';
 import { appendReadings } from '../lib/route';
 import type { TripPayload } from '../lib/tripForm';
 import { mergeTrips, type Trip, tripFromPanel, tripFromSession } from '../lib/trips';
@@ -38,6 +39,7 @@ import {
   fetchPresence,
   fetchRoute,
   fetchServices,
+  fetchTollPassages,
   fetchTripDetail,
   fetchTripList,
   fetchTrips,
@@ -627,6 +629,34 @@ export function useClients() {
   const listed = useMemo(() => lists.data?.clients ?? [], [lists.data]);
   const clients = useMemo(() => groupClients(trips, movements, listed), [trips, movements, listed]);
   return { clients, trips, movements, query, tripsQuery, catalog, lists };
+}
+
+/**
+ * What the profit needs (decisions of 26/10/2026 and 27/10/2026): every trip, the fuel, the toll passages, the expenses,
+ * the hitches of Flota and the drivers' salaries and payments (only the panel accounts read them). reads are the queries
+ * behind it, for the page to say when one failed.
+ */
+export function useProfit() {
+  const { trips, query: tripsQuery, catalog } = useAllTrips();
+  const fuel = useFuel();
+  const { expenses, query: expensesQuery } = useExpenses();
+  const { vehicles, hitches, query: vehiclesQuery } = useVehicles();
+  const { drivers, salaries, payments, query: driversQuery } = useDrivers();
+  const tolls = useQuery({ queryKey: ['tollPassages'], queryFn: fetchTollPassages, staleTime: 60_000, refetchInterval: 5 * 60_000 });
+  const passages = useMemo(() => (tolls.data ?? []).map(tollPassageFromRow).filter((p): p is TollPassage => p !== null), [tolls.data]);
+  const names = useMemo(() => {
+    const entries = truckEntries(catalog.data ?? [], vehicles, hitches);
+    return new Map([...entries.current, ...entries.gone].map((e) => [e.key, e.label]));
+  }, [catalog.data, vehicles, hitches]);
+  const payroll = useMemo(
+    () => drivers.map((d) => ({ leftOn: d.leftOn, salaries: salaries.filter((s) => s.driverId === d.id), payments: payments.filter((p) => p.driverId === d.id) })),
+    [drivers, salaries, payments],
+  );
+  const input: ProfitInput = useMemo(
+    () => ({ trips, receipts: fuel.receipts, passages, expenses, hitches, payroll, names }),
+    [trips, fuel.receipts, passages, expenses, hitches, payroll, names],
+  );
+  return { input, reads: { trips: tripsQuery, fuel: fuel.query, tolls, expenses: expensesQuery, vehicles: vehiclesQuery, drivers: driversQuery, catalog } };
 }
 
 function useClientMovementsChanged() {

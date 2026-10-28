@@ -7,6 +7,7 @@ import { ReceiptFormDialog } from '../components/ReceiptFormDialog';
 import { CatalogNote, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote, Stat } from '../components/ui';
 import { ConflictError, describeWriteError } from '../data/api';
 import { useFuel, useNow, useUpdateReceipt } from '../data/hooks';
+import { moneyTrend, type PeriodName, periodBefore, trend } from '../lib/change';
 import { ago, dayInZone, formatDay } from '../lib/dates';
 import { count, decimal, money } from '../lib/format';
 import { balances, filterReceipts, isFuture, NO_STATION, type Receipt, receiptVehicles, type Station, totals } from '../lib/fuel';
@@ -196,6 +197,12 @@ export function Combustible() {
     return choices;
   }, [stations, receipts, view.value, station]);
   const periodTotals = totals(inPeriod);
+  // The period before, of the same length, for «↑ 6 % más que setiembre».
+  const before = useMemo(() => (from && to ? periodBefore(period.value as PeriodName, { from, to }, today) : null), [period.value, from, to, today]);
+  const totalsBefore = useMemo(() => (before ? totals(filterReceipts(receipts, { from: before.from, to: before.to })) : null), [receipts, before]);
+  // A period that goes on after today compares only up to today, as the period before is cut on the same day: a receipt
+  // dated later shows in the period but not in the change.
+  const totalsSoFar = useMemo(() => (before && to && before.upTo < to ? totals(filterReceipts(receipts, { from, to: before.upTo })) : null), [receipts, before, from, to]);
   const { owed, credit } = balances(stations);
   const missing = receipts.filter((r) => !r.archived && r.total === null).length;
   const future = receipts.filter((r) => !r.archived && isFuture(r, today)).length;
@@ -281,8 +288,22 @@ export function Combustible() {
 
       {ready && (
         <div className="stats stats-money">
-          <Stat featured label="Cargado en el período" value={badRange ? '—' : <Lines parts={amountParts(periodTotals.amounts, '$ 0')} />} detail={badRange ? 'Revisá las fechas' : `${count(periodTotals.receipts)} boleta${periodTotals.receipts === 1 ? '' : 's'}`} tone="blue" icon="fuel" />
-          <Stat label="Litros en el período" value={badRange ? '—' : decimal(periodTotals.liters, 1)} tone="grey" icon="chart" />
+          <Stat
+            featured
+            label="Cargado en el período"
+            value={badRange ? '—' : <Lines parts={amountParts(periodTotals.amounts, '$ 0')} />}
+            detail={badRange ? 'Revisá las fechas' : `${count(periodTotals.receipts)} boleta${periodTotals.receipts === 1 ? '' : 's'}`}
+            trend={before && totalsBefore ? moneyTrend((totalsSoFar ?? periodTotals).amounts, totalsBefore.amounts, before.than, 'down') : null}
+            tone="blue"
+            icon="fuel"
+          />
+          <Stat
+            label="Litros en el período"
+            value={badRange ? '—' : decimal(periodTotals.liters, 1)}
+            trend={before && totalsBefore ? trend((totalsSoFar ?? periodTotals).liters, totalsBefore.liters, before.than, 'neither') : null}
+            tone="grey"
+            icon="chart"
+          />
           <Stat label="Saldo con las estaciones" value={<Lines parts={amountParts(owed, '$ 0')} />} detail={credit.UYU > 0 || credit.USD > 0 ? `Lo que se les debe · a favor: ${amounts(credit)}` : 'Lo que se les debe'} tone={owed.UYU > 0 || owed.USD > 0 ? 'amber' : 'green'} icon="money" />
           <Stat label="Boletas sin importe" value={count(missing)} detail={missing > 0 ? 'Completalas para que sumen' : 'Todas tienen importe'} tone={missing > 0 ? 'red' : 'green'} icon="warning" />
         </div>

@@ -11,6 +11,7 @@ import { type KmTrip, kmTripsAsCorrected, type MaintenanceRow, type Service } fr
 import type { BilledTrip } from '../lib/metrics';
 import { toNumber } from '../lib/numbers';
 import type { PresenceRow } from '../lib/presence';
+import type { TollRow } from '../lib/profit';
 import { supabase } from '../lib/supabase';
 import type { TripPayload } from '../lib/tripForm';
 import type { TankReference } from '../lib/road';
@@ -760,6 +761,16 @@ export async function fetchAllTrips(): Promise<TripListData> {
     all((from, to) => supabase.from('trf_trip_details').select('trip_id,data').order('trip_id').range(from, to), 50_000, true),
   ]);
   return { sessions, panelRows, details };
+}
+
+/** Every toll passage the GPS saw, with the truck's rate when it passed (only the panel accounts read them). */
+export async function fetchTollPassages(): Promise<TollRow[]> {
+  return all(
+    (from, to) =>
+      supabase.from('trf_road_events').select('id,trip_id,vehicle_key,vehicle_name,happened_at,amount,point_name').eq('kind', 'toll').order('happened_at', { ascending: false }).order('id').range(from, to),
+    50_000,
+    true,
+  );
 }
 
 /** Every collection and opening balance of the clients, the annulled ones too (only the panel accounts read them). */

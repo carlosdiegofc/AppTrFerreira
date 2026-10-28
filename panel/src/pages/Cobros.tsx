@@ -10,6 +10,7 @@ import { Icon } from '../components/Icon';
 import { Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote, Stat } from '../components/ui';
 import { ConflictError, DataError, describeWriteError } from '../data/api';
 import { useClients, useNow, useSetClientMovementDeleted } from '../data/hooks';
+import { moneyTrend, periodBefore } from '../lib/change';
 import { billedAmount, billedInPeriod, type Client, clientBalances, clientWithoutAmount, type ClientMovement, collectionTotals, filterClients, filterCollections, NO_CLIENT, periodSums, withoutAmount } from '../lib/clients';
 import { ago, dayInZone, formatDay } from '../lib/dates';
 import { count, money } from '../lib/format';
@@ -149,6 +150,11 @@ export function Cobros() {
   const inPeriod = useMemo(() => (badRange ? [] : filterCollections(movements, { from, to })), [movements, from, to, badRange]);
   const annulled = useMemo(() => (badRange ? [] : filterCollections(movements, { from, to, annulled: true })), [movements, from, to, badRange]);
   const sums = periodSums(clients, from, to);
+  // The period before, of the same length, for «↑ 6 % más que setiembre».
+  const before = useMemo(() => (from && to ? periodBefore(period.value, { from, to }, today) : null), [period.value, from, to, today]);
+  const sumsBefore = useMemo(() => (before ? periodSums(clients, before.from, before.to) : null), [clients, before]);
+  // A period that goes on after today compares only up to today, as the period before is cut on the same day.
+  const sumsSoFar = useMemo(() => (before && to && before.upTo < to ? periodSums(clients, from, before.upTo) : null), [clients, before, from, to]);
   const { owed, credit, owing } = clientBalances(clients);
   const missing = withoutAmount(clients);
   const loose = clients.find((c) => c.key === NO_CLIENT)?.trips.length ?? 0;
@@ -232,8 +238,22 @@ export function Cobros() {
             tone="blue"
             icon="money"
           />
-          <Stat label="Facturado en el período" value={badRange ? '—' : <Lines parts={amountParts(sums.billed, '$ 0')} />} detail={badRange ? 'Revisá las fechas' : plural(sums.trips, 'viaje', 'viajes')} tone="grey" icon="route" />
-          <Stat label="Cobrado en el período" value={badRange ? '—' : <Lines parts={amountParts(sums.paid, '$ 0')} />} detail={badRange ? 'Revisá las fechas' : plural(sums.payments, 'cobro', 'cobros')} tone="grey" icon="check" />
+          <Stat
+            label="Facturado en el período"
+            value={badRange ? '—' : <Lines parts={amountParts(sums.billed, '$ 0')} />}
+            detail={badRange ? 'Revisá las fechas' : plural(sums.trips, 'viaje', 'viajes')}
+            trend={before && sumsBefore ? moneyTrend((sumsSoFar ?? sums).billed, sumsBefore.billed, before.than, 'up') : null}
+            tone="grey"
+            icon="route"
+          />
+          <Stat
+            label="Cobrado en el período"
+            value={badRange ? '—' : <Lines parts={amountParts(sums.paid, '$ 0')} />}
+            detail={badRange ? 'Revisá las fechas' : plural(sums.payments, 'cobro', 'cobros')}
+            trend={before && sumsBefore ? moneyTrend((sumsSoFar ?? sums).paid, sumsBefore.paid, before.than, 'up') : null}
+            tone="grey"
+            icon="check"
+          />
           <Stat label="Viajes sin importe" value={count(missing)} detail={missing > 0 ? 'Completalos para que sumen' : 'Todos tienen importe'} tone={missing > 0 ? 'red' : 'green'} icon="warning" />
         </div>
       )}
@@ -341,7 +361,7 @@ export function Cobros() {
           </ul>
         </>
       )}
-      <p className="note">Lo facturado sale del importe de cada viaje, como lo completa la oficina en Viajes; los viajes en la papelera no cuentan. La ganancia de cada viaje y el simulador de fletes llegan en la próxima entrega.</p>
+      <p className="note">Lo facturado sale del importe de cada viaje, como lo completa la oficina en Viajes; los viajes en la papelera no cuentan. Lo que dejó cada viaje, con su combustible, sus peajes y sus gastos, está en Ganancia.</p>
 
       {editing && (
         <CollectionFormDialog

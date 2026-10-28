@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { Trend } from '../lib/change';
 import { Icon, type IconName } from './Icon';
 
 export function PageHead({ title, subtitle, actions }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode }) {
@@ -30,7 +31,24 @@ export function Card({ title, action, children, className = '', padded = true }:
 export type Tone = 'green' | 'amber' | 'red' | 'blue' | 'grey';
 
 /** A number of the page; featured, the main one, on the logo's blue (one per page at most). */
-export function Stat({ label, value, detail, tone, icon, featured = false }: { label: string; value: ReactNode; detail?: ReactNode; tone: Tone; icon: IconName; featured?: boolean }) {
+export function Stat({
+  label,
+  value,
+  detail,
+  tone,
+  icon,
+  featured = false,
+  trend = null,
+}: {
+  label: string;
+  value: ReactNode;
+  detail?: ReactNode;
+  tone: Tone;
+  icon: IconName;
+  featured?: boolean;
+  /** How it moved against the period before: «↑ 6 % más que setiembre». */
+  trend?: Trend | null;
+}) {
   return (
     <div className={`stat tone-${tone}${featured ? ' is-featured' : ''}`}>
       <span className="stat-icon"><Icon name={icon} size={22} /></span>
@@ -38,6 +56,7 @@ export function Stat({ label, value, detail, tone, icon, featured = false }: { l
         <span className="stat-value">{value}</span>
         <span className="stat-label">{label}</span>
         {detail && <span className="stat-detail">{detail}</span>}
+        {trend && <span className={`stat-trend is-${trend.tone}`}>{trend.text}</span>}
       </div>
     </div>
   );

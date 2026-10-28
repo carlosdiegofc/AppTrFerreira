@@ -235,3 +235,13 @@ insert into public.trf_client_movements (id, client_key, client_name, kind, happ
   ('c0000000-0000-4000-8000-000000000002', 'name:molino san jose', 'Molino San José', 'payment', (select today from t0) - 2, 15000, 'UYU', 'cheque', 'Cheque BROU 4521', null),
   ('c0000000-0000-4000-8000-000000000003', 'name:cooperativa agraria', 'Cooperativa Agraria', 'payment', (select today from t0) - 1, 1000, 'USD', 'transferencia', '', null),
   ('c0000000-0000-4000-8000-000000000004', 'name:navios', 'Navios', 'payment', (select today from t0) - 4, 5000, 'UYU', 'transferencia', 'Era de otro cliente.', (select now from t0) - interval '3 days');
+
+-- Ganancia (second delivery of part 12b). The GPS saw Diego's trip of today pass the Queguay toll, at the Ford's rate,
+-- and Ana's trip on the road pass Pando, whose rate for the Volvo is not loaded yet: it adds nothing.
+insert into public.trf_road_events (point_id, point_name, kind, vehicle_key, vehicle_name, trip_id, entered_at, happened_at, amount)
+select p.id, p.name, 'toll', v.vkey, v.vname, v.trip::uuid, (select now from t0) - v.ago, (select now from t0) - v.ago + interval '1 minute', v.amount
+from (values
+  ('Peaje Queguay', 'plate:jkl3456', 'Ford Cargo 1722 · JKL3456', '10000000-0000-4000-8000-00000000000d', interval '5 hours', 455.5),
+  ('Peaje Pando', 'plate:abc1234', 'Volvo FH 460 · ABC1234', '10000000-0000-4000-8000-00000000000a', interval '90 minutes', null::numeric)
+) as v(point, vkey, vname, trip, ago, amount)
+join public.trf_road_points p on p.name = v.point and p.kind = 'toll';
