@@ -42,12 +42,14 @@ test('la campana avisa los viajes abiertos, lo que falta completar y las apps vi
   await expect(line('1 boleta sin importe o sin litros')).toContainText('De los últimos 30 días: completalas en Combustible.');
   await expect(line(/viajes? con carga sin importe/)).toContainText('De los últimos 60 días: completá el importe para cobrarlos.');
   await expect(line('2 choferes con la app vieja')).toContainText('Bruno (0.17.0), Carla (0.17.0). Ya hay una más nueva: 0.17.1.');
-  // Each one leads to where it is completed.
+  // Each one leads to where it is completed; the bell closes when the new page lands, and opens again from there.
   await line('1 boleta sin importe o sin litros').click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Combustible');
+  await expect(notices).toBeHidden();
   await bell.click();
   await line(/viajes? con carga sin importe/).click();
   await expect(page).toHaveURL(/#\/finanzas\/cobros$/);
+  await expect(notices).toBeHidden();
   await bell.click();
   await line('DEF5678 · Bruno Díaz').click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('GPS en vivo');
