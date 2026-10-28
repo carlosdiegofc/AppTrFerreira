@@ -150,6 +150,9 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 28/10/2026: Lo que sigue después del diseño de la app.
+  - La app para iPhone (iOS) queda para más adelante: primero se mejoran la app de Android y la web.
+  - Las próximas mejoras, en este orden y cada una presentada como etapa antes de programarla: avisos (en el teléfono del chofer y en la campana del panel), leer la boleta de combustible con la foto, y viajes con y sin carga en Viajes y Métricas.
 - 28/10/2026: Diseño de la app.
   - La app toma el diseño «vidrio» del panel y se vuelve más fluida. Por ahora solo diseño y movimiento: las funciones nuevas (avisos, resumen de plata, buscador) quedan para otra etapa.
   - El modo sencillo de los choferes también toma el diseño nuevo, con los botones igual de grandes y en el mismo lugar.
