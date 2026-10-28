@@ -135,6 +135,13 @@ Para pasar el rato mientras se espera la carga (aprobado el 21/10/2026). Se jueg
    - Necesita una migración, con su respaldo antes, y actualizar la política de privacidad y el formulario de datos de Google Play.
    - La misma regla del camión parado: si alguien arranca, la partida queda en pausa.
 
+### App: diseño «vidrio» y más fluida (aprobado el 28/10/2026)
+La app toma el diseño del panel y se mueve con más suavidad. Mismas funciones, mismos botones en el mismo lugar; lo que guarda y lo que manda no cambian, así que la base no cambia y los choferes que no actualicen siguen igual. Va en la app 0.22.0:
+1. [x] El diseño: el mismo fondo cálido desenfocado del panel, en claro y en oscuro según el teléfono; tarjetas translúcidas con borde fino, títulos y números grandes, botones en forma de píldora y los colores del panel. La barra de abajo marca la sección con una pastilla. En la pantalla del viaje y en el modo sencillo las tarjetas van casi opacas, para leer al sol. Los mapas y los juegos no cambian.
+2. [x] El movimiento: las pantallas entran deslizándose (desde la derecha al avanzar, desde la izquierda al volver), redibujar una pantalla no la vuelve al principio, las listas aparecen escalonadas, los botones y las tarjetas se achican al tocarlos, las acciones importantes vibran suave, los números del viaje cambian sin saltos y las listas para elegir suben desde abajo. Si el teléfono tiene las animaciones apagadas, la app no las hace.
+3. [ ] Capturas de cada pantalla, en claro y en oscuro, para que el dueño las apruebe antes de publicar: la versión de prueba muestra la app con datos de ejemplo, sin red, en el emulador de la CI.
+4. [ ] Publicación: el .aab de la 0.22.0, que se sube a Google Play cuando lo decidas.
+
 Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - El rol anónimo tiene todos los permisos de tabla en 8 tablas de la app y del panel (`trf_driver_*`, `trf_trip_*`, `trf_mobile_catalog`, `trf_panel_trips`), y también los de la secuencia que numera los puntos GPS. Es lo que Supabase da por defecto y la seguridad por filas lo frena, pero hay que quitarlos: solo `trf_rates` necesita lectura anónima.
 - Conviven dos tipos de administrador: `trf_private.admin_emails` (administración completa, por correo) y `trf_panel_admins` (panel: lee toda la flota y también administra mantenimiento y documentos). Los datos que se completan en el panel (`trf_panel_trips`) los lee solo la segunda lista. Los dos pasan a ser roles por empresa.
@@ -143,6 +150,10 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 28/10/2026: Diseño de la app.
+  - La app toma el diseño «vidrio» del panel y se vuelve más fluida. Por ahora solo diseño y movimiento: las funciones nuevas (avisos, resumen de plata, buscador) quedan para otra etapa.
+  - El modo sencillo de los choferes también toma el diseño nuevo, con los botones igual de grandes y en el mismo lugar.
+  - El desenfoque del fondo es una imagen ya preparada, como en el panel: no se calcula en el teléfono, para no gastar batería ni trabar los teléfonos más simples.
 - 27/10/2026: Cobros, ganancia y simulador.
   - La parte 12b va en dos entregas: primero Cobros, con su migración y su respaldo antes; después la ganancia, el simulador y la variación de los números grandes, sin cambios en la base.
   - Los gastos de un acoplado cuentan en la ganancia del camión que lo llevaba ese día, según los enganches de Flota. Si ese día no iba enganchado, cuentan solo en el total de la empresa.

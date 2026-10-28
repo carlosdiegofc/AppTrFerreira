@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The window of the dialogs: nearly solid, with the rounded corners of the panel's. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:insetLeft="20dp"
+    android:insetTop="24dp"
+    android:insetRight="20dp"
+    android:insetBottom="24dp">
+    <shape android:shape="rectangle">
+        <corners android:radius="28dp" />
+        <solid android:color="@color/trf_dialog" />
+    </shape>
+</inset>

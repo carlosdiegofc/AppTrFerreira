@@ -23,7 +23,7 @@ class Api(private val context: Context) {
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build())
         }.generateKey()
     }
-    fun session(): JSONObject? = synchronized(lock) {
+    fun session(): JSONObject? = sample ?: synchronized(lock) {
         try {
             val parts = prefs.getString("encrypted", null)?.split(":") ?: return@synchronized null
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
@@ -60,6 +60,8 @@ class Api(private val context: Context) {
         s.getString("access_token")
     }
     fun request(path: String, method: String = "GET", body: ByteArray? = null, prefer: String? = null, contentType: String = "application/json", auth: Boolean = true, retry: Boolean = true): String {
+        // The sample view of the emulator has a made-up account and never goes out to the network.
+        if (sample != null) throw java.io.IOException("Vista de muestra: sin red")
         val jwt = if(auth) token() else null
         val c = URL(Config.SUPABASE_URL + path).openConnection() as HttpURLConnection
         try {
@@ -76,6 +78,13 @@ class Api(private val context: Context) {
         } finally {c.disconnect()}
     }
     fun json(path:String, value:JSONObject, prefer:String?=null,method:String="POST") = request(path,method,value.toString().toByteArray(),prefer)
-    companion object { private val lock=Any() }
+    companion object {
+        private val lock=Any()
+        /**
+         * The made-up account of the sample view (MainActivity.sampleView): only on a debug build started for it, which
+         * never goes to Google Play. While it is set nothing is read from or sent to the server.
+         */
+        @Volatile var sample: JSONObject? = null
+    }
 }
 class ApiError(val status:Int, val response:String):Exception("No se pudo sincronizar (HTTP $status)")

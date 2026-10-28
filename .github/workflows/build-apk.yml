@@ -82,7 +82,7 @@ jobs:
     name: Probar la versión optimizada en un emulador
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -100,7 +100,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       # Sin DNS (-dns-server 127.0.0.1): la prueba nunca llega a la base real. Después de la versión optimizada, los juegos
-      # con la versión de prueba.
+      # con la versión de prueba, y con ella las capturas de cada pantalla en claro y en oscuro, con datos de muestra.
       - uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
@@ -112,6 +112,7 @@ jobs:
           script: |
             python3 .github/scripts/probar_app_optimizada.py apk-a-probar/app-release.apk prueba-version-optimizada
             python3 .github/scripts/probar_juegos.py apk-de-prueba/app-debug.apk prueba-juegos
+            python3 .github/scripts/capturas_app.py apk-de-prueba/app-debug.apk capturas-app
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -125,4 +126,11 @@ jobs:
           name: prueba-juegos
           path: prueba-juegos
           retention-days: 14
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: capturas-app
+          path: capturas-app
+          retention-days: 30
           if-no-files-found: ignore
