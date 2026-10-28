@@ -176,6 +176,7 @@ class MainActivity:AppCompatActivity(){
   if(ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED){if(active())try{service()}catch(_:Exception){};homeOrTrip()}
   else AlertDialog.Builder(this).setTitle("Activá la ubicación precisa").setMessage("El cuentakilómetros necesita ubicación precisa. Habilitala en los permisos de la app.").setPositiveButton("Abrir ajustes"){_,_->startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:$packageName")))}.setNegativeButton("Ahora no",null).show()
  }
+ private val notifyPermission=registerForActivityResult(ActivityResultContracts.RequestPermission()){if(screen=="settings")settings()}
  private val take=registerForActivityResult(ActivityResultContracts.TakePicture()){ok->if(ok)camera?.let{preparePhoto(Uri.fromFile(it))}else camera?.delete()}
  private val pick=registerForActivityResult(ActivityResultContracts.GetContent()){uri->if(uri!=null)preparePhoto(uri)}
 
@@ -196,7 +197,7 @@ class MainActivity:AppCompatActivity(){
   if(api.session()==null&&gamesTest()){intent?.getStringExtra("trf_test_truco")?.takeIf{b==null&&Truco.Match.load(it)!=null}?.let{prefs().edit().putString(trucoKey(),it).apply()}
    when(b?.getString("screen")){"chessnew"->chessOptions();"chess"->chess();"truco"->truco();else->games()};return}
   if(api.session()==null)login() else {name=driverName();when(b?.getString("screen")){"fuel"->fuel();"document"->document();"prepare"->prepare();"newtrip"->newTrip();"maintenance"->maintenance();"maintform"->maintForm();"documents"->documents();"docform"->paperForm();"privacy"->privacy();"mode"->askMode()
-   "triphistory"->history("trips",true);"fuelhistory"->history("fuel",true);"tripdetail"->historyTrip?.let{detail(it,true)}?:homeOrTrip();"settings"->settings();"performance"->performance(true);"owner"->ownerDashboard();"games"->games();"chessnew"->chessOptions();"chess"->chess();"truco"->truco();else->homeOrTrip()};Sync.schedule(this);refreshCatalog()}
+   "triphistory"->history("trips",true);"fuelhistory"->history("fuel",true);"tripdetail"->historyTrip?.let{detail(it,true)}?:homeOrTrip();"settings"->settings();"performance"->performance(true);"owner"->ownerDashboard();"games"->games();"chessnew"->chessOptions();"chess"->chess();"truco"->truco();else->homeOrTrip()};Sync.schedule(this);Reminders.schedule(this);refreshCatalog()}
  }
  @Suppress("DEPRECATION") private fun transparentBars(){window.statusBarColor=Color.TRANSPARENT;window.navigationBarColor=Color.TRANSPARENT}
  override fun onSaveInstanceState(b:Bundle){super.onSaveInstanceState(b);b.putString("camera",camera?.path);b.putString("photo",photo?.path);b.putString("screen",screen);b.putString("truck",truck);b.putBoolean("empty",empty);b.putString("tripForm",tripForm.toString());b.putString("fuelForm",fuelForm.toString());b.putString("docForm",docForm.toString());b.putString("draftDocs",draftDocs.toString());b.putString("fuelTrip",fuelTrip?.toString());b.putString("docTrip",docTrip?.toString());b.putString("historyTrip",historyTrip?.toString());b.putString("photoMode",photoMode);b.putString("docReturn",docReturn);b.putString("editForm",editForm.toString());b.putString("editId",editId);b.putString("maintTruck",maintTruck);b.putInt("maintFilter",maintFilter)
@@ -519,7 +520,7 @@ class MainActivity:AppCompatActivity(){
   val msg=text(form,"",14f,red,0,10)
   lateinit var submit:Btn
   submit=button(form,"Ingresar",top=6){val e=email.text.toString().trim().lowercase();val p=pass.text.toString();if(e.isBlank()||p.isBlank()){msg.text="Completá correo y contraseña";return@button};submit.enable(false);msg.setTextColor(muted);msg.text="Ingresando…"
-   thread{try{api.login(e,p);name=driverName();runOnUiThread{pass.text.clear();if(panelFirst())ownerDashboard() else askMode();Sync.schedule(this);refreshCatalog()}}catch(_:Exception){runOnUiThread{submit.enable(true);msg.setTextColor(red);msg.text="No se pudo ingresar. Revisá tus datos y la conexión."}}}}
+   thread{try{api.login(e,p);name=driverName();runOnUiThread{pass.text.clear();if(panelFirst())ownerDashboard() else askMode();Sync.schedule(this);Reminders.schedule(this);refreshCatalog()}}catch(_:Exception){runOnUiThread{submit.enable(true);msg.setTextColor(red);msg.text="No se pudo ingresar. Revisá tus datos y la conexión."}}}}
   text(form,"Tu sesión queda guardada de forma segura en este teléfono.",13f,muted,0,16).gravity=Gravity.CENTER
   link(form,"Política de privacidad",top=2,color=blue){privacy()}
  }
@@ -870,6 +871,15 @@ class MainActivity:AppCompatActivity(){
   button(dock,"Finalizar viaje",Kind.DANGER,R.drawable.ic_flag,top=0){askFinish()}
   refresh();try{service()}catch(_:Exception){gps?.text="Revisá el permiso de ubicación para continuar"}
  }
+ /** A trip that ended without receipts asks once whether fuel was loaded in it (decision of 28/10/2026). */
+ private fun askReceipt(t:JSONObject){
+  val id=t.optString("id");val asked="asked-receipt-"
+  if(id.isBlank()||store.receiptCount(id)>0||!Reminders.on(this,Reminders.RECEIPT,uid())||prefs().getBoolean(asked,false))return
+  prefs().edit().putBoolean(asked,true).apply()
+  sheet("¿Cargaste combustible en este viaje?","No tiene boletas cargadas. Si cargaste, sumala ahora que la tenés a mano."){list,d->
+   button(list,"Cargar la boleta",Kind.PRIMARY,R.drawable.ic_fuel,top=0){d.dismiss();openFuel(t)}
+   button(list,"No cargué combustible",Kind.LINE,top=10){d.dismiss()}}
+ }
  private fun askFinish(){AlertDialog.Builder(this).setTitle("¿Finalizar este viaje?").setMessage("Se guardarán el recorrido, las boletas y los remitos.").setNegativeButton("Seguir viaje",null).setPositiveButton("Finalizar"){_,_->try{service(GpsService.FINISH)}catch(_:Exception){toast("No se pudo finalizar. Reintentá.")}}.show()}
  private fun actionBox(p:LinearLayout,icon:Int,label:String,index:Int,action:()->Unit):Pair<ImageView,TextView>{
   val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=ripple(glassy(20));isClickable=true;isFocusable=true;contentDescription=label;setOnClickListener{action()}};sink(v,.95f)
@@ -895,7 +905,7 @@ class MainActivity:AppCompatActivity(){
   if(screen=="owner"&&!fleetLoading){val now=System.currentTimeMillis();if(now-fleetLoadedAt>FLEET_MS)loadFleet() else if(!liveLoading&&now-liveLoadedAt>LIVE_MS)loadLive()}
   if(screen=="games"||screen=="chessnew"||screen=="chess"||screen=="truco")gamesCheck()
   if(screen!="trip"&&screen!="simpletrip")return;val t=store.current()?:return
-  if(!t.optBoolean("active")){home();toast("Viaje finalizado. Los datos pendientes se enviarán con conexión.");return}
+  if(!t.optBoolean("active")){home();toast("Viaje finalizado. Los datos pendientes se enviarán con conexión.");askReceipt(t);return}
   val paused=t.optBoolean("paused")
   status?.text=if(paused)"Viaje pausado" else "Viaje en curso";statusBox?.background=bg(if(paused)0xFFB7740B.toInt() else 0xFF178A4C.toInt(),if(screen=="trip")24 else 22)
   elapsed?.text=elapsedText(t.optString("started_at"))
@@ -1174,7 +1184,7 @@ class MainActivity:AppCompatActivity(){
    "fuel"->openFuel(null);"document"->openDocument(t,"tripdetail","arrival");"triphistory"->history("trips");"fuelhistory"->history("fuel");"tripdetail"->t?.let{detail(it)}?:home()
    "documents"->documents();"maintenance"->maintenance();"settings"->settings();"games"->games();"privacy"->privacy()
    "simplehome"->simpleHome();"simpleask"->{startAskAt=SystemClock.elapsedRealtime();simpleHome(true)};"simpletrip"->simpleTrip();"simplefinish"->{simpleTrip();finishAsk=true;simpleDock()}
-   "trip"->trip();"tripfinish"->{trip();askFinish()};"ownermenu"->{home();ownerMenu()};"owner"->ownerDashboard();"performance"->performance()
+   "trip"->trip();"tripfinish"->{trip();askFinish()};"receipt"->{home();t?.let{askReceipt(it)}};"ownermenu"->{home();ownerMenu()};"owner"->ownerDashboard();"performance"->performance()
    else->home()}
   // The screens of a trip change every second and the emulator's reader of screens never finds them still: the script
   // knows the screen is up from this line of the log.
@@ -1591,6 +1601,17 @@ class MainActivity:AppCompatActivity(){
   if(!panelFirst()){section("Modo de uso");val mc=card(pad=16)
    segmented(mc,listOf("Sencillo","Normal"),if(mode()==UiMode.SIMPLE)0 else 1,top=0){setMode(if(it==0)UiMode.SIMPLE else UiMode.NORMAL);toast(if(it==0)"Modo sencillo activado" else "Modo normal activado");homeOrTrip()}
    note("Sencillo: solo iniciar y finalizar el viaje, con botones grandes. Normal: todas las opciones.",mc,10)}
+  // Notices (decision of 28/10/2026): each kind can be turned off; the company account has no trips of its own.
+  section("Avisos")
+  val ac=card()
+  fun toggle(icon:Int,title:String,sub:String,kind:String){
+   val sw=Switch(this).apply{isChecked=Reminders.on(this@MainActivity,kind,uid());isClickable=false;isFocusable=false;importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO}
+   row(ac,icon,title,sub+if(sw.isChecked)" · Activado" else " · Desactivado",trailing=sw){val on=!sw.isChecked;Reminders.set(this,kind,uid(),on);if(on&&!Reminders.allowed(this))askNotify();settings()}
+  }
+  toggle(R.drawable.ic_doc,"Papeles y services","A las 8:00, lo que vence en 30 días o ya venció",Reminders.PAPERS)
+  if(!panelFirst()){toggle(R.drawable.ic_flag,"Viaje abierto","A las 14 horas en curso, o con 2 horas detenido sin pausar",Reminders.TRIP)
+   toggle(R.drawable.ic_fuel,"Boleta al finalizar","Si el viaje no tiene boletas cargadas",Reminders.RECEIPT)}
+  if(!Reminders.allowed(this)){note("Las notificaciones de la app están apagadas en el teléfono: los avisos no llegan.",top=8);link(root,"Activar las notificaciones",top=2){askNotify()}}
   section("Sincronización")
   val sc=card(pad=16);sync=text(sc,store.message(),15f,ink);note("Los viajes, boletas y remitos se guardan en el teléfono y se envían solos cuando hay conexión.",sc,6)
   button(sc,"Enviar pendientes y actualizar",Kind.SOFT,R.drawable.ic_sync){syncNow()}
@@ -1606,6 +1627,11 @@ class MainActivity:AppCompatActivity(){
   button(root,"Cerrar sesión",Kind.LINE_DANGER,R.drawable.ic_logout){logout()}
   note("Transportes Ferreira GPS · versión $appVersion",top=18).gravity=Gravity.CENTER
   navBar("more")
+ }
+ /** Asks for the notifications, or opens their page of the phone's settings when they were turned off there. */
+ private fun askNotify(){
+  if(Build.VERSION.SDK_INT>=33&&ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)notifyPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+  else try{startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,packageName))}catch(_:Exception){toast("Activá las notificaciones en Ajustes › Apps › Transportes Ferreira GPS")}
  }
  private fun logout(){if(active()||store.pendingCount()>0){toast("Finalizá el viaje y enviá los datos pendientes antes de cerrar sesión.");return};api.clear();presenceAt=null;login()}
  /**

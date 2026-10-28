@@ -5,7 +5,15 @@ Panel web nuevo (React + TypeScript), en la dirección principal del panel desde
 # Panel web (anterior)
 La carpeta [`web/`](web/README.md) tiene el panel web anterior, que queda en `/anterior/` de la misma dirección un tiempo: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
 
-# Transportes Ferreira GPS — v0.22.0
+# Transportes Ferreira GPS — v0.23.0
+
+## Nuevo en v0.23.0 (avisos; versionCode 35)
+- **Avisos en el teléfono** (decisión del 28/10/2026): los calcula la app con lo que ya tiene; no se envía nada más y llegan aunque no haya señal.
+  - **Papeles y services, a las 8:00:** los papeles del chofer y los de su camión que vencen en 30 días o ya vencieron, y los services del camión a 15 días o atrasados. Avisa cuando algo pasa a «por vencer» o a «vencido», no todos los días. El dueño que maneja recibe los de toda la flota. Los services por kilómetros avisan en el panel, que conoce todos los viajes del camión.
+  - **Viaje abierto:** «¿Te olvidaste de finalizar el viaje?» a las 14 horas en curso, o con 2 horas detenido sin pausar.
+  - **Boleta:** al finalizar un viaje sin boletas, pregunta «¿Cargaste combustible en este viaje?», con el botón para cargarla.
+  - **En Mi cuenta,** un interruptor para cada tipo de aviso, y el aviso de si las notificaciones están apagadas en el teléfono.
+- **Sin cambios en lo que se guarda o se envía.**
 
 ## Nuevo en v0.22.0 (el diseño del panel, y más fluida; versionCode 34)
 - **La app se ve como el panel web** (decisión del 28/10/2026): la misma habitación desenfocada de fondo, de día o de noche según el teléfono, con tarjetas de vidrio encima, botones redondeados y el azul del logo.

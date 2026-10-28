@@ -7,8 +7,9 @@ import { dayInZone } from '../lib/dates';
 import { usePopover } from './popover';
 
 export function Notices() {
-  const today = dayInZone(useNow(60_000));
-  const notices = useNotices(today);
+  const now = useNow(60_000);
+  const today = dayInZone(now);
+  const notices = useNotices(today, now);
   const { open, setOpen, ref } = usePopover();
   const total = notices.total;
   return (

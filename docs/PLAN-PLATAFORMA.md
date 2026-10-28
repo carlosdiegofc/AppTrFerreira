@@ -139,8 +139,17 @@ Para pasar el rato mientras se espera la carga (aprobado el 21/10/2026). Se jueg
 La app toma el diseño del panel y se mueve con más suavidad. Mismas funciones, mismos botones en el mismo lugar; lo que guarda y lo que manda no cambian, así que la base no cambia y los choferes que no actualicen siguen igual. Va en la app 0.22.0:
 1. [x] El diseño: el mismo fondo cálido desenfocado del panel, en claro y en oscuro según el teléfono; tarjetas translúcidas con borde fino, títulos y números grandes, botones en forma de píldora y los colores del panel. La barra de abajo marca la sección con una pastilla. En la pantalla del viaje y en el modo sencillo las tarjetas van casi opacas, para leer al sol. Los mapas y los juegos no cambian.
 2. [x] El movimiento: las pantallas entran deslizándose (desde la derecha al avanzar, desde la izquierda al volver), redibujar una pantalla no la vuelve al principio, las listas aparecen escalonadas, los botones y las tarjetas se achican al tocarlos, las acciones importantes vibran suave, los números del viaje cambian sin saltos y las listas para elegir suben desde abajo. Si el teléfono tiene las animaciones apagadas, la app no las hace.
-3. [ ] Capturas de cada pantalla, en claro y en oscuro, para que el dueño las apruebe antes de publicar: la versión de prueba muestra la app con datos de ejemplo, sin red, en el emulador de la CI.
-4. [ ] Publicación: el .aab de la 0.22.0, que se sube a Google Play cuando lo decidas.
+3. [x] Capturas de cada pantalla, en claro y en oscuro, para que el dueño las apruebe antes de publicar: la versión de prueba muestra la app con datos de ejemplo, sin red, en el emulador de la CI. Aprobadas por el dueño el 28/10/2026 (24 pantallas, ejecución 40715422543); unión del PR #28 el mismo día.
+4. [x] Publicación: el .aab de la 0.22.0, que se sube a Google Play cuando lo decidas. Quedó firmado el 28/10/2026 en la ejecución 40722251341 de main (artefacto «Google-Play-Transportes-Ferreira-GPS-v0.22.0»).
+
+### Avisos (aprobado el 28/10/2026)
+Avisos en el teléfono del chofer y en la campana del panel. Los del teléfono los calcula la app con lo que ya tiene: no hay servidor nuevo, no se envía nada más y llegan aunque no haya señal. Va en la app 0.23.0 y en el panel:
+1. [x] Papeles y services, a las 8:00: los papeles del chofer y los de su camión que vencen en 30 días o ya vencieron, y los services de su camión a 15 días o atrasados. Avisa cuando algo pasa a «por vencer» o a «vencido», no todos los días. El dueño que maneja recibe los de toda la flota, como los ve en su inicio. Los services por kilómetros avisan en el panel: el teléfono del chofer solo ve sus propios viajes y no puede estimar los kilómetros del camión.
+2. [x] Viaje abierto: «¿Te olvidaste de finalizar el viaje?» cuando lleva 14 horas en curso, o 2 horas detenido sin pausar.
+3. [x] Boleta: al finalizar un viaje sin boletas, «¿Cargaste combustible en este viaje?», con el botón para cargarla.
+4. [x] En Mi cuenta, un interruptor por cada tipo de aviso.
+5. [x] La campana del panel suma los viajes en curso hace más de 14 horas, las boletas sin importe o sin litros, los viajes con carga sin importe y los choferes con una versión vieja de la app; cada aviso lleva a su página.
+6. [ ] Publicación: el panel y el .aab de la 0.23.0.
 
 Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - El rol anónimo tiene todos los permisos de tabla en 8 tablas de la app y del panel (`trf_driver_*`, `trf_trip_*`, `trf_mobile_catalog`, `trf_panel_trips`), y también los de la secuencia que numera los puntos GPS. Es lo que Supabase da por defecto y la seguridad por filas lo frena, pero hay que quitarlos: solo `trf_rates` necesita lectura anónima.
@@ -150,6 +159,10 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 28/10/2026: Avisos.
+  - Los avisos del teléfono los calcula la app, sin Firebase ni servidor nuevo: sin costo y sin cambios en la política de privacidad. Los avisos al instante al dueño (por ejemplo, un camión detenido) quedan para más adelante.
+  - Un viaje abierto se avisa a las 14 horas en curso, o con 2 horas detenido sin pausar.
+  - Los avisos de papeles y services llegan a las 8:00.
 - 28/10/2026: Lo que sigue después del diseño de la app.
   - La app para iPhone (iOS) queda para más adelante: primero se mejoran la app de Android y la web.
   - Las próximas mejoras, en este orden y cada una presentada como etapa antes de programarla: avisos (en el teléfono del chofer y en la campana del panel), leer la boleta de combustible con la foto, y viajes con y sin carga en Viajes y Métricas.

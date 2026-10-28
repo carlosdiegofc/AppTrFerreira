@@ -20,6 +20,8 @@ class GpsService:Service(){
  /** The reading before the last one, for the route: when the truck turns, it is the corner (RouteSampler.corner). */
  private var lastReading:JSONObject?=null
  private var watchSince=System.currentTimeMillis();private var lastRestart=0L
+ // When the truck last moved, and whether its stop was already told (Notices.open): a trip that looks left open asks.
+ private var movedAt=System.currentTimeMillis();private var toldStop=false
  private val syncing=AtomicBoolean(false);private val executor=Executors.newSingleThreadExecutor()
  // The live position has its own line out, so it never waits behind the trip, the route or the photos.
  private val sendingLive=AtomicBoolean(false);private val liveExecutor=Executors.newSingleThreadExecutor();private var tripSentAt=0L
@@ -36,8 +38,8 @@ class GpsService:Service(){
   if(tripId!=t.getString("id")){distance.reset();route.restore(t.optString("route_state"));lastReading=t.optJSONObject("last_point");tripId=t.getString("id")}
   when(i?.action){
    PAUSE->{keepLast();store.update{it.put("paused",true).put("speed_kmh",0.0)};stopGps();distance.reset();sendLive();sync()}
-   RESUME->{store.update{it.put("paused",false).put("segment",it.optInt("segment")+1)};distance.reset();sync()}
-   FINISH->{keepLast();store.update{it.optJSONObject("last_point")?.let{p->it.put("arrival_lat",p.optDouble("latitude")).put("arrival_lng",p.optDouble("longitude"))};it.put("active",false).put("paused",false).put("ended_at",Instant.now().toString()).put("speed_kmh",0.0)};stopGps();Sync.schedule(this);sync();stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();return START_NOT_STICKY}
+   RESUME->{store.update{it.put("paused",false).put("segment",it.optInt("segment")+1)};distance.reset();movedAt=System.currentTimeMillis();toldStop=false;sync()}
+   FINISH->{keepLast();Reminders.tripClosed(this);store.update{it.optJSONObject("last_point")?.let{p->it.put("arrival_lat",p.optDouble("latitude")).put("arrival_lng",p.optDouble("longitude"))};it.put("active",false).put("paused",false).put("ended_at",Instant.now().toString()).put("speed_kmh",0.0)};stopGps();Sync.schedule(this);sync();stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();return START_NOT_STICKY}
   }
   val paused=store.current()?.optBoolean("paused")?:false;try{notifyTrip(paused)}catch(_:Exception){};if(paused)stopGps() else startGps();handler.removeCallbacks(timer);handler.post(timer);return START_STICKY
  }
@@ -45,6 +47,7 @@ class GpsService:Service(){
  @Suppress("MissingPermission") private fun startGps(){if(callback!=null)return;callback=object:LocationCallback(){override fun onLocationResult(r:LocationResult){r.locations.forEach{record(it)}}};try{fused.requestLocationUpdates(LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY,2000).setMinUpdateIntervalMillis(1000).setWaitForAccurateLocation(false).build(),callback!!,mainLooper).addOnFailureListener{store.message("GPS no disponible · revisá los permisos");stopGps()}}catch(_:SecurityException){store.message("Falta permiso de ubicación precisa");stopGps()}}
  private fun watchdog(){
   val t=store.current()?:return
+  openCheck(t)
   if(!t.optBoolean("active")||t.optBoolean("paused")){if(store.warning().isNotEmpty()){store.warning("");clearAlert()};return}
   val now=System.currentTimeMillis()
   val granted=checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED
@@ -58,6 +61,16 @@ class GpsService:Service(){
   }
   // A location client that stops delivering fixes is restarted at most once a minute.
   if(granted&&gpsOn&&silent>60&&now-lastRestart>60000){lastRestart=now;stopGps();startGps()}
+ }
+ /** A trip that looks left open asks whether to finish it: after 14 hours once, and once for each long stop without a pause. */
+ private fun openCheck(t:JSONObject){
+  if(!t.optBoolean("active"))return
+  val started=try{Instant.parse(t.getString("started_at")).toEpochMilli()}catch(_:Exception){return}
+  when(Notices.open(started,movedAt,System.currentTimeMillis(),t.optBoolean("paused"))){
+   Notices.Open.LONG->Reminders.tripOpen(this,Notices.Open.LONG,t)
+   Notices.Open.STOPPED->if(!toldStop){toldStop=true;Reminders.tripOpen(this,Notices.Open.STOPPED,t)}
+   null->{}
+  }
  }
  private fun alert(text:String){
   val open=PendingIntent.getActivity(this,1,Intent(this,MainActivity::class.java),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
@@ -73,6 +86,7 @@ class GpsService:Service(){
   // GPS jitter (RouteSampler). At a turn the reading before it, where the truck went round the corner, goes in first.
   store.appendTrack(t.getString("id"),l.latitude,l.longitude,t.optInt("segment"),l.time)
   val kmh=if(l.hasSpeed())(l.speed*3.6).coerceAtLeast(0.0) else null
+  if((kmh?:0.0)>=Notices.MOVING_KMH){movedAt=System.currentTimeMillis();toldStop=false}
   if(route.keep(l.latitude,l.longitude,l.time,t.optInt("segment"),kmh,l.accuracy.toDouble(),if(l.hasBearing())l.bearing.toDouble() else null)){
    if(route.corner)lastReading?.let{store.addPoint(it)}
    store.addPoint(p)

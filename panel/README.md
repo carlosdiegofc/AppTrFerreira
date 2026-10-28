@@ -24,7 +24,13 @@ Desde el 26/10/2026, el panel tiene el estilo «vidrio» del video que mandó el
 - **Barra de arriba,** flotante:
   - quién ingresó, que abre el tema y «Salir»;
   - un buscador de secciones, camiones, acoplados y choferes por nombre, matrícula o teléfono, sin importar tildes ni mayúsculas, que también busca el texto en Viajes, en Gastos y entre los clientes de Cobros. Si no puede leer los camiones o los choferes, lo dice con «Reintentar» en vez de «No hay…»;
-  - la campana, con los mismos avisos de «Para tener en cuenta» de Inicio y cuántos son, y lo que no se pudo leer o actualizar.
+  - la campana, con los mismos avisos de «Para tener en cuenta» de Inicio y cuántos son, y lo que no se pudo leer o actualizar. Desde el 28/10/2026 suma:
+    - los viajes en curso hace 14 horas o más, que llevan al GPS en vivo;
+    - las boletas de los últimos 30 días sin importe o sin litros, que llevan a Combustible;
+    - los viajes de los últimos 60 días con carga y sin importe (la regla de Cobros), que llevan a Cobros;
+    - los choferes vistos en los últimos 30 días con una versión de la app más vieja que la de otro teléfono, que llevan al GPS en vivo.
+
+    Se leen cada 5 minutos, porque la campana está en todas las páginas (`src/lib/notices.ts`, `src/data/notices.ts`).
 - **Menú:** a la izquierda, una columna de íconos que dicen su nombre al pasar el mouse. En el celular se abre con el botón de menú, con los nombres, el tema y «Salir».
 - **Vidrio:**
   - Las tarjetas son translúcidas.
