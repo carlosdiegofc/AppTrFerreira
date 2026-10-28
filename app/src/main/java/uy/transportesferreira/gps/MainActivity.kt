@@ -1176,6 +1176,9 @@ class MainActivity:AppCompatActivity(){
    "simplehome"->simpleHome();"simpleask"->{startAskAt=SystemClock.elapsedRealtime();simpleHome(true)};"simpletrip"->simpleTrip();"simplefinish"->{simpleTrip();finishAsk=true;simpleDock()}
    "trip"->trip();"tripfinish"->{trip();askFinish()};"ownermenu"->{home();ownerMenu()};"owner"->ownerDashboard();"performance"->performance()
    else->home()}
+  // The screens of a trip change every second and the emulator's reader of screens never finds them still: the script
+  // knows the screen is up from this line of the log.
+  stage?.post{android.util.Log.i("TRF-muestra","lista ${intent.getStringExtra("trf_sample_tag")?:see}.")}
  }
  /** Trips, receipts, papers, services, the fleet and the month of a small company, around today. */
  private fun sampleData(){

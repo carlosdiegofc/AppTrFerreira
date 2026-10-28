@@ -3,8 +3,9 @@
 
 The design of the app (decision of 28/10/2026, «vidrio») is approved from these screenshots. The debug APK opens each
 screen with made-up data and no network (the sample view, MainActivity.sampleView): trf_sample says the account
-(«driver» or «owner») and trf_sample_screen the screen. The sign-in is taken without an account. Each screen has to show
-its words; it fails if one does not, or if the app closes by itself. The emulator starts without DNS anyway.
+(«driver» or «owner») and trf_sample_screen the screen. The sign-in is taken without an account. Each screen says in the
+log that it is up (TRF-muestra) and, unless it changes every second, has to show its words; it fails if one does not, or
+if the app closes by itself. The emulator starts without DNS anyway.
 
 Usage: capturas_app.py <debug apk> <output folder>. The screenshots and the phone's log are left in the folder.
 """
@@ -17,7 +18,8 @@ from pathlib import Path
 PKG = 'com.transportesferreira.app'
 MAIN = PKG + '/uy.transportesferreira.gps.MainActivity'
 # Each screen: its name in the screenshot, the account, the screen of the sample view and a text it has to show. The trip
-# screens go last: their trip in progress would show on the start screens.
+# screens go last: their trip in progress would show on the start screens. Their clock changes every second, so the
+# reader of screens (uiautomator) never finds them still: for them (None) the line of the log is enough.
 SCREENS = [
     ('modo', 'driver', 'mode', '¿Qué modo querés usar?'),
     ('inicio', 'driver', 'home', 'Martín Pereira'),
@@ -38,10 +40,10 @@ SCREENS = [
     ('menu-del-dueno', 'owner', 'ownermenu', 'Toda la flota, desde tu cuenta'),
     ('flota-en-vivo', 'owner', 'owner', 'Flota en vivo'),
     ('rendimiento', 'owner', 'performance', 'Rendimiento'),
-    ('viaje-activo', 'driver', 'trip', 'Viaje activo'),
-    ('finalizar-viaje', 'driver', 'tripfinish', '¿Finalizar este viaje?'),
-    ('sencillo-viaje', 'driver', 'simpletrip', 'FINALIZAR VIAJE'),
-    ('sencillo-finalizar', 'driver', 'simplefinish', '¿Finalizar el viaje?'),
+    ('viaje-activo', 'driver', 'trip', None),
+    ('finalizar-viaje', 'driver', 'tripfinish', None),
+    ('sencillo-viaje', 'driver', 'simpletrip', None),
+    ('sencillo-finalizar', 'driver', 'simplefinish', None),
 ]
 
 apk, out = Path(sys.argv[1]), Path(sys.argv[2])
@@ -96,6 +98,18 @@ def wait(what: str, text: str, seconds: int = 40) -> None:
     fail(f'no apareció {what} («{text}»)')
 
 
+def ready(what: str, tag: str, seconds: int = 40) -> None:
+    """Waits for the line the sample view writes in the log once the screen of that tag is up."""
+    end = time.time() + seconds
+    while time.time() < end:
+        if f'lista {tag}.' in adb('logcat', '-d', '-s', 'TRF-muestra:I', check=False, timeout=60).stdout:
+            return
+        if not running():
+            fail(f'la app se cerró mientras se esperaba {what}')
+        time.sleep(1)
+    fail(f'no apareció {what}')
+
+
 def shot(name: str) -> None:
     image = subprocess.run(['adb', 'exec-out', 'screencap', '-p'], capture_output=True, timeout=30).stdout
     (out / f'{name}.png').write_bytes(image)
@@ -135,8 +149,13 @@ try:
         shot(f'{theme}-00-ingreso')
         for i, (name, who, see, text) in enumerate(SCREENS, start=1):
             step(f'{name} ({theme})')
-            open_screen(['--es', 'trf_sample', who, '--es', 'trf_sample_screen', see])
-            wait(name, text)
+            tag = f'{theme}-{i}'
+            open_screen(['--es', 'trf_sample', who, '--es', 'trf_sample_screen', see, '--es', 'trf_sample_tag', tag])
+            ready(name, tag)
+            if text is not None:
+                wait(name, text)
+            elif not running():
+                fail(f'la app se cerró en {name}')
             # The photo of the room fades in and the screen settles.
             time.sleep(1.5)
             shot(f'{theme}-{i:02d}-{name}')
