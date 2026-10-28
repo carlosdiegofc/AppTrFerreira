@@ -61,6 +61,20 @@ test('unas fechas de un enlace que no son fechas no rompen la página ni compara
   }
 });
 
+test('actualizar en Métricas vuelve a leer también los días anteriores', async ({ page }) => {
+  // The 3 days before 13/10 start on 10/10: the trips of that window are asked with its bounds.
+  const asked: string[] = [];
+  page.on('request', (r) => {
+    if (r.url().includes('trf_driver_tracking_sessions') && r.url().includes('2026-10-10T03')) asked.push(r.url());
+  });
+  await signInAt(page, './#/metricas?periodo=fechas&desde=2026-10-13&hasta=2026-10-15');
+  await expect(tile(page, 'Combustible').locator('.stat-trend')).toBeVisible();
+  const first = asked.length;
+  expect(first).toBeGreaterThan(0);
+  await page.getByRole('button', { name: 'Actualizar' }).click();
+  await expect.poll(() => asked.length).toBeGreaterThan(first);
+});
+
 test('Gastos compara lo gastado con los días anteriores', async ({ page }) => {
   // 24 days, against the 24 before them, which had the Mercedes' road tax of 21/09.
   await signInAt(page, './#/finanzas?periodo=fechas&desde=2026-09-22&hasta=2026-10-15');

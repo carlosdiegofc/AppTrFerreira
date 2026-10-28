@@ -383,8 +383,8 @@ export function Ganancia() {
       <p key="fuel" className="notice notice-warn">
         <Icon name="warning" size={18} />{' '}
         {chosen.fleet.fuelMissing === 1
-          ? 'Una boleta de combustible del mes no tiene importe: no suma hasta completarla en Combustible.'
-          : `${count(chosen.fleet.fuelMissing)} boletas de combustible del mes no tienen importe: no suman hasta completarlas en Combustible.`}
+          ? 'Una boleta de combustible del mes no tiene importe o está en cero: no suma hasta completarla en Combustible.'
+          : `${count(chosen.fleet.fuelMissing)} boletas de combustible del mes no tienen importe o están en cero: no suman hasta completarlas en Combustible.`}
       </p>,
     );
   if (chosen && chosen.fleet.tollsWithoutRate > 0)

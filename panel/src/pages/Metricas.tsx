@@ -295,7 +295,9 @@ export function Metricas() {
   };
   const onSort = (key: SortKey) => setSort((s) => (s.key === key ? { key, ascending: !s.ascending } : { key, ascending: key === 'name' }));
   const tripsOf = (r: MetricsRow) => `/viajes?${new URLSearchParams({ periodo: 'fechas', desde: from, hasta: to, [view.param]: r.name }).toString()}`;
-  const refresh = () => void Promise.all([query.refetch(), fuel.query.refetch(), billed.refetch()]);
+  // The days before are read again too, or the change would compare two different moments. Without them (a period that
+  // cannot be compared) that query is off, and asking it would read nothing useful.
+  const refresh = () => void Promise.all([query.refetch(), ...(beforeInstants ? [previous.query.refetch()] : []), fuel.query.refetch(), billed.refetch()]);
   const loadedAt = query.dataUpdatedAt || null;
   const what = `Del ${formatDay(from)} al ${formatDay(to)}`;
 
@@ -371,7 +373,7 @@ export function Metricas() {
         </div>
         <div className="list-info">
           {loadedAt !== null && <span className="updated">actualizado {ago(loadedAt, now)}</span>}
-          <RefreshButton onClick={refresh} busy={query.isFetching || fuel.query.isFetching || billed.isFetching} />
+          <RefreshButton onClick={refresh} busy={query.isFetching || previous.query.isFetching || fuel.query.isFetching || billed.isFetching} />
         </div>
       </div>
 

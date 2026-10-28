@@ -78,11 +78,14 @@ export function simulate(v: SimulatorValues): { quote: Quote | null; errors: Par
   };
 }
 
-/** A price of diesel to start from: the pesos per litre of the last receipt in pesos with litres and amount. */
-export function lastDieselPrice(receipts: readonly Receipt[]): { price: number; date: string; station: string | null } | null {
+/**
+ * A price of diesel to start from: the pesos per litre of the last receipt in pesos with litres and amount, of today or
+ * before. A receipt dated after today is a wrong date waiting to be corrected, not a price to quote with.
+ */
+export function lastDieselPrice(receipts: readonly Receipt[], today: string): { price: number; date: string; station: string | null } | null {
   let found: Receipt | null = null;
   for (const r of receipts) {
-    if (r.archived || r.currency !== 'UYU' || !r.liters || !r.total || r.date === null) continue;
+    if (r.archived || r.currency !== 'UYU' || !r.liters || !r.total || r.date === null || r.date > today) continue;
     if (!found || r.date > (found.date as string) || (r.date === found.date && (r.recordedAt ?? '') > (found.recordedAt ?? ''))) found = r;
   }
   return found ? { price: cents((found.total as number) / (found.liters as number)), date: found.date as string, station: found.station } : null;

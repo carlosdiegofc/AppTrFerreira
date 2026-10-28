@@ -69,3 +69,13 @@ test('un camión sin consumo no se queda con el del camión anterior, pero sí c
   await truck.selectOption({ label: 'Mercedes Benz Actros · GHI9012' });
   await expect(consumption).toHaveValue('2,8');
 });
+
+test('el precio del gasoil que ofrece no sale de una boleta con fecha posterior a hoy', async ({ page }) => {
+  // The browser two days before the seed: the receipts of 15/10 are dated after «today», like a receipt with a wrong date.
+  await page.clock.setFixedTime(new Date('2026-10-13T15:00:00Z'));
+  await openSimulador(page);
+  // Diego's of 13/10, in pesos: 300 litres for $ 16.500.
+  await expect(page.locator('.hint', { hasText: 'La última boleta en pesos' })).toContainText('$ 55 el litro, del 13/10/2026');
+  await page.getByRole('button', { name: 'Usar ese' }).click();
+  await expect(page.getByLabel('Precio del gasoil')).toHaveValue('55');
+});

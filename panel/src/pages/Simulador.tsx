@@ -6,9 +6,9 @@ import { type ReactNode, useId, useMemo, useState } from 'react';
 import { FinanceTabs } from '../components/FinanceTabs';
 import { Icon } from '../components/Icon';
 import { PageHead } from '../components/ui';
-import { useFuel } from '../data/hooks';
+import { useFuel, useNow } from '../data/hooks';
 import { useTanks } from '../data/tanks';
-import { formatDay } from '../lib/dates';
+import { dayInZone, formatDay } from '../lib/dates';
 import { count, decimal, money } from '../lib/format';
 import { EMPTY_SIMULATOR, lastDieselPrice, simulate, type SimulatorField, type SimulatorValues } from '../lib/simulator';
 import { kmPerLiter } from '../lib/tanks';
@@ -47,7 +47,8 @@ export function Simulador() {
     [tanks.rows],
   );
   const chosen = trucks.find((t) => t.key === truck) ?? null;
-  const diesel = useMemo(() => lastDieselPrice(fuel.receipts), [fuel.receipts]);
+  const today = dayInZone(useNow(60_000));
+  const diesel = useMemo(() => lastDieselPrice(fuel.receipts, today), [fuel.receipts, today]);
 
   const chooseTruck = (key: string) => {
     setTruck(key);

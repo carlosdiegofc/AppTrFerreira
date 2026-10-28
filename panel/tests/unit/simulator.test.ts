@@ -64,8 +64,16 @@ describe('lastDieselPrice', () => {
         r({ date: '2026-10-14', total: 300, currency: 'USD' }),
         r({ date: '2026-10-14', liters: null }),
         r({ date: '2026-10-14', archived: true }),
-      ]),
+      ], '2026-10-14'),
     ).toEqual({ price: 56, date: '2026-10-12', station: 'Petrobras Salto' });
-    expect(lastDieselPrice([])).toBeNull();
+    expect(lastDieselPrice([], '2026-10-14')).toBeNull();
+  });
+
+  it('leaves out the receipts dated after today: a wrong date is no price to quote with', () => {
+    const list = [r({ date: '2026-10-10', total: 5450 }), r({ date: '2026-10-12', total: 5600, station: 'Petrobras Salto' }), r({ date: '2026-10-15', total: 9000 })];
+    expect(lastDieselPrice(list, '2026-10-14')).toEqual({ price: 56, date: '2026-10-12', station: 'Petrobras Salto' });
+    // A receipt of today counts; only the ones after it do not.
+    expect(lastDieselPrice(list, '2026-10-15')?.date).toBe('2026-10-15');
+    expect(lastDieselPrice(list, '2026-10-09')).toBeNull();
   });
 });

@@ -94,17 +94,21 @@ test('lo que dejó el mes: cada camión, cada viaje y la empresa, en pesos y en 
   await expect(page.getByRole('button', { name: 'Mes siguiente' })).toBeDisabled();
 });
 
-test('una boleta sin importe no suma, y la página lo dice', async ({ page }) => {
-  // Carla's receipt of 10/10 in the Mercedes, as if it had come without its amount.
+test('una boleta sin importe, o en cero, no suma, y la página lo dice', async ({ page }) => {
+  // Carla's receipt of 10/10 in the Mercedes, as if it had come without its amount; Diego's of 13/10 in the Ford, as if a
+  // driver had saved a 0 in the app.
   await page.route('**/rest/v1/trf_driver_fuel_receipts*', async (route) => {
     const response = await route.fetch();
     const rows = (await response.json()) as { id: string; total: number | null }[];
-    await route.fulfill({ response, json: rows.map((r) => (r.id === '40000000-0000-4000-8000-000000000004' ? { ...r, total: null } : r)) });
+    const changed: Record<string, number | null> = { '40000000-0000-4000-8000-000000000004': null, '40000000-0000-4000-8000-000000000002': 0 };
+    await route.fulfill({ response, json: rows.map((r) => (r.id in changed ? { ...r, total: changed[r.id] } : r)) });
   });
   await openGanancia(page);
-  await expect(page.getByText('Una boleta de combustible del mes no tiene importe: no suma hasta completarla en Combustible.')).toBeVisible();
-  await expect(row(page, /Cómo se llega a la ganancia de octubre de 2026/, /^− ?Combustible/)).toContainText('$ 26.450');
+  await expect(page.getByText('2 boletas de combustible del mes no tienen importe o están en cero: no suman hasta completarlas en Combustible.')).toBeVisible();
+  // Only Ana's remains in pesos.
+  await expect(row(page, /Cómo se llega a la ganancia de octubre de 2026/, /^− ?Combustible/)).toContainText('$ 9.950');
   await expect(row(page, /Ganancia de cada camión en octubre de 2026/, 'Mercedes Benz Actros')).toContainText('1 boleta sin importe');
+  await expect(row(page, /Ganancia de cada camión en octubre de 2026/, 'Ford Cargo 1722')).toContainText('1 boleta sin importe');
 });
 
 test('el mes en curso cuenta hasta hoy: lo que tiene fecha posterior todavía no suma', async ({ page }) => {
