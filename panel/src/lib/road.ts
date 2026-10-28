@@ -4,8 +4,12 @@ import { validPosition } from './route';
 
 export type PointKind = 'toll' | 'scale' | 'radar' | 'place';
 export const POINT_LABEL: Record<PointKind, string> = { toll: 'Peaje', scale: 'Balanza', radar: 'Radar', place: 'Mi punto' };
-/** A point on screen: what it is, then its name, unless the name already says it («Peaje Pando», «Radar · Ruta 5 km 30»). */
+/**
+ * A point on screen: what it is, then its name, unless the name already says it («Peaje Pando», «Radar · Ruta 5 km 30»).
+ * The company's own points go by their name alone (request of 28/10/2026): their flag says what they are.
+ */
 export function pointTitle(p: Pick<RoadPoint, 'kind' | 'name'>): string {
+  if (p.kind === 'place') return p.name;
   const label = POINT_LABEL[p.kind];
   const [name, start] = [p.name.trim().toLocaleLowerCase('es'), label.toLocaleLowerCase('es')];
   return name === start || name.startsWith(`${start} `) ? p.name : `${label} · ${p.name}`;

@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import { type RefObject, useEffect, useRef } from 'react';
 import { DEFAULT_CENTER, DEFAULT_ZOOM, LIVE_REFRESH_MS } from '../config';
 import { GAP_STYLE, mapView, ROUTE_STYLE } from './mapView';
+import { badgeElement } from './PointBadge';
 import type { RoutePoint } from '../data/api';
 import { type FleetUnit, STATE_LABEL, unitTitle } from '../lib/fleet';
 import { type Glide, glideAt, type Point, startGlide, tailStart } from '../lib/glide';
@@ -295,11 +296,15 @@ export function FleetMap({
     const layer = L.layerGroup().addTo(m);
     for (const p of roadPoints ?? []) {
       const title = pointTitle(p);
+      // The dot with its badge, and the name next to it. Names come from the database: textContent, never HTML.
+      const pin = document.createElement('div');
+      pin.className = 'road-pin';
       const text = document.createElement('span');
       text.textContent = title;
+      pin.append(badgeElement(p.kind), text);
       const marker = L.marker([p.latitude, p.longitude], {
         title,
-        icon: L.divIcon({ className: `road-marker road-${p.kind}`, html: text, iconSize: [26, 26] }),
+        icon: L.divIcon({ className: `road-marker road-${p.kind}`, html: pin, iconSize: [26, 26] }),
       }).addTo(layer);
       marker.on('click', () => onPointSelect?.(p));
     }
