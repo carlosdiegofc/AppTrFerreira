@@ -1,6 +1,6 @@
 # Política de privacidad de Transportes Ferreira GPS
 
-Última actualización: 26 de octubre de 2026
+Última actualización: 28 de octubre de 2026
 
 Transportes Ferreira GPS es la aplicación interna de Transportes Ferreira (Uruguay) para sus choferes y su administración. Sirve para registrar los viajes de los camiones de la empresa, las cargas de combustible, los remitos, el mantenimiento de la flota y los vencimientos de documentos. Solo pueden usarla las personas a las que la empresa les entregó una cuenta.
 
@@ -15,7 +15,7 @@ Transportes Ferreira, empresa de transporte de carga de Uruguay. La empresa admi
 - Datos de la cuenta: nombre, correo electrónico e identificador de usuario. La empresa crea las cuentas; la aplicación no permite registrarse por cuenta propia.
 - Ubicación precisa durante un viaje: mientras hay un viaje en curso, la aplicación registra la posición GPS del teléfono, la precisión, la velocidad y el rumbo. Sigue registrándola aunque la aplicación esté cerrada o la pantalla apagada, y durante todo ese tiempo se muestra una notificación fija. Cuando el viaje está pausado o terminado, deja de registrarla.
 - Actividad y ubicación con la aplicación abierta: al abrirla y cada 5 minutos mientras está abierta, la aplicación avisa a la empresa que estás activo, con la versión instalada y el camión guardado en el teléfono. Si no hay un viaje en curso, diste permiso de ubicación y aceptaste compartirla con la aplicación abierta (se pregunta una vez y se cambia en Mi cuenta), ese aviso lleva también la posición del teléfono y su precisión. Con la aplicación cerrada no se envía nada de esto, y fuera de un viaje la aplicación nunca usa la ubicación en segundo plano.
-- Datos de los viajes: camión, fecha y hora de salida y de llegada, distancia recorrida, lugar de salida y de llegada, destino, cliente, tipo de carga y peso.
+- Datos de los viajes: camión, fecha y hora de salida y de llegada, distancia recorrida, lugar de salida y de llegada, destino, cliente, tipo de carga y peso. Si el GPS se corta durante un viaje (por ejemplo, sin señal) y vuelve, la aplicación estima el camino que hizo el camión en ese tramo y lo guarda junto al recorrido, marcado como estimado.
 - Combustible: fecha, litros, monto y la foto de la boleta.
 - Remitos: número de remito y las fotos que agregues.
 - Documentos: tipo de documento (por ejemplo, licencia de conducir, carné de salud o seguro del camión), fecha de vencimiento y notas.
@@ -42,6 +42,7 @@ Los datos no se venden ni se usan con fines publicitarios.
 - Los mapas son de Google Maps, por su SDK para Android. Para dibujarlos, Google recibe la zona del mapa que se muestra, la dirección de internet del teléfono, datos técnicos del teléfono y de la aplicación (por ejemplo, informes de fallas) y un identificador del SDK, y los trata según su [política de privacidad](https://policies.google.com/privacy). No recibe tu nombre ni tu cuenta de la aplicación.
 - En un teléfono sin los servicios de Google Play, la aplicación dibuja los mapas con imágenes de OpenStreetMap, OpenTopoMap y Esri, que reciben la zona del mapa que se muestra y la dirección de internet del teléfono, pero no tu nombre ni tu cuenta.
 - Para trazar la ruta hasta el destino, la aplicación envía la posición del camión y la del destino al servicio de rutas OSRM, que recibe además la dirección de internet del teléfono, pero no tu nombre ni tu cuenta.
+- Para estimar el camino de un tramo sin señal, la aplicación envía a Google (Routes API) el último punto antes del corte y el primero después. Google recibe además la dirección de internet del teléfono y el identificador de la aplicación, pero no tu nombre, tu cuenta ni los datos del viaje, y lo trata según su [política de privacidad](https://policies.google.com/privacy).
 - Si buscás un destino por su nombre, el texto de la búsqueda lo procesa el servicio de direcciones del propio teléfono (Google).
 
 La empresa no comparte los datos con otras empresas, salvo que una ley o una autoridad competente lo exija.

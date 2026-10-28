@@ -60,6 +60,17 @@ select '00000000-0000-4000-8000-000000000011', 'Volvo FH 460 · ABC1234', -34.86
 from generate_series(0, 11) as i;
 insert into public.trf_driver_location_history (driver_id, vehicle, latitude, longitude, speed_kmh, recorded_at, trip_id, segment) values
   ('00000000-0000-4000-8000-000000000011', 'Volvo FH 460 · ABC1234', 0, 0, 80, (select now from t0) - interval '14 minutes 30 seconds', '10000000-0000-4000-8000-00000000000a', 0);
+-- The five minutes without signal after the ninth reading, as app 0.24.0 fills them (migration 0013): the road Google
+-- gave between the two readings, two estimated readings along it, and 6,3 km counted. Ana's earlier trip lost the signal
+-- for more than 3 hours: that stretch was left without counting, for the office to check.
+insert into public.trf_driver_location_history (driver_id, vehicle, latitude, longitude, speed_kmh, recorded_at, trip_id, segment, estimated) values
+  ('00000000-0000-4000-8000-000000000011', 'Volvo FH 460 · ABC1234', -34.49, -56.40, null, (select now from t0) - interval '7 minutes', '10000000-0000-4000-8000-00000000000a', 1, true),
+  ('00000000-0000-4000-8000-000000000011', 'Volvo FH 460 · ABC1234', -34.475, -56.415, null, (select now from t0) - interval '5 minutes', '10000000-0000-4000-8000-00000000000a', 1, true);
+insert into public.trf_route_gaps (id, trip_id, driver_id, vehicle, segment, from_at, to_at, from_lat, from_lng, to_lat, to_lng, straight_meters, meters, method) values
+  ('70000000-0000-4000-8000-0000000000f1', '10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000011', 'Volvo FH 460 · ABC1234', 1,
+   (select now from t0) - interval '9 minutes', (select now from t0) - interval '3 minutes', -34.504, -56.398, -34.4595, -56.4265, 5600, 6300, 'ruta'),
+  ('70000000-0000-4000-8000-0000000000f2', '10000000-0000-4000-8000-00000000000f', '00000000-0000-4000-8000-000000000011', 'Iveco Stralis · MNO7890', 0,
+   (select now from t0) - interval '25 hours 45 minutes', (select now from t0) - interval '22 hours 5 minutes', -34.87, -55.9, -34.905, -55.0, 82000, 0, 'sin_rellenar');
 insert into public.trf_driver_location_history (driver_id, vehicle, latitude, longitude, speed_kmh, recorded_at, trip_id) values
   ('00000000-0000-4000-8000-000000000012', 'Scania R450 · DEF5678', -34.471, -57.844, 0, (select now from t0) - interval '3 minutes', null),
   ('00000000-0000-4000-8000-000000000013', 'Mercedes Benz Actros', -32.318, -58.081, 64, (select now from t0) - interval '40 minutes', '10000000-0000-4000-8000-00000000000c');

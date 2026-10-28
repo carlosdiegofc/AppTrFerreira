@@ -57,11 +57,20 @@ class MobileData(private val c:Context){
  fun route(trip:JSONObject,refresh:Boolean=false):JSONArray{
   val key="route-${uid()}-${trip.getString("id")}";val owner=trip.optString("driver_id").ifBlank{uid()}
   if(refresh){val out=JSONArray();var offset=0
-   while(true){val path="/rest/v1/trf_driver_location_history?driver_id=eq.${enc(owner)}&or=(trip_id.eq.${trip.getString("id")},trip_id.is.null)&recorded_at=gte.${enc(trip.getString("started_at"))}"+(if(!trip.isNull("ended_at"))"&recorded_at=lte.${enc(trip.getString("ended_at"))}" else "")+"&vehicle=eq.${enc(trip.optString("vehicle"))}&order=recorded_at.asc,id.asc&limit=1000&offset=$offset&select=latitude,longitude,recorded_at,segment"
+   while(true){val path="/rest/v1/trf_driver_location_history?driver_id=eq.${enc(owner)}&or=(trip_id.eq.${trip.getString("id")},trip_id.is.null)&recorded_at=gte.${enc(trip.getString("started_at"))}"+(if(!trip.isNull("ended_at"))"&recorded_at=lte.${enc(trip.getString("ended_at"))}" else "")+"&vehicle=eq.${enc(trip.optString("vehicle"))}&order=recorded_at.asc,id.asc&limit=1000&offset=$offset&select=latitude,longitude,recorded_at,segment,estimated"
     val page=array(path);for(i in 0 until page.length())out.put(page.getJSONObject(i));if(page.length()<1000)break;offset+=1000
-   };store.cache(key,JSONObject().put("points",out))
+   }
+   // The trip's stretches without signal, for its distance; if they cannot be read, the route is kept all the same.
+   val gaps=try{array("/rest/v1/trf_route_gaps?trip_id=eq.${enc(trip.getString("id"))}&select=id,meters,method&order=from_at.asc")}catch(_:Exception){store.cache(key).optJSONArray("gaps")}
+   store.cache(key,JSONObject().put("points",out).put("gaps",gaps?:JSONArray()))
   }
   return store.cache(key).optJSONArray("points")?:JSONArray()
+ }
+ /** The trip's stretches without signal: the ones in the panel and the ones of this phone still on their way there. */
+ fun gaps(trip:JSONObject):List<JSONObject>{
+  val saved=store.cache("route-${uid()}-${trip.getString("id")}").optJSONArray("gaps")?:JSONArray()
+  val list=(0 until saved.length()).map{saved.getJSONObject(it)};val ids=list.map{it.optString("id")}.toSet()
+  return list+store.gaps().map{it.second}.filter{it.optString("trip_id")==trip.getString("id")&&it.optString("id") !in ids}
  }
  /** Trips in progress with their driver's latest position, plus recently finished trips to place idle trucks. */
  fun fleet(refresh:Boolean=false):JSONObject{

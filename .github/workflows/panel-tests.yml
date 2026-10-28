@@ -54,6 +54,7 @@ jobs:
           psql -X -q -v ON_ERROR_STOP=1 -d panel_e2e -f tests/e2e/db/fleet.sql
           psql -X -q -v ON_ERROR_STOP=1 -d panel_e2e -f tests/e2e/db/expenses.sql
           psql -X -q -v ON_ERROR_STOP=1 -d panel_e2e -f tests/e2e/db/clients.sql
+          psql -X -q -v ON_ERROR_STOP=1 -d panel_e2e -f tests/e2e/db/gaps.sql
       - name: PostgREST (la misma API que usa Supabase)
         run: |
           curl -sSL -o "$RUNNER_TEMP/postgrest.tar.xz" https://github.com/PostgREST/postgrest/releases/download/v12.2.3/postgrest-v12.2.3-linux-static-x64.tar.xz

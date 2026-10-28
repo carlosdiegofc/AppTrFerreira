@@ -5,11 +5,11 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { type RefObject, useEffect, useRef } from 'react';
 import { DEFAULT_CENTER, DEFAULT_ZOOM, LIVE_REFRESH_MS } from '../config';
-import { mapView } from './mapView';
+import { GAP_STYLE, mapView, ROUTE_STYLE } from './mapView';
 import type { RoutePoint } from '../data/api';
 import { type FleetUnit, STATE_LABEL, unitTitle } from '../lib/fleet';
 import { type Glide, glideAt, type Point, startGlide, tailStart } from '../lib/glide';
-import { drawable, routeLines } from '../lib/route';
+import { drawable, routeRuns } from '../lib/route';
 import { pointTitle, type RoadPoint } from '../lib/road';
 
 /** A driver with the app open and no trip, where the phone is («chofer activo»). */
@@ -264,8 +264,8 @@ export function FleetMap({
     layer.clearLayers();
     tail.current.line = null;
     // Readings without a fix are left out, and a pause or a gap without signal leaves the route open, as in the app.
-    const lines = route ? routeLines(route) : [];
-    const all = lines.flat();
+    const runs = route ? routeRuns(route) : [];
+    const all = runs.flatMap((r) => r.points);
     // Nothing selected, or a selection without a route (a truck without a trip, a driver): the route shown is forgotten,
     // so choosing that trip again shows all of it again.
     if (!selected || all.length === 0) routeShown.current = null;
@@ -275,7 +275,8 @@ export function FleetMap({
       routeShown.current = selected;
       m.fitBounds(L.latLngBounds(all), { padding: [56, 56], maxZoom: 13, animate: !calm() });
     }
-    for (const line of lines) if (line.length > 1) L.polyline(line, { className: 'fm-route', weight: 4, opacity: 0.9 }).addTo(layer);
+    // A stretch without signal goes dashed, along its estimated road or straight while the road comes.
+    for (const r of runs) if (r.points.length > 1) L.polyline(r.points, r.estimated ? GAP_STYLE : ROUTE_STYLE).addTo(layer);
     const [first] = all;
     if (first) L.circleMarker(first, { radius: 6, className: 'fm-start', weight: 3 }).bindTooltip('Salida').addTo(layer);
   }, [route, selected]);

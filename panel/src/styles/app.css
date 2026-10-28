@@ -1648,7 +1648,8 @@ body.map-full-open {
   color: #fff;
 }
 
-.leaflet-interactive.fm-route {
+.leaflet-interactive.fm-route,
+.leaflet-interactive.fm-gap {
   stroke: var(--blue);
 }
 
@@ -2359,6 +2360,17 @@ body.map-full-open {
 .lg-declared {
   border: 2px dashed var(--amber);
   background: var(--amber-bg);
+}
+
+.map-legend i.lg-gap {
+  width: 16px;
+  height: 0;
+  border-radius: 0;
+  border-top: 3px dashed var(--blue);
+}
+
+.route-gap {
+  margin: 0 16px 14px;
 }
 
 .map-legend + .route-facts {

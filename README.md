@@ -5,7 +5,16 @@ Panel web nuevo (React + TypeScript), en la dirección principal del panel desde
 # Panel web (anterior)
 La carpeta [`web/`](web/README.md) tiene el panel web anterior, que queda en `/anterior/` de la misma dirección un tiempo: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
 
-# Transportes Ferreira GPS — v0.23.0
+# Transportes Ferreira GPS — v0.24.0
+
+## Nuevo en v0.24.0 (tramos sin señal; versionCode 36)
+- **Cuando el GPS se corta y vuelve** (decisión del 28/10/2026): si pasaron más de 90 segundos sin lecturas y el camión apareció a más de 300 m, el viaje cuenta ese tramo y la línea del mapa sigue.
+  - Enseguida suma la línea recta y un 20 %. Al sincronizar pide a Google el camino por ruta entre los dos puntos y cuenta esos kilómetros, aunque el viaje ya haya terminado. Si Google no contesta, lo vuelve a pedir cada 10 minutos, y al día se queda con la recta.
+  - Un corte de más de 3 horas, o un salto que un camión no puede hacer, queda sin contar y el panel pide revisarlo.
+  - En los mapas el tramo va en línea punteada: por su camino estimado, o en recta mientras llega. El detalle del viaje dice cuántos kilómetros se estimaron.
+  - Las lecturas del camino estimado no cuentan como pasos por peajes ni balanzas.
+- **Necesita la migración 0013 en producción** antes de publicar, y la «Routes API» habilitada en Google Cloud para la llave de Android. Sin la API, los tramos se cuentan en línea recta.
+- **Privacidad:** para el camino, Google recibe los dos puntos del corte, sin el chofer ni el viaje; la política lo dice.
 
 ## Nuevo en v0.23.0 (avisos; versionCode 35)
 - **Avisos en el teléfono** (decisión del 28/10/2026): los calcula la app con lo que ya tiene; no se envía nada más y llegan aunque no haya señal.

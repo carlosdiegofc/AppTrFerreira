@@ -1123,6 +1123,9 @@ class MainActivity:AppCompatActivity(){
   if(t.optString("load_type")!="empty")fact(f,R.drawable.ic_weight,"Peso transportado",d.optString("kg").takeIf{it.isNotBlank()&&it!="null"}?.let{"$it kg"}?:"Pendiente")
   fact(f,R.drawable.ic_business,"Cliente",d.optString("cliente").ifBlank{"Pendiente"})
   fact(f,R.drawable.ic_route,"Distancia recorrida",d.optString("km").takeIf{it.isNotBlank()&&it!="null"}?.let{"$it km"}?:km(t.optDouble("distance_meters",0.0)))
+  // What the distance counted while the GPS had no signal, and the cuts left for the panel to check.
+  mobile.gaps(t).takeIf{it.isNotEmpty()}?.let{g->val open=g.count{it.optString("method")==Gaps.Method.UNFILLED.db};val filled=g.size-open
+   fact(f,R.drawable.ic_gps,"Sin señal GPS",listOfNotNull(if(filled>0)"${km(g.sumOf{it.optDouble("meters",0.0)})} estimados en $filled ${if(filled==1)"tramo" else "tramos"}" else null,if(open>0)"$open sin completar, para revisar" else null).joinToString(" · "))}
   if(!running)durationText(t.optString("started_at"),t.optString("ended_at"))?.let{fact(f,R.drawable.ic_clock,"Tiempo de viaje",it)}
   coord("arrival_lat","arrival_lng")?.let{fact(f,R.drawable.ic_pin,"Última ubicación / llegada",it)}
   if(d.optString("remito").isNotBlank())fact(f,R.drawable.ic_receipt,"Remitos cargados en el panel",d.optString("remito"))
@@ -1135,7 +1138,7 @@ class MainActivity:AppCompatActivity(){
   if(t.optString("driver_id").ifBlank{uid()}==uid())button(root,"Agregar remito",Kind.LINE,R.drawable.ic_plus){openDocument(t,"tripdetail","arrival")}
   section("Recorrido")
   val points=mobile.route(t)
-  if(points.length()>0){val mc=card();val map=TripMap.view(this,points);activeMap=map;mc.addView(map.view,LinearLayout.LayoutParams(-1,dp(300)));button(root,"Ver mapa en pantalla completa",Kind.LINE,R.drawable.ic_map){fullMap(points)};note("Las líneas unen lecturas GPS; los tramos sin señal o pausados quedan abiertos.")}
+  if(points.length()>0){val mc=card();val map=TripMap.view(this,points);activeMap=map;mc.addView(map.view,LinearLayout.LayoutParams(-1,dp(300)));button(root,"Ver mapa en pantalla completa",Kind.LINE,R.drawable.ic_map){fullMap(points)};note("Las líneas unen las lecturas GPS. Lo punteado es un tramo sin señal, estimado; las pausas quedan abiertas.")}
   else note("Sin recorrido disponible. Actualizá para consultar el GPS guardado.",top=8)
   link(root,"Actualizar desde el panel",top=10){detail(t,true)}
   if(refresh)thread{try{mobile.detail(t,true);mobile.route(t,true);runOnUiThread{if(screen=="tripdetail"&&historyTrip?.optString("id")==t.optString("id"))detail(t)}}catch(_:Exception){runOnUiThread{if(screen=="tripdetail")toast("No se pudo actualizar. Se mantienen los datos guardados.")}}}
@@ -1212,7 +1215,9 @@ class MainActivity:AppCompatActivity(){
   store.cache("tripinfo-$u",JSONObject().put("data",info))
   store.cache("detail-$u-muestra-viaje-0",JSONObject().put("data",JSONObject(info.getJSONObject("muestra-viaje-0").toString()).put("origen","Vergara, Treinta y Tres"))
    .put("documents",JSONArray(listOf(JSONObject().put("id","r1").put("kind","departure").put("number","004512").put("cargo_type","Arroz").put("kg",28500),JSONObject().put("id","r2").put("kind","arrival").put("number","004513").put("cargo_type","Arroz").put("kg",28380)))))
-  store.cache("route-$u-muestra-viaje-0",JSONObject().put("points",JSONArray((0..12).map{i->JSONObject().put("latitude",-32.944-i*0.0242).put("longitude",-53.939-i*0.037+(if(i%3==1)0.006 else 0.0)).put("recorded_at",hours(6-i/3L)).put("segment",0)})))
+  // A reading a minute, and a stretch without signal whose road the app estimated (Gaps): drawn dashed.
+  store.cache("route-$u-muestra-viaje-0",JSONObject().put("points",JSONArray((0..12).map{i->JSONObject().put("latitude",-32.944-i*0.0242).put("longitude",-53.939-i*0.037+(if(i%3==1)0.006 else 0.0)).put("recorded_at",now.minus(Duration.ofMinutes(360L-i)).toString()).put("segment",0).put("estimated",i in 6..7)}))
+   .put("gaps",JSONArray().put(JSONObject().put("id","muestra-tramo").put("meters",8400.0).put("method",Gaps.Method.ROUTE.db))))
   // Fuel receipts of the last days, some in a trip.
   val fuel=JSONArray()
   listOf(listOf(1L,"ANCAP Ruta 8 km 120",180.0,11358.0,true,"muestra-viaje-0"),listOf(2L,"Petrobras Treinta y Tres",150.0,9465.0,false,"muestra-viaje-1"),listOf(4L,"ANCAP Ruta 8 km 120",200.0,12620.0,true,""),listOf(6L,"Petrobras Treinta y Tres",95.5,6026.0,false,"muestra-viaje-4"))

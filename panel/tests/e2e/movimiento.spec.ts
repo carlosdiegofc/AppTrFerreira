@@ -82,12 +82,13 @@ test('el mapa de un viaje en curso lleva el camión por las lecturas nuevas y el
   await zoomIn(page, '.map-trip', 3, now);
   const start = await circleAt(page, now);
   expect(start).not.toBeNull();
-  // The next refresh of the route brings one more reading, 1,5 km further north, in the same stretch.
+  // The next refresh of the route (the readings saved after the last one shown) brings one more reading, 1,5 km north
+  // of Ana's last one, in the same stretch.
   await page.route('**/rest/v1/trf_driver_location_history*', async (route) => {
     const response = await route.fetch();
-    const readings = (await response.json()) as { latitude: number; longitude: number; segment: number }[];
-    const last = readings.at(-1);
-    const more = last ? [...readings, { ...last, id: 990001, latitude: last.latitude + 0.0135, recorded_at: BASE, speed_kmh: 80 }] : readings;
+    const readings = (await response.json()) as object[];
+    const refresh = new URL(route.request().url()).searchParams.has('id');
+    const more = refresh ? [...readings, { id: 990001, latitude: -34.3705 + 0.0135, longitude: -56.4835, recorded_at: BASE, segment: 1, speed_kmh: 80, estimated: false }] : readings;
     await route.fulfill({ response, json: more });
   });
   const ys = await heights(() => circleAt(page, now), 100);
