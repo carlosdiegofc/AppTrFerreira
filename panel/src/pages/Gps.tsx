@@ -9,7 +9,7 @@ import { ago, dayInZone, formatDay, formatTime } from '../lib/dates';
 import { type FleetUnit, fleetCounts, STATE_LABEL, unitTitle } from '../lib/fleet';
 import { count, km, kmh } from '../lib/format';
 import { type DriverPresence, driverPresence, PRESENCE_LABEL } from '../lib/presence';
-import { drawable } from '../lib/route';
+import { measuredCount } from '../lib/route';
 import { presenceLine } from './presenceText';
 import { PRESENCE_TONE, STATE_TONE } from './states';
 import { PointEditor, TruckRoad, type RoadView } from '../components/RoadControls';
@@ -322,7 +322,7 @@ export function Gps() {
             <Detail
               unit={unit}
               now={now}
-              points={unit.trip ? (route.data ? drawable(route.data).length : route.error ? 'error' : null) : null}
+              points={unit.trip ? (route.data ? measuredCount(route.data) : route.error ? 'error' : null) : null}
               stale={Boolean(unit.trip && route.error && route.data)}
               onRetry={() => void route.refetch()}
               onClose={() => choose(null)}

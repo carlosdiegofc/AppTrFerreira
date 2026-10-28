@@ -9,16 +9,22 @@ import { TripMap } from '../components/TripMap';
 import { CatalogNote, Card, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote } from '../components/ui';
 import { ROUTE_REFRESH_MS } from '../config';
 import { ConflictError, describeWriteError } from '../data/api';
-import { useExpenses, useRoute, useSetTripDeleted, useTripDetail } from '../data/hooks';
+import { useExpenses, useRoute, useRouteGaps, useSetTripDeleted, useTripDetail } from '../data/hooks';
 import { clientKey } from '../lib/clients';
 import { calendarDay, dayInZone, formatDay, formatDayTime, formatDuration } from '../lib/dates';
 import { type Expense, expensesLink, expenseTotals, NO_CHOICES, NO_NAMES, tripTargetName } from '../lib/expenses';
 import { count, money, number } from '../lib/format';
 import { documentLabel, sourceLabel, tripFacts } from '../lib/tripTable';
+import { gapSummary, routeRuns } from '../lib/route';
 import { fuelFromReceipt, type LatLng, parseTripKey, routeStats } from '../lib/trips';
 import { clientPath } from './clientText';
 import { amounts } from './fuelText';
 import { STATUS_TONE } from './states';
+
+/** «12,3 km estimados en 2 tramos · 1 sin contar». */
+function gapText({ filled, meters, open }: { filled: number; meters: number; open: number }): string {
+  return [filled > 0 ? `${number(meters / 1000, 1)} km estimados en ${filled} ${filled === 1 ? 'tramo' : 'tramos'}` : null, open > 0 ? `${open} sin contar` : null].filter(Boolean).join(' · ');
+}
 
 const samePlace = (a: LatLng | null, b: LatLng | null) => a !== null && b !== null && a[0] === b[0] && a[1] === b[1];
 
@@ -58,8 +64,14 @@ function Missing() {
 function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
   const { trip, detail, catalog } = useTripDetail(kind, id);
   const session = detail.data?.session ?? null;
-  const route = useRoute(session ? { id: session.id, driver_id: session.driver_id, started_at: session.started_at, ended_at: session.ended_at } : null);
+  const routeTrip = session ? { id: session.id, driver_id: session.driver_id, started_at: session.started_at, ended_at: session.ended_at } : null;
+  const route = useRoute(routeTrip);
   const stats = useMemo(() => (route.data ? routeStats(route.data) : null), [route.data]);
+  // The stretches without signal: the kilometres the app estimated, and the cuts it left for the office to check.
+  const gaps = useRouteGaps(routeTrip);
+  const gapTotals = useMemo(() => gapSummary(gaps.data ?? []), [gaps.data]);
+  const openGaps = (gaps.data ?? []).filter((g) => g.method === 'sin_rellenar');
+  const dashed = useMemo(() => (route.data ? routeRuns(route.data).some((r) => r.estimated && r.points.length > 1) : false), [route.data]);
   const fuel = useMemo(() => (detail.data?.fuel ?? []).map((f) => fuelFromReceipt(f, catalog.data ?? [])), [detail.data, catalog.data]);
   const documents = detail.data?.documents ?? [];
   const [photo, setPhoto] = useState<Photo | null>(null);
@@ -154,7 +166,7 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
               <Icon name="doc" size={18} />
               <span className="btn-text">Descargar PDF</span>
             </button>
-            <RefreshButton onClick={() => void Promise.all([detail.refetch(), route.refetch()])} busy={detail.isFetching || route.isFetching} />
+            <RefreshButton onClick={() => void Promise.all([detail.refetch(), route.refetch(), gaps.refetch()])} busy={detail.isFetching || route.isFetching} />
           </>
         }
       />
@@ -242,6 +254,11 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
                     <i className="lg-gps" aria-hidden="true" /> Medido por el GPS
                   </span>
                 )}
+                {trip.source === 'app' && dashed && (
+                  <span>
+                    <i className="lg-gap" aria-hidden="true" /> Sin señal: el camino estimado
+                  </span>
+                )}
                 {(declared.origin || declared.destination) && (
                   <span>
                     <i className="lg-declared" aria-hidden="true" /> {trip.source === 'app' ? 'Origen y destino declarados por la oficina o el chofer' : 'Origen y destino declarados al cargar el viaje a mano (sin GPS)'}
@@ -253,8 +270,20 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
                   <div><dt>Puntos del recorrido</dt><dd>{stats ? count(stats.count) : route.error ? '—' : '…'}</dd></div>
                   <div><dt>Duración</dt><dd>{stats?.durationMs != null ? formatDuration(stats.durationMs) : '—'}</dd></div>
                   <div><dt>Velocidad máxima</dt><dd>{stats?.maxSpeedKmh != null ? `${number(stats.maxSpeedKmh)} km/h` : '—'}</dd></div>
+                  {(gaps.data?.length ?? 0) > 0 && (
+                    <div>
+                      <dt>Sin señal</dt>
+                      <dd>{gapText(gapTotals)}</dd>
+                    </div>
+                  )}
                 </dl>
               )}
+              {trip.source === 'app' &&
+                openGaps.map((g) => (
+                  <p key={g.id} className="notice notice-warn route-gap">
+                    <Icon name="warning" size={18} /> Sin señal desde el {formatDayTime(Date.parse(g.from_at))} durante {formatDuration(Date.parse(g.to_at) - Date.parse(g.from_at))}: ese tramo quedó sin contar, porque pasaron más de 3 horas o el salto fue más largo de lo que anda un camión. Revisá los km del viaje.
+                  </p>
+                ))}
             </>
           )}
         </Card>

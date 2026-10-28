@@ -8,9 +8,9 @@ import { useEffect, useRef } from 'react';
 import { DEFAULT_CENTER, DEFAULT_ZOOM, ROUTE_REFRESH_MS } from '../config';
 import type { RoutePoint } from '../data/api';
 import { type Glide, glideAt, grownTail, type Point, sameLines, startGlide } from '../lib/glide';
-import { routeLines } from '../lib/route';
+import { routeRuns } from '../lib/route';
 import type { LatLng } from '../lib/trips';
-import { mapView } from './mapView';
+import { GAP_STYLE, mapView, ROUTE_STYLE } from './mapView';
 
 interface Props {
   route: readonly RoutePoint[] | null;
@@ -73,7 +73,8 @@ export function TripMap({ route, start, end, declared, live, label }: Props) {
     cancelAnimationFrame(frame.current);
     frame.current = 0;
     g.clearLayers();
-    const lines: Point[][] = route ? routeLines(route) : [];
+    const runs = route ? routeRuns(route) : [];
+    const lines: Point[][] = runs.map((r) => r.points);
     const all = lines.flat();
     // A trip in progress whose route only grew since the last draw: the truck glides along the new readings. A first
     // load, a new stretch after a pause or a long catch-up is drawn at once; a redraw that changed nothing on the route
@@ -88,7 +89,8 @@ export function TripMap({ route, start, end, declared, live, label }: Props) {
     }
     active.current = run;
     drawn.current = lines;
-    const routeDrawn = lines.map((line) => (line.length > 1 ? L.polyline(line, { className: 'fm-route', weight: 4, opacity: 0.9 }).addTo(g) : null));
+    // A stretch without signal goes dashed, along its estimated road or straight while the road comes.
+    const routeDrawn = runs.map((r) => (r.points.length > 1 ? L.polyline(r.points, r.estimated ? GAP_STYLE : ROUTE_STYLE).addTo(g) : null));
     // Declared places first, so the measured markers stay on top where they coincide.
     if (origin) L.circleMarker(origin, { radius: 7, className: 'fm-declared', weight: 3, dashArray: '3 3' }).bindTooltip('Origen declarado').addTo(g);
     if (destination) L.circleMarker(destination, { radius: 7, className: 'fm-declared', weight: 3, dashArray: '3 3' }).bindTooltip('Destino declarado').addTo(g);

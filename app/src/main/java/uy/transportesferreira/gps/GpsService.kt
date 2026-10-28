@@ -81,6 +81,7 @@ class GpsService:Service(){
  private fun record(l:Location){val t=store.current()?:return;if(!t.optBoolean("active")||t.optBoolean("paused")||!l.hasAccuracy()||l.accuracy>50||System.currentTimeMillis()-l.time !in -2000..30000)return
   val delta=distance.add(DistanceTracker.Fix(l.latitude,l.longitude,l.accuracy.toDouble(),l.time),System.currentTimeMillis())
   if(!distance.accepted)return
+  val filled=gap(t,l)
   val p=JSONObject().put("event_id",UUID.randomUUID().toString()).put("trip_id",t.getString("id")).put("driver_id",t.getString("driver_id")).put("vehicle",t.getString("vehicle")).put("latitude",l.latitude).put("longitude",l.longitude).put("accuracy_m",l.accuracy.toDouble()).put("speed_kmh",if(l.hasSpeed())(l.speed*3.6).coerceAtLeast(0.0) else JSONObject.NULL).put("heading",if(l.hasBearing())l.bearing.toDouble() else JSONObject.NULL).put("recorded_at",Instant.ofEpochMilli(l.time).toString()).put("segment",t.optInt("segment"))
   // The phone's own map draws every reading; the route sent to the panel keeps one every few seconds, the corners, and no
   // GPS jitter (RouteSampler). At a turn the reading before it, where the truck went round the corner, goes in first.
@@ -93,9 +94,31 @@ class GpsService:Service(){
   }
   lastReading=p
   // The trip (distance, last reading) goes up every 15 s, without waiting for the timer; a pause, a resume or the end go at once.
-  val now=System.currentTimeMillis();val send=now-tripSentAt>=15000;if(send)tripSentAt=now
-  store.update(send){if(!it.has("origin_lat")){it.put("origin_lat",l.latitude).put("origin_lng",l.longitude)};it.put("distance_meters",it.optDouble("distance_meters",0.0)+delta).put("last_point",p).put("speed_kmh",p.optDouble("speed_kmh",0.0)).put("route_state",route.state())}
+  // A stretch without signal just closed goes up at once too, so it gets its road.
+  val now=System.currentTimeMillis();val send=filled!=null||now-tripSentAt>=15000;if(send)tripSentAt=now
+  store.update(send){if(!it.has("origin_lat")){it.put("origin_lat",l.latitude).put("origin_lng",l.longitude)};it.put("distance_meters",it.optDouble("distance_meters",0.0)+delta+(filled?:0.0)).put("last_point",p).put("speed_kmh",p.optDouble("speed_kmh",0.0)).put("route_state",route.state())}
   sendLive();if(send)sync()
+ }
+ /**
+  * A stretch without signal (Gaps): the reading before this one is in the same stretch of the trip, more than 90 seconds
+  * ago and more than 300 m away. Up to 3 hours it is counted at once as the straight line and a fifth more, until the
+  * sync gets Google's road (Sync.flush); a longer cut or a jump no truck could make is kept with nothing counted, for the
+  * panel to check. Returns the meters counted, or null without a stretch.
+  */
+ private fun gap(t:JSONObject,l:Location):Double?{
+  val prev=t.optJSONObject("last_point")?:return null
+  if(prev.optInt("segment")!=t.optInt("segment"))return null
+  val from=try{Instant.parse(prev.getString("recorded_at")).toEpochMilli()}catch(_:Exception){return null}
+  val aLat=prev.optDouble("latitude");val aLng=prev.optDouble("longitude")
+  if(!FleetStats.validPosition(aLat,aLng))return null
+  val straight=Gaps.meters(aLat,aLng,l.latitude,l.longitude)
+  val kind=Gaps.kind(from,l.time,straight)?:return null
+  val meters=if(kind==Gaps.Kind.FILL)Gaps.straight(straight) else 0.0
+  store.saveGap(JSONObject().put("id",UUID.randomUUID().toString()).put("trip_id",t.getString("id")).put("driver_id",t.getString("driver_id")).put("vehicle",t.getString("vehicle")).put("segment",t.optInt("segment"))
+   .put("from_at",prev.getString("recorded_at")).put("to_at",Instant.ofEpochMilli(l.time).toString()).put("from_lat",aLat).put("from_lng",aLng).put("to_lat",l.latitude).put("to_lng",l.longitude)
+   .put("straight_meters",straight).put("meters",meters).put("method",if(kind==Gaps.Kind.FILL)Gaps.Method.STRAIGHT.db else Gaps.Method.UNFILLED.db)
+   .put("counted",meters).put("resolved",kind!=Gaps.Kind.FILL).put("found_at",System.currentTimeMillis()))
+  return meters
  }
  /**
   * The route keeps a reading every few seconds, so the last one may not be in it: a pause or the end adds it, and the

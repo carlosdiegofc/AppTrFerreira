@@ -205,6 +205,7 @@ export type Database = {
         Row: {
           accuracy_m: number | null
           driver_id: string
+          estimated: boolean
           event_id: string | null
           heading: number | null
           id: number
@@ -219,6 +220,7 @@ export type Database = {
         Insert: {
           accuracy_m?: number | null
           driver_id: string
+          estimated?: boolean
           event_id?: string | null
           heading?: number | null
           id?: number
@@ -233,6 +235,7 @@ export type Database = {
         Update: {
           accuracy_m?: number | null
           driver_id?: string
+          estimated?: boolean
           event_id?: string | null
           heading?: number | null
           id?: number
@@ -1037,6 +1040,68 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "trf_profiles"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      trf_route_gaps: {
+        Row: {
+          created_at: string
+          driver_id: string
+          from_at: string
+          from_lat: number
+          from_lng: number
+          id: string
+          meters: number
+          method: string
+          segment: number
+          straight_meters: number
+          to_at: string
+          to_lat: number
+          to_lng: number
+          trip_id: string
+          vehicle: string
+        }
+        Insert: {
+          created_at?: string
+          driver_id?: string
+          from_at: string
+          from_lat: number
+          from_lng: number
+          id: string
+          meters: number
+          method: string
+          segment?: number
+          straight_meters: number
+          to_at: string
+          to_lat: number
+          to_lng: number
+          trip_id: string
+          vehicle: string
+        }
+        Update: {
+          created_at?: string
+          driver_id?: string
+          from_at?: string
+          from_lat?: number
+          from_lng?: number
+          id?: string
+          meters?: number
+          method?: string
+          segment?: number
+          straight_meters?: number
+          to_at?: string
+          to_lat?: number
+          to_lng?: number
+          trip_id?: string
+          vehicle?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trf_route_gaps_owned_trip"
+            columns: ["trip_id", "driver_id"]
+            isOneToOne: false
+            referencedRelation: "trf_driver_tracking_sessions"
+            referencedColumns: ["id", "driver_id"]
           },
         ]
       }

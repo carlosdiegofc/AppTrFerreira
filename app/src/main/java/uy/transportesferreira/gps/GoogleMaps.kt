@@ -208,8 +208,13 @@ object GoogleMaps {
   private fun add(m:GoogleMap,points:List<DoubleArray>){
    points.forEach{p->
     val at=LatLng(p[0],p[1])
-    // A new segment, or a gap of more than 90 seconds, starts a new line, like the route of each trip.
-    if(line==null||p[2]!=seg||p[3]-lastT>90_000){line?.points=path.toList();path.clear();seg=p[2];line=m.addPolyline(PolylineOptions().color(BLUE).width(5*d).zIndex(1f))}
+    // A new segment, or a gap of more than 90 seconds, starts a new line, like the route of each trip. After a stretch
+    // without signal a dashed line joins the two ends, as on the trip's route until its road is there (Gaps.link).
+    if(line==null||p[2]!=seg||p[3]-lastT>90_000){
+     val before=last
+     if(line!=null&&before!=null&&Gaps.link(Gaps.Reading(before.latitude,before.longitude,seg.toInt(),lastT.toLong()),Gaps.Reading(p[0],p[1],p[2].toInt(),p[3].toLong()))==Gaps.Link.DASHED)
+      m.addPolyline(PolylineOptions().addAll(listOf(before,at)).color(BLUE).width(5*d).pattern(listOf(Dash(8*d),Gap(6*d))).zIndex(1f))
+     line?.points=path.toList();path.clear();seg=p[2];line=m.addPolyline(PolylineOptions().color(BLUE).width(5*d).zIndex(1f))}
     lastT=p[3];path.add(at);last=at;placed.add(at)
    }
    line?.points=path.toList()
@@ -246,19 +251,14 @@ object GoogleMaps {
  private class RouteMap(c:Context,points:JSONArray):Frame(c),TripMap.Shown{
   override val view:View get()=root
   init{
-   class P(val at:LatLng,val seg:Int,val time:Long?)
    val list=(0 until points.length()).mapNotNull{i->val p=points.optJSONObject(i)?:return@mapNotNull null;val lat=p.optDouble("latitude");val lng=p.optDouble("longitude")
-    if(!FleetStats.validPosition(lat,lng))null else P(LatLng(lat,lng),p.optInt("segment"),runCatching{OffsetDateTime.parse(p.optString("recorded_at")).toInstant().toEpochMilli()}.getOrNull())}
+    if(!FleetStats.validPosition(lat,lng))null else Gaps.Reading(lat,lng,p.optInt("segment"),runCatching{OffsetDateTime.parse(p.optString("recorded_at")).toInstant().toEpochMilli()}.getOrNull(),p.optBoolean("estimated"))}
+   val at=list.map{LatLng(it.lat,it.lng)}
    whenReady{m->
     m.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(-32.2,-56.0),6f))
-    // A new segment, or more than 90 seconds without readings, is a new line: the truck was not followed in between.
-    var part=mutableListOf<LatLng>()
-    fun draw(){if(part.size>1)m.addPolyline(PolylineOptions().addAll(part).color(BLUE).width(4*d))}
-    list.forEachIndexed{i,p->val before=list.getOrNull(i-1)
-     if(before!=null&&(p.seg!=before.seg||(p.time!=null&&before.time!=null&&p.time-before.time>90_000))){draw();part=mutableListOf()}
-     part.add(p.at)}
-    draw()
-    if(list.isNotEmpty()){marker(m,list.first().at,dot(GREEN,7f,2f,null),"Inicio GPS",2f);marker(m,list.last().at,dot(RED,7f,2f,null),"Última ubicación",2f);fit(m,list.map{it.at},25,15f)}
+    // A pause leaves the line open; a stretch without signal goes dashed, along its estimated road (Gaps.runs).
+    Gaps.runs(list).forEach{(from,to,dashed)->m.addPolyline(PolylineOptions().addAll(at.subList(from,to+1)).color(BLUE).width(4*d).apply{if(dashed)pattern(listOf(Dash(8*d),Gap(6*d)))})}
+    if(at.isNotEmpty()){marker(m,at.first(),dot(GREEN,7f,2f,null),"Inicio GPS",2f);marker(m,at.last(),dot(RED,7f,2f,null),"Última ubicación",2f);fit(m,at,25,15f)}
    }
   }
  }

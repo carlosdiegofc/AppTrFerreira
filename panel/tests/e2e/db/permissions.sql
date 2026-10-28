@@ -11,7 +11,8 @@ declare
   n int;
 begin
   if (select count(*) from public.trf_driver_tracking_sessions) <> 2 then raise exception 'chofer: tendría que ver solo sus 2 viajes'; end if;
-  if (select count(*) from public.trf_driver_location_history) <> 13 then raise exception 'chofer: tendría que ver solo sus 13 lecturas GPS'; end if;
+  -- Her 13 readings of the GPS and the 2 of the estimated road of a stretch without signal.
+  if (select count(*) from public.trf_driver_location_history) <> 15 then raise exception 'chofer: tendría que ver solo sus 15 lecturas GPS'; end if;
   if (select count(*) from public.trf_driver_locations) <> 1 then raise exception 'chofer: tendría que ver solo su posición en vivo'; end if;
   if (select count(*) from public.trf_driver_presence) <> 1 then raise exception 'chofer: tendría que ver solo su propio «activo»'; end if;
   -- «Chofer activo»: the phone says it is open; the server notes when, whatever the phone's clock says.
@@ -84,7 +85,7 @@ begin
   if not public.trf_is_panel_admin() then raise exception 'lectura: tendría que ser administrador del panel'; end if;
   if public.trf_is_admin() then raise exception 'lectura: no es administrador completo'; end if;
   if (select count(*) from public.trf_driver_tracking_sessions) <> 6 then raise exception 'lectura: tendría que ver los 6 viajes'; end if;
-  if (select count(*) from public.trf_driver_location_history) <> 15 then raise exception 'lectura: tendría que ver las 15 lecturas GPS'; end if;
+  if (select count(*) from public.trf_driver_location_history) <> 17 then raise exception 'lectura: tendría que ver las 17 lecturas GPS'; end if;
   if (select count(*) from public.trf_driver_locations) <> 4 then raise exception 'lectura: tendría que ver la posición en vivo de los 4 choferes'; end if;
   if (select count(*) from public.trf_driver_presence) <> 4 then raise exception 'lectura: tendría que ver quién tiene la app abierta'; end if;
   if (select count(*) from public.trf_panel_trips) <> 3 then raise exception 'lectura: tendría que ver los 3 viajes del panel'; end if;

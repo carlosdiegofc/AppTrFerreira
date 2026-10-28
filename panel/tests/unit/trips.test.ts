@@ -184,6 +184,12 @@ describe('fuel, route and numbers', () => {
       { latitude: -34.8, longitude: -56.2, recorded_at: at(10), speed_kmh: 200 },
     ])).toEqual({ count: 2, durationMs: 10 * 60_000, maxSpeedKmh: 70 });
     expect(routeStats([])).toEqual({ count: 0, durationMs: null, maxSpeedKmh: null });
+    // The estimated road of a stretch without signal is not a reading of the GPS.
+    expect(routeStats([
+      { latitude: -34.9, longitude: -56.1, recorded_at: at(0), speed_kmh: 70 },
+      { latitude: -34.85, longitude: -56.15, recorded_at: at(5), speed_kmh: null, estimated: true },
+      { latitude: -34.8, longitude: -56.2, recorded_at: at(10), speed_kmh: 60 },
+    ]).count).toBe(2);
   });
 
   it('numbers are read the Uruguayan way', () => {

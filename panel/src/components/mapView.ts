@@ -123,6 +123,10 @@ function notice(m: L.Map, text: string) {
   window.setTimeout(() => box.remove(), 6000);
 }
 
+/** The route the GPS measured, and a stretch without signal: dashed, its road estimated (lib/route.ts, routeRuns). */
+export const ROUTE_STYLE: L.PolylineOptions = { className: 'fm-route', weight: 4, opacity: 0.9 };
+export const GAP_STYLE: L.PolylineOptions = { className: 'fm-gap', weight: 4, opacity: 0.9, dashArray: '8 8' };
+
 export interface MapViewOptions {
   /** What opens over the whole screen: the map, or a box that holds it with its own buttons. */
   full?: () => HTMLElement | null;

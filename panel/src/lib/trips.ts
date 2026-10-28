@@ -311,8 +311,9 @@ export interface RouteStats {
 }
 
 /** Readings with a position, how long they span and the top speed (readings over 160 km/h are GPS noise). */
-export function routeStats(points: readonly { latitude: number; longitude: number; recorded_at: string; speed_kmh?: number | null }[]): RouteStats {
-  const valid = points.filter((p) => validPosition(p.latitude, p.longitude));
+export function routeStats(points: readonly { latitude: number; longitude: number; recorded_at: string; speed_kmh?: number | null; estimated?: boolean | null }[]): RouteStats {
+  // The estimated road of a stretch without signal is not a reading of the GPS.
+  const valid = points.filter((p) => validPosition(p.latitude, p.longitude) && !p.estimated);
   if (valid.length === 0) return { count: 0, durationMs: null, maxSpeedKmh: null };
   const times = valid.map((p) => Date.parse(p.recorded_at)).filter((t) => Number.isFinite(t));
   const speeds = valid.map((p) => toNumber(p.speed_kmh)).filter((s): s is number => s !== null && s >= 0 && s <= 160);

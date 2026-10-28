@@ -274,18 +274,29 @@ export interface RoutePoint {
   recorded_at: string;
   segment: number;
   speed_kmh: number | null;
+  /** The estimated road of a stretch without signal (migration 0013). */
+  estimated: boolean;
 }
 
 /**
  * GPS readings of a trip, oldest first. Same rule as the phone and the current panel: the readings of this trip, or
- * readings without trip saved by older app versions inside its time window.
+ * readings without trip saved by older app versions inside its time window. With afterId, only the ones saved after
+ * that one, whatever their time: the estimated road of a stretch without signal is saved when the signal is back.
  */
-export async function fetchRoute(trip: Pick<ActiveTrip, 'id' | 'driver_id' | 'started_at'> & { ended_at?: string | null }, since?: string): Promise<RoutePoint[]> {
+export async function fetchRoute(trip: Pick<ActiveTrip, 'id' | 'driver_id' | 'started_at'> & { ended_at?: string | null }, afterId?: number): Promise<RoutePoint[]> {
   return all((from, to) => {
-    let q = supabase.from('trf_driver_location_history').select('id,latitude,longitude,recorded_at,segment,speed_kmh').eq('driver_id', trip.driver_id).or(`trip_id.eq.${trip.id},trip_id.is.null`).gte('recorded_at', since ?? trip.started_at);
+    let q = supabase.from('trf_driver_location_history').select('id,latitude,longitude,recorded_at,segment,speed_kmh,estimated').eq('driver_id', trip.driver_id).or(`trip_id.eq.${trip.id},trip_id.is.null`).gte('recorded_at', trip.started_at);
+    if (afterId !== undefined) q = q.gt('id', afterId);
     if (trip.ended_at) q = q.lte('recorded_at', trip.ended_at);
     return q.order('recorded_at', { ascending: true }).order('id', { ascending: true }).range(from, to);
   }, 40_000);
+}
+
+export type RouteGapRow = Pick<Tables<'trf_route_gaps'>, 'id' | 'from_at' | 'to_at' | 'meters' | 'method'>;
+
+/** The stretches without signal of a trip (app 0.24.0), in order. */
+export async function fetchRouteGaps(tripId: string): Promise<RouteGapRow[]> {
+  return all((from, to) => supabase.from('trf_route_gaps').select('id,from_at,to_at,meters,method').eq('trip_id', tripId).order('from_at', { ascending: true }).order('id').range(from, to), 2_000);
 }
 
 export type DocumentRow = Tables<'trf_trip_documents'>;

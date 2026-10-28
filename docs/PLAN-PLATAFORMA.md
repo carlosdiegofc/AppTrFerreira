@@ -149,7 +149,16 @@ Avisos en el teléfono del chofer y en la campana del panel. Los del teléfono l
 3. [x] Boleta: al finalizar un viaje sin boletas, «¿Cargaste combustible en este viaje?», con el botón para cargarla.
 4. [x] En Mi cuenta, un interruptor por cada tipo de aviso.
 5. [x] La campana del panel suma los viajes en curso hace más de 14 horas, las boletas sin importe o sin litros, los viajes con carga sin importe y los choferes con una versión vieja de la app; cada aviso lleva a su página.
-6. [ ] Publicación: el panel y el .aab de la 0.23.0.
+6. [x] Publicación: el panel y el .aab de la 0.23.0. Unión del PR #29, panel publicado y .aab firmado el 28/10/2026 en la ejecución 40762083098 de main (artefacto «Google-Play-Transportes-Ferreira-GPS-v0.23.0»).
+
+### Tramos sin señal (aprobado el 28/10/2026)
+Cuando el GPS de un viaje se corta (sin señal, el teléfono sin batería, el sistema que cerró la app) y vuelve, la línea del mapa sigue por el camino que hizo el camión y el viaje cuenta esos kilómetros. Va en la migración 0013, la app 0.24.0 y el panel:
+1. [x] La base (migración 0013, solo agrega): las lecturas del camino estimado van con las del GPS, marcadas como estimadas y sin precisión, así no generan pasos por peajes ni balanzas; y cada corte queda en una tabla nueva (`trf_route_gaps`) con sus dos puntas, los kilómetros que contó y cómo se rellenó. Cada chofer carga y ve los suyos, el panel ve todos y nadie los cambia ni los borra. Pruebas en `panel/tests/e2e/db/gaps.sql`.
+2. [x] La app: si pasaron más de 90 segundos sin lecturas y el camión apareció a más de 300 m, en el mismo tramo del viaje (una pausa no cuenta), el viaje suma enseguida la línea recta y un 20 %, y al sincronizar pide a Google el camino por ruta entre los dos puntos. Con el camino, cuenta sus kilómetros y guarda sus lecturas estimadas. Si Google no contesta (sin señal, la API sin habilitar) lo vuelve a pedir cada 10 minutos, y al día se queda con la recta. Un corte de más de 3 horas, o un salto que un camión no puede hacer (más de 120 km/h de promedio), queda sin contar y para revisar.
+3. [x] Los mapas de la app: el tramo sin señal va en línea punteada, por su camino estimado o en recta mientras llega. El detalle del viaje dice los kilómetros estimados y los cortes sin contar.
+4. [x] El panel: el mismo punteado en el GPS en vivo y en el viaje, la leyenda, «Sin señal: 6,3 km estimados en 1 tramo» y el aviso del corte sin contar para revisar los km. El mapa en vivo trae también el camino que llega después del corte. Los puntos del recorrido cuentan solo las lecturas del GPS.
+5. [ ] Antes de publicar: el dueño habilita la «Routes API» en Google Cloud y la agrega a las APIs permitidas de la llave de Android; respaldo completo de la base y la migración 0013 en producción.
+6. [ ] Publicación: el panel y el .aab de la 0.24.0.
 
 Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - El rol anónimo tiene todos los permisos de tabla en 8 tablas de la app y del panel (`trf_driver_*`, `trf_trip_*`, `trf_mobile_catalog`, `trf_panel_trips`), y también los de la secuencia que numera los puntos GPS. Es lo que Supabase da por defecto y la seguridad por filas lo frena, pero hay que quitarlos: solo `trf_rates` necesita lectura anónima.
@@ -159,6 +168,10 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 28/10/2026: Tramos sin señal.
+  - El tramo se rellena con el camino por ruta de Google (Routes API), con la misma llave de Android de los mapas. Solo los dos puntos van a Google, sin el chofer ni el viaje; la política de privacidad lo dice.
+  - Se rellenan los cortes de hasta 3 horas; uno más largo, o un salto imposible, queda sin contar para revisarlo en el panel.
+  - Va antes de leer las boletas con la foto.
 - 28/10/2026: Avisos.
   - Los avisos del teléfono los calcula la app, sin Firebase ni servidor nuevo: sin costo y sin cambios en la política de privacidad. Los avisos al instante al dueño (por ejemplo, un camión detenido) quedan para más adelante.
   - Un viaje abierto se avisa a las 14 horas en curso, o con 2 horas detenido sin pausar.

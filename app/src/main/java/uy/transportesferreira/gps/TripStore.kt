@@ -43,9 +43,21 @@ class TripStore(private val c:Context) {
     }
     fun addPoint(point:JSONObject)=synchronized(lock){write(File(dir("points"),"${point.getString("event_id")}.json"),point);Unit}
     fun points()=synchronized(lock){dir("points").listFiles()?.filter{it.extension=="json"}?.mapNotNull{f->read(f)?.let{Pair(f,it)}}?.sortedBy{it.second.optString("recorded_at")} ?: emptyList()}
+    /** Stretches without signal (Gaps): waiting for Google's road, or settled and waiting to go up to the panel. */
+    fun saveGap(gap:JSONObject)=synchronized(lock){write(File(dir("gaps"),"${gap.getString("id")}.json"),gap);Unit}
+    fun gaps()=records("gaps")
+    /**
+     * A stretch settled: the trip counts its meters instead of the ones it counted while it waited, and is sent again
+     * (the trip in progress or a finished one). Both change together, so the difference is never counted twice.
+     */
+    fun settleGap(gap:JSONObject,meters:Double,method:String)=synchronized(lock){
+        val f=File(dir("trips"),"${gap.getString("trip_id")}.json")
+        read(f)?.let{t->t.put("distance_meters",(t.optDouble("distance_meters",0.0)+meters-gap.optDouble("counted",0.0)).coerceAtLeast(0.0)).put("revision",t.optInt("revision")+1);write(f,t)}
+        saveGap(gap.put("meters",meters).put("method",method).put("counted",meters).put("resolved",true))
+    }
     fun receipts()=synchronized(lock){dir("receipts").listFiles()?.filter{it.extension=="json"}?.mapNotNull{f->read(f)?.let{Pair(f,it)}} ?: emptyList()}
     fun receiptCount(id:String)=receipts().count{it.second.optString("trip_id")==id}
-    fun pendingCount()=trips().sumOf{it.optJSONArray("pending_documents")?.length()?:0}+trips().count{it.optInt("revision")>it.optInt("synced_revision")}+points().size+receipts().count{!it.second.optBoolean("synced")}+documents().count{!it.second.optBoolean("synced")}+details().count{!it.second.optBoolean("synced")}
+    fun pendingCount()=trips().sumOf{it.optJSONArray("pending_documents")?.length()?:0}+trips().count{it.optInt("revision")>it.optInt("synced_revision")}+points().size+receipts().count{!it.second.optBoolean("synced")}+documents().count{!it.second.optBoolean("synced")}+details().count{!it.second.optBoolean("synced")}+gaps().size
     fun records(folder:String)=synchronized(lock){dir(folder).listFiles()?.filter{it.extension=="json"}?.mapNotNull{f->read(f)?.let{Pair(f,it)}} ?: emptyList()}
     fun documents()=records("documents")
     fun details()=records("details")

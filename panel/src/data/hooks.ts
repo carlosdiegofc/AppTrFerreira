@@ -11,7 +11,7 @@ import { type ActiveTrip, type CatalogTruck, fleetUnits, truckLabel, withLivePos
 import { groupStations, type Movement, movementFromRow, type Receipt, receiptFromRow } from '../lib/fuel';
 import { kmReferences, kmSince, type MaintenanceRow, sameService, type Service, serviceFromRow, type TruckKm, truckKms } from '../lib/maintenance';
 import { type ProfitInput, type TollPassage, tollPassageFromRow } from '../lib/profit';
-import { appendReadings } from '../lib/route';
+import { appendReadings, lastSaved } from '../lib/route';
 import type { TripPayload } from '../lib/tripForm';
 import { mergeTrips, type Trip, tripFromPanel, tripFromSession } from '../lib/trips';
 import { hitchFromRow, type Hitch, truckEntries, type Vehicle, vehicleFromRow } from '../lib/vehicles';
@@ -38,6 +38,7 @@ import {
   fetchPaperDrivers,
   fetchPresence,
   fetchRoute,
+  fetchRouteGaps,
   fetchServices,
   fetchTollPassages,
   fetchTripDetail,
@@ -316,13 +317,23 @@ export function useRoute(trip: RouteTrip | null) {
     queryFn: async (): Promise<RoutePoint[]> => {
       if (!trip) return [];
       const shown = client.getQueryData<RoutePoint[]>(key);
-      const last = shown?.at(-1);
-      return shown && last ? appendReadings(shown, await fetchRoute(trip, last.recorded_at)) : fetchRoute(trip);
+      const last = shown ? lastSaved(shown) : null;
+      return shown && last !== null ? appendReadings(shown, await fetchRoute(trip, last)) : fetchRoute(trip);
     },
     enabled: trip !== null,
     refetchInterval: trip && (!trip.ended_at || settling(trip.ended_at)) ? ROUTE_REFRESH_MS : false,
     staleTime: trip?.ended_at ? 10 * 60_000 : 0,
     placeholderData: (previous, previousQuery) => (trip && previousQuery?.queryKey[1] === trip.id ? previous : undefined),
+  });
+}
+
+/** The stretches without signal of a trip, read again with its route while it is in progress. */
+export function useRouteGaps(trip: RouteTrip | null) {
+  return useQuery({
+    queryKey: ['routeGaps', trip?.id ?? null],
+    queryFn: () => (trip ? fetchRouteGaps(trip.id) : Promise.resolve([])),
+    enabled: trip !== null,
+    refetchInterval: trip && (!trip.ended_at || settling(trip.ended_at)) ? ROUTE_REFRESH_MS * 6 : false,
   });
 }
 
