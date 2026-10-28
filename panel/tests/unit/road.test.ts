@@ -69,7 +69,9 @@ describe('control de ruta', () => {
     expect(pointTitle({ kind: 'toll', name: 'Queguay' })).toBe('Peaje · Queguay');
     expect(pointTitle({ kind: 'toll', name: 'Peajes del este' })).toBe('Peaje · Peajes del este');
     expect(pointTitle({ kind: 'radar', name: 'Ruta 5 km 30' })).toBe('Radar · Ruta 5 km 30');
-    expect(pointTitle({ kind: 'place', name: 'Junco' })).toBe('Mi punto · Junco');
+    // Own points go by their name alone.
+    expect(pointTitle({ kind: 'place', name: 'Junco' })).toBe('Junco');
+    expect(pointTitle({ kind: 'place', name: 'Puerto de Nueva Palmira' })).toBe('Puerto de Nueva Palmira');
   });
 
   it('lists tolls, scales, radars and own points, each by name', () => {

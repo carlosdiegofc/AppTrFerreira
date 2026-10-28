@@ -57,3 +57,35 @@ test('punto, tarifa, cuenta individual y medición del tanque', async ({ page })
   await page.getByRole('dialog').getByRole('button',{name:'Archivar',exact:true}).click();
   await expect(point).toHaveCount(0);
 });
+
+test('mis puntos van solo con su nombre, y cada punto del mapa con la insignia de lo que es', async ({ page }) => {
+  await signIn(page, 'lectura@ejemplo.uy');
+  await open(page, 'GPS');
+  await page.getByRole('button', { name: 'Mis puntos', exact: true }).click();
+  await page.getByRole('button', { name: 'Ingresar coordenadas' }).click();
+  const form = page.getByRole('dialog');
+  await form.getByLabel('Nombre', { exact: true }).fill('Depósito de ensayo');
+  await form.getByLabel('Latitud').fill('-34.5');
+  await form.getByLabel('Longitud').fill('-56.3');
+  await form.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(form).toBeHidden();
+  // In the list and on the map, the name alone, with its flag.
+  const point = page.locator('.road-controls .road-point').filter({ hasText: 'Depósito de ensayo' });
+  await expect(point.getByRole('button').first()).toHaveText('Depósito de ensayo');
+  await expect(point.locator('.point-dot.road-place .road-badge')).toHaveCount(1);
+  await point.getByRole('button').first().click();
+  const map = page.locator('.gps-map .fleet-map');
+  const marker = map.locator('.road-marker.road-place[title="Depósito de ensayo"]');
+  await expect(marker.locator('.road-badge')).toHaveCount(1);
+  await expect(marker.locator('span')).toHaveText('Depósito de ensayo');
+  // Tolls, scales and radars carry theirs too.
+  await page.getByRole('button', { name: 'Peajes, balanzas y radares', exact: true }).click();
+  for (const kind of ['toll', 'scale', 'radar']) await expect(map.locator(`.road-marker.road-${kind} .road-badge`).first()).toBeAttached();
+  await expect(page.locator('.chips .point-dot')).toHaveCount(3);
+  await shot(page, 'gps-insignias');
+  // The point of the test goes to the archive again.
+  await page.getByRole('button', { name: 'Mis puntos', exact: true }).click();
+  await point.getByRole('button', { name: 'Archivar', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Archivar', exact: true }).click();
+  await expect(point).toHaveCount(0);
+});

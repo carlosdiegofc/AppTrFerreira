@@ -169,6 +169,7 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 28/10/2026: Insignias en los puntos del mapa. Cada punto del GPS en vivo lleva en su círculo lo que es: «$» en los peajes, una balanza en las balanzas, un velocímetro en los radares y una bandera en los puntos propios, también en la lista y en los filtros. Los puntos propios van solo con su nombre, sin «Mi punto ·». Solo el panel: la app no muestra estos puntos.
 - 28/10/2026: Tramos sin señal.
   - El tramo se rellena con el camino por ruta de Google (Routes API), con la misma llave de Android de los mapas. Solo los dos puntos van a Google, sin el chofer ni el viaje; la política de privacidad lo dice.
   - Se rellenan los cortes de hasta 3 horas; uno más largo, o un salto imposible, queda sin contar para revisarlo en el panel.

@@ -15,6 +15,7 @@ import { PRESENCE_TONE, STATE_TONE } from './states';
 import { PointEditor, TruckRoad, type RoadView } from '../components/RoadControls';
 import { useRoadPoints, useRoadWrite } from '../data/road';
 import { POINT_LABEL, pointTitle, type RoadPoint, type PointKind, sortedPoints } from '../lib/road';
+import { PointBadge } from '../components/PointBadge';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
 type Filter = 'all' | 'moving' | 'halted' | 'idle';
@@ -255,7 +256,7 @@ export function Gps() {
                       key={kind}
                       onClick={() => setKinds((old) => (old.includes(kind) ? old.filter((k) => k !== kind) : [...old, kind]))}
                     >
-                      {POINT_LABEL[kind]}
+                      <PointBadge kind={kind} /> {POINT_LABEL[kind]}
                     </button>
                   ))}
                 </div>
@@ -289,7 +290,7 @@ export function Gps() {
               {visiblePoints.map((p) => (
                 <div className="road-point" key={p.id}>
                   <button className="btn btn-quiet" onClick={() => setFocusPoint(p)}>
-                    {pointTitle(p)}
+                    <PointBadge kind={p.kind} /> {pointTitle(p)}
                   </button>
                   <p>{p.notes}</p>
                   <div className="road-actions">

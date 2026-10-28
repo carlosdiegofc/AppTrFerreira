@@ -4,7 +4,7 @@ Etapa autorizada el 21/10/2026. Continúa el mapa Leaflet, componentes, permisos
 
 ## Uso
 
-GPS tiene Seguimiento, Peajes/balanzas/radares y Mis puntos. Conserva camión, recorrido y zoom al cambiar de vista. Se puede agregar tocando el mapa o ingresando coordenadas, editar y archivar. La cuenta del camión muestra enlaces a su última ubicación en Google Maps/Apple Maps, saldo de telepeaje en UYU, movimientos, tarifas y combustible estimado.
+GPS tiene Seguimiento, Peajes/balanzas/radares y Mis puntos. Conserva camión, recorrido y zoom al cambiar de vista. Se puede agregar tocando el mapa o ingresando coordenadas, editar y archivar. Cada punto lleva en su círculo la insignia de lo que es (pedido del 28/10/2026): «$» en los peajes, una balanza en las balanzas, un velocímetro en los radares y una bandera en los puntos propios. La misma insignia está en la lista y en los filtros. Los puntos propios van solo con su nombre; los peajes, balanzas y radares dicen qué son, salvo que el nombre ya lo diga. La cuenta del camión muestra enlaces a su última ubicación en Google Maps/Apple Maps, saldo de telepeaje en UYU, movimientos, tarifas y combustible estimado.
 
 Cada tarifa nueva conserva la anterior; los pasos guardan el nombre, precio, límite y máxima velocidad observada. Las recargas y correcciones son movimientos nuevos: no se borran cobros. Se identifica la cuenta por matrícula normalizada, o por modelo completo cuando no hay matrícula; los nombres antiguos no se unen automáticamente a una cuenta con matrícula.
 
