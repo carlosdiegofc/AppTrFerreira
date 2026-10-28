@@ -90,13 +90,13 @@ test('la campana cuenta los avisos de Inicio en cualquier sección y lleva a cad
   await signIn(page, 'dueno@ejemplo.uy');
   await open(page, 'Viajes');
   const bell = page.getByRole('button', { name: /^Avisos/ });
-  // The Ford low on fuel, two things expired and three close: the same six of Inicio.
-  await expect(bell).toHaveAccessibleName('Avisos: 6');
-  await expect(bell.locator('.badge')).toHaveText('6');
+  // The Ford low on fuel, two things expired, three close and the two drivers with an older app: the same seven of Inicio.
+  await expect(bell).toHaveAccessibleName('Avisos: 7');
+  await expect(bell.locator('.badge')).toHaveText('7');
   await bell.click();
   const notices = page.locator('#avisos');
   await expect(notices.getByRole('heading')).toHaveText('Para tener en cuenta');
-  await expect(notices.locator('.alert-line')).toHaveCount(6);
+  await expect(notices.locator('.alert-line')).toHaveCount(7);
   await expect(notices.locator('.alert-line').first()).toContainText('Ford Cargo 1722 · JKL3456');
   await expect(notices.locator('.alert-line').first()).toContainText('Combustible bajo');
   await shot(page, 'avisos');

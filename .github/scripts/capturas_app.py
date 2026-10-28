@@ -34,6 +34,7 @@ SCREENS = [
     ('documentos', 'driver', 'documents', 'Mis documentos'),
     ('mantenimiento', 'driver', 'maintenance', 'Cambio de aceite'),
     ('mi-cuenta', 'driver', 'settings', 'Mi cuenta'),
+    ('boleta-al-finalizar', 'driver', 'receipt', '¿Cargaste combustible en este viaje?'),
     ('juegos', 'driver', 'games', 'Ajedrez'),
     ('sencillo-inicio', 'driver', 'simplehome', 'INICIAR VIAJE'),
     ('sencillo-iniciar', 'driver', 'simpleask', '¿Iniciar el viaje?'),

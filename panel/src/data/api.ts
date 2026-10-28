@@ -453,6 +453,11 @@ export async function fetchFuel(): Promise<FuelData> {
   return { receipts, movements };
 }
 
+/** The receipts recorded since fromIso, the ones in the trash too, for the bell: it only looks at the last month. */
+export async function fetchRecentReceipts(fromIso: string): Promise<Tables<'trf_driver_fuel_receipts'>[]> {
+  return all((from, to) => supabase.from('trf_driver_fuel_receipts').select('*').gte('recorded_at', fromIso).order('recorded_at', { ascending: false }).order('id').range(from, to), 5_000, true);
+}
+
 /** The photo of a receipt typed in the panel. One already uploaded (a save tried again) counts as uploaded. */
 export async function uploadReceiptPhoto(path: string, photo: Blob): Promise<void> {
   const result = await supabase.storage.from('trf-fuel-receipts').upload(path, photo, { contentType: 'image/jpeg', upsert: false });

@@ -52,7 +52,7 @@ export function Inicio() {
   const catalog = useCatalog();
   const todays = useTrips(startOfDay(today), startOfDay(addDays(today, 1)), 60_000);
   const month = useTrips(startOfDay(firstOfMonth(today)), startOfDay(firstOfNextMonth(today)));
-  const notices = useNotices(today);
+  const notices = useNotices(today, now);
   const { documents, maintenance, tanks } = notices;
 
   const counts = fleetCounts(fleet.units);
