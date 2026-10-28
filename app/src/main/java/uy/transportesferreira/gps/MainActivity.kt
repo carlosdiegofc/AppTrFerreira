@@ -1,5 +1,7 @@
 package uy.transportesferreira.gps
 import android.Manifest
+import android.animation.ValueAnimator
+import android.annotation.SuppressLint
 import android.app.DatePickerDialog
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -11,6 +13,8 @@ import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
 import android.graphics.drawable.RippleDrawable
+import android.graphics.drawable.StateListDrawable
+import android.graphics.drawable.TransitionDrawable
 import android.location.Geocoder
 import android.net.Uri
 import android.os.*
@@ -20,6 +24,9 @@ import android.text.InputType
 import android.text.TextUtils
 import android.text.TextWatcher
 import android.view.*
+import android.view.animation.AccelerateInterpolator
+import android.view.animation.DecelerateInterpolator
+import android.view.animation.PathInterpolator
 import android.view.inputmethod.EditorInfo
 import android.widget.*
 import androidx.activity.OnBackPressedCallback
@@ -54,34 +61,50 @@ private const val FLEET_MS=60000L
  * One per account (presenceKey), so another driver who signs in on the same phone is asked again.
  */
 private const val PRESENCE_POSITION="presence_position"
+/** The photo of the room behind the glass, opened once while the app lives (also across a turn of the screen): night or day. */
+private var roomPhoto:Pair<Boolean,Bitmap>?=null
 
 class MainActivity:AppCompatActivity(){
- // Palette: light value first, dark value second.
+ // Palette, the panel's glass (decision of 28/10/2026): light value first, dark value second. The cards are translucent
+ // over a room that is already out of focus (Room); what floats over the screen (the bars, the sheets) is nearly solid.
  private val dark by lazy{(resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES}
  private fun tone(light:Long,night:Long)=(if(dark)night else light).toInt()
- private val barBg by lazy{tone(0xFF0F2142,0xFF0A1730)}
- private val blue by lazy{tone(0xFF1663E8,0xFF5B9BFF)}
- private val blueSoft by lazy{tone(0xFFE8F0FE,0xFF1B2B4A)}
- private val appBg by lazy{tone(0xFFEEF2F7,0xFF0D1422)}
- private val cardBg by lazy{tone(0xFFFFFFFF,0xFF172133)}
- private val ink by lazy{tone(0xFF111C2E,0xFFE8EEF7)}
- private val muted by lazy{tone(0xFF67758B,0xFF9AA8BE)}
- private val faint by lazy{tone(0xFF9AA5B6,0xFF6C7A90)}
- private val inkSoft by lazy{tone(0xFF4F5D73,0xFFB4C0D3)}
- private val line by lazy{tone(0xFFE5EAF1,0xFF253047)}
- private val fieldLine by lazy{tone(0xFFD5DDE8,0xFF33415A)}
- private val green by lazy{tone(0xFF178A4C,0xFF4CC58A)}
- private val greenBg by lazy{tone(0xFFDEF3E6,0xFF143826)}
- private val amber by lazy{tone(0xFFB06A00,0xFFF2B25C)}
- private val amberBg by lazy{tone(0xFFFFEFD3,0xFF3A2A10)}
- private val red by lazy{tone(0xFFE0393E,0xFFF0575C)}
- private val redBg by lazy{tone(0xFFFDE4E4,0xFF3D1A1C)}
+ /** The logo's blue, for what is filled: the main buttons, the avatar, the + button. */
+ private val brand by lazy{tone(0xFF133396,0xFF3457D5)}
+ private val blue by lazy{tone(0xFF133396,0xFF92B0FF)}
+ private val blueSoft by lazy{tone(0x1C133396,0x2978A0FF)}
+ private val roomTone by lazy{tone(0xFFE4D8CA,0xFF1D1A1E)}
+ private val glass by lazy{tone(0xA3FFFFFF,0x851E2536)}
+ private val glassLine by lazy{tone(0xB8FFFFFF,0x17FFFFFF)}
+ private val raised by lazy{tone(0xF0FFFFFF,0xF51B2131)}
+ private val float by lazy{tone(0xC7FFFFFF,0xCC121622)}
+ private val menuFill by lazy{tone(0xF7FFFFFF,0xFA1A1F2E)}
+ private val fieldFill by lazy{tone(0xA8FFFFFF,0x38000000)}
+ private val btnFill by lazy{tone(0x9EFFFFFF,0x14FFFFFF)}
+ private val surface by lazy{tone(0xFFF7F2EC,0xFF1D2232)}
+ /** The chosen tab of the bottom bar. */
+ private val railOn by lazy{tone(0xFFFFFFFF,0x2BFFFFFF)}
+ private val railInk by lazy{tone(0xFF133396,0xFFFFFFFF)}
+ /** Cards: glass, or nearly solid on the screens of a trip and of simple mode, read at a glance (opaque). */
+ private val cardBg get()=if(opaque)raised else glass
+ private val ink by lazy{tone(0xFF121A2B,0xFFEEF2F8)}
+ private val muted by lazy{tone(0xFF515B6C,0xFFA4AEC0)}
+ private val faint by lazy{tone(0xFF8A919D,0xFF77829A)}
+ private val inkSoft by lazy{tone(0xFF3D4658,0xFFC5CDDB)}
+ private val line by lazy{tone(0x1C242C3E,0x17FFFFFF)}
+ private val fieldLine by lazy{tone(0x2B242C3E,0x29FFFFFF)}
+ private val green by lazy{tone(0xFF13753F,0xFF62D39B)}
+ private val greenBg by lazy{tone(0x24178A4C,0x294CC58A)}
+ private val amber by lazy{tone(0xFF965400,0xFFF4B862)}
+ private val amberBg by lazy{tone(0x2EDE8C14,0x29F2B25C)}
+ private val red by lazy{tone(0xFFC4262D,0xFFFF7D82)}
+ private val redBg by lazy{tone(0x21E0393E,0x2EF0575C)}
+ private val redFill by lazy{tone(0xFFC4262D,0xFFD9363C)}
  private val grey by lazy{tone(0xFF8F9BAD,0xFF6C7A90)}
- private val greyBg by lazy{tone(0xFFEDF0F5,0xFF222C3E)}
- private val press by lazy{tone(0x1F0F2142,0x33FFFFFF)}
+ private val greyBg by lazy{tone(0x12242C3E,0x12FFFFFF)}
+ private val press by lazy{tone(0x1F133396,0x33FFFFFF)}
  private val medium by lazy{Typeface.create("sans-serif-medium",Typeface.NORMAL)}
  private val uy=Locale.forLanguageTag("es-UY")
- private val loginBg=0xFF0A1220.toInt()
  private enum class Kind{PRIMARY,DANGER,LINE,SOFT,LINE_DANGER,GO}
  private class Btn(val view:LinearLayout,val label:TextView){fun enable(v:Boolean){view.isEnabled=v;view.alpha=if(v)1f else .5f}}
  private class Tile(val icon:Int,val title:String,val sub:String?,val action:()->Unit)
@@ -93,6 +116,12 @@ class MainActivity:AppCompatActivity(){
  private lateinit var head:LinearLayout
  private lateinit var root:LinearLayout
  private lateinit var dock:LinearLayout
+ // The screens come and go over the room on a stage that stays: going says how the next one comes in (1 forward, from
+ // the right; -1 back, from the left; 0 another tab of the bottom bar, in place). leaving counts the ones still going out.
+ private var stage:FrameLayout?=null
+ private var going=1;private var leaving=0;private var opaque=false;private var again=false
+ /** Where the chosen pill of the bottom bar and of each row of options was, so that it slides from there. */
+ private var tabAt=-1;private val segAt=HashMap<String,Int>()
  private var topTarget:View?=null
  private lateinit var store:TripStore
  private lateinit var api:Api
@@ -161,6 +190,7 @@ class MainActivity:AppCompatActivity(){
   // A new game's options as they were being picked, or else as they were picked the last time.
   val chessOptions={if(b?.containsKey("chessPick")==true)chessNew() else newChess()}
   onBackPressedDispatcher.addCallback(this,back)
+  if(sampleView()){sample(b==null);return}
   // The emulator test of the games (CI) opens them without an account, also after turning the screen: only on a debug
   // build, which never goes to Google Play. Nothing of the games goes out.
   if(api.session()==null&&gamesTest()){intent?.getStringExtra("trf_test_truco")?.takeIf{b==null&&Truco.Match.load(it)!=null}?.let{prefs().edit().putString(trucoKey(),it).apply()}
@@ -177,7 +207,7 @@ class MainActivity:AppCompatActivity(){
  override fun onStop(){handler.removeCallbacks(tick);Presence.closed();super.onStop()}
  // Screens where back stays inside the app; on the rest the system back gesture leaves it.
  private val innerScreens=setOf("fuel","document","prepare","newtrip","trip","triphistory","fuelhistory","settings","privacy","tripdetail","maintenance","documents","maintform","docform","performance","games","chessnew","chess","truco")
- private val back=object:OnBackPressedCallback(false){override fun handleOnBackPressed(){when(screen){
+ private val back=object:OnBackPressedCallback(false){override fun handleOnBackPressed(){going=-1;when(screen){
   "fuel"->homeOrTrip()
   "document"->backFromDocument()
   "prepare"->newTrip()
@@ -194,7 +224,7 @@ class MainActivity:AppCompatActivity(){
   "chessnew","chess","truco"->games()
   // Only enabled while the question before starting a trip is up: back answers "no".
   "simplehome"->simpleHome()
- }}}
+ };going=1}}
  private fun refreshCatalog(){thread{try{mobile.catalog(true);runOnUiThread{if(screen=="prepare")prepare() else if(screen=="newtrip")newTrip()}}catch(_:Exception){}}}
 
  // ---------- Building blocks ----------
@@ -203,7 +233,29 @@ class MainActivity:AppCompatActivity(){
  private fun bg(color:Int,r:Int=12)=GradientDrawable().apply{setColor(color);cornerRadius=dpf(r.toFloat())}
  private fun outline(color:Int,edge:Int,r:Int=12)=GradientDrawable().apply{setColor(color);cornerRadius=dpf(r.toFloat());setStroke(dp(1),edge)}
  private fun oval(color:Int)=GradientDrawable().apply{shape=GradientDrawable.OVAL;setColor(color)}
+ /** The panel's featured blue: the logo's, lighter at the top left. */
+ private fun featured()=GradientDrawable(GradientDrawable.Orientation.TL_BR,intArrayOf(tone(0xFF2F58D8,0xFF3155D0),tone(0xFF133396,0xFF22409F))).apply{shape=GradientDrawable.OVAL}
+ /** A glass card: translucent, with a hairline edge that catches the light. */
+ private fun glassy(r:Int=20)=outline(cardBg,glassLine,r)
+ /** A field, the panel's: glass, with a blue edge while it is being written in. */
+ private fun fieldLook(r:Int=14)=StateListDrawable().apply{addState(intArrayOf(android.R.attr.state_focused),outline(fieldFill,blue,r).apply{setStroke(dp(2),blue)});addState(intArrayOf(),outline(fieldFill,fieldLine,r))}
+ /** What is filled in a solid colour glows a little of that colour under it, like the panel's main buttons. */
+ private fun glow(v:View,color:Int,height:Float=3f){v.elevation=dpf(height);if(Build.VERSION.SDK_INT>=28){v.outlineSpotShadowColor=color;v.outlineAmbientShadowColor=color}}
+ private fun moves()=ValueAnimator.areAnimatorsEnabled()
+ private val ease by lazy{PathInterpolator(.2f,0f,0f,1f)}
+ /** What is tapped sinks a little under the finger and comes back when let go; the tap itself goes on as always. */
+ @SuppressLint("ClickableViewAccessibility")
+ private fun sink(v:View,to:Float=.97f){v.setOnTouchListener{x,e->when(e.actionMasked){MotionEvent.ACTION_DOWN->if(moves())x.animate().scaleX(to).scaleY(to).setStartDelay(0).setDuration(90).setInterpolator(DecelerateInterpolator()).start();MotionEvent.ACTION_UP,MotionEvent.ACTION_CANCEL->x.animate().scaleX(1f).scaleY(1f).setStartDelay(0).setDuration(180).setInterpolator(ease).start()};false}}
+ /** A short buzz for what matters: starting and finishing a trip, saving. */
+ private fun buzz(v:View){v.performHapticFeedback(if(Build.VERSION.SDK_INT>=30)HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.VIRTUAL_KEY)}
+ /** Slides a chosen pill from one slot to another. */
+ private fun slide(pill:Slider,from:Int,to:Int){
+  if(from==to||from<0||!moves()){pill.at=to.toFloat();return}
+  pill.at=from.toFloat();ValueAnimator.ofFloat(from.toFloat(),to.toFloat()).apply{duration=300;interpolator=ease;addUpdateListener{pill.at=it.animatedValue as Float}}.start()
+ }
  private fun ripple(content:Drawable?,tint:Int=press):Drawable=RippleDrawable(ColorStateList.valueOf(tint),content,if(content==null)ColorDrawable(Color.WHITE) else null)
+ /** Only the touch ripple, rounded. */
+ private fun touch(r:Int,tint:Int=press):Drawable=RippleDrawable(ColorStateList.valueOf(tint),null,bg(Color.WHITE,r))
  private fun tinted(res:Int,color:Int,size:Int=20):Drawable=getDrawable(res)!!.mutate().apply{setTint(color);setBounds(0,0,dp(size),dp(size))}
  private fun hex(c:Int)=String.format("#%06X",0xFFFFFF and c)
  private fun iconView(res:Int,color:Int,size:Int=22)=ImageView(this).apply{setImageResource(res);imageTintList=ColorStateList.valueOf(color);importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO;layoutParams=LinearLayout.LayoutParams(dp(size),dp(size))}
@@ -214,11 +266,11 @@ class MainActivity:AppCompatActivity(){
  private fun note(s:String,p:LinearLayout=root,top:Int=12)=text(p,s,13.5f,muted,0,top).apply{setLineSpacing(0f,1.15f)}
  private fun divider(p:LinearLayout,start:Int=0)=p.addView(View(this).apply{setBackgroundColor(line)},LinearLayout.LayoutParams(-1,1).apply{marginStart=dp(start)})
  private fun card(p:LinearLayout=root,pad:Int=0,top:Int=12):LinearLayout{
-  val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=bg(cardBg,16);elevation=dpf(1.5f);clipToOutline=true;setPadding(dp(pad),dp(pad),dp(pad),dp(pad))}
+  val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=glassy();clipToOutline=true;setPadding(dp(pad),dp(pad),dp(pad),dp(pad))}
   p.addView(v,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(top)});return v
  }
- private fun square(res:Int,color:Int,fill:Int,size:Int=40,inner:Int=22)=FrameLayout(this).apply{background=bg(fill,11);addView(ImageView(this@MainActivity).apply{setImageResource(res);imageTintList=ColorStateList.valueOf(color)},FrameLayout.LayoutParams(dp(inner),dp(inner),Gravity.CENTER));importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS;layoutParams=LinearLayout.LayoutParams(dp(size),dp(size))}
- private fun pill(s:String,fg:Int,fill:Int)=tv(s,12f,fg,1).apply{background=bg(fill,7);setPadding(dp(9),dp(4),dp(9),dp(5));layoutParams=LinearLayout.LayoutParams(-2,-2)}
+ private fun square(res:Int,color:Int,fill:Int,size:Int=40,inner:Int=22)=FrameLayout(this).apply{background=bg(fill,size/3);addView(ImageView(this@MainActivity).apply{setImageResource(res);imageTintList=ColorStateList.valueOf(color)},FrameLayout.LayoutParams(dp(inner),dp(inner),Gravity.CENTER));importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS;layoutParams=LinearLayout.LayoutParams(dp(size),dp(size))}
+ private fun pill(s:String,fg:Int,fill:Int)=tv(s,12f,fg,1).apply{background=bg(fill,12);setPadding(dp(10),dp(4),dp(10),dp(5));layoutParams=LinearLayout.LayoutParams(-2,-2)}
  private fun row(p:LinearLayout,icon:Int?,title:String,sub:String?=null,subColor:Int=muted,trailing:View?=null,tint:Int=blue,action:(()->Unit)?=null):TextView?{
   if(p.childCount>0)divider(p,if(icon!=null)56 else 16)
   val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;minimumHeight=dp(60);setPadding(dp(16),dp(10),dp(12),dp(10))}
@@ -242,21 +294,22 @@ class MainActivity:AppCompatActivity(){
  /** How a button of a kind looks: its background with the touch ripple, its text colour, and whether it is solid. */
  private fun buttonLook(kind:Kind):Triple<Drawable,Int,Boolean>{
   val solid=kind==Kind.PRIMARY||kind==Kind.DANGER||kind==Kind.GO
-  val fill=when(kind){Kind.PRIMARY->blue;Kind.DANGER->red;Kind.GO->0xFF178A4C.toInt();Kind.SOFT->blueSoft;else->cardBg}
-  val fg=when(kind){Kind.PRIMARY,Kind.DANGER,Kind.GO->Color.WHITE;Kind.LINE_DANGER->red;else->blue}
-  val shape=when(kind){Kind.LINE->outline(fill,tone(0xFFC9D8F6,0xFF35507E),14);Kind.LINE_DANGER->outline(fill,tone(0xFFF3C5C7,0xFF6A2C30),14);else->bg(fill,14)}
+  val fg=when(kind){Kind.PRIMARY,Kind.DANGER,Kind.GO->Color.WHITE;Kind.LINE_DANGER->red;Kind.SOFT->blue;else->ink}
+  // Pills, the panel's buttons: the quiet ones on glass with a hairline edge.
+  val shape=when(kind){Kind.LINE->outline(fillOf(kind),tone(0x24242C3E,0x24FFFFFF),27);Kind.LINE_DANGER->outline(fillOf(kind),tone(0x47C4262D,0x47FF7D82),27);else->bg(fillOf(kind),27)}
   return Triple(ripple(shape,if(solid)0x40FFFFFF else press),fg,solid)
  }
+ private fun fillOf(kind:Kind)=when(kind){Kind.PRIMARY->brand;Kind.DANGER->redFill;Kind.GO->0xFF178A4C.toInt();Kind.SOFT->blueSoft;else->btnFill}
  private fun button(p:LinearLayout,s:String,kind:Kind=Kind.PRIMARY,icon:Int?=null,top:Int=12,action:()->Unit):Btn{
   val (look,fg,solid)=buttonLook(kind)
-  val v=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;background=look;isClickable=true;isFocusable=true;contentDescription=s;setPadding(dp(16),0,dp(16),0);if(solid)elevation=dpf(2f)}
+  val v=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;background=look;isClickable=true;isFocusable=true;contentDescription=s;setPadding(dp(18),0,dp(18),0);if(solid)glow(this,fillOf(kind))}
   if(icon!=null)v.addView(iconView(icon,fg,20).apply{(layoutParams as LinearLayout.LayoutParams).marginEnd=dp(10)})
   val label=tv(s,16f,fg,1).apply{maxLines=1;ellipsize=TextUtils.TruncateAt.END};v.addView(label)
-  v.setOnClickListener{action()};p.addView(v,LinearLayout.LayoutParams(-1,dp(54)).apply{topMargin=dp(top)});return Btn(v,label)
+  v.setOnClickListener{if(kind==Kind.GO||kind==Kind.DANGER)buzz(it);action()};sink(v);p.addView(v,LinearLayout.LayoutParams(-1,dp(54)).apply{topMargin=dp(top)});return Btn(v,label)
  }
  private fun link(p:LinearLayout,s:String,top:Int=8,color:Int=blue,action:()->Unit)=tv(s,15f,color,1).apply{gravity=Gravity.CENTER;minHeight=dp(48);background=ripple(null);isClickable=true;isFocusable=true;setOnClickListener{action()};p.addView(this,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(top)})}
- /** A field of a form. The phone's autofill stays out: it filled «Otro tipo» with the account's email. The sign-in fields (darkField) keep it. */
- private fun input(type:Int,hint:String="")=EditText(this).apply{inputType=type;textSize=16f;setTextColor(ink);setHintTextColor(faint);this.hint=hint;background=outline(cardBg,fieldLine,12);setPadding(dp(14),0,dp(14),0);importantForAutofill=View.IMPORTANT_FOR_AUTOFILL_NO}
+ /** A field of a form. The phone's autofill stays out: it filled «Otro tipo» with the account's email. The sign-in fields (signField) keep it. */
+ private fun input(type:Int,hint:String="")=EditText(this).apply{inputType=type;textSize=16f;setTextColor(ink);setHintTextColor(faint);this.hint=hint;background=fieldLook();setPadding(dp(14),0,dp(14),0);importantForAutofill=View.IMPORTANT_FOR_AUTOFILL_NO}
  private fun field(p:LinearLayout,title:String,type:Int,hint:String=""):EditText{caption(p,title);val e=input(type,hint);p.addView(e,LinearLayout.LayoutParams(-1,dp(52)).apply{topMargin=dp(6)});return e}
  private fun bind(v:EditText,data:JSONObject,key:String){
   v.setText(data.optString(key).takeUnless{it=="null"}?:"")
@@ -266,25 +319,30 @@ class MainActivity:AppCompatActivity(){
  private fun spinnerAdapter(items:List<String>)=object:ArrayAdapter<String>(this,android.R.layout.simple_spinner_item,items){
   override fun getView(position:Int,convertView:View?,parent:ViewGroup):View=(super.getView(position,convertView,parent) as TextView).apply{setTextColor(ink);textSize=16f;setPadding(dp(14),0,dp(40),0);maxLines=1;ellipsize=TextUtils.TruncateAt.END}
  }.apply{setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)}
- private fun spinnerBg():Drawable=LayerDrawable(arrayOf(outline(cardBg,fieldLine,12),getDrawable(R.drawable.ic_expand)!!.mutate().apply{setTint(muted)})).apply{setLayerGravity(1,Gravity.END or Gravity.CENTER_VERTICAL);setLayerInsetEnd(1,dp(12));setLayerSize(1,dp(22),dp(22))}
+ private fun spinnerBg():Drawable=LayerDrawable(arrayOf(outline(fieldFill,fieldLine,14),getDrawable(R.drawable.ic_expand)!!.mutate().apply{setTint(muted)})).apply{setLayerGravity(1,Gravity.END or Gravity.CENTER_VERTICAL);setLayerInsetEnd(1,dp(12));setLayerSize(1,dp(22),dp(22))}
  private fun select(c:LinearLayout,title:String,data:JSONObject,key:String,values:List<String>,changed:(String)->Unit={}){
   caption(c,title);val options=listOf("Sin seleccionar")+(values+data.optString(key)).distinct().filter{it.isNotBlank()}
-  val spinner=Spinner(this).apply{adapter=spinnerAdapter(options);background=spinnerBg()};c.addView(spinner,LinearLayout.LayoutParams(-1,dp(52)).apply{topMargin=dp(6)})
+  val spinner=Spinner(this).apply{adapter=spinnerAdapter(options);background=spinnerBg();setPopupBackgroundDrawable(bg(menuFill,16))};c.addView(spinner,LinearLayout.LayoutParams(-1,dp(52)).apply{topMargin=dp(6)})
   spinner.setSelection(options.indexOf(data.optString(key)).coerceAtLeast(0));spinner.onItemSelectedListener=object:AdapterView.OnItemSelectedListener{override fun onNothingSelected(p:AdapterView<*>?){};override fun onItemSelected(p:AdapterView<*>?,v:View?,pos:Int,id:Long){val next=if(pos==0)"" else options[pos];val previous=data.optString(key);data.put(key,next);if(previous!=next)changed(next)}}
  }
  private fun radio(p:LinearLayout,title:String,selected:Boolean,action:()->Unit){
-  val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;minimumHeight=dp(56);setPadding(dp(14),dp(8),dp(14),dp(8));background=ripple(if(selected)outline(blueSoft,blue,12) else outline(cardBg,fieldLine,12));isClickable=true;isFocusable=true;contentDescription=title+if(selected)", elegido" else "";setOnClickListener{action()}}
+  val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;minimumHeight=dp(56);setPadding(dp(14),dp(8),dp(14),dp(8));background=ripple(if(selected)outline(blueSoft,blue,16) else outline(fieldFill,fieldLine,16));isClickable=true;isFocusable=true;contentDescription=title+if(selected)", elegido" else "";setOnClickListener{action()}}
   r.addView(if(selected)iconView(R.drawable.ic_check_circle,blue,24) else View(this).apply{background=GradientDrawable().apply{shape=GradientDrawable.OVAL;setStroke(dp(2),faint)};layoutParams=LinearLayout.LayoutParams(dp(22),dp(22)).apply{marginStart=dp(1);marginEnd=dp(1)}})
   r.addView(tv(title,15.5f,ink,1).apply{setPadding(dp(14),0,0,0)},LinearLayout.LayoutParams(0,-2,1f))
   p.addView(r,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(10)})
  }
  private fun segmented(p:LinearLayout,options:List<String>,selected:Int,top:Int=12,change:(Int)->Unit){
-  val box=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;background=bg(tone(0xFFE1E7F0,0xFF1C2638),12);setPadding(dp(4),dp(4),dp(4),dp(4))}
-  options.forEachIndexed{i,s->val on=i==selected;box.addView(tv(s,14f,if(on)Color.WHITE else muted,1).apply{gravity=Gravity.CENTER;background=if(on)bg(blue,9) else ripple(null);isClickable=true;isFocusable=true;contentDescription=s+if(on)", elegido" else "";setOnClickListener{if(!on)change(i)}},LinearLayout.LayoutParams(0,dp(40),1f))}
+  // The panel's switch: the chosen option on a light pill, which slides from the one chosen before when the screen is
+  // drawn again for the change.
+  val key=options.joinToString("|");val from=if(again)segAt[key]?:selected else selected;segAt[key]=selected
+  val chosen=Slider(raised,options.size,dpf(4f),if(dark)0 else 0x29000000)
+  val box=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;background=LayerDrawable(arrayOf(outline(greyBg,glassLine,24),chosen));clipToOutline=true;setPadding(dp(4),dp(4),dp(4),dp(4))}
+  options.forEachIndexed{i,s->val on=i==selected;box.addView(tv(s,14f,if(on)ink else inkSoft,1).apply{gravity=Gravity.CENTER;background=if(on)null else touch(20);isClickable=true;isFocusable=true;contentDescription=s+if(on)", elegido" else "";setOnClickListener{if(!on)change(i)}},LinearLayout.LayoutParams(0,dp(40),1f))}
   p.addView(box,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(top)})
+  slide(chosen,from,selected)
  }
  private fun searchBox(p:LinearLayout,hint:String,value:String):EditText{
-  val box=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;background=outline(cardBg,fieldLine,12);setPadding(dp(14),0,dp(8),0)}
+  val box=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;background=fieldLook(25);setAddStatesFromChildren(true);setPadding(dp(16),0,dp(8),0)}
   box.addView(iconView(R.drawable.ic_search,faint,20))
   val e=EditText(this).apply{inputType=InputType.TYPE_CLASS_TEXT;imeOptions=EditorInfo.IME_ACTION_SEARCH;textSize=15.5f;setTextColor(ink);setHintTextColor(faint);this.hint=hint;background=null;setPadding(dp(10),0,dp(4),0);setText(value);importantForAutofill=View.IMPORTANT_FOR_AUTOFILL_NO}
   box.addView(e,LinearLayout.LayoutParams(0,-1,1f));p.addView(box,LinearLayout.LayoutParams(-1,dp(50)).apply{topMargin=dp(12)});return e
@@ -292,8 +350,8 @@ class MainActivity:AppCompatActivity(){
  private fun tileGrid(items:List<Tile>){
   for(i in items.indices step 2){val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL};root.addView(r,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12)})
    for(j in i until minOf(i+2,items.size)){val t=items[j]
-    val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=ripple(bg(cardBg,16));elevation=dpf(1.5f);setPadding(dp(16),dp(16),dp(12),dp(14));isClickable=true;isFocusable=true;contentDescription=t.title+(t.sub?.let{". $it"}?:"");setOnClickListener{t.action()}}
-    v.addView(iconView(t.icon,blue,28));v.addView(tv(t.title,15.5f,ink,1).apply{setPadding(0,dp(12),0,0)});if(t.sub!=null)v.addView(tv(t.sub,13f,muted).apply{setPadding(0,dp(2),0,0)})
+    val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=ripple(glassy(22));setPadding(dp(16),dp(16),dp(12),dp(14));isClickable=true;isFocusable=true;contentDescription=t.title+(t.sub?.let{". $it"}?:"");setOnClickListener{t.action()}};sink(v)
+    v.addView(square(t.icon,blue,blueSoft,44,24));v.addView(tv(t.title,15.5f,ink,1).apply{setPadding(0,dp(12),0,0)});if(t.sub!=null)v.addView(tv(t.sub,13f,muted).apply{setPadding(0,dp(2),0,0)})
     r.addView(v,LinearLayout.LayoutParams(0,-1,1f).apply{if(j%2==1)marginStart=dp(12)})}}
  }
  private fun menuList(items:List<Shortcut>)=menuRows(card(),items)
@@ -320,13 +378,13 @@ class MainActivity:AppCompatActivity(){
   return values
  }
  private fun kpi(p:LinearLayout,label:String,value:String,index:Int,lines:Int=1){
-  val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=bg(cardBg,16);elevation=dpf(1.5f);setPadding(dp(16),dp(14),dp(12),dp(14))}
+  val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=glassy();setPadding(dp(16),dp(14),dp(12),dp(14))}
   v.addView(tv(label,13.5f,muted));v.addView(tv(value,22f,ink,2).apply{setPadding(0,dp(4),0,0);maxLines=lines});v.contentDescription="$label: $value"
   // Full height of the row: cards stay the same size when one shows two lines.
   p.addView(v,LinearLayout.LayoutParams(0,-1,1f).apply{if(index>0)marginStart=dp(12)})
  }
  private fun stat(p:LinearLayout,value:String,label:String,color:Int,index:Int){
-  val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=bg(cardBg,16);elevation=dpf(1.5f);setPadding(dp(14),dp(12),dp(10),dp(12))}
+  val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=glassy();setPadding(dp(14),dp(12),dp(10),dp(12))}
   v.addView(tv(value,24f,ink,2))
   val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(0,dp(2),0,0)}
   r.addView(View(this).apply{background=oval(color)},LinearLayout.LayoutParams(dp(8),dp(8)));r.addView(tv(label,13f,muted).apply{setPadding(dp(6),0,0,0);maxLines=1})
@@ -338,93 +396,139 @@ class MainActivity:AppCompatActivity(){
   text(c,title,16f,ink,1,12).gravity=Gravity.CENTER;text(c,sub,14f,muted,0,4).gravity=Gravity.CENTER
  }
 
- // ---------- Page frame: navy header, scrolling content, optional bottom dock and navigation ----------
+ // ---------- Page frame: the room, a floating bar on top, scrolling content, optional bottom dock and navigation ----------
+ /** Screens read at a glance, on a trip or in simple mode: their cards are nearly solid. */
+ private val solidScreens=setOf("trip","simpletrip","simplehome")
  private fun page(key:String,header:Boolean=true){
-  activeMap?.destroy();activeMap=null;liveMap=null;fleetMap=null;screen=key;back.isEnabled=key in innerScreens;fleetStats=null;fleetCard=null;fleetNote=null;peopleCard=null
+  // The map of the screen going out goes blank before it closes, so that it does not show black while it leaves.
+  activeMap?.view?.visibility=View.INVISIBLE
+  activeMap?.destroy();activeMap=null;liveMap=null;fleetMap=null
+  // The same screen drawn again (a choice, new data) stays where it was, without moving; another one comes in.
+  again=key==screen&&stage!=null;val move=going;going=1
+  val keep=if(again)(root.parent as? ScrollView)?.scrollY?:0 else 0
+  val before=if(stage!=null)shell else null
+  screen=key;back.isEnabled=key in innerScreens;fleetStats=null;fleetCard=null;fleetNote=null;peopleCard=null;opaque=key in solidScreens
   distance=null;speed=null;limit=null;status=null;statusBox=null;elapsed=null;sync=null;gps=null;count=null;pauseLabel=null;pauseIcon=null
   // Leaving the board drops the phone's move on its way.
   board=null;chessTop=null;chessBottom=null;chessStatus=null;undoButton=null;if(key!="chess"){chessJob++;thinking=false}
   trucoUi=null;if(key!="truco"){trucoJob++;trucoThinking=false}
-  shell=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(appBg)}
-  head=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setBackgroundColor(barBg);visibility=if(header)View.VISIBLE else View.GONE}
+  shell=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
+  head=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;visibility=if(header)View.VISIBLE else View.GONE}
   shell.addView(head,LinearLayout.LayoutParams(-1,-2));topTarget=head
-  val scroll=ScrollView(this).apply{isFillViewport=true;isVerticalScrollBarEnabled=false;overScrollMode=View.OVER_SCROLL_NEVER;setBackgroundColor(appBg)}
+  // The content fades out at the edges where it scrolls under the bar and the dock.
+  val scroll=ScrollView(this).apply{isFillViewport=true;isVerticalScrollBarEnabled=false;overScrollMode=View.OVER_SCROLL_NEVER;isVerticalFadingEdgeEnabled=true;setFadingEdgeLength(dp(14))}
   root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),dp(6),dp(14),dp(24))}
   scroll.addView(root);shell.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
-  dock=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),dp(10),dp(14),dp(12));setBackgroundColor(appBg);visibility=View.GONE}
+  dock=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),dp(8),dp(14),dp(12));visibility=View.GONE}
   shell.addView(dock,LinearLayout.LayoutParams(-1,-2))
-  setContentView(shell)
+  // Touches wait while a screen goes out, so that they do not land on it.
+  val st=stage?:object:FrameLayout(this){override fun onInterceptTouchEvent(e:MotionEvent)=leaving>0||super.onInterceptTouchEvent(e)}.also{stage=it;it.background=ColorDrawable(roomTone);setContentView(it);showRoom(it)}
+  st.addView(shell,FrameLayout.LayoutParams(-1,-1))
   ViewCompat.setOnApplyWindowInsetsListener(shell){v,i->fitBars(v,i);i}
-  // AppCompat swaps the content view without asking for a new insets pass, so only the first screen would hear about the
-  // system bars and every later one would sit under them. Each screen takes the sizes the window already has and asks for its own pass.
-  ViewCompat.getRootWindowInsets(shell)?.let{fitBars(shell,it)};shell.requestApplyInsets()
-  WindowCompat.getInsetsController(window,window.decorView).apply{isAppearanceLightStatusBars=false;isAppearanceLightNavigationBars=!dark}
-  shell.alpha=0f;shell.animate().alpha(1f).setDuration(160).start()
+  // Each screen takes the sizes of the system bars the window already has and asks for its own pass.
+  ViewCompat.getRootWindowInsets(st)?.let{fitBars(shell,it)};shell.requestApplyInsets()
+  WindowCompat.getInsetsController(window,window.decorView).apply{isAppearanceLightStatusBars=!dark;isAppearanceLightNavigationBars=!dark}
+  if(keep>0)scroll.addOnLayoutChangeListener(object:View.OnLayoutChangeListener{override fun onLayoutChange(v:View,a:Int,b:Int,c:Int,d:Int,e:Int,f:Int,g:Int,h:Int){v.removeOnLayoutChangeListener(this);(v as ScrollView).scrollTo(0,keep)}})
+  if(before!=null)swap(st,before,if(again)null else move)
+  // The first screen, when the app opens, fades in.
+  else if(moves()){shell.alpha=0f;shell.animate().alpha(1f).setDuration(220).setInterpolator(ease).start();rise()}
+ }
+ /**
+  * The screen going out and the one coming in (decision of 28/10/2026): from the right going forward, from the left
+  * going back, in place for a tab of the bottom bar; at once when it is the same screen or the phone has animations off.
+  */
+ private fun swap(st:FrameLayout,old:View,move:Int?){
+  if(move==null||!moves()){st.removeView(old);return}
+  leaving++;val far=dpf(32f)
+  old.animate().alpha(0f).translationX(-move*far*.6f).setStartDelay(0).setDuration(110).setInterpolator(AccelerateInterpolator()).withEndAction{st.removeView(old);leaving--}.start()
+  shell.alpha=0f;shell.translationX=move*far;if(move==0){shell.scaleX=.98f;shell.scaleY=.98f}
+  shell.animate().alpha(1f).translationX(0f).scaleX(1f).scaleY(1f).setStartDelay(60).setDuration(if(move==0)220L else 280L).setInterpolator(ease).start()
+  if(move!=-1)rise()
+ }
+ /** The first cards of a screen that comes in rise one after the other; not with a map, which does not fade. */
+ private fun rise(){
+  val r=root
+  r.viewTreeObserver.addOnPreDrawListener(object:ViewTreeObserver.OnPreDrawListener{override fun onPreDraw():Boolean{
+   r.viewTreeObserver.removeOnPreDrawListener(this)
+   if(r===root&&activeMap==null)for(i in 0 until minOf(r.childCount,7)){val c=r.getChildAt(i);c.alpha=0f;c.translationY=dpf(14f)
+    c.animate().alpha(1f).translationY(0f).setStartDelay(80L+i*30L).setDuration(260).setInterpolator(ease).start()}
+   return true}})
+ }
+ /** The photo of the room is opened once, aside; until then the room is its colour, and the photo fades in. */
+ private fun showRoom(st:FrameLayout){
+  val night=dark;roomPhoto?.takeIf{it.first==night}?.let{st.background=Room(it.second);return}
+  thread{val photo=try{BitmapFactory.decodeResource(resources,if(night)R.drawable.fondo_oscuro else R.drawable.fondo_claro,BitmapFactory.Options().apply{inSampleSize=2})}catch(_:Throwable){null}
+   if(photo!=null)runOnUiThread{roomPhoto=Pair(night,photo);if(stage===st&&!isDestroyed)st.background=TransitionDrawable(arrayOf(ColorDrawable(roomTone),Room(photo))).apply{isCrossFadeEnabled=true;startTransition(240)}}}
  }
  /** Keeps a screen clear of the status bar, the navigation bar and the keyboard. */
  private fun fitBars(v:View,i:WindowInsetsCompat){val bars=i.getInsets(WindowInsetsCompat.Type.systemBars());val ime=i.getInsets(WindowInsetsCompat.Type.ime())
   topTarget?.let{it.setPadding(it.paddingLeft,bars.top,it.paddingRight,it.paddingBottom)}
   v.setPadding(bars.left,0,bars.right,max(bars.bottom,ime.bottom))}
- private fun barButton(res:Int,desc:String,action:()->Unit)=ImageView(this).apply{setImageResource(res);imageTintList=ColorStateList.valueOf(Color.WHITE);setPadding(dp(12),dp(12),dp(12),dp(12));background=RippleDrawable(ColorStateList.valueOf(0x33FFFFFF),null,null);contentDescription=desc;isClickable=true;isFocusable=true;setOnClickListener{action()};layoutParams=LinearLayout.LayoutParams(dp(48),dp(48))}
- private fun plusButton(desc:String,action:()->Unit)=ImageView(this).apply{setImageResource(R.drawable.ic_plus);imageTintList=ColorStateList.valueOf(Color.WHITE);setPadding(dp(7),dp(7),dp(7),dp(7));background=ripple(bg(0xFF1663E8.toInt(),10),0x40FFFFFF);contentDescription=desc;isClickable=true;isFocusable=true;setOnClickListener{action()};layoutParams=LinearLayout.LayoutParams(dp(38),dp(38)).apply{marginEnd=dp(8)}}
- private fun chip(s:String)=tv(s,13f,0xFFDCE6F8.toInt(),1).apply{background=bg(0x26FFFFFF,8);setPadding(dp(10),dp(5),dp(10),dp(6));layoutParams=LinearLayout.LayoutParams(-2,-2).apply{marginEnd=dp(10)}}
+ private fun barButton(res:Int,desc:String,action:()->Unit)=ImageView(this).apply{setImageResource(res);imageTintList=ColorStateList.valueOf(ink);setPadding(dp(12),dp(12),dp(12),dp(12));background=RippleDrawable(ColorStateList.valueOf(press),null,null);contentDescription=desc;isClickable=true;isFocusable=true;setOnClickListener{action()};layoutParams=LinearLayout.LayoutParams(dp(48),dp(48))}
+ private fun plusButton(desc:String,action:()->Unit)=ImageView(this).apply{setImageResource(R.drawable.ic_plus);imageTintList=ColorStateList.valueOf(Color.WHITE);setPadding(dp(9),dp(9),dp(9),dp(9));background=ripple(oval(brand),0x40FFFFFF);glow(this,brand);contentDescription=desc;isClickable=true;isFocusable=true;setOnClickListener{action()};sink(this,.92f);layoutParams=LinearLayout.LayoutParams(dp(40),dp(40)).apply{marginEnd=dp(6)}}
+ private fun chip(s:String)=tv(s,13f,inkSoft,1).apply{background=bg(greyBg,14);setPadding(dp(12),dp(5),dp(12),dp(6));layoutParams=LinearLayout.LayoutParams(-2,-2).apply{marginEnd=dp(8)}}
+ /** The bar on top, the panel's: a pill of glass floating over the room. */
+ private fun floating(r:LinearLayout,height:Int){r.background=outline(float,glassLine,height/2);head.addView(r,LinearLayout.LayoutParams(-1,dp(height)).apply{setMargins(dp(10),dp(6),dp(10),dp(4))})}
  private fun bar(title:String,back:(()->Unit)?=null,trailing:View?=null){
-  val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(if(back==null)20 else 4),0,dp(6),0)}
-  if(back!=null)r.addView(barButton(R.drawable.ic_back,"Volver",back))
-  r.addView(tv(title,20f,Color.WHITE,1).apply{maxLines=1;ellipsize=TextUtils.TruncateAt.END;setPadding(dp(if(back==null)0 else 4),0,dp(8),0)},LinearLayout.LayoutParams(0,-2,1f))
+  val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(if(back==null)20 else 4),0,dp(4),0)}
+  if(back!=null)r.addView(barButton(R.drawable.ic_back,"Volver"){going=-1;back();going=1})
+  r.addView(tv(title,18.5f,ink,1).apply{maxLines=1;ellipsize=TextUtils.TruncateAt.END;setPadding(dp(if(back==null)0 else 4),0,dp(8),0)},LinearLayout.LayoutParams(0,-2,1f))
   if(trailing!=null)r.addView(trailing)
-  head.addView(r,LinearLayout.LayoutParams(-1,dp(60)))
+  floating(r,56)
  }
  private fun initials(s:String)=s.split(" ").filter{it.isNotBlank()}.take(2).joinToString(""){it.take(1).uppercase()}.ifBlank{"TF"}
  private fun hello(small:String,big:String,trailing:View?=null){
-  val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(18),dp(8),dp(6),dp(18))}
-  r.addView(tv(initials(name),15f,0xFFDCE6F8.toInt(),1).apply{gravity=Gravity.CENTER;background=GradientDrawable().apply{shape=GradientDrawable.OVAL;setColor(0xFF2A3E66.toInt());setStroke(dp(1),0x33FFFFFF)};importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO},LinearLayout.LayoutParams(dp(46),dp(46)))
-  val col=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),0,dp(8),0)}
-  col.addView(tv(small,14f,0xFFAFBCD3.toInt()));col.addView(tv(big,21f,Color.WHITE,1).apply{maxLines=1;ellipsize=TextUtils.TruncateAt.END})
+  val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(8),0,dp(6),0)}
+  r.addView(tv(initials(name),15f,Color.WHITE,1).apply{gravity=Gravity.CENTER;background=featured();importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO},LinearLayout.LayoutParams(dp(46),dp(46)))
+  val col=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(12),0,dp(8),0)}
+  col.addView(tv(small,13.5f,muted));col.addView(tv(big,19f,ink,2).apply{maxLines=1;ellipsize=TextUtils.TruncateAt.END})
   r.addView(col,LinearLayout.LayoutParams(0,-2,1f));if(trailing!=null)r.addView(trailing)
-  head.addView(r,LinearLayout.LayoutParams(-1,-2))
+  floating(r,62)
  }
+ /** The bottom bar: a pill of glass with the chosen tab on a lighter pill, which slides there from the tab left. */
  private fun navBar(active:String){
   val items=listOf(if(panelFirst())Triple("owner",R.drawable.ic_map,"Flota") else Triple("home",R.drawable.ic_home,"Inicio"),Triple("trips",R.drawable.ic_route,"Viajes"),Triple("fuel",R.drawable.ic_fuel,"Combustible"),Triple("more",R.drawable.ic_more,"Más"))
-  shell.addView(View(this).apply{setBackgroundColor(line)},LinearLayout.LayoutParams(-1,1))
-  val nav=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;setBackgroundColor(cardBg)}
-  for((key,res,label) in items){val on=key==active;val color=if(on)blue else muted
-   val item=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=RippleDrawable(ColorStateList.valueOf(press),null,null);isClickable=true;isFocusable=true;isSelected=on;contentDescription=label;setOnClickListener{if(!on)go(key)}}
-   item.addView(iconView(res,color,24));item.addView(tv(label,12f,color,if(on)1 else 0).apply{gravity=Gravity.CENTER;setPadding(0,dp(3),0,0)})
-   nav.addView(item,LinearLayout.LayoutParams(0,dp(64),1f))}
-  shell.addView(nav,LinearLayout.LayoutParams(-1,-2));shell.setBackgroundColor(cardBg)
+  val at=items.indexOfFirst{it.first==active};val chosen=Slider(railOn,items.size,dpf(6f),if(dark)0 else 0x24000000)
+  val nav=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;background=LayerDrawable(arrayOf(outline(float,glassLine,34),chosen));setPadding(dp(6),dp(6),dp(6),dp(6))}
+  for((i,item) in items.withIndex()){val (key,res,label)=item;val on=i==at;val color=if(on)railInk else muted
+   val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=touch(28);isClickable=true;isFocusable=true;isSelected=on;contentDescription=label;setOnClickListener{if(!on){going=0;go(key);going=1}}}
+   v.addView(iconView(res,color,22));v.addView(tv(label,11.5f,color,if(on)1 else 0).apply{gravity=Gravity.CENTER;maxLines=1;setPadding(0,dp(2),0,0)})
+   nav.addView(v,LinearLayout.LayoutParams(0,dp(56),1f))}
+  shell.addView(nav,LinearLayout.LayoutParams(-1,-2).apply{setMargins(dp(12),dp(2),dp(12),dp(10))})
+  slide(chosen,if(tabAt>=0&&!again)tabAt else at,at);tabAt=at
  }
  private fun go(key:String){when(key){"home"->home();"owner"->ownerDashboard();"trips"->openHistory("trips",panelFirst());"fuel"->openHistory("fuel",panelFirst());else->settings()}}
 
  // ---------- Login ----------
  private fun login(){
-  page("login",header=false);shell.setBackgroundColor(loginBg);(root.parent as View).setBackgroundColor(loginBg);root.setPadding(0,0,0,dp(28))
+  page("login",header=false);root.setPadding(dp(14),0,dp(14),dp(24))
   // Whoever signs in next starts on their own lists, sends their notice at once and is asked for their own consent.
   fleetView=false;detailFrom="list";presenceAt=null;presenceAsked=false
-  WindowCompat.getInsetsController(window,window.decorView).isAppearanceLightNavigationBars=false
-  val hero=FrameLayout(this)
+  val top=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL};root.addView(top,LinearLayout.LayoutParams(-1,-2));topTarget=top
+  // The truck at dusk in a frame of glass, with the logo over its sky; the form on a card of glass, the panel's.
+  val hero=FrameLayout(this).apply{background=outline(0xFF0B1630.toInt(),glassLine,28);clipToOutline=true}
   hero.addView(ImageView(this).apply{setImageResource(R.drawable.login_scene);scaleType=ImageView.ScaleType.CENTER_CROP;importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO},FrameLayout.LayoutParams(-1,-1))
-  val top=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER_HORIZONTAL}
-  top.addView(ImageView(this).apply{setImageResource(R.drawable.tr_ferreira_logo);adjustViewBounds=true;contentDescription="TR Ferreira"},LinearLayout.LayoutParams(dp(240),-2).apply{topMargin=dp(36)})
-  hero.addView(top,FrameLayout.LayoutParams(-1,-2));topTarget=top
-  root.addView(hero,LinearLayout.LayoutParams(-1,dp(400)))
-  val form=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(24),0,dp(24),0)};root.addView(form,LinearLayout.LayoutParams(-1,-2))
-  text(form,"Tu viaje empieza acá.",27f,Color.WHITE,2)
-  text(form,"Ingresá con tu cuenta de chofer.",15.5f,0xFFA9B6CC.toInt(),0,6)
-  val email=darkField(form,R.drawable.ic_mail,"Correo electrónico",InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS,22);email.setText(prefs().getString("email",""))
-  val pass=darkField(form,R.drawable.ic_lock,"Contraseña",InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD,12)
-  val msg=text(form,"",14f,0xFFFFB4B4.toInt(),0,10)
+  hero.addView(ImageView(this).apply{setImageResource(R.drawable.tr_ferreira_logo);adjustViewBounds=true;contentDescription="TR Ferreira"},FrameLayout.LayoutParams(dp(220),-2,Gravity.CENTER_HORIZONTAL).apply{topMargin=dp(26)})
+  top.addView(hero,LinearLayout.LayoutParams(-1,dp(270)).apply{topMargin=dp(8)})
+  val form=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=outline(float,glassLine,28);setPadding(dp(20),dp(22),dp(20),dp(14))}
+  root.addView(form,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12)})
+  text(form,"Tu viaje empieza acá.",25f,ink,2).letterSpacing=-.01f
+  text(form,"Ingresá con tu cuenta de chofer.",15.5f,muted,0,4)
+  val email=signField(form,R.drawable.ic_mail,"Correo electrónico",InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS,18);email.setText(prefs().getString("email",""))
+  val pass=signField(form,R.drawable.ic_lock,"Contraseña",InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD,10)
+  val msg=text(form,"",14f,red,0,10)
   lateinit var submit:Btn
-  submit=button(form,"Ingresar",top=6){val e=email.text.toString().trim().lowercase();val p=pass.text.toString();if(e.isBlank()||p.isBlank()){msg.text="Completá correo y contraseña";return@button};submit.enable(false);msg.setTextColor(0xFFA9B6CC.toInt());msg.text="Ingresando…"
-   thread{try{api.login(e,p);name=driverName();runOnUiThread{pass.text.clear();if(panelFirst())ownerDashboard() else askMode();Sync.schedule(this);refreshCatalog()}}catch(_:Exception){runOnUiThread{submit.enable(true);msg.setTextColor(0xFFFFB4B4.toInt());msg.text="No se pudo ingresar. Revisá tus datos y la conexión."}}}}
-  text(form,"Tu sesión queda guardada de forma segura en este teléfono.",13f,0xFF8E9CB4.toInt(),0,18).gravity=Gravity.CENTER
-  link(form,"Política de privacidad",top=2,color=0xFFA9B6CC.toInt()){privacy()}
+  submit=button(form,"Ingresar",top=6){val e=email.text.toString().trim().lowercase();val p=pass.text.toString();if(e.isBlank()||p.isBlank()){msg.text="Completá correo y contraseña";return@button};submit.enable(false);msg.setTextColor(muted);msg.text="Ingresando…"
+   thread{try{api.login(e,p);name=driverName();runOnUiThread{pass.text.clear();if(panelFirst())ownerDashboard() else askMode();Sync.schedule(this);refreshCatalog()}}catch(_:Exception){runOnUiThread{submit.enable(true);msg.setTextColor(red);msg.text="No se pudo ingresar. Revisá tus datos y la conexión."}}}}
+  text(form,"Tu sesión queda guardada de forma segura en este teléfono.",13f,muted,0,16).gravity=Gravity.CENTER
+  link(form,"Política de privacidad",top=2,color=blue){privacy()}
  }
- private fun darkField(p:LinearLayout,icon:Int,hint:String,type:Int,top:Int):EditText{
-  val box=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;background=outline(0xB30F1A2E.toInt(),0x47FFFFFF,12);setPadding(dp(16),0,dp(8),0)}
-  box.addView(iconView(icon,0xFFB9C4D6.toInt(),20))
-  val e=EditText(this).apply{inputType=type;textSize=16f;setTextColor(Color.WHITE);setHintTextColor(0xFF8E9CB4.toInt());this.hint=hint;background=null;setPadding(dp(12),0,dp(4),0)}
-  box.addView(e,LinearLayout.LayoutParams(0,-1,1f));p.addView(box,LinearLayout.LayoutParams(-1,dp(56)).apply{topMargin=dp(top)});return e
+ /** A field of the sign-in, with its icon; these keep the phone's autofill for the email and the password. */
+ private fun signField(p:LinearLayout,icon:Int,hint:String,type:Int,top:Int):EditText{
+  val box=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;background=fieldLook(16);setAddStatesFromChildren(true);setPadding(dp(16),0,dp(8),0)}
+  box.addView(iconView(icon,muted,20))
+  val e=EditText(this).apply{inputType=type;textSize=16f;setTextColor(ink);setHintTextColor(faint);this.hint=hint;background=null;setPadding(dp(12),0,dp(4),0)}
+  box.addView(e,LinearLayout.LayoutParams(0,-1,1f));p.addView(box,LinearLayout.LayoutParams(-1,dp(54)).apply{topMargin=dp(top)});return e
  }
  private fun driverName():String{val u=api.session()?.optJSONObject("user")?:return "Chofer";val m=u.optJSONObject("user_metadata");val known=mapOf("immer@trferreira.com" to "Immer Sampayo","luis@trferreira.com" to "Luis Ferreira","hugo@trferreira.com" to "Hugo Silva","transportesferreirauy@gmail.com" to "Transportes Ferreira");return m?.optString("full_name")?.takeIf{it.isNotBlank()}?:m?.optString("name")?.takeIf{it.isNotBlank()}?:known[u.optString("email").lowercase()]?:u.optString("email").substringBefore("@").replaceFirstChar{it.uppercase()}}
  // Without an account (the emulator test of the games) every way out goes to the sign-in.
@@ -433,22 +537,20 @@ class MainActivity:AppCompatActivity(){
  // ---------- Mode of use: asked after signing in, kept per driver ----------
  private fun askMode(){modePick=mode()?:UiMode.SIMPLE;modeChoice()}
  private fun modeChoice(){
-  page("mode",header=false);back.isEnabled=mode()!=null
-  shell.setBackgroundColor(loginBg);(root.parent as View).setBackgroundColor(loginBg);dock.setBackgroundColor(loginBg);root.setPadding(dp(20),0,dp(20),dp(16))
-  WindowCompat.getInsetsController(window,window.decorView).isAppearanceLightNavigationBars=false
+  page("mode",header=false);back.isEnabled=mode()!=null;root.setPadding(dp(16),0,dp(16),dp(16))
   val top=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER_HORIZONTAL};root.addView(top,LinearLayout.LayoutParams(-1,-2));topTarget=top
   top.addView(ImageView(this).apply{setImageResource(R.drawable.tr_ferreira_logo);adjustViewBounds=true;contentDescription="TR Ferreira"},LinearLayout.LayoutParams(dp(170),-2).apply{topMargin=dp(28)})
-  text(root,"Hola, ${name.substringBefore(" ")}",30f,Color.WHITE,2,30).gravity=Gravity.CENTER
-  text(root,"¿Qué modo querés usar?",17f,0xFFA9B6CC.toInt(),0,6).gravity=Gravity.CENTER
+  text(root,"Hola, ${name.substringBefore(" ")}",30f,ink,2,30).apply{gravity=Gravity.CENTER;letterSpacing=-.02f}
+  text(root,"¿Qué modo querés usar?",17f,muted,0,6).gravity=Gravity.CENTER
   modeCard(R.drawable.ic_truck,0xFF178A4C.toInt(),"Modo sencillo","Solo lo necesario: iniciar y finalizar el viaje. Botones grandes y datos automáticos.",modePick==UiMode.SIMPLE,26){modePick=UiMode.SIMPLE;modeChoice()}
-  modeCard(R.drawable.ic_list,0xFF1663E8.toInt(),"Modo normal","Todas las opciones: combustible, remitos, historial, documentos y mantenimiento.",modePick==UiMode.NORMAL,14){modePick=UiMode.NORMAL;modeChoice()}
-  text(root,if(ownerDriver())"Podés cambiar el modo cuando quieras. El menú del dueño está en los dos." else "Podés cambiar el modo cuando quieras.",13.5f,0xFF8E9CB4.toInt(),0,18).gravity=Gravity.CENTER
+  modeCard(R.drawable.ic_list,brand,"Modo normal","Todas las opciones: combustible, remitos, historial, documentos y mantenimiento.",modePick==UiMode.NORMAL,14){modePick=UiMode.NORMAL;modeChoice()}
+  text(root,if(ownerDriver())"Podés cambiar el modo cuando quieras. El menú del dueño está en los dos." else "Podés cambiar el modo cuando quieras.",13.5f,muted,0,18).gravity=Gravity.CENTER
   dock.visibility=View.VISIBLE
   button(dock,"Continuar",top=0){setMode(modePick);homeOrTrip()}
-  if(mode()!=null)link(dock,"Cerrar sesión",top=2,color=0xFFA9B6CC.toInt()){logout()}
+  if(mode()!=null)link(dock,"Cerrar sesión",top=2,color=blue){logout()}
  }
  private fun modeCard(icon:Int,fill:Int,title:String,sub:String,selected:Boolean,top:Int,action:()->Unit){
-  val f=FrameLayout(this).apply{background=ripple(if(selected)outline(greenBg,green,16).apply{setStroke(dp(2),green)} else bg(cardBg,16));isClickable=true;isFocusable=true;contentDescription="$title. $sub"+if(selected)". Elegido" else "";setOnClickListener{action()}}
+  val f=FrameLayout(this).apply{background=ripple(if(selected)outline(raised,green,24).apply{setStroke(dp(2),green)} else glassy(24));isClickable=true;isFocusable=true;contentDescription="$title. $sub"+if(selected)". Elegido" else "";setOnClickListener{action()}};sink(f,.98f)
   val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(16),dp(18),dp(16),dp(18))}
   r.addView(square(icon,Color.WHITE,fill,56,30))
   val col=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(16),0,dp(if(selected)24 else 0),0)}
@@ -460,14 +562,15 @@ class MainActivity:AppCompatActivity(){
 
  // ---------- Simple mode: two screens, big buttons, nothing to fill in ----------
  private fun brandBar(){
-  val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(18),0,dp(14),0)}
-  r.addView(ImageView(this).apply{setImageResource(R.drawable.tr_ferreira_logo);adjustViewBounds=true;contentDescription="TR Ferreira"},LinearLayout.LayoutParams(dp(170),-2))
+  val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(16),0,dp(8),0)}
+  r.addView(ImageView(this).apply{setImageResource(R.drawable.tr_ferreira_logo);adjustViewBounds=true;contentDescription="TR Ferreira"},LinearLayout.LayoutParams(dp(150),-2))
   r.addView(View(this),LinearLayout.LayoutParams(0,1,1f))
-  r.addView(if(ownerDriver())menuButton() else chip(name.substringBefore(" ")).apply{(layoutParams as LinearLayout.LayoutParams).marginEnd=0})
-  head.addView(r,LinearLayout.LayoutParams(-1,dp(60)))
+  r.addView(if(ownerDriver())menuButton() else chip(name.substringBefore(" ")).apply{(layoutParams as LinearLayout.LayoutParams).marginEnd=dp(4)})
+  floating(r,58)
  }
  private fun bigButton(p:LinearLayout,s:String,fill:Int,icon:Int,stacked:Boolean,lp:LinearLayout.LayoutParams,action:()->Unit):LinearLayout{
-  val v=LinearLayout(this).apply{orientation=if(stacked)LinearLayout.VERTICAL else LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;background=ripple(bg(fill,18),0x40FFFFFF);elevation=dpf(3f);isClickable=true;isFocusable=true;contentDescription=s;setPadding(dp(16),dp(14),dp(16),dp(14));setOnClickListener{action()}}
+  // The big buttons keep their place and size; rounder, with the glow of their colour, and a buzz when tapped.
+  val v=LinearLayout(this).apply{orientation=if(stacked)LinearLayout.VERTICAL else LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;background=ripple(bg(fill,if(stacked)30 else 26),0x40FFFFFF);glow(this,fill,5f);isClickable=true;isFocusable=true;contentDescription=s;setPadding(dp(16),dp(14),dp(16),dp(14));setOnClickListener{buzz(it);action()}};sink(v,.98f)
   v.addView(iconView(icon,Color.WHITE,if(stacked)76 else 34))
   val label=tv(s,if(stacked)28f else 20f,Color.WHITE,2).apply{gravity=Gravity.CENTER;letterSpacing=.03f;maxLines=1;ellipsize=TextUtils.TruncateAt.END}
   if(stacked){label.setAutoSizeTextTypeUniformWithConfiguration(16,28,1,android.util.TypedValue.COMPLEX_UNIT_SP);v.addView(label,LinearLayout.LayoutParams(-1,dp(44)).apply{topMargin=dp(6)})}
@@ -475,7 +578,7 @@ class MainActivity:AppCompatActivity(){
   p.addView(v,lp);return v
  }
  private fun bigStat(p:LinearLayout,label:String,value:String,unit:String?,index:Int):TextView{
-  val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=bg(cardBg,16);elevation=dpf(1.5f);setPadding(dp(16),dp(12),dp(12),dp(12))}
+  val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=glassy();setPadding(dp(16),dp(12),dp(12),dp(12))}
   v.addView(tv(label,14f,muted))
   val figures=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.BOTTOM}
   val big=tv(value,28f,ink,2).apply{maxLines=1};figures.addView(big)
@@ -494,7 +597,7 @@ class MainActivity:AppCompatActivity(){
   r.addView(col,LinearLayout.LayoutParams(0,-2,1f))
   r.addView(ImageView(this).apply{setImageResource(R.drawable.truck_side);importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO},LinearLayout.LayoutParams(dp(126),dp(50)))
   tc.addView(r)
-  val ready=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;background=bg(greenBg,16);setPadding(dp(16),dp(14),dp(16),dp(14))}
+  val ready=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;background=outline(tone(0xF2E3F3E9,0xF2142A21),tone(0x40178A4C,0x404CC58A),20);setPadding(dp(16),dp(14),dp(16),dp(14))}
   ready.addView(iconView(R.drawable.ic_check_circle,green,30))
   val rc=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),0,0,0)}
   rc.addView(tv("Listo para viajar",17f,ink,1));rc.addView(tv("El recorrido, los kilómetros y la hora se registran solos.",14f,inkSoft).apply{setPadding(0,dp(2),0,0)})
@@ -524,7 +627,7 @@ class MainActivity:AppCompatActivity(){
  }
  /** Takes the place of the start button once it is tapped, so that a trip never starts with a single touch. */
  private fun startQuestion(model:String,plate:String){
-  val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER_VERTICAL;background=outline(cardBg,green,18).apply{setStroke(dp(2),green)};elevation=dpf(3f);setPadding(dp(16),dp(18),dp(16),dp(16));minimumHeight=dp(190)}
+  val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER_VERTICAL;background=outline(raised,green,30).apply{setStroke(dp(2),green)};setPadding(dp(16),dp(18),dp(16),dp(16));minimumHeight=dp(190)}
   text(box,"¿Iniciar el viaje?",24f,ink,2).gravity=Gravity.CENTER
   text(box,listOf(model,plate).filter{it.isNotBlank()}.joinToString(" · ").ifBlank{"Sin camión elegido"},15.5f,inkSoft,0,4).gravity=Gravity.CENTER
   // The question comes up right under the finger that tapped the start button: a double tap must not answer it.
@@ -543,7 +646,7 @@ class MainActivity:AppCompatActivity(){
   val t=store.current()?.takeIf{it.optBoolean("active")}?:return simpleHome()
   page("simpletrip");brandBar();finishAsk=false
   val (model,plate)=truckParts(t.optString("vehicle"))
-  val sb=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(16),dp(12),dp(16),dp(12));background=bg(0xFF178A4C.toInt(),14)}
+  val sb=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(16),dp(12),dp(16),dp(12));background=bg(0xFF178A4C.toInt(),22)}
   sb.addView(iconView(R.drawable.ic_clock,Color.WHITE,30))
   val bc=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),0,0,0)}
   val state=tv("Viaje en curso",18f,Color.WHITE,2);bc.addView(state);status=state
@@ -570,17 +673,18 @@ class MainActivity:AppCompatActivity(){
  private fun simpleDock(){
   dock.removeAllViews();dock.visibility=View.VISIBLE
   if(finishAsk){
-   val t=store.current()
-   text(dock,"¿Finalizar el viaje?",20f,ink,2).gravity=Gravity.CENTER
-   text(dock,"${elapsedText(t?.optString("started_at")?:"")} · ${km(t?.optDouble("distance_meters",0.0)?:0.0)}. Todo queda guardado.",14.5f,muted,0,4).gravity=Gravity.CENTER
-   bigButton(dock,"SÍ, FINALIZAR",0xFFD32F2F.toInt(),R.drawable.ic_stop,false,LinearLayout.LayoutParams(-1,dp(76)).apply{topMargin=dp(12)}){
+   // The question on a card of its own, over the room.
+   val t=store.current();val q=card(dock,pad=16,top=0)
+   text(q,"¿Finalizar el viaje?",20f,ink,2).gravity=Gravity.CENTER
+   text(q,"${elapsedText(t?.optString("started_at")?:"")} · ${km(t?.optDouble("distance_meters",0.0)?:0.0)}. Todo queda guardado.",14.5f,muted,0,4).gravity=Gravity.CENTER
+   bigButton(q,"SÍ, FINALIZAR",0xFFC4262D.toInt(),R.drawable.ic_stop,false,LinearLayout.LayoutParams(-1,dp(76)).apply{topMargin=dp(12)}){
     finishAsk=false;dock.removeAllViews();text(dock,"Guardando el viaje…",17f,ink,1,18).apply{gravity=Gravity.CENTER;setPadding(0,0,0,dp(18))}
     try{service(GpsService.FINISH)}catch(_:Exception){toast("No se pudo finalizar. Reintentá.");simpleDock()}}
-   button(dock,"Seguir viaje",Kind.LINE,top=10){finishAsk=false;simpleDock()}
+   button(q,"Seguir viaje",Kind.LINE,top=10){finishAsk=false;simpleDock()}
   }else{
    // A trip paused from normal mode would otherwise have no way to continue here.
    if(store.current()?.optBoolean("paused")==true)button(dock,"Reanudar viaje",Kind.PRIMARY,R.drawable.ic_play,top=0){try{service(GpsService.RESUME)}catch(_:Exception){toast("Revisá el permiso de ubicación")};handler.postDelayed({if(screen=="simpletrip")simpleDock()},700)}
-   bigButton(dock,"FINALIZAR VIAJE",0xFFD32F2F.toInt(),R.drawable.ic_stop,false,LinearLayout.LayoutParams(-1,dp(92)).apply{topMargin=dp(if(dock.childCount>0)10 else 0)}){finishAsk=true;simpleDock()}
+   bigButton(dock,"FINALIZAR VIAJE",0xFFC4262D.toInt(),R.drawable.ic_stop,false,LinearLayout.LayoutParams(-1,dp(92)).apply{topMargin=dp(if(dock.childCount>0)10 else 0)}){finishAsk=true;simpleDock()}
   }
  }
 
@@ -622,13 +726,13 @@ class MainActivity:AppCompatActivity(){
  }
  private fun truckParts(v:String):Pair<String,String>{val i=v.indexOf(" · ");return if(i<0)Pair(v.trim(),"") else Pair(v.substring(0,i).trim(),v.substring(i+3).trim())}
  private fun saveTruck(v:String){truck=v;prefs().edit().putString("truck",v).apply()}
- private fun pickTruck(then:()->Unit){val items=truckChoices();AlertDialog.Builder(this).setTitle("¿Con qué camión salís?").setItems((items+"Dejar pendiente").toTypedArray()){_,i->saveTruck(if(i<items.size)items[i] else "");then()}.setNegativeButton("Cancelar",null).show()}
+ private fun pickTruck(then:()->Unit){val items=truckChoices();pick("¿Con qué camión salís?",items,truck,"Dejar pendiente"){i->saveTruck(if(i<items.size)items[i] else "");then()}}
  private fun truckSelector(c:LinearLayout,title:String){
   caption(c,title);val choices=listOf("Sin seleccionar")+truckChoices()
-  val spinner=Spinner(this).apply{adapter=spinnerAdapter(choices);background=spinnerBg()};c.addView(spinner,LinearLayout.LayoutParams(-1,dp(52)).apply{topMargin=dp(6)})
+  val spinner=Spinner(this).apply{adapter=spinnerAdapter(choices);background=spinnerBg();setPopupBackgroundDrawable(bg(menuFill,16))};c.addView(spinner,LinearLayout.LayoutParams(-1,dp(52)).apply{topMargin=dp(6)})
   spinner.setSelection(choices.indexOf(truck).coerceAtLeast(0));spinner.onItemSelectedListener=object:AdapterView.OnItemSelectedListener{override fun onNothingSelected(p:AdapterView<*>?){};override fun onItemSelected(p:AdapterView<*>?,v:View?,pos:Int,id:Long){saveTruck(if(pos>0)choices[pos] else "")}}
  }
- private fun fuelChoice(){if(active())AlertDialog.Builder(this).setTitle("¿Dónde registrar la carga?").setItems(arrayOf("En el viaje en curso","Sin viaje")){_,i->openFuel(if(i==0)store.current() else null)}.setNegativeButton("Cancelar",null).show() else openFuel(null)}
+ private fun fuelChoice(){if(active())pick("¿Dónde registrar la carga?",listOf("En el viaje en curso","Sin viaje")){i->openFuel(if(i==0)store.current() else null)} else openFuel(null)}
  private fun syncNow(){Sync.schedule(this);toast("Enviando pendientes y actualizando…");thread{try{mobile.catalog(true);runOnUiThread{toast("Datos actualizados")}}catch(_:Exception){runOnUiThread{toast("Sin conexión. Los datos siguen guardados en el teléfono.")}}}}
  private fun locationPermissions()=mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION).apply{if(Build.VERSION.SDK_INT>=33)add(Manifest.permission.POST_NOTIFICATIONS)}
  private fun checkGps(){
@@ -658,7 +762,7 @@ class MainActivity:AppCompatActivity(){
   link(dock,"¿Apurado? Salir ahora y completar después",top=2){beginTrip()}
  }
  private fun choiceCard(icon:Int,title:String,sub:String,selected:Boolean,action:()->Unit){
-  val f=FrameLayout(this).apply{background=ripple(if(selected)outline(cardBg,blue,16).apply{setStroke(dp(2),blue)} else bg(cardBg,16));elevation=dpf(if(selected)3f else 1.5f);isClickable=true;isFocusable=true;contentDescription="$title. $sub"+if(selected)". Elegido" else "";setOnClickListener{action()}}
+  val f=FrameLayout(this).apply{background=ripple(if(selected)outline(raised,blue,24).apply{setStroke(dp(2),blue)} else glassy(24));isClickable=true;isFocusable=true;contentDescription="$title. $sub"+if(selected)". Elegido" else "";setOnClickListener{action()}};sink(f,.98f)
   val col=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER_HORIZONTAL;setPadding(dp(20),dp(24),dp(20),dp(22))}
   col.addView(iconView(icon,blue,64))
   col.addView(tv(title,19f,ink,1).apply{gravity=Gravity.CENTER;setPadding(0,dp(10),0,0)})
@@ -689,8 +793,7 @@ class MainActivity:AppCompatActivity(){
   val current=data.optString(key);val items=values.filter{it.isNotBlank()}.distinct().toMutableList()
   if(current.isNotBlank()&&!items.contains(current))items.add(0,current)
   if(items.isEmpty()){toast("No hay opciones cargadas. Actualizá desde Mi cuenta.");return}
-  val labels=(items+if(current.isNotBlank())listOf("Quitar selección") else emptyList()).toTypedArray()
-  AlertDialog.Builder(this).setTitle(title).setItems(labels){_,i->val next=if(i<items.size)items[i] else "";if(next!=current){data.put(key,next);changed()};rerender()}.setNegativeButton("Cancelar",null).show()
+  pick(title,items,current,if(current.isNotBlank())"Quitar selección" else null){i->val next=if(i<items.size)items[i] else "";if(next!=current){data.put(key,next);changed()};rerender()}
  }
  private fun rerender(){when(screen){"prepare"->prepare();"newtrip"->newTrip();"fuel"->fuel();"document"->document()}}
  private fun askNumber(title:String,data:JSONObject,key:String,done:()->Unit){
@@ -732,7 +835,7 @@ class MainActivity:AppCompatActivity(){
   val t=store.current()?:return home();page("trip")
   val (model,plate)=truckParts(t.optString("vehicle"))
   bar("Viaje activo",back={home()},trailing=if(plate.isNotBlank())chip(plate) else null)
-  val sb=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(16),0,dp(16),0);background=bg(0xFF178A4C.toInt(),14)}
+  val sb=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(18),0,dp(18),0);background=bg(0xFF178A4C.toInt(),24)}
   sb.addView(View(this).apply{background=oval(Color.WHITE)},LinearLayout.LayoutParams(dp(9),dp(9)))
   status=tv("Viaje en curso",15.5f,Color.WHITE,1).apply{setPadding(dp(10),0,0,0)};sb.addView(status,LinearLayout.LayoutParams(0,-2,1f))
   elapsed=tv("",15.5f,Color.WHITE,1).apply{fontFeatureSettings="tnum"};sb.addView(elapsed)
@@ -764,11 +867,12 @@ class MainActivity:AppCompatActivity(){
   count=note("",top=16);sync=note(store.message(),top=4)
   link(root,"Revisar ubicación GPS",top=4){requestStart()}
   dock.visibility=View.VISIBLE
-  button(dock,"Finalizar viaje",Kind.DANGER,R.drawable.ic_flag,top=0){AlertDialog.Builder(this).setTitle("¿Finalizar este viaje?").setMessage("Se guardarán el recorrido, las boletas y los remitos.").setNegativeButton("Seguir viaje",null).setPositiveButton("Finalizar"){_,_->try{service(GpsService.FINISH)}catch(_:Exception){toast("No se pudo finalizar. Reintentá.")}}.show()}
+  button(dock,"Finalizar viaje",Kind.DANGER,R.drawable.ic_flag,top=0){askFinish()}
   refresh();try{service()}catch(_:Exception){gps?.text="Revisá el permiso de ubicación para continuar"}
  }
+ private fun askFinish(){AlertDialog.Builder(this).setTitle("¿Finalizar este viaje?").setMessage("Se guardarán el recorrido, las boletas y los remitos.").setNegativeButton("Seguir viaje",null).setPositiveButton("Finalizar"){_,_->try{service(GpsService.FINISH)}catch(_:Exception){toast("No se pudo finalizar. Reintentá.")}}.show()}
  private fun actionBox(p:LinearLayout,icon:Int,label:String,index:Int,action:()->Unit):Pair<ImageView,TextView>{
-  val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=ripple(bg(cardBg,14));elevation=dpf(1.5f);isClickable=true;isFocusable=true;contentDescription=label;setOnClickListener{action()}}
+  val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=ripple(glassy(20));isClickable=true;isFocusable=true;contentDescription=label;setOnClickListener{action()}};sink(v,.95f)
   val image=iconView(icon,blue,24);val caption=tv(label,13.5f,blue,1).apply{gravity=Gravity.CENTER;setPadding(0,dp(6),0,0)};v.addView(image);v.addView(caption)
   p.addView(v,LinearLayout.LayoutParams(0,dp(76),1f).apply{if(index>0)marginStart=dp(10)});return Pair(image,caption)
  }
@@ -780,21 +884,28 @@ class MainActivity:AppCompatActivity(){
    .setPositiveButton("Abrir ajustes"){_,_->try{startActivity(if(appPage)Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:$packageName")) else Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))}catch(_:Exception){toast("Abrí Ajustes › Apps › Transportes Ferreira GPS › Batería y elegí «Sin restricciones»")}}
    .setNegativeButton("Ahora no",null).show()
  }
+ /** A figure that changes rolls to the new value instead of jumping; no value is a dash. */
+ private fun roll(t:TextView,to:Double){
+  val from=t.tag as? Double;t.tag=to
+  fun show(v:Double){t.text=if(v.isNaN())"—" else String.format(uy,"%.0f",v)}
+  if(from==null||from.isNaN()||to.isNaN()||Math.round(from)==Math.round(to)||!moves()){show(to);return}
+  ValueAnimator.ofFloat(from.toFloat(),to.toFloat()).apply{duration=500;interpolator=DecelerateInterpolator();addUpdateListener{if(t.tag==to)show((it.animatedValue as Float).toDouble())}}.start()
+ }
  private fun refresh(){if(!::store.isInitialized)return;sync?.text=store.message();presence()
   if(screen=="owner"&&!fleetLoading){val now=System.currentTimeMillis();if(now-fleetLoadedAt>FLEET_MS)loadFleet() else if(!liveLoading&&now-liveLoadedAt>LIVE_MS)loadLive()}
   if(screen=="games"||screen=="chessnew"||screen=="chess"||screen=="truco")gamesCheck()
   if(screen!="trip"&&screen!="simpletrip")return;val t=store.current()?:return
   if(!t.optBoolean("active")){home();toast("Viaje finalizado. Los datos pendientes se enviarán con conexión.");return}
   val paused=t.optBoolean("paused")
-  status?.text=if(paused)"Viaje pausado" else "Viaje en curso";statusBox?.background=bg(if(paused)0xFFB7740B.toInt() else 0xFF178A4C.toInt(),14)
+  status?.text=if(paused)"Viaje pausado" else "Viaje en curso";statusBox?.background=bg(if(paused)0xFFB7740B.toInt() else 0xFF178A4C.toInt(),if(screen=="trip")24 else 22)
   elapsed?.text=elapsedText(t.optString("started_at"))
   distance?.text=km(t.optDouble("distance_meters",0.0))
   pauseLabel?.text=if(paused)"Reanudar" else "Pausar";pauseIcon?.setImageResource(if(paused)R.drawable.ic_play else R.drawable.ic_pause);(pauseLabel?.parent as? View)?.contentDescription=pauseLabel?.text
   val recent=instant(t.optJSONObject("last_point")?.optString("recorded_at"))?.let{System.currentTimeMillis()-it.toEpochMilli()<30000}?:false
   val v=if(paused)0.0 else if(recent)t.optDouble("speed_kmh",0.0) else Double.NaN
-  speed?.text=if(v.isNaN())"—" else String.format(uy,"%.0f",v)
+  speed?.let{roll(it,v)}
   val over=!v.isNaN()&&v>90;speed?.setTextColor(if(over)red else ink)
-  limit?.background=GradientDrawable().apply{shape=GradientDrawable.OVAL;setColor(if(over)red else cardBg);setStroke(dp(4),red)};limit?.setTextColor(if(over)Color.WHITE else ink)
+  limit?.background=GradientDrawable().apply{shape=GradientDrawable.OVAL;setColor(if(over)red else raised);setStroke(dp(4),red)};limit?.setTextColor(if(over)Color.WHITE else ink)
   val warn=store.warning();gps?.text=if(paused)"El GPS y los kilómetros están pausados" else if(warn.isNotBlank())"⚠ $warn" else if(recent)"GPS actualizado" else "Esperando señal GPS precisa…";gps?.setTextColor(if(warn.isNotBlank()&&!paused)amber else muted)
   val n=store.receiptCount(t.getString("id"));count?.text=if(n==0)"Sin boletas en este viaje" else "$n boleta${if(n==1)"" else "s"} en este viaje"
   liveMap?.let{map->val (points,end)=store.track(t.getString("id"),trackOffset);trackOffset=end;map.push(points)}
@@ -809,7 +920,7 @@ class MainActivity:AppCompatActivity(){
   val c=card(pad=16)
   if(fuelTrip==null)truckSelector(c,"Camión · opcional")
   caption(c,"Fecha");val day=fuelForm.optString("receipt_date",LocalDate.now().toString())
-  c.addView(tv(try{LocalDate.parse(day).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))}catch(_:Exception){day},16f,ink).apply{gravity=Gravity.CENTER_VERTICAL;background=ripple(outline(cardBg,fieldLine,12));setPadding(dp(14),0,dp(14),0);setCompoundDrawablesRelative(null,null,tinted(R.drawable.ic_calendar,muted),null);isClickable=true;isFocusable=true;contentDescription="Fecha de la boleta: $day";setOnClickListener{
+  c.addView(tv(try{LocalDate.parse(day).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))}catch(_:Exception){day},16f,ink).apply{gravity=Gravity.CENTER_VERTICAL;background=ripple(outline(fieldFill,fieldLine,14));setPadding(dp(14),0,dp(14),0);setCompoundDrawablesRelative(null,null,tinted(R.drawable.ic_calendar,muted),null);isClickable=true;isFocusable=true;contentDescription="Fecha de la boleta: $day";setOnClickListener{
    val date=try{LocalDate.parse(fuelForm.optString("receipt_date"))}catch(_:Exception){LocalDate.now()};DatePickerDialog(this@MainActivity,{_,y,m,d->fuelForm.put("receipt_date",LocalDate.of(y,m+1,d).toString());fuel()},date.year,date.monthValue-1,date.dayOfMonth).show()}},LinearLayout.LayoutParams(-1,dp(52)).apply{topMargin=dp(6)})
   val stations=mobile.catalog().optJSONArray("estaciones")?:JSONArray();val names=(0 until stations.length()).map{stations.getJSONObject(it).optString("nombre")}
   if(names.isEmpty())bound(c,"Estación de servicio",fuelForm,"station_name",hint="Nombre de la estación") else {select(c,"Estación de servicio",fuelForm,"station_name",names){fuel()};bound(c,"Otra estación · si no está en la lista",fuelForm,"station_name")}
@@ -861,14 +972,14 @@ class MainActivity:AppCompatActivity(){
   two.addView(photoButton(R.drawable.ic_camera,if(photo==null)"Sacar foto" else "Sacar otra"){takePhoto()},LinearLayout.LayoutParams(0,dp(72),1f))
   two.addView(photoButton(R.drawable.ic_image,"Galería"){pick.launch("image/*")},LinearLayout.LayoutParams(0,dp(72),1f).apply{marginStart=dp(10)})
   photo?.takeIf{it.exists()}?.let{f->
-   val frame=FrameLayout(this).apply{background=bg(0xFF263041.toInt(),12);clipToOutline=true}
+   val frame=FrameLayout(this).apply{background=bg(0xFF263041.toInt(),16);clipToOutline=true}
    frame.addView(ImageView(this).apply{setImageURI(Uri.fromFile(f));scaleType=ImageView.ScaleType.CENTER_CROP;contentDescription="Vista previa del comprobante"},FrameLayout.LayoutParams(-1,-1))
    frame.addView(ImageView(this).apply{setImageResource(R.drawable.ic_close);imageTintList=ColorStateList.valueOf(0xFF111C2E.toInt());background=oval(0xEEFFFFFF.toInt());setPadding(dp(7),dp(7),dp(7),dp(7));contentDescription="Quitar foto";isClickable=true;isFocusable=true;setOnClickListener{removePhoto()}},FrameLayout.LayoutParams(dp(36),dp(36),Gravity.TOP or Gravity.END).apply{setMargins(dp(8),dp(8),dp(8),dp(8))})
-   frame.addView(tv("Foto adjunta",12f,Color.WHITE,1).apply{background=bg(0xF2178A4C.toInt(),7);setPadding(dp(9),dp(4),dp(9),dp(5))},FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM or Gravity.START).apply{setMargins(dp(10),dp(10),dp(10),dp(10))})
+   frame.addView(tv("Foto adjunta",12f,Color.WHITE,1).apply{background=bg(0xF2178A4C.toInt(),12);setPadding(dp(9),dp(4),dp(9),dp(5))},FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM or Gravity.START).apply{setMargins(dp(10),dp(10),dp(10),dp(10))})
    c.addView(frame,LinearLayout.LayoutParams(-1,dp(170)).apply{topMargin=dp(12)})
   }
  }
- private fun photoButton(icon:Int,label:String,action:()->Unit)=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=ripple(outline(cardBg,fieldLine,12));isClickable=true;isFocusable=true;contentDescription=label;setOnClickListener{action()}
+ private fun photoButton(icon:Int,label:String,action:()->Unit)=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=ripple(outline(btnFill,fieldLine,18));isClickable=true;isFocusable=true;contentDescription=label;setOnClickListener{action()};sink(this,.96f)
   addView(iconView(icon,blue,24));addView(tv(label,13.5f,ink,1).apply{gravity=Gravity.CENTER;setPadding(0,dp(5),0,0)})}
  private fun takePhoto(){try{camera=File(File(filesDir,"camera").apply{mkdirs()},"${UUID.randomUUID()}.jpg");take.launch(FileProvider.getUriForFile(this,"$packageName.files",camera!!))}catch(_:Exception){toast("No hay cámara disponible. Elegí una imagen de la galería.")}}
  private fun removePhoto(){photoJob++;photoBusy=false;photo?.delete();photo=null;if(screen=="document")document() else fuel()}
@@ -880,7 +991,7 @@ class MainActivity:AppCompatActivity(){
  private fun catalogNames(key:String):List<String>{val a=mobile.catalog().optJSONArray(key)?:JSONArray();return (0 until a.length()).map{a.optString(it)}}
  private fun searchDestination(){
   val q=tripForm.optString("destino");if(q.isBlank()){toast("Escribí un lugar para buscar. También podés iniciar sin destino.");return};toast("Buscando destino…")
-  thread{try{@Suppress("DEPRECATION") val found=Geocoder(this,uy).getFromLocationName(q,5)?:emptyList();runOnUiThread{if(screen!="prepare")return@runOnUiThread;if(found.isEmpty()){toast("No se encontraron resultados. Podés conservar el nombre escrito.");return@runOnUiThread};AlertDialog.Builder(this).setTitle("Elegí un destino").setItems(found.map{it.getAddressLine(0)?:it.featureName?:q}.toTypedArray()){_,i->val a=found[i];tripForm.put("destino",a.getAddressLine(0)?:q).put("destination_lat",a.latitude).put("destination_lng",a.longitude);prepare()}.setNegativeButton("Cancelar",null).show()}}catch(_:Exception){runOnUiThread{toast("Búsqueda no disponible. Podés iniciar con el destino escrito o sin destino.")}}}
+  thread{try{@Suppress("DEPRECATION") val found=Geocoder(this,uy).getFromLocationName(q,5)?:emptyList();runOnUiThread{if(screen!="prepare")return@runOnUiThread;if(found.isEmpty()){toast("No se encontraron resultados. Podés conservar el nombre escrito.");return@runOnUiThread};pick("Elegí un destino",found.map{it.getAddressLine(0)?:it.featureName?:q}){i->val a=found[i];tripForm.put("destino",a.getAddressLine(0)?:q).put("destination_lat",a.latitude).put("destination_lng",a.longitude);prepare()}}}catch(_:Exception){runOnUiThread{toast("Búsqueda no disponible. Podés iniciar con el destino escrito o sin destino.")}}}
  }
 
  // ---------- History ----------
@@ -921,7 +1032,7 @@ class MainActivity:AppCompatActivity(){
   if(c.childCount>0)divider(c,16)
   val z=zoned(r.optString("started_at"))
   val v=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(12),dp(12),dp(12),dp(12));background=ripple(null);isClickable=true;isFocusable=true;setOnClickListener{detailFrom="list";detail(r,true)}}
-  val badge=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=bg(appBg,10)}
+  val badge=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=bg(greyBg,14)}
   badge.addView(tv(z?.format(DateTimeFormatter.ofPattern("dd"))?:"--",19f,ink,2).apply{gravity=Gravity.CENTER})
   badge.addView(tv(z?.format(DateTimeFormatter.ofPattern("MMM",uy))?.replace(".","")?.uppercase(uy)?:"",11f,muted,1).apply{gravity=Gravity.CENTER})
   v.addView(badge,LinearLayout.LayoutParams(dp(50),dp(56)))
@@ -987,7 +1098,7 @@ class MainActivity:AppCompatActivity(){
   val bundle=mobile.detail(t);val d=bundle.optJSONObject("data")?:JSONObject();val docs=bundle.optJSONArray("documents")?:JSONArray()
   val running=t.optBoolean("active");val (model,plate)=truckParts(t.optString("vehicle"))
   val (label,fg,fill)=when{running&&t.optBoolean("paused")->Triple("Viaje pausado",amber,amberBg);running->Triple("Viaje en curso",blue,blueSoft);else->Triple("Viaje finalizado",green,greenBg)}
-  val banner=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;background=bg(fill,14);setPadding(dp(14),0,dp(14),0)}
+  val banner=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;background=outline(fill,glassLine,24);setPadding(dp(16),0,dp(16),0)}
   banner.addView(iconView(if(running)R.drawable.ic_navigation else R.drawable.ic_check_circle,fg,20));banner.addView(tv(label,15.5f,fg,1).apply{setPadding(dp(10),0,0,0)},LinearLayout.LayoutParams(0,-2,1f))
   if(plate.isNotBlank())banner.addView(tv(plate,13f,fg))
   root.addView(banner,LinearLayout.LayoutParams(-1,dp(48)).apply{topMargin=dp(12)})
@@ -1024,7 +1135,7 @@ class MainActivity:AppCompatActivity(){
  private fun stop(p:LinearLayout,label:String,place:String,time:String,first:Boolean){
   val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
   val rail=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER_HORIZONTAL}
-  rail.addView(View(this).apply{background=GradientDrawable().apply{shape=GradientDrawable.OVAL;setColor(if(first)cardBg else green);setStroke(dp(3),green)}},LinearLayout.LayoutParams(dp(16),dp(16)).apply{topMargin=dp(3)})
+  rail.addView(View(this).apply{background=GradientDrawable().apply{shape=GradientDrawable.OVAL;setColor(if(first)raised else green);setStroke(dp(3),green)}},LinearLayout.LayoutParams(dp(16),dp(16)).apply{topMargin=dp(3)})
   if(first)rail.addView(View(this).apply{setBackgroundColor(tone(0xFFB9DEC8,0xFF2A5A40))},LinearLayout.LayoutParams(dp(2),0,1f).apply{topMargin=dp(2)})
   r.addView(rail,LinearLayout.LayoutParams(dp(18),-1))
   val col=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),0,dp(8),if(first)dp(16) else 0)}
@@ -1035,11 +1146,105 @@ class MainActivity:AppCompatActivity(){
  }
  private fun fullMap(points:JSONArray){
   val dialog=android.app.Dialog(this,android.R.style.Theme_Material_Light_NoActionBar)
-  val layout=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(12),dp(12),dp(12),dp(12));setBackgroundColor(appBg)}
+  val layout=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(12),dp(12),dp(12),dp(12));setBackgroundColor(surface)}
   button(layout,"Cerrar mapa",Kind.LINE,R.drawable.ic_close,top=0){dialog.dismiss()}
   val map=TripMap.view(this,points);layout.addView(map.view,LinearLayout.LayoutParams(-1,0,1f).apply{topMargin=dp(12)});dialog.setContentView(layout)
   dialog.setOnDismissListener{map.destroy()};dialog.show();dialog.window?.setLayout(-1,-1)
   ViewCompat.setOnApplyWindowInsetsListener(layout){v,i->val insets=i.getInsets(WindowInsetsCompat.Type.systemBars());v.setPadding(insets.left+dp(12),insets.top+dp(12),insets.right+dp(12),insets.bottom+dp(12));i}
+ }
+
+ // ---------- Sample view: every screen with made-up data, for the screenshots of the emulator (CI) ----------
+ /**
+  * Only on a debug build, which never goes to Google Play, started with trf_sample («driver» or «owner») and the screen
+  * to show in trf_sample_screen. The account and the data are made up; nothing is read from or sent to the server
+  * (Api.sample). The screenshots of every screen, in light and in dark, are taken by .github/scripts/capturas_app.py.
+  */
+ private fun sampleView()=(applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)!=0&&intent?.getStringExtra("trf_sample")!=null
+ private fun sample(first:Boolean){
+  val owner=intent.getStringExtra("trf_sample")=="owner"
+  Api.sample=JSONObject().put("user",JSONObject().put("id",if(owner)"muestra-duenio" else "muestra-chofer").put("email",if(owner)"luis@trferreira.com" else "chofer@ejemplo.com")
+   .put("user_metadata",JSONObject().put("full_name",if(owner)"Luis Ferreira" else "Martín Pereira")))
+  name=driverName();if(first)sampleData()
+  val see=intent.getStringExtra("trf_sample_screen")?:"home"
+  setMode(if(see.startsWith("simple"))UiMode.SIMPLE else UiMode.NORMAL)
+  if(see in setOf("trip","tripfinish","simpletrip","simplefinish")&&!active())sampleTrip()
+  val t=mobile.history("trips").optJSONObject(0)
+  when(see){
+   "mode"->askMode();"newtrip"->newTrip();"pick"->{newTrip();pickTruck{newTrip()}};"prepare"->{tripForm=JSONObject().put("destino","Puerto de Montevideo").put("cliente","Cooperativa del Este").put("tipoCarga","Arroz").put("kg","28500");prepare()}
+   "fuel"->openFuel(null);"document"->openDocument(t,"tripdetail","arrival");"triphistory"->history("trips");"fuelhistory"->history("fuel");"tripdetail"->t?.let{detail(it)}?:home()
+   "documents"->documents();"maintenance"->maintenance();"settings"->settings();"games"->games();"privacy"->privacy()
+   "simplehome"->simpleHome();"simpleask"->{startAskAt=SystemClock.elapsedRealtime();simpleHome(true)};"simpletrip"->simpleTrip();"simplefinish"->{simpleTrip();finishAsk=true;simpleDock()}
+   "trip"->trip();"tripfinish"->{trip();askFinish()};"ownermenu"->{home();ownerMenu()};"owner"->ownerDashboard();"performance"->performance()
+   else->home()}
+  // The screens of a trip change every second and the emulator's reader of screens never finds them still: the script
+  // knows the screen is up from this line of the log.
+  stage?.post{android.util.Log.i("TRF-muestra","lista ${intent.getStringExtra("trf_sample_tag")?:see}.")}
+ }
+ /** Trips, receipts, papers, services, the fleet and the month of a small company, around today. */
+ private fun sampleData(){
+  val u=uid();val now=Instant.now();val today=LocalDate.now()
+  fun hours(h:Long)=now.minus(Duration.ofMinutes(h*60)).toString()
+  val trucks=listOf("Ford Cargo 1722" to "ATP 2231","Mercedes-Benz 1618" to "ATR 4410","Volvo FH 460" to "ATN 9032","Scania R450" to "ATS 1187")
+  val label={i:Int->"${trucks[i].first} · ${trucks[i].second}"}
+  store.cache("catalog-$u",JSONObject().put("equipos",JSONArray(trucks.map{JSONObject().put("tipo",it.first).put("matriculaCamion",it.second)}))
+   .put("tiposCarga",JSONArray(listOf("Arroz","Soja","Granos","Caña de azúcar","Fertilizante"))).put("clientes",JSONArray(listOf("Cooperativa del Este","Molino San José","Agroservicios del Norte")))
+   .put("estaciones",JSONArray(listOf(JSONObject().put("id","e1").put("nombre","ANCAP Ruta 8 km 120"),JSONObject().put("id","e2").put("nombre","Petrobras Treinta y Tres")))))
+  saveTruck(label(0))
+  // The driver's trips: hours ago it started, hours it lasted, kilometres, destination, client, cargo and kilos (empty without).
+  val trips=JSONArray();val info=JSONObject()
+  listOf(listOf(6L,5L,286.4,"Molino San José, Treinta y Tres","Molino San José","Arroz","28500"),listOf(27L,4L,212.0,"Puerto de Montevideo","Cooperativa del Este","Soja","30100"),
+   listOf(50L,3L,198.3,"Vergara","","",""),listOf(74L,4L,154.8,"Silos de José Pedro Varela","Agroservicios del Norte","Granos","27000"),listOf(122L,5L,241.6,"Puerto de Montevideo","Molino San José","Arroz","29800"))
+   .forEachIndexed{i,v->val id="muestra-viaje-$i";val start=v[0] as Long;val empty=(v[5] as String).isBlank()
+    trips.put(JSONObject().put("id",id).put("driver_id",u).put("driver_name",name).put("vehicle",label(0)).put("started_at",hours(start)).put("ended_at",hours(start-(v[1] as Long)))
+     .put("active",false).put("paused",false).put("load_type",if(empty)"empty" else "loaded").put("distance_meters",(v[2] as Double)*1000).put("origin_lat",-32.944).put("origin_lng",-53.939).put("arrival_lat",-33.233).put("arrival_lng",-54.383))
+    info.put(id,JSONObject().put("destino",v[3]).put("cliente",v[4]).put("tipoCarga",v[5]).put("kg",v[6]))}
+  store.cache("trips-$u",JSONObject().put("rows",trips).put("fetched_at",now.toEpochMilli()))
+  store.cache("tripinfo-$u",JSONObject().put("data",info))
+  store.cache("detail-$u-muestra-viaje-0",JSONObject().put("data",JSONObject(info.getJSONObject("muestra-viaje-0").toString()).put("origen","Vergara, Treinta y Tres"))
+   .put("documents",JSONArray(listOf(JSONObject().put("id","r1").put("kind","departure").put("number","004512").put("cargo_type","Arroz").put("kg",28500),JSONObject().put("id","r2").put("kind","arrival").put("number","004513").put("cargo_type","Arroz").put("kg",28380)))))
+  store.cache("route-$u-muestra-viaje-0",JSONObject().put("points",JSONArray((0..12).map{i->JSONObject().put("latitude",-32.944-i*0.0242).put("longitude",-53.939-i*0.037+(if(i%3==1)0.006 else 0.0)).put("recorded_at",hours(6-i/3L)).put("segment",0)})))
+  // Fuel receipts of the last days, some in a trip.
+  val fuel=JSONArray()
+  listOf(listOf(1L,"ANCAP Ruta 8 km 120",180.0,11358.0,true,"muestra-viaje-0"),listOf(2L,"Petrobras Treinta y Tres",150.0,9465.0,false,"muestra-viaje-1"),listOf(4L,"ANCAP Ruta 8 km 120",200.0,12620.0,true,""),listOf(6L,"Petrobras Treinta y Tres",95.5,6026.0,false,"muestra-viaje-4"))
+   .forEachIndexed{i,v->val day=today.minusDays(v[0] as Long)
+    fuel.put(JSONObject().put("id","muestra-boleta-$i").put("driver_id",u).put("driver_name",name).put("vehicle",label(0)).put("station_name",v[1]).put("receipt_date",day.toString()).put("recorded_at",day.atTime(10,30).atZone(ZoneId.systemDefault()).toInstant().toString())
+     .put("liters",v[2]).put("total",v[3]).put("full_tank",v[4]).put("trip_id",(v[5] as String).ifBlank{null}?:JSONObject.NULL).put("object_path",JSONObject.NULL))}
+  store.cache("fuel-$u",JSONObject().put("rows",fuel).put("fetched_at",now.toEpochMilli()))
+  // Papers: one to renew soon, one expired, the rest in order. Services: one coming, one done, one planned.
+  store.cache("documents-$u",JSONObject().put("rows",JSONArray(listOf(
+   JSONObject().put("id","p1").put("scope","driver").put("driver_id",u).put("driver_name",name).put("kind","Licencia de conducir").put("expires_on",today.plusDays(18).toString()),
+   JSONObject().put("id","p2").put("scope","driver").put("driver_id",u).put("driver_name",name).put("kind","Carné de salud").put("expires_on",today.plusDays(210).toString()),
+   JSONObject().put("id","p3").put("scope","vehicle").put("vehicle",label(0)).put("kind","SOA / Seguro").put("expires_on",today.minusDays(3).toString()),
+   JSONObject().put("id","p4").put("scope","vehicle").put("vehicle",label(0)).put("kind","Habilitación MTOP").put("expires_on",today.plusDays(95).toString())))).put("fetched_at",now.toEpochMilli()))
+  store.cache("maintenance-$u",JSONObject().put("rows",JSONArray(listOf(
+   JSONObject().put("id","s1").put("vehicle",label(0)).put("kind","Cambio de aceite").put("due_on",today.plusDays(6).toString()).put("due_km",412500).put("interval_km",10000).put("created_by",u),
+   JSONObject().put("id","s2").put("vehicle",label(0)).put("kind","Revisión de frenos").put("done_on",today.minusDays(12).toString()).put("odometer_km",401380).put("created_by",u),
+   JSONObject().put("id","s3").put("vehicle",label(0)).put("kind","Cubiertas").put("due_on",today.plusDays(40).toString()).put("created_by",u)))).put("fetched_at",now.toEpochMilli()))
+  // The fleet: two trucks on a trip, one moving and one stopped; the other two without a trip.
+  store.cache("fleet-$u",JSONObject().put("fetched_at",now.toEpochMilli()).put("live_at",now.toEpochMilli())
+   .put("active",JSONArray(listOf(
+    JSONObject().put("id","muestra-flota-1").put("driver_id","muestra-d1").put("driver_name","Diego Rodríguez").put("vehicle",label(2)).put("started_at",hours(2)).put("paused",false).put("load_type","loaded").put("distance_meters",142300.0)
+     .put("last",JSONObject().put("latitude",-33.512).put("longitude",-55.103).put("speed_kmh",82.0).put("recorded_at",now.minusSeconds(20).toString())),
+    JSONObject().put("id","muestra-flota-2").put("driver_id","muestra-d2").put("driver_name","Sofía Martínez").put("vehicle",label(3)).put("started_at",hours(1)).put("paused",false).put("load_type","loaded").put("distance_meters",38400.0)
+     .put("last",JSONObject().put("latitude",-32.371).put("longitude",-54.168).put("speed_kmh",0.0).put("recorded_at",now.minusSeconds(60).toString())))))
+   .put("recent",JSONArray(listOf(JSONObject().put("driver_name","Martín Pereira").put("vehicle",label(0)).put("ended_at",hours(1)).put("arrival_lat",-33.233).put("arrival_lng",-54.383),
+    JSONObject().put("driver_name","Luis Ferreira").put("vehicle",label(1)).put("ended_at",hours(26)).put("arrival_lat",-34.905).put("arrival_lng",-56.191)))))
+  store.cache("presence-$u",JSONObject().put("rows",JSONArray(listOf(
+   JSONObject().put("driver_id","muestra-d1").put("driver_name","Diego Rodríguez").put("app_version","0.22.0").put("seen_at",now.minusSeconds(60).toString()),
+   JSONObject().put("driver_id","muestra-d3").put("driver_name","Martín Pereira").put("app_version","0.22.0").put("seen_at",now.minusSeconds(240).toString()).put("latitude",-33.233).put("longitude",-54.383).put("located_at",now.minusSeconds(240).toString()),
+   JSONObject().put("driver_id","muestra-d2").put("driver_name","Sofía Martínez").put("app_version","0.21.0").put("seen_at",hours(3))))))
+  // The month by truck and by driver: trips, GPS km, with and without cargo, billable km, kilos, billed, unbilled, litres and fuel.
+  fun row(n:String,v:List<Number>)=JSONObject().put("name",n).put("trips",v[0]).put("gps_km",v[1]).put("loaded_km",v[2]).put("empty_km",v[3]).put("billable_km",v[4]).put("kg",v[5]).put("billed_uyu",v[6]).put("billed_usd",0).put("unbilled",v[7]).put("liters",v[8]).put("fuel_uyu",v[9]).put("fuel_usd",0)
+  val month=listOf(listOf(14,3420.0,2180.0,1240.0,2050.0,382000.0,486000.0,1,1160.0,73200.0),listOf(11,2890.0,1920.0,970.0,1800.0,301000.0,402500.0,0,980.0,61900.0),listOf(8,1960.0,1210.0,750.0,1150.0,198000.0,255000.0,2,690.0,43500.0))
+  val total=(0 until 10).map{k->month.sumOf{it[k].toDouble()}}
+  fun summary(names:List<String>)=JSONObject().put("rows",JSONArray(names.indices.map{row(names[it],month[it])})).put("total",row("Toda la flota",total.mapIndexed{k,v->if(k==0||k==7)v.toInt() else v}))
+  store.cache("performance-$u-${YearMonth.now()}",JSONObject().put("trucks",summary(listOf(label(0),label(2),label(3)))).put("drivers",summary(listOf("Martín Pereira","Diego Rodríguez","Sofía Martínez"))).put("fetched_at",now.toEpochMilli()))
+ }
+ /** A trip in progress for an hour and a half, going at 78 km/h, with the route so far for the map. */
+ private fun sampleTrip(){
+  val now=Instant.now();val t=store.start(Api.sample!!.getJSONObject("user"),name,"Ford Cargo 1722 · ATP 2231",false,JSONObject().put("destino","Puerto de Montevideo").put("cliente","Cooperativa del Este").put("tipoCarga","Arroz").put("kg","28500"))
+  store.update(false){it.put("started_at",now.minusSeconds(83*60L).toString()).put("distance_meters",86400.0).put("speed_kmh",78.0).put("last_point",JSONObject().put("recorded_at",now.toString()).put("latitude",-33.62).put("longitude",-55.31))}
+  for(i in 0..20)store.appendTrack(t.getString("id"),-33.233-i*0.019,-54.383-i*0.044,0,now.toEpochMilli()-(20-i)*240_000L)
  }
 
  // ---------- Games: for the waits, with the truck stopped (decision of 21/10/2026). Nothing of them leaves the phone ----------
@@ -1064,7 +1269,7 @@ class MainActivity:AppCompatActivity(){
   page("games");bar("Juegos",back={homeOrTrip()})
   val s=parkedState();gamesAllowed=s.allowed;gamesCheckAt=SystemClock.elapsedRealtime()
   if(!s.allowed){
-   val w=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;background=bg(amberBg,16);setPadding(dp(16),dp(14),dp(16),dp(14))}
+   val w=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;background=outline(amberBg,glassLine,20);setPadding(dp(16),dp(14),dp(16),dp(14))}
    w.addView(iconView(R.drawable.ic_warning,amber,26))
    val wc=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),0,0,0)}
    wc.addView(tv("Primero, el camión parado",16f,ink,1));wc.addView(tv(parkedText(s),14f,inkSoft).apply{setPadding(0,dp(2),0,0)})
@@ -1172,7 +1377,7 @@ class MainActivity:AppCompatActivity(){
  }
  private fun askPromotion(moves:List<Chess.Move>){
   val kinds=listOf(Chess.QUEEN to "Dama",Chess.ROOK to "Torre",Chess.BISHOP to "Alfil",Chess.KNIGHT to "Caballo")
-  AlertDialog.Builder(this).setTitle("¿En qué se convierte el peón?").setItems(kinds.map{it.second}.toTypedArray()){_,i->moves.firstOrNull{it.promo==kinds[i].first}?.let{playChess(it)}}.setNegativeButton("Cancelar",null).show()
+  pick("¿En qué se convierte el peón?",kinds.map{it.second}){i->moves.firstOrNull{it.promo==kinds[i].first}?.let{playChess(it)}}
  }
  private fun playChess(move:Chess.Move){val m=match?:return;if(screen!="chess"||!m.game.play(move))return;chessSel=-1;saveMatch(m);chessViews();phoneTurn()}
  /** The phone's answer, worked out on another thread; dropped if the board closed or the game changed meanwhile. */
@@ -1338,7 +1543,7 @@ class MainActivity:AppCompatActivity(){
   val label=when(a){is Truco.Action.Sing->a.call.text;Truco.Action.Quiero->"Quiero";Truco.Action.NoQuiero->"No quiero";Truco.Action.Achico->"Me achico";Truco.Action.Mazo->"Ir al mazo";is Truco.Action.Play->TrucoTalk.cardName(a.card)}
   val kind=when(a){Truco.Action.Quiero->Kind.PRIMARY;Truco.Action.Mazo->Kind.LINE_DANGER;Truco.Action.NoQuiero,Truco.Action.Achico->Kind.LINE;else->if(a==Truco.Action.Sing(Truco.Call.FLOR))Kind.GO else Kind.SOFT}
   val (look,fg,solid)=buttonLook(kind)
-  val v=tv(label,14.5f,fg,1).apply{gravity=Gravity.CENTER;maxLines=2;background=look;isClickable=true;isFocusable=true;contentDescription=label;setPadding(dp(6),0,dp(6),0);if(solid)elevation=dpf(2f)
+  val v=tv(label,14.5f,fg,1).apply{gravity=Gravity.CENTER;maxLines=2;background=look;isClickable=true;isFocusable=true;contentDescription=label;setPadding(dp(6),0,dp(6),0);if(solid)glow(this,fillOf(kind),2f);sink(this,.95f)
    setOnClickListener{if(a==Truco.Action.Mazo)askMazo() else trucoAct(a)}}
   p.addView(v,LinearLayout.LayoutParams(0,dp(48),1f).apply{if(!first)marginStart=dp(8)})
  }
@@ -1378,7 +1583,7 @@ class MainActivity:AppCompatActivity(){
   page("settings");bar("Mi cuenta")
   val email=api.session()?.optJSONObject("user")?.optString("email")?:""
   val pc=card();val pr=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(16),dp(16),dp(16),dp(16))}
-  pr.addView(tv(initials(name),17f,Color.WHITE,1).apply{gravity=Gravity.CENTER;background=oval(barBg)},LinearLayout.LayoutParams(dp(52),dp(52)))
+  pr.addView(tv(initials(name),17f,Color.WHITE,1).apply{gravity=Gravity.CENTER;background=featured()},LinearLayout.LayoutParams(dp(52),dp(52)))
   val col=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),0,0,0)}
   col.addView(tv(name,18f,ink,1));col.addView(tv(email,14f,muted).apply{setPadding(0,dp(2),0,0)})
   col.addView(pill(when{panelFirst()->"Dueño · panel de flota";isOwner()->"Dueño y chofer";else->"Chofer"},blue,blueSoft).apply{(layoutParams as LinearLayout.LayoutParams).topMargin=dp(8)})
@@ -1585,22 +1790,51 @@ class MainActivity:AppCompatActivity(){
  }
 
  // ---------- Owner menu: every fleet function, one tap away from the start screen of an owner who also drives ----------
- private fun menuButton()=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;background=ripple(bg(0x26FFFFFF,12),0x40FFFFFF);setPadding(dp(12),0,dp(14),0);isClickable=true;isFocusable=true;contentDescription="Menú del dueño";setOnClickListener{ownerMenu()}
-  addView(iconView(R.drawable.ic_menu,Color.WHITE,22));addView(tv("Menú",15.5f,Color.WHITE,1).apply{setPadding(dp(8),0,0,0)})
+ private fun menuButton()=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;background=ripple(bg(blueSoft,22));setPadding(dp(12),0,dp(16),0);isClickable=true;isFocusable=true;contentDescription="Menú del dueño";setOnClickListener{ownerMenu()};sink(this,.95f)
+  addView(iconView(R.drawable.ic_menu,blue,22));addView(tv("Menú",15.5f,blue,1).apply{setPadding(dp(8),0,0,0)})
   layoutParams=LinearLayout.LayoutParams(-2,dp(44))}
- /** A panel that slides up from the bottom. It closes before opening the chosen screen, with the back gesture or by tapping outside. */
- private fun ownerMenu(){
+ /**
+  * A sheet that slides up from the bottom, nearly solid like the panel's menus: it closes with the back gesture, tapping
+  * outside or its ✕. fill gets the list to fill and the sheet, to close it before opening what was chosen.
+  */
+ private fun sheet(title:String,sub:String?,fill:(LinearLayout,android.app.Dialog)->Unit){
   sheet?.dismiss()
   val d=android.app.Dialog(this);sheet=d
   d.requestWindowFeature(Window.FEATURE_NO_TITLE)
   val frame=FrameLayout(this).apply{setPadding(dp(10),dp(10),dp(10),dp(10));setOnClickListener{d.dismiss()}}
-  val panel=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=bg(appBg,22);clipToOutline=true;isClickable=true}
-  val top=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(18),dp(12),dp(6),dp(8))}
+  val panel=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=outline(menuFill,glassLine,28);clipToOutline=true;isClickable=true}
+  // The handle on top says that it is a sheet.
+  panel.addView(View(this).apply{background=bg(fieldLine,2);importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO},LinearLayout.LayoutParams(dp(36),dp(4)).apply{gravity=Gravity.CENTER_HORIZONTAL;topMargin=dp(8)})
+  val top=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(20),dp(6),dp(6),dp(6))}
   val col=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
-  col.addView(tv("Menú del dueño",20f,ink,2));col.addView(tv("Toda la flota, desde tu cuenta",13.5f,muted).apply{setPadding(0,dp(2),0,0)})
+  col.addView(tv(title,19f,ink,2));if(sub!=null)col.addView(tv(sub,13.5f,muted).apply{setPadding(0,dp(2),0,0)})
   top.addView(col,LinearLayout.LayoutParams(0,-2,1f))
-  top.addView(ImageView(this).apply{setImageResource(R.drawable.ic_close);imageTintList=ColorStateList.valueOf(muted);setPadding(dp(12),dp(12),dp(12),dp(12));background=RippleDrawable(ColorStateList.valueOf(press),null,null);contentDescription="Cerrar el menú";isClickable=true;isFocusable=true;setOnClickListener{d.dismiss()}},LinearLayout.LayoutParams(dp(48),dp(48)))
+  top.addView(ImageView(this).apply{setImageResource(R.drawable.ic_close);imageTintList=ColorStateList.valueOf(muted);setPadding(dp(12),dp(12),dp(12),dp(12));background=RippleDrawable(ColorStateList.valueOf(press),null,null);contentDescription="Cerrar";isClickable=true;isFocusable=true;setOnClickListener{d.dismiss()}},LinearLayout.LayoutParams(dp(48),dp(48)))
   panel.addView(top,LinearLayout.LayoutParams(-1,-2))
+  val list=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(10),dp(2),dp(10),dp(12))}
+  fill(list,d)
+  panel.addView(ScrollView(this).apply{isVerticalScrollBarEnabled=false;overScrollMode=View.OVER_SCROLL_NEVER;addView(list)},LinearLayout.LayoutParams(-1,-2,1f))
+  frame.addView(panel,FrameLayout.LayoutParams(if(resources.displayMetrics.widthPixels>dp(560))dp(520) else -1,-2,Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM))
+  ViewCompat.setOnApplyWindowInsetsListener(frame){v,i->val bars=i.getInsets(WindowInsetsCompat.Type.systemBars());v.setPadding(bars.left+dp(10),bars.top+dp(10),bars.right+dp(10),bars.bottom+dp(10));i}
+  d.setContentView(frame);d.setTitle(title);d.setCanceledOnTouchOutside(true)
+  d.setOnDismissListener{if(sheet===d)sheet=null}
+  d.window?.apply{setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT));setGravity(Gravity.BOTTOM);setLayout(-1,-2);setWindowAnimations(R.style.TRF_SheetMotion)}
+  d.show();d.window?.setLayout(-1,-2)
+ }
+ /**
+  * A list to choose from, in a sheet (they were dialogs before 0.22.0): the current choice is marked; choosing closes it.
+  * last is one more choice at the end, quieter (leave it pending, take the choice away), given as items.size.
+  */
+ private fun pick(title:String,items:List<String>,current:String?=null,last:String?=null,chosen:(Int)->Unit)=sheet(title,null){list,d->
+  val c=card(list,top=0);val all=items+listOfNotNull(last)
+  all.forEachIndexed{i,s->if(i>0)divider(c,16);val on=i<items.size&&s==current;val quiet=i>=items.size
+   val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;minimumHeight=dp(54);setPadding(dp(16),dp(8),dp(12),dp(8));background=ripple(null);isClickable=true;isFocusable=true;contentDescription=s+if(on)", elegido" else "";setOnClickListener{d.dismiss();chosen(i)}}
+   r.addView(tv(s,15.5f,if(on)blue else if(quiet)muted else ink,if(quiet)0 else 1).apply{maxLines=2;ellipsize=TextUtils.TruncateAt.END},LinearLayout.LayoutParams(0,-2,1f))
+   if(on)r.addView(iconView(R.drawable.ic_check_circle,blue,22))
+   c.addView(r,LinearLayout.LayoutParams(-1,-2))}
+ }
+ /** Every fleet function, in a sheet; each closes it before opening its screen. */
+ private fun ownerMenu(){
   val items=mutableListOf(
    Shortcut(R.drawable.ic_map,0xFF178A4C.toInt(),"Flota en vivo","Mapa y estado de cada camión"){ownerDashboard()},
    Shortcut(R.drawable.ic_route,0xFF1663E8.toInt(),"Viajes de la flota","De todos los choferes"){openHistory("trips",true)},
@@ -1610,15 +1844,7 @@ class MainActivity:AppCompatActivity(){
    Shortcut(R.drawable.ic_doc,0xFF0E8A8A.toInt(),"Documentos","Vencimientos de la flota"){documents(true)})
   // In simple mode this menu takes the place of the "Cambiar de modo" button of the start screen.
   if(simple())items.add(Shortcut(R.drawable.ic_list,0xFF8590A2.toInt(),"Cambiar de modo","Sencillo o normal"){askMode()})
-  val list=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(10),dp(2),dp(10),dp(12))}
-  menuRows(card(list,top=0),items){d.dismiss()}
-  panel.addView(ScrollView(this).apply{isVerticalScrollBarEnabled=false;overScrollMode=View.OVER_SCROLL_NEVER;addView(list)},LinearLayout.LayoutParams(-1,-2,1f))
-  frame.addView(panel,FrameLayout.LayoutParams(if(resources.displayMetrics.widthPixels>dp(560))dp(520) else -1,-2,Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM))
-  ViewCompat.setOnApplyWindowInsetsListener(frame){v,i->val bars=i.getInsets(WindowInsetsCompat.Type.systemBars());v.setPadding(bars.left+dp(10),bars.top+dp(10),bars.right+dp(10),bars.bottom+dp(10));i}
-  d.setContentView(frame);d.setTitle("Menú del dueño");d.setCanceledOnTouchOutside(true)
-  d.setOnDismissListener{if(sheet===d)sheet=null}
-  d.window?.apply{setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT));setGravity(Gravity.BOTTOM);setLayout(-1,-2);setWindowAnimations(android.R.style.Animation_InputMethod)}
-  d.show();d.window?.setLayout(-1,-2)
+  sheet("Menú del dueño","Toda la flota, desde tu cuenta"){list,d->menuRows(card(list,top=0),items){d.dismiss()}}
  }
 
  // ---------- Owner: month totals per truck or per driver ----------
@@ -1739,7 +1965,7 @@ class MainActivity:AppCompatActivity(){
  private fun dateField(c:LinearLayout,title:String,data:JSONObject,key:String,changed:()->Unit){
   caption(c,title);val current=day(data,key)
   val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
-  r.addView(tv(current?.let{fmt(it)}?:"Elegir fecha",16f,if(current==null)faint else ink).apply{gravity=Gravity.CENTER_VERTICAL;background=ripple(outline(cardBg,fieldLine,12));setPadding(dp(14),0,dp(14),0);setCompoundDrawablesRelative(null,null,tinted(R.drawable.ic_calendar,muted),null);isClickable=true;isFocusable=true;contentDescription="$title: ${current?.let{fmt(it)}?:"sin fecha"}";setOnClickListener{
+  r.addView(tv(current?.let{fmt(it)}?:"Elegir fecha",16f,if(current==null)faint else ink).apply{gravity=Gravity.CENTER_VERTICAL;background=ripple(outline(fieldFill,fieldLine,14));setPadding(dp(14),0,dp(14),0);setCompoundDrawablesRelative(null,null,tinted(R.drawable.ic_calendar,muted),null);isClickable=true;isFocusable=true;contentDescription="$title: ${current?.let{fmt(it)}?:"sin fecha"}";setOnClickListener{
    val start=current?:LocalDate.now();DatePickerDialog(this@MainActivity,{_,y,m,d->data.put(key,LocalDate.of(y,m+1,d).toString());changed()},start.year,start.monthValue-1,start.dayOfMonth).show()}},LinearLayout.LayoutParams(0,dp(52),1f))
   if(current!=null)r.addView(ImageView(this).apply{setImageResource(R.drawable.ic_close);imageTintList=ColorStateList.valueOf(muted);setPadding(dp(12),dp(12),dp(12),dp(12));background=RippleDrawable(ColorStateList.valueOf(press),null,null);contentDescription="Quitar fecha";isClickable=true;isFocusable=true;setOnClickListener{data.remove(key);changed()}},LinearLayout.LayoutParams(dp(48),dp(48)).apply{marginStart=dp(4)})
   c.addView(r,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(6)})
@@ -1780,7 +2006,7 @@ class MainActivity:AppCompatActivity(){
   page("maintenance");bar("Mantenimiento",back={homeOrTrip()},trailing=plusButton("Agregar service"){editMaintenance(null)})
   val (model,plate)=truckParts(maintTruck)
   row(card(),R.drawable.ic_truck,if(maintTruck.isBlank())"Todos los camiones" else model,if(maintTruck.isBlank())"Tocá para ver un solo camión" else if(plate.isNotBlank())"Matrícula $plate" else null,trailing=tv("Cambiar",14.5f,blue,1)){
-   val items=truckChoices();AlertDialog.Builder(this).setTitle("¿Qué camión?").setItems((listOf("Todos los camiones")+items).toTypedArray()){_,i->maintTruck=if(i==0)"" else items[i-1];maintenance()}.setNegativeButton("Cancelar",null).show()}
+   val items=truckChoices();pick("¿Qué camión?",listOf("Todos los camiones")+items,maintTruck.ifBlank{"Todos los camiones"}){i->maintTruck=if(i==0)"" else items[i-1];maintenance()}}
   segmented(root,listOf("Todos","Pendientes","Hechos"),maintFilter){maintFilter=it;maintenance()}
   val rows=mobile.maintenance().objects().filter{maintTruck.isBlank()||sameTruck(it.optString("vehicle"),maintTruck)}
    .filter{when(maintFilter){1->day(it,"done_on")==null;2->day(it,"done_on")!=null;else->true}}
@@ -1891,7 +2117,7 @@ class MainActivity:AppCompatActivity(){
  /** Owner only: the driver a new paper is for. */
  private fun driverField(c:LinearLayout){
   caption(c,"Chofer");val current=editForm.optString("driver_name").takeUnless{it.isBlank()||it=="null"}
-  c.addView(tv(current?:"Elegir chofer",16f,if(current==null)faint else ink).apply{gravity=Gravity.CENTER_VERTICAL;background=ripple(outline(cardBg,fieldLine,12));setPadding(dp(14),0,dp(14),0);setCompoundDrawablesRelative(null,null,tinted(R.drawable.ic_expand,muted),null);isClickable=true;isFocusable=true;contentDescription="Chofer: ${current?:"sin elegir"}";setOnClickListener{pickDriver()}},LinearLayout.LayoutParams(-1,dp(52)).apply{topMargin=dp(6)})
+  c.addView(tv(current?:"Elegir chofer",16f,if(current==null)faint else ink).apply{gravity=Gravity.CENTER_VERTICAL;background=ripple(outline(fieldFill,fieldLine,14));setPadding(dp(14),0,dp(14),0);setCompoundDrawablesRelative(null,null,tinted(R.drawable.ic_expand,muted),null);isClickable=true;isFocusable=true;contentDescription="Chofer: ${current?:"sin elegir"}";setOnClickListener{pickDriver()}},LinearLayout.LayoutParams(-1,dp(52)).apply{topMargin=dp(6)})
  }
  /** Drivers with trips, plus the ones that only have papers, by name; the owner is left out ("Mío" is for that). */
  private fun pickDriver(){
@@ -1903,7 +2129,7 @@ class MainActivity:AppCompatActivity(){
     known.remove(uid())
     if(known.isEmpty()){toast(if(found==null)"Sin conexión. Probá de nuevo cuando tengas señal." else "Todavía no hay choferes con viajes.");return@runOnUiThread}
     val list=known.entries.sortedBy{it.value.lowercase(uy)}
-    AlertDialog.Builder(this).setTitle("¿De qué chofer?").setItems(list.map{it.value}.toTypedArray()){_,i->editForm.put("driver_id",list[i].key).put("driver_name",list[i].value);paperForm()}.setNegativeButton("Cancelar",null).show()}}
+    pick("¿De qué chofer?",list.map{it.value},editForm.optString("driver_name")){i->editForm.put("driver_id",list[i].key).put("driver_name",list[i].value);paperForm()}}}
  }
 
  // ---------- Formatting ----------
@@ -1924,5 +2150,6 @@ class MainActivity:AppCompatActivity(){
   val original=File(cacheDir,"receipt-original-${UUID.randomUUID()}");contentResolver.openInputStream(uri)?.use{input->original.outputStream().use{out->val buf=ByteArray(8192);var total=0L;while(true){val n=input.read(buf);if(n<0)break;total+=n;check(total<=40*1024*1024);out.write(buf,0,n)}}}?:error("Sin imagen")
   val bounds=BitmapFactory.Options().apply{inJustDecodeBounds=true};BitmapFactory.decodeFile(original.path,bounds);var sample=1;while(max(bounds.outWidth,bounds.outHeight)/sample>2400)sample*=2;val bitmap=BitmapFactory.decodeFile(original.path,BitmapFactory.Options().apply{inSampleSize=sample})?:error("Formato no compatible");val exif=ExifInterface(original);val matrix=Matrix();matrix.postRotate(exif.rotationDegrees.toFloat());if(exif.isFlipped)matrix.postScale(-1f,1f);val rotated=Bitmap.createBitmap(bitmap,0,0,bitmap.width,bitmap.height,matrix,true);val out=File(File(filesDir,"draft-photos").apply{mkdirs()},"receipt-${UUID.randomUUID()}.jpg");out.outputStream().use{rotated.compress(Bitmap.CompressFormat.JPEG,88,it)};if(rotated!==bitmap)rotated.recycle();bitmap.recycle();original.delete();check(out.length()<=10*1024*1024);runOnUiThread{if(job==photoJob){photoBusy=false;photo=out;if(screen==target){if(target=="document")document() else fuel()}}else out.delete()}
  }catch(_:Exception){runOnUiThread{if(job==photoJob)photoBusy=false;toast("No se pudo preparar la foto. Probá con otra imagen.")}}}}
- private fun toast(s:String)=Toast.makeText(this,s,Toast.LENGTH_LONG).show()
+ // The sample view has no network: the notices that say so would cover its screenshots.
+ private fun toast(s:String){if(Api.sample==null)Toast.makeText(this,s,Toast.LENGTH_LONG).show()}
 }

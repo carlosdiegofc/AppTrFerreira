@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The same colours in dark mode, like the panel's. -->
+    <color name="trf_brand">#3457D5</color>
+    <color name="trf_accent">#92B0FF</color>
+    <color name="trf_dialog">#1B2131</color>
+    <color name="trf_room">#1D1A1E</color>
+</resources>

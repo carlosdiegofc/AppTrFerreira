@@ -8,4 +8,9 @@
     <color name="tr_gray_text">#6B7280</color>
     <color name="tr_red">#D32F2F</color>
     <color name="ic_launcher_background">#0F2142</color>
+    <!-- The glass of the panel (decision of 28/10/2026): the logo's blue for fills, the blue of text and the dialogs. -->
+    <color name="trf_brand">#133396</color>
+    <color name="trf_accent">#133396</color>
+    <color name="trf_dialog">#FBF8F5</color>
+    <color name="trf_room">#E4D8CA</color>
 </resources>

@@ -5,7 +5,22 @@ Panel web nuevo (React + TypeScript), en la dirección principal del panel desde
 # Panel web (anterior)
 La carpeta [`web/`](web/README.md) tiene el panel web anterior, que queda en `/anterior/` de la misma dirección un tiempo: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
 
-# Transportes Ferreira GPS — v0.21.0
+# Transportes Ferreira GPS — v0.22.0
+
+## Nuevo en v0.22.0 (el diseño del panel, y más fluida; versionCode 34)
+- **La app se ve como el panel web** (decisión del 28/10/2026): la misma habitación desenfocada de fondo, de día o de noche según el teléfono, con tarjetas de vidrio encima, botones redondeados y el azul del logo.
+  - Arriba, una barra flotante con el título y la flecha para volver; abajo, la barra de Inicio, Viajes, Combustible y Más, con la pestaña elegida resaltada.
+  - En el viaje en curso y en el modo sencillo las tarjetas son casi opacas, para leerlas de un vistazo.
+  - El modo sencillo tiene los mismos botones grandes, en los mismos lugares.
+- **Más fluida:**
+  - Las pantallas entran deslizándose desde la derecha al avanzar y desde la izquierda al volver; las pestañas de abajo cambian en el lugar.
+  - Al elegir una opción, la pantalla queda donde estaba, sin volver arriba.
+  - Botones y tarjetas se achican apenas al tocarlos; iniciar y finalizar el viaje vibran un poco.
+  - La pastilla de la opción elegida se desliza a la nueva, y la velocidad del viaje sube y baja sin saltos.
+  - Para elegir camión, carga, cliente o destino se abre una hoja desde abajo, en lugar de una ventana.
+  - Con las animaciones apagadas en el teléfono, todo cambia al instante.
+- **Sin funciones nuevas ni cambios en lo que se guarda o se envía.**
+- **Para las capturas:** la versión de prueba (nunca la de Google Play) abre cada pantalla con datos inventados y sin conexión, y el emulador de GitHub saca una captura de cada una, en claro y en oscuro (`.github/scripts/capturas_app.py`).
 
 ## Nuevo en v0.21.0 (el mapa de Google; versionCode 33)
 - **Los mapas de la app son de Google** (decisión del 26/10/2026): el del viaje en curso, el recorrido de cada viaje (también en pantalla completa) y el de la flota del dueño.
