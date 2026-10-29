@@ -183,7 +183,7 @@ class MainActivity:AppCompatActivity(){
  private val take=registerForActivityResult(ActivityResultContracts.TakePicture()){ok->if(ok)camera?.let{preparePhoto(Uri.fromFile(it))}else camera?.delete()}
  private val pick=registerForActivityResult(ActivityResultContracts.GetContent()){uri->if(uri!=null)preparePhoto(uri)}
 
- override fun onCreate(b:Bundle?){super.onCreate(b);store=TripStore(this);api=Api(this)
+ override fun onCreate(b:Bundle?){super.onCreate(b);CrashLog.install(this);store=TripStore(this);api=Api(this)
   WindowCompat.setDecorFitsSystemWindows(window,false);transparentBars()
   tripForm=JSONObject(b?.getString("tripForm")?:"{}");fuelForm=JSONObject(b?.getString("fuelForm")?:"{}");docForm=JSONObject(b?.getString("docForm")?:"{}");draftDocs=JSONArray(b?.getString("draftDocs")?:"[]")
   fuelTrip=b?.getString("fuelTrip")?.let{JSONObject(it)};docTrip=b?.getString("docTrip")?.let{JSONObject(it)};historyTrip=b?.getString("historyTrip")?.let{JSONObject(it)};photoMode=b?.getString("photoMode")?:"fuel";docReturn=b?.getString("docReturn")?:"prepare"
@@ -913,7 +913,8 @@ class MainActivity:AppCompatActivity(){
   root.setPadding(dp(14),0,dp(14),dp(18));box.addView(root);panel.addView(box,LinearLayout.LayoutParams(-1,0));sheetBox=box;sheetOpen=false
   swipe(grip);swipe(stats)
   // The map leaves the room the bar and the closed panel cover, so the truck stays in sight.
-  val room=View.OnLayoutChangeListener{_,_,_,_,_,_,_,_,_->live.pad(top.bottom,panel.height-box.height)}
+  // Only while this map is the screen's: a screen that is leaving does not move a map already closed.
+  val room=View.OnLayoutChangeListener{_,_,_,_,_,_,_,_,_->if(liveMap===live)live.pad(top.bottom,panel.height-box.height)}
   top.addOnLayoutChangeListener(room);panel.addOnLayoutChangeListener(room)
   return live
  }
@@ -1406,14 +1407,18 @@ class MainActivity:AppCompatActivity(){
   name=driverName();if(first)sampleData()
   val see=intent.getStringExtra("trf_sample_screen")?:"home"
   setMode(if(see.startsWith("simple"))UiMode.SIMPLE else UiMode.NORMAL)
-  if(see in setOf("trip","tripsheet","tripfinish","simpletrip","simplefinish")&&!active())sampleTrip()
+  if(see in setOf("trip","tripsheet","tripfinish","tripend","simpletrip","simplefinish","simpletripend")&&!active())sampleTrip()
   val t=mobile.history("trips").optJSONObject(0)
   when(see){
    "mode"->askMode();"newtrip"->newTrip();"pick"->{newTrip();pickTruck{newTrip()}};"prepare"->{tripForm=JSONObject().put("destino","Puerto de Montevideo").put("cliente","Cooperativa del Este").put("tipoCarga","Arroz").put("kg","28500");prepare()}
    "fuel"->openFuel(null);"document"->openDocument(t,"tripdetail","arrival");"triphistory"->history("trips");"fuelhistory"->history("fuel");"tripdetail"->t?.let{detail(it)}?:home()
    "documents"->documents();"maintenance"->maintenance();"settings"->settings();"games"->games();"privacy"->privacy()
    "simplehome"->simpleHome();"simpleask"->{startAskAt=SystemClock.elapsedRealtime();simpleHome(true)};"simpletrip"->simpleTrip();"simplefinish"->{simpleTrip();finishAsk=true;simpleDock()}
-   "trip"->trip();"tripsheet"->{trip();stage?.postDelayed({sheet(true)},300)};"tripfinish"->{trip();askFinish()};"receipt"->{home();t?.let{askReceipt(it)}};"ownermenu"->{home();ownerMenu()};"owner"->ownerDashboard();"fleetfull"->{ownerDashboard();fullFleet()};"performance"->performance()
+   "trip"->trip()
+   // The trip ends a few seconds after it opens, the way the finish button ends it (the emulator test of finishing a trip).
+   "tripend"->{trip();handler.postDelayed({try{service(GpsService.FINISH)}catch(_:Exception){}},4000)}
+   "simpletripend"->{simpleTrip();handler.postDelayed({try{service(GpsService.FINISH)}catch(_:Exception){}},4000)}
+   "tripsheet"->{trip();stage?.postDelayed({sheet(true)},300)};"tripfinish"->{trip();askFinish()};"receipt"->{home();t?.let{askReceipt(it)}};"ownermenu"->{home();ownerMenu()};"owner"->ownerDashboard();"fleetfull"->{ownerDashboard();fullFleet()};"performance"->performance()
    else->home()}
   // The screens of a trip change every second and the emulator's reader of screens never finds them still: the script
   // knows the screen is up from this line of the log.
@@ -1484,7 +1489,7 @@ class MainActivity:AppCompatActivity(){
  /** A trip in progress for an hour and a half, going at 78 km/h, with the route so far for the map. */
  private fun sampleTrip(){
   val now=Instant.now();val t=store.start(Api.sample!!.getJSONObject("user"),name,"Ford Cargo 1722 · ATP 2231",false,JSONObject().put("destino","Puerto de Montevideo").put("cliente","Cooperativa del Este").put("tipoCarga","Arroz").put("kg","28500"))
-  store.update(false){it.put("started_at",now.minusSeconds(83*60L).toString()).put("distance_meters",86400.0).put("speed_kmh",78.0).put("last_point",JSONObject().put("recorded_at",now.toString()).put("latitude",-33.62).put("longitude",-55.31))}
+  store.update(false){it.put("started_at",now.minusSeconds(83*60L).toString()).put("distance_meters",86400.0).put("speed_kmh",78.0).put("last_point",JSONObject().put("event_id",UUID.randomUUID().toString()).put("trip_id",it.getString("id")).put("driver_id",it.getString("driver_id")).put("vehicle",it.getString("vehicle")).put("recorded_at",now.toString()).put("latitude",-33.62).put("longitude",-55.31).put("accuracy_m",8.0).put("speed_kmh",78.0).put("heading",JSONObject.NULL).put("segment",0))}
   for(i in 0..20)store.appendTrack(t.getString("id"),-33.233-i*0.019,-54.383-i*0.044,0,now.toEpochMilli()-(20-i)*240_000L)
   // Three unloadings: one done, one in progress and one to come (the screens with stops).
   val u=Api.sample!!.getJSONObject("user").getString("id")
@@ -1860,6 +1865,13 @@ class MainActivity:AppCompatActivity(){
   section("Camiones y papeles")
   val pp=card();row(pp,R.drawable.ic_wrench,"Mantenimiento","Services hechos y pendientes"){maintenance(true)};row(pp,R.drawable.ic_doc,"Documentos","Licencia, carné de salud, SOA y más"){documents(true)}
   button(root,"Renovar acceso",Kind.LINE,R.drawable.ic_lock,top=24){login()}
+  // The last error that closed the app, to send it as it is (CrashLog).
+  CrashLog.last(this)?.let{text->
+   section("Último error de la app");val ec=card(pad=16)
+   note(text.lineSequence().take(3).joinToString("\n").take(300),ec,0)
+   button(ec,"Enviar el error",Kind.LINE,R.drawable.ic_receipt,top=12){startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_SUBJECT,"Error de Transportes Ferreira GPS");putExtra(Intent.EXTRA_TEXT,text)},"Enviar el error"))}
+   link(ec,"Borrar este error",top=8){CrashLog.clear(this);settings()}
+  }
   button(root,"Cerrar sesión",Kind.LINE_DANGER,R.drawable.ic_logout){logout()}
   note("Transportes Ferreira GPS · versión $appVersion",top=18).gravity=Gravity.CENTER
   navBar("more")

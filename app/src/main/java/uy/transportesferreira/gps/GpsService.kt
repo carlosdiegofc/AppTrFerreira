@@ -29,7 +29,7 @@ class GpsService:Service(){
  private val sendingLive=AtomicBoolean(false);private val liveExecutor=Executors.newSingleThreadExecutor();private var tripSentAt=0L
  private val timer=object:Runnable{override fun run(){sync();watchdog();handler.postDelayed(this,10000)}}
  override fun onBind(i:Intent?):IBinder?=null
- override fun onCreate(){super.onCreate();store=TripStore(this);fused=LocationServices.getFusedLocationProviderClient(this);(getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(NotificationChannel("gps","Viaje en curso",NotificationManager.IMPORTANCE_LOW));(getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(NotificationChannel("gps-alert","Avisos del GPS",NotificationManager.IMPORTANCE_HIGH))}
+ override fun onCreate(){super.onCreate();CrashLog.install(this);store=TripStore(this);fused=LocationServices.getFusedLocationProviderClient(this);(getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(NotificationChannel("gps","Viaje en curso",NotificationManager.IMPORTANCE_LOW));(getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(NotificationChannel("gps-alert","Avisos del GPS",NotificationManager.IMPORTANCE_HIGH))}
  override fun onStartCommand(i:Intent?,flags:Int,id:Int):Int{
   val t=store.current();if(t==null||!t.optBoolean("active")){stopSelf();return START_NOT_STICKY}
   // Android 12+ can refuse a foreground start from the background after the system killed the service.
@@ -140,7 +140,9 @@ class GpsService:Service(){
   */
  private fun keepLast(){
   val p=store.current()?.optJSONObject("last_point")?:return
-  if(!route.jittery)store.addPoint(p)
+  // A reading without its id cannot go to the route without repeating itself; the end of the trip goes on anyway.
+  if(p.optString("event_id").isBlank())return
+  if(!route.jittery)try{store.addPoint(p)}catch(_:Exception){}
  }
  private fun sync(){if(syncing.compareAndSet(false,true))executor.execute{try{Sync.flush(this)}finally{syncing.set(false)}}}
  /** The latest reading to the live map; a reading that arrives while one is on its way goes with the next one. */
