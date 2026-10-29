@@ -16,13 +16,19 @@ object CrashLog{
   if(installed)return;installed=true
   val app=c.applicationContext;val previous=Thread.getDefaultUncaughtExceptionHandler()
   Thread.setDefaultUncaughtExceptionHandler{thread,e->
-   try{
-    val trace=StringWriter().also{e.printStackTrace(PrintWriter(it))}.toString()
-    val version=try{app.packageManager.getPackageInfo(app.packageName,0).versionName}catch(_:Exception){"?"}
-    File(app.filesDir,FILE).writeText("Versión $version · ${Instant.now()} · hilo ${thread.name}\n\n${trace.take(20_000)}")
-   }catch(_:Throwable){}
+   keep(app,e,thread.name)
    previous?.uncaughtException(thread,e)
   }
+ }
+ /** Keeps an error, also one the app got over without closing (then it says so). */
+ fun keep(c:Context,e:Throwable,thread:String?=null){
+  try{
+   val app=c.applicationContext
+   val trace=StringWriter().also{e.printStackTrace(PrintWriter(it))}.toString()
+   val version=try{app.packageManager.getPackageInfo(app.packageName,0).versionName}catch(_:Exception){"?"}
+   val how=if(thread!=null)"hilo $thread" else "la app siguió abierta"
+   File(app.filesDir,FILE).writeText("Versión $version · ${Instant.now()} · $how\n\n${trace.take(20_000)}")
+  }catch(_:Throwable){}
  }
  fun last(c:Context):String?=File(c.filesDir,FILE).takeIf{it.exists()}?.readText()
  fun clear(c:Context){File(c.filesDir,FILE).delete()}

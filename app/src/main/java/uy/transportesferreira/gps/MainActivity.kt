@@ -1013,7 +1013,9 @@ class MainActivity:AppCompatActivity(){
  private fun stopsRefresh(){
   if(screen!="trip"&&screen!="simpletrip")return
   val sig=stopsSignature();if(sig==stopSig)return;stopSig=sig
-  renderStopBar();fillStops()
+  // The stops are drawn every second with the trip open, and the trip opens again with the app: an error here must not
+  // close the app each time it opens. It stays in Mi cuenta («Último error de la app») to send it.
+  try{renderStopBar();fillStops()}catch(e:Exception){CrashLog.keep(this,e)}
  }
  /** The one button that matters now: «Llegué a …» for the next stop, or «Terminé de descargar» while unloading. */
  private fun renderStopBar(){
@@ -1033,7 +1035,7 @@ class MainActivity:AppCompatActivity(){
   when{
    unloading!=null->make("Terminé de descargar","${Stops.title(unloading)} · ${Stops.minutes(unloading,System.currentTimeMillis())?:0} min",0xFFB7740B.toInt(),R.drawable.ic_check_circle){finishUnloading(unloading)}
    next!=null->make("Llegué a ${Stops.short(next)}",if(stops.size>1)"Parada ${stops.indexOf(next)+1} de ${stops.size}" else null,brand,R.drawable.ic_pin){arriveAt(next)}
-   else->box.addView(note("Descargaste en todas las paradas. Podés sumar otra o finalizar el viaje.",box,0).apply{gravity=Gravity.CENTER})
+   else->note("Descargaste en todas las paradas. Podés sumar otra o finalizar el viaje.",box,0).apply{gravity=Gravity.CENTER}
   }
  }
  private fun arriveAt(stop:JSONObject){
@@ -1407,7 +1409,7 @@ class MainActivity:AppCompatActivity(){
   name=driverName();if(first)sampleData()
   val see=intent.getStringExtra("trf_sample_screen")?:"home"
   setMode(if(see.startsWith("simple"))UiMode.SIMPLE else UiMode.NORMAL)
-  if(see in setOf("trip","tripsheet","tripfinish","tripend","simpletrip","simplefinish","simpletripend")&&!active())sampleTrip()
+  if(see in setOf("trip","tripsheet","tripfinish","tripend","simpletrip","simplefinish","simpletripend","tripstops","simpletripstops")&&!active())sampleTrip()
   val t=mobile.history("trips").optJSONObject(0)
   when(see){
    "mode"->askMode();"newtrip"->newTrip();"pick"->{newTrip();pickTruck{newTrip()}};"prepare"->{tripForm=JSONObject().put("destino","Puerto de Montevideo").put("cliente","Cooperativa del Este").put("tipoCarga","Arroz").put("kg","28500");prepare()}
@@ -1418,6 +1420,9 @@ class MainActivity:AppCompatActivity(){
    // The trip ends a few seconds after it opens, the way the finish button ends it (the emulator test of finishing a trip).
    "tripend"->{trip();handler.postDelayed({try{service(GpsService.FINISH)}catch(_:Exception){}},4000)}
    "simpletripend"->{simpleTrip();handler.postDelayed({try{service(GpsService.FINISH)}catch(_:Exception){}},4000)}
+   // The unloadings go on with the same steps as the buttons until every stop is done (a driver on 29/10/2026: the app
+   // closed on «Terminé de descargar» of the last stop and did not open again).
+   "tripstops","simpletripstops"->{if(see=="tripstops")trip() else simpleTrip();sampleUnloadAll(3)}
    "tripsheet"->{trip();stage?.postDelayed({sheet(true)},300)};"tripfinish"->{trip();askFinish()};"receipt"->{home();t?.let{askReceipt(it)}};"ownermenu"->{home();ownerMenu()};"owner"->ownerDashboard();"fleetfull"->{ownerDashboard();fullFleet()};"performance"->performance()
    else->home()}
   // The screens of a trip change every second and the emulator's reader of screens never finds them still: the script
@@ -1485,6 +1490,13 @@ class MainActivity:AppCompatActivity(){
   val total=(0 until 10).map{k->month.sumOf{it[k].toDouble()}}
   fun summary(names:List<String>)=JSONObject().put("rows",JSONArray(names.indices.map{row(names[it],month[it])})).put("total",row("Toda la flota",total.mapIndexed{k,v->if(k==0||k==7)v.toInt() else v}))
   store.cache("performance-$u-${YearMonth.now()}",JSONObject().put("trucks",summary(listOf(label(0),label(2),label(3)))).put("drivers",summary(listOf("Martín Pereira","Diego Rodríguez","Sofía Martínez"))).put("fetched_at",now.toEpochMilli()))
+ }
+ /** Ends the unloading in progress, or arrives at the next stop, every 2 seconds, until no stop is left (TEST ONLY). */
+ private fun sampleUnloadAll(steps:Int){
+  if(steps<=0)return
+  handler.postDelayed({val stops=stopsOf();val u=Stops.unloading(stops);val n=Stops.next(stops)
+   when{u!=null->finishUnloading(u);n!=null->arriveAt(n)}
+   if(u!=null||n!=null)sampleUnloadAll(steps-1)},2000)
  }
  /** A trip in progress for an hour and a half, going at 78 km/h, with the route so far for the map. */
  private fun sampleTrip(){
