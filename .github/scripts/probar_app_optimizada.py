@@ -89,19 +89,41 @@ def fail(why: str) -> None:
     raise SystemExit(f'La prueba falló: {why}.')
 
 
+def system_wait(root: ET.Element) -> bool:
+    """A slow emulator shows «isn't responding» for its own parts (System UI, the launcher): «Wait» closes it."""
+    if not any('responding' in (n.get('text') or '') for n in root.iter('node') if n.get('package') != PKG):
+        return False
+    for n in root.iter('node'):
+        if n.get('package') != PKG and (n.get('text') or '').lower() == 'wait':
+            tap(n)
+            return True
+    return False
+
+
+def on_screen(root: ET.Element | None) -> str:
+    """What was on the screen when something did not show up: the window in front and its texts."""
+    window = adb('shell', 'dumpsys', 'window', 'windows', check=False, timeout=30).stdout
+    focus = [l.strip() for l in window.splitlines() if 'mCurrentFocus' in l or 'mFocusedApp' in l]
+    texts = [f"{n.get('package')}: {n.get('text')}" for n in root.iter('node') if n.get('text')] if root is not None else ['(no se pudo leer la pantalla)']
+    return '\n'.join(focus + texts[:30])
+
+
 def wait(what: str, found, seconds: int = 30):
     """Waits until found(screen) gives something and returns it; fails if the app closes or it does not show up."""
     end = time.time() + seconds
+    root = None
     while time.time() < end:
         alive = running()
         root = screen()
         hit = found(root) if root is not None else None
         if hit:
             return hit
+        if root is not None and system_wait(root):
+            continue
         if not alive:
-            fail(f'la app se cerró mientras se esperaba {what}')
+            fail(f'la app se cerró mientras se esperaba {what}\n{on_screen(root)}')
         time.sleep(1)
-    fail(f'no apareció {what}')
+    fail(f'no apareció {what}\n{on_screen(root)}')
 
 
 def tap(node: ET.Element) -> None:
@@ -144,8 +166,16 @@ try:
     adb('logcat', '-b', 'all', '-c', check=False)
 
     step('Abrir la app: tiene que aparecer el ingreso')
+    # A slow emulator is still starting its own parts after it says it booted (a key press took 8 seconds instead of
+    # 0.1 in the runs that failed on 29/10/2026): it waits for the home screen first.
+    settle = time.time() + 120
+    while time.time() < settle:
+        root = screen()
+        if root is not None and not system_wait(root) and any('launcher' in n.get('package', '') for n in root.iter('node')):
+            break
+        time.sleep(2)
     adb('shell', 'am', 'start', '-W', '-n', MAIN, timeout=120)
-    wait('la pantalla de ingreso', sign_in_screen, seconds=60)
+    wait('la pantalla de ingreso', sign_in_screen, seconds=120)
     shot('1-ingreso')
 
     step('Política de privacidad: sale de los archivos de la app')
