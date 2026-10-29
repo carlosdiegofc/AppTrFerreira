@@ -186,6 +186,14 @@ El chofer saca la foto de la boleta y la app llena litros, importe, precio, esta
 5. [x] Unión del PR #34 el 29/10/2026 y .aab de la 0.26.0.
 6. [ ] El dueño carga `ANTHROPIC_API_KEY` como secreto en Supabase; después se despliega `leer-boleta` y se prueba con una boleta de verdad desde un teléfono. Sin la función, la app lee solo con el teléfono.
 
+### Viajes con varias descargas (aprobado el 29/10/2026)
+Un viaje puede llevar carga para distintos clientes: en cada lugar el chofer marca que llegó y que terminó de descargar, y el viaje sigue con el próximo cliente. Va en la migración 0014, la app 0.27.0 y el panel. Un viaje sin paradas sigue siendo uno solo.
+1. [ ] La base (migración 0014, solo agrega): una tabla `trf_trip_stops` con las paradas de cada viaje (cliente, lugar, orden, llegada con su ubicación, fin de la descarga y cómo terminó, kilos) y una columna opcional `stop_id` en los remitos. Cada chofer carga y maneja las suyas; las cuentas del panel y la administración las ven todas. Una parada ya visitada no se borra. Pruebas en `panel/tests/e2e/db/paradas.sql`.
+2. [ ] La app: las paradas se cargan antes de salir o sobre la marcha. En el viaje, «Llegué a [cliente]» anota la hora y el lugar y pasa a «Descargando»; la descarga termina cuando el chofer toca «Terminé de descargar» o cuando el camión pasa de 15 km/h durante 30 segundos; entonces sigue la parada siguiente en el mismo viaje. El modo sencillo lleva los mismos botones, grandes. Un remito se puede atar a su parada.
+3. [ ] El panel: el viaje muestra sus paradas con la hora de llegada, el fin y cuánto duró cada descarga, las marca en el mapa y reparte los kilómetros por tramo.
+4. [ ] Respaldo completo de la base (entregado al dueño, fuera del repositorio), migración 0014 en producción antes de publicar la app y el panel, y .aab firmado.
+5. [ ] Segunda parte, a pedir: el importe y los kilos por cliente, para que Cobros y la ganancia cuenten por cliente.
+
 Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - El rol anónimo tiene todos los permisos de tabla en 8 tablas de la app y del panel (`trf_driver_*`, `trf_trip_*`, `trf_mobile_catalog`, `trf_panel_trips`), y también los de la secuencia que numera los puntos GPS. Es lo que Supabase da por defecto y la seguridad por filas lo frena, pero hay que quitarlos: solo `trf_rates` necesita lectura anónima.
 - Conviven dos tipos de administrador: `trf_private.admin_emails` (administración completa, por correo) y `trf_panel_admins` (panel: lee toda la flota y también administra mantenimiento y documentos). Los datos que se completan en el panel (`trf_panel_trips`) los lee solo la segunda lista. Los dos pasan a ser roles por empresa.
@@ -194,6 +202,11 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 29/10/2026: Viajes con varias descargas.
+  - Las paradas se cargan antes de salir o sobre la marcha.
+  - La descarga termina cuando el chofer lo marca o cuando el camión pasa de 15 km/h durante 30 segundos; lo que pasó primero queda anotado.
+  - El modo sencillo también lleva paradas, con botones grandes.
+  - El importe por cliente queda para una segunda parte.
 - 29/10/2026: Viajes con y sin carga: filtro en Viajes, sin cambios en la base; un viaje sale cargado o vacío, no las dos cosas.
 - 29/10/2026: Leer la boleta con la foto: primero el teléfono, si falla Claude desde una función de Supabase; el chofer siempre confirma; el campo se marca si litros por precio difiere del importe en más de un 5 %.
 - 29/10/2026: Pantalla del viaje con el mapa grande.
