@@ -10,8 +10,8 @@ android {
         minSdk = 26
         targetSdk = 36
         // Google Play accepts each versionCode only once: every bundle uploaded there needs a higher one, even a rebuild of the same versionName.
-        versionCode = 38
-        versionName = "0.25.1"
+        versionCode = 39
+        versionName = "0.26.0"
         // Google's map (decision of 26/10/2026): its key only exists in the CI secrets and goes into the manifest when the
         // app is built. Without it the app keeps its own map, as before.
         manifestPlaceholders["mapsApiKey"] = System.getenv("GOOGLE_MAPS_ANDROID_KEY")?.trim().orEmpty()
@@ -57,4 +57,6 @@ dependencies {
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("com.google.android.gms:play-services-maps:19.2.0")
     implementation("com.google.android.material:material:1.12.0")
+    // Reads the text of a receipt's photo on the phone itself (decision of 29/10/2026).
+    implementation("com.google.mlkit:text-recognition:16.0.1")
 }

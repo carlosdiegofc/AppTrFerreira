@@ -5,7 +5,14 @@ Panel web nuevo (React + TypeScript), en la dirección principal del panel desde
 # Panel web (anterior)
 La carpeta [`web/`](web/README.md) tiene el panel web anterior, que queda en `/anterior/` de la misma dirección un tiempo: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
 
-# Transportes Ferreira GPS — v0.25.1
+# Transportes Ferreira GPS — v0.26.0
+
+## Nuevo en v0.26.0 (leer la boleta con la foto; versionCode 39)
+- **Combustible:** al sacar o elegir la foto de la boleta, la app lee litros, importe, fecha y estación y llena el formulario (decisión del 29/10/2026). Siempre revisás y confirmás antes de guardar; lo que ya escribiste no se pisa.
+  - Primero la lee el teléfono, sin red y sin que la foto salga. Si no encuentra litros e importe que coincidan con el precio (hasta un 5 % de diferencia), la foto va a una función de la empresa que la lee con Claude (Anthropic). Sin señal, o sin la función habilitada, queda lo que leyó el teléfono.
+  - Si litros por precio no dan el importe, lo avisa.
+- No cambia lo que se guarda: no necesita migración. La función `leer-boleta` de Supabase necesita el secreto `ANTHROPIC_API_KEY`; sin él, la app sigue con la lectura del teléfono. La política de privacidad lo dice.
+- Panel: Viajes tiene el filtro «Carga» (con y sin carga).
 
 ## Nuevo en v0.25.1 (Finalizar siempre a la vista; versionCode 38)
 - En la pantalla del viaje, «Finalizar» queda en el panel de abajo, al lado de «Pausar viaje», sin abrir la hoja. Sigue pidiendo confirmar. El botón de la hoja se mantiene.

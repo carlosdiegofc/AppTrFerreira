@@ -1,6 +1,6 @@
 # Política de privacidad de Transportes Ferreira GPS
 
-Última actualización: 28 de octubre de 2026
+Última actualización: 29 de octubre de 2026
 
 Transportes Ferreira GPS es la aplicación interna de Transportes Ferreira (Uruguay) para sus choferes y su administración. Sirve para registrar los viajes de los camiones de la empresa, las cargas de combustible, los remitos, el mantenimiento de la flota y los vencimientos de documentos. Solo pueden usarla las personas a las que la empresa les entregó una cuenta.
 
@@ -43,6 +43,7 @@ Los datos no se venden ni se usan con fines publicitarios.
 - En un teléfono sin los servicios de Google Play, la aplicación dibuja los mapas con imágenes de OpenStreetMap, OpenTopoMap y Esri, que reciben la zona del mapa que se muestra y la dirección de internet del teléfono, pero no tu nombre ni tu cuenta.
 - Para trazar la ruta hasta el destino, la aplicación envía la posición del camión y la del destino al servicio de rutas OSRM, que recibe además la dirección de internet del teléfono, pero no tu nombre ni tu cuenta.
 - Para estimar el camino de un tramo sin señal, la aplicación envía a Google (Routes API) el último punto antes del corte y el primero después. Google recibe además la dirección de internet del teléfono y el identificador de la aplicación, pero no tu nombre, tu cuenta ni los datos del viaje, y lo trata según su [política de privacidad](https://policies.google.com/privacy).
+- Para completar los datos de una boleta de combustible, la aplicación primero lee la foto en el propio teléfono, sin enviarla a ningún lado. Solo si el teléfono no logra leerla, la foto de esa boleta se envía a Supabase (a una función de la empresa) y de ahí a Anthropic, el proveedor de la inteligencia artificial Claude, que la lee y devuelve los litros, el importe, la fecha y la estación. La foto no se guarda en esa lectura y no se envía tu nombre ni los datos del viaje. Siempre confirmás los datos antes de guardar.
 - Si buscás un destino por su nombre, el texto de la búsqueda lo procesa el servicio de direcciones del propio teléfono (Google).
 
 La empresa no comparte los datos con otras empresas, salvo que una ley o una autoridad competente lo exija.

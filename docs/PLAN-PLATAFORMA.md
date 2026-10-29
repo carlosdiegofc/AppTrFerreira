@@ -179,10 +179,10 @@ Solo el panel: la app ya guarda si un viaje va con carga o es un retorno vacío 
 
 ### Leer la boleta con la foto (aprobado el 29/10/2026)
 El chofer saca la foto de la boleta y la app llena litros, importe, precio, estación y fecha; el chofer siempre confirma antes de guardar. Va en la app 0.26.0 y una función de Supabase. Lo que se guarda no cambia, así que no hay migración de la base:
-1. [ ] Primero en el teléfono, con el reconocimiento de texto de Google (ML Kit), sin red y sin que la foto salga del teléfono.
-2. [ ] Si no encuentra litros e importe con claridad, la foto va a una función de Supabase que la lee con Claude (la llave `ANTHROPIC_API_KEY` la carga el dueño como secreto de Supabase, nunca en el repositorio ni en la app) y devuelve los datos.
-3. [ ] Los campos aparecen llenos y se corrigen. Si litros por precio difiere del importe en más de un 5 %, el campo se marca para revisar.
-4. [ ] La política de privacidad dice que, solo cuando el teléfono no pudo leerla, la foto de la boleta se manda a Anthropic para leerla.
+1. [x] Primero en el teléfono, con el reconocimiento de texto de Google (ML Kit), sin red y sin que la foto salga del teléfono (`ReceiptText.kt` con sus pruebas, `ReceiptReader.kt`).
+2. [x] Si no encuentra litros e importe que coincidan con el precio, la foto va a una función de Supabase (`supabase/functions/leer-boleta`) que la lee con Claude (la llave `ANTHROPIC_API_KEY` la carga el dueño como secreto de Supabase, nunca en el repositorio ni en la app) y devuelve los datos.
+3. [x] Los campos aparecen llenos y se corrigen, sin pisar lo que el chofer ya escribió. Si litros por precio difiere del importe en más de un 5 %, la lectura del teléfono no se da por buena (pasa a la IA) y, si aun así no coincide, la app avisa que revise esos números.
+4. [x] La política de privacidad dice que, solo cuando el teléfono no pudo leerla, la foto de la boleta se manda a Anthropic para leerla.
 5. [ ] Capturas para aprobar, unión, función desplegada con la llave cargada, y .aab de la 0.26.0.
 
 Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
