@@ -40,11 +40,16 @@ SCREENS = [
     ('sencillo-iniciar', 'driver', 'simpleask', '¿Iniciar el viaje?'),
     ('menu-del-dueno', 'owner', 'ownermenu', 'Toda la flota, desde tu cuenta'),
     ('flota-en-vivo', 'owner', 'owner', 'Flota en vivo'),
+    ('flota-pantalla-completa', 'owner', 'fleetfull', 'Cerrar mapa'),
     ('rendimiento', 'owner', 'performance', 'Rendimiento'),
     ('viaje-activo', 'driver', 'trip', None),
+    ('viaje-hoja', 'driver', 'tripsheet', None),
     ('finalizar-viaje', 'driver', 'tripfinish', None),
     ('sencillo-viaje', 'driver', 'simpletrip', None),
     ('sencillo-finalizar', 'driver', 'simplefinish', None),
+    # Luis on a trip sees the fleet on the trip's map (decision of 29/10/2026).
+    ('dueno-de-viaje', 'owner', 'trip', None),
+    ('dueno-de-viaje-sencillo', 'owner', 'simpletrip', None),
 ]
 
 apk, out = Path(sys.argv[1]), Path(sys.argv[2])

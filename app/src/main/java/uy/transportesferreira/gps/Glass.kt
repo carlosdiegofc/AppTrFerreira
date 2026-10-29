@@ -1,6 +1,10 @@
 package uy.transportesferreira.gps
+import android.animation.ValueAnimator
+import android.content.Context
 import android.graphics.*
 import android.graphics.drawable.Drawable
+import android.view.View
+import android.view.animation.DecelerateInterpolator
 
 /**
  * The room behind the glass (decision of 28/10/2026), the panel's: a photo already out of focus that fills the screen
@@ -39,4 +43,28 @@ class Slider(private val fill:Int,private val slots:Int,private val inset:Float,
  override fun setAlpha(a:Int){paint.alpha=a;invalidateSelf()}
  override fun setColorFilter(f:ColorFilter?){paint.colorFilter=f;invalidateSelf()}
  @Deprecated("Deprecated in Java") override fun getOpacity()=PixelFormat.TRANSLUCENT
+}
+
+/**
+ * The speed of the trip on an arc (decision of 29/10/2026): it fills up to 120 km/h, in blue, and turns red past the
+ * limit for trucks. No speed (NaN) leaves it empty. It moves to each new speed unless the phone has animations off.
+ */
+class Gauge(c:Context,private val track:Int,private val fill:Int,private val over:Int,private val limit:Double,private val moves:Boolean):View(c){
+ private val paint=Paint(Paint.ANTI_ALIAS_FLAG).apply{style=Paint.Style.STROKE;strokeCap=Paint.Cap.ROUND}
+ private val box=RectF();private var shown=0f;private var kmh=Double.NaN;private var anim:ValueAnimator?=null
+ fun set(speed:Double){
+  kmh=speed;val to=if(speed.isNaN())0f else (speed/MAX).toFloat().coerceIn(0f,1f)
+  anim?.cancel()
+  if(!moves||kotlin.math.abs(to-shown)<.004f){shown=to;invalidate();return}
+  anim=ValueAnimator.ofFloat(shown,to).apply{duration=500;interpolator=DecelerateInterpolator();addUpdateListener{shown=it.animatedValue as Float;invalidate()}}.also{it.start()}
+ }
+ override fun onDraw(c:Canvas){
+  val stroke=minOf(width,height)*.075f;paint.strokeWidth=stroke
+  val size=minOf(width,height)-stroke;val left=(width-size)/2f;val top=(height-size)/2f
+  box.set(left,top,left+size,top+size)
+  paint.color=track;c.drawArc(box,START,SWEEP,false,paint)
+  if(shown>0f){paint.color=if(!kmh.isNaN()&&kmh>limit)over else fill;c.drawArc(box,START,SWEEP*shown,false,paint)}
+ }
+ override fun onDetachedFromWindow(){anim?.cancel();super.onDetachedFromWindow()}
+ private companion object{const val MAX=120.0;const val START=150f;const val SWEEP=240f}
 }
