@@ -191,8 +191,18 @@ export function mergeTrips({ sessions, panelRows, details }: { sessions: readonl
 
 export type StatusFilter = 'all' | 'pending' | 'running' | 'complete';
 
+/** What the trip carried, by the app's own record; a trip typed in the panel does not say (null). */
+export function loadOf(t: Pick<Trip, 'source' | 'loadType'>): 'loaded' | 'empty' | null {
+  if (t.source === 'manual') return null;
+  return t.loadType === 'empty' ? 'empty' : 'loaded';
+}
+
+export type LoadFilter = 'all' | 'loaded' | 'empty';
+
 export interface TripFilter {
   q?: string;
+  /** With or without cargo, as the app recorded it. */
+  load?: LoadFilter;
   status?: StatusFilter;
   vehicle?: string;
   driver?: string;
@@ -202,11 +212,12 @@ export interface TripFilter {
   bin?: boolean;
 }
 
-export function filterTrips(list: readonly Trip[], { q = '', status = 'all', vehicle = '', driver = '', card = null, bin = false }: TripFilter = {}): Trip[] {
+export function filterTrips(list: readonly Trip[], { q = '', status = 'all', load = 'all', vehicle = '', driver = '', card = null, bin = false }: TripFilter = {}): Trip[] {
   const needle = fold(q);
   return list.filter((t) => {
     if (bin !== t.deleted) return false;
     if (!bin && status !== 'all' && t.status.code !== status) return false;
+    if (load !== 'all' && loadOf(t) !== load) return false;
     if (vehicle && (t.vehicle ?? '') !== vehicle) return false;
     if (driver && (t.driverName ?? '') !== driver) return false;
     if (card && !belongsTo(card, t, card.claimed)) return false;

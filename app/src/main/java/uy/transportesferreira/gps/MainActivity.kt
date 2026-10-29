@@ -1035,11 +1035,12 @@ class MainActivity:AppCompatActivity(){
  }
 
  // ---------- Fuel receipt ----------
- private fun openFuel(t:JSONObject?){photoJob++;photoBusy=false;fuelTrip=t;fuelForm=JSONObject().put("receipt_date",LocalDate.now().toString());photo=null;photoMode="fuel";fuel()}
+ private fun openFuel(t:JSONObject?){photoJob++;photoBusy=false;receiptNote="";receiptReading=false;fuelTrip=t;fuelForm=JSONObject().put("receipt_date",LocalDate.now().toString());photo=null;photoMode="fuel";fuel()}
  private fun fuel(){
   page("fuel");photoMode="fuel";bar("Cargar combustible",back={homeOrTrip()})
   root.addView(pill(fuelTrip?.let{"En este viaje · ${truckParts(it.optString("vehicle")).first}"}?:"Sin viaje",blue,blueSoft).apply{(layoutParams as LinearLayout.LayoutParams).topMargin=dp(14)})
   val pc=card(pad=16);text(pc,"Foto de la boleta",16.5f,ink,1);note("Sacá una foto o elegí una guardada. También podés guardar sin foto.",pc,4);photoControls(pc)
+  if(receiptReading)note("Leyendo la boleta…",pc,10) else if(receiptNote.isNotBlank())note(receiptNote,pc,10)
   val c=card(pad=16)
   if(fuelTrip==null)truckSelector(c,"Camión · opcional")
   caption(c,"Fecha");val day=fuelForm.optString("receipt_date",LocalDate.now().toString())
@@ -1105,7 +1106,7 @@ class MainActivity:AppCompatActivity(){
  private fun photoButton(icon:Int,label:String,action:()->Unit)=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=ripple(outline(btnFill,fieldLine,18));isClickable=true;isFocusable=true;contentDescription=label;setOnClickListener{action()};sink(this,.96f)
   addView(iconView(icon,blue,24));addView(tv(label,13.5f,ink,1).apply{gravity=Gravity.CENTER;setPadding(0,dp(5),0,0)})}
  private fun takePhoto(){try{camera=File(File(filesDir,"camera").apply{mkdirs()},"${UUID.randomUUID()}.jpg");take.launch(FileProvider.getUriForFile(this,"$packageName.files",camera!!))}catch(_:Exception){toast("No hay cámara disponible. Elegí una imagen de la galería.")}}
- private fun removePhoto(){photoJob++;photoBusy=false;photo?.delete();photo=null;if(screen=="document")document() else fuel()}
+ private fun removePhoto(){photoJob++;photoBusy=false;receiptNote="";receiptReading=false;photo?.delete();photo=null;if(screen=="document")document() else fuel()}
  private fun cargoNames(client:String):List<String>{
   val entries=mobile.catalog().optJSONArray("clientesDetalle")?:JSONArray()
   for(i in 0 until entries.length()){val e=entries.getJSONObject(i);if(e.optString("nombre").equals(client,true)){val a=e.optJSONArray("cargas")?:JSONArray();if(a.length()>0)return (0 until a.length()).map{a.optString(it)}}}
@@ -2315,9 +2316,35 @@ class MainActivity:AppCompatActivity(){
  private fun showPhoto(r:JSONObject,bucket:String){
   toast("Abriendo foto…");thread{try{val local=r.optString("local_path").takeIf{it.isNotBlank()}?.let{File(it)};val bytes=if(local?.exists()==true)local.readBytes() else mobile.photo(r.getString("object_path"),bucket);val bitmap=BitmapFactory.decodeByteArray(bytes,0,bytes.size)?:error("Imagen no disponible");runOnUiThread{val image=ImageView(this).apply{setImageBitmap(bitmap);adjustViewBounds=true;contentDescription="Comprobante adjunto"};AlertDialog.Builder(this).setView(image).setPositiveButton("Cerrar",null).show()}}catch(_:Exception){runOnUiThread{toast("No se pudo abrir la foto. Revisá la conexión.")}}}
  }
+ private var receiptReading=false;private var receiptNote=""
+ /**
+  * Reads the receipt of the photo (decision of 29/10/2026): first with the phone, then with the AI. It only fills what the
+  * driver has not typed, says where the numbers come from, and the driver confirms before saving.
+  */
+ private fun readReceipt(file:File){
+  val job=photoJob;receiptReading=true;receiptNote=""
+  val stations=mobile.catalog().optJSONArray("estaciones")?:JSONArray();val names=(0 until stations.length()).map{stations.getJSONObject(it).optString("nombre")}
+  ReceiptReader.read(this,api,file,names,LocalDate.now()){res->runOnUiThread{
+   if(job!=photoJob)return@runOnUiThread
+   receiptReading=false
+   if(res==null)receiptNote="No se pudo leer la boleta. Completá los datos a mano."
+   else{
+    val r=res.reading
+    fun put(key:String,v:Double?){if(v!=null&&fuelForm.optString(key).isBlank())fuelForm.put(key,numberText(v))}
+    put("liters",r.liters);put("total",r.total)
+    r.date?.let{fuelForm.put("receipt_date",it.toString())}
+    res.station?.takeIf{fuelForm.optString("station_name").isBlank()}?.let{fuelForm.put("station_name",it)}
+    val agree=ReceiptText.consistent(r.liters,r.price,r.total)
+    receiptNote="Leí la boleta con ${res.source.label}"+(if(r.complete)"." else ", pero no todo.")+" Revisá los datos antes de guardar."+
+     (r.price?.let{" Precio por litro leído: \$${numberText(it)}."}?:"")+(if(agree==false)" Los litros, el precio y el importe no coinciden: fijate bien esos números." else "")
+   }
+   if(screen=="fuel")fuel()}}
+  if(screen=="fuel")fuel()
+ }
+ private fun numberText(v:Double)=if(v==Math.rint(v))v.toLong().toString() else String.format(Locale.US,"%.2f",v).trimEnd('0').trimEnd('.')
  private fun preparePhoto(uri:Uri){val job=++photoJob;val target=photoMode;photoBusy=true;toast("Preparando foto…");thread{try{
   val original=File(cacheDir,"receipt-original-${UUID.randomUUID()}");contentResolver.openInputStream(uri)?.use{input->original.outputStream().use{out->val buf=ByteArray(8192);var total=0L;while(true){val n=input.read(buf);if(n<0)break;total+=n;check(total<=40*1024*1024);out.write(buf,0,n)}}}?:error("Sin imagen")
-  val bounds=BitmapFactory.Options().apply{inJustDecodeBounds=true};BitmapFactory.decodeFile(original.path,bounds);var sample=1;while(max(bounds.outWidth,bounds.outHeight)/sample>2400)sample*=2;val bitmap=BitmapFactory.decodeFile(original.path,BitmapFactory.Options().apply{inSampleSize=sample})?:error("Formato no compatible");val exif=ExifInterface(original);val matrix=Matrix();matrix.postRotate(exif.rotationDegrees.toFloat());if(exif.isFlipped)matrix.postScale(-1f,1f);val rotated=Bitmap.createBitmap(bitmap,0,0,bitmap.width,bitmap.height,matrix,true);val out=File(File(filesDir,"draft-photos").apply{mkdirs()},"receipt-${UUID.randomUUID()}.jpg");out.outputStream().use{rotated.compress(Bitmap.CompressFormat.JPEG,88,it)};if(rotated!==bitmap)rotated.recycle();bitmap.recycle();original.delete();check(out.length()<=10*1024*1024);runOnUiThread{if(job==photoJob){photoBusy=false;photo=out;if(screen==target){if(target=="document")document() else fuel()}}else out.delete()}
+  val bounds=BitmapFactory.Options().apply{inJustDecodeBounds=true};BitmapFactory.decodeFile(original.path,bounds);var sample=1;while(max(bounds.outWidth,bounds.outHeight)/sample>2400)sample*=2;val bitmap=BitmapFactory.decodeFile(original.path,BitmapFactory.Options().apply{inSampleSize=sample})?:error("Formato no compatible");val exif=ExifInterface(original);val matrix=Matrix();matrix.postRotate(exif.rotationDegrees.toFloat());if(exif.isFlipped)matrix.postScale(-1f,1f);val rotated=Bitmap.createBitmap(bitmap,0,0,bitmap.width,bitmap.height,matrix,true);val out=File(File(filesDir,"draft-photos").apply{mkdirs()},"receipt-${UUID.randomUUID()}.jpg");out.outputStream().use{rotated.compress(Bitmap.CompressFormat.JPEG,88,it)};if(rotated!==bitmap)rotated.recycle();bitmap.recycle();original.delete();check(out.length()<=10*1024*1024);runOnUiThread{if(job==photoJob){photoBusy=false;photo=out;if(target=="fuel")readReceipt(out);if(screen==target){if(target=="document")document() else fuel()}}else out.delete()}
  }catch(_:Exception){runOnUiThread{if(job==photoJob)photoBusy=false;toast("No se pudo preparar la foto. Probá con otra imagen.")}}}}
  // The sample view has no network: the notices that say so would cover its screenshots.
  private fun toast(s:String){if(Api.sample==null)Toast.makeText(this,s,Toast.LENGTH_LONG).show()}

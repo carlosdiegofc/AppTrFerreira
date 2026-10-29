@@ -233,6 +233,15 @@ La app de Google Play es una app nueva para Android (nombre de paquete `com.tran
 
 Cada versión nueva lleva un número de versión más alto, y GitHub Actions arma su `.aab` solo. En Play Console: *Prueba interna › Crear versión* › subí el `.aab` nuevo › **Lanzar**. Los teléfonos se actualizan desde Google Play sin hacer nada más.
 
+Versión `0.26.0` (código de versión 39). Al cargar combustible, la app lee la foto de la boleta y llena el formulario. Primero lo hace en el teléfono; si no puede, la foto de esa boleta va a la función de la empresa en Supabase y de ahí a Anthropic (Claude), que la lee y devuelve los datos sin guardarla. Eso cambia la **Seguridad de los datos**: en «Fotos y videos › Fotos» la app ya recopilaba la foto de la boleta; ahora, además, se **procesa por un proveedor que actúa por cuenta de la empresa** (Anthropic), que Play no cuenta como «compartido». Si el formulario lo pregunta, marcalo así. La política de privacidad ya lo dice (actualizada el 29/10/2026). Antes de lanzarla, el dueño tiene que haber cargado el secreto `ANTHROPIC_API_KEY` en Supabase y la función `leer-boleta` tiene que estar desplegada; sin eso la app lee solo con el teléfono. Prueba en un teléfono: **Combustible › Sacar foto** de una boleta de verdad; los litros y el importe tienen que aparecer solos, con el aviso de revisarlos. Notas de la versión:
+
+```text
+<es-419>
+• Combustible: al sacar la foto de la boleta, la app completa sola los litros, el importe, la fecha y la estación. Revisá los datos antes de guardar.
+• Pantalla del viaje con el mapa en toda la pantalla, y Finalizar siempre a la vista.
+</es-419>
+```
+
 Versión `0.21.0` (código de versión 33). Los mapas de la app pasan a ser de **Google Maps** (su SDK para Android, sin costo), con calles, satélite y tráfico. No cambian los permisos. Antes de subirla:
 - **La clave:** el secreto `GOOGLE_MAPS_ANDROID_KEY` tiene que estar en GitHub antes de armar el `.aab` ([GOOGLE-MAPS.md](../GOOGLE-MAPS.md)). Sin él, la versión sale con el mapa de siempre.
 - **La política de privacidad** ya dice que los mapas son de Google (actualizada el 26/10/2026). El enlace de la ficha la muestra actualizada, y la app la lleva adentro desde esta versión.

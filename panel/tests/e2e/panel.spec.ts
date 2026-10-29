@@ -184,6 +184,22 @@ test('modo oscuro', async ({ page }) => {
 // Last 30 days from the fixed day (15/10/2026): the five trips of the app of today and yesterday, the one deleted in the
 // old panel and the one typed by hand three days ago.
 
+test('Viajes separa los viajes con carga de los retornos vacíos de la app', async ({ page }) => {
+  await signIn(page, 'dueno@ejemplo.uy');
+  await open(page, 'Viajes');
+  const carga = page.locator('label.field', { has: page.locator('span', { hasText: /^Carga$/ }) }).locator('select');
+  // Two returns without cargo in the seed (Carla's, in progress, and Ana's of yesterday); the one typed by hand is in neither.
+  await carga.selectOption({ label: 'Sin carga (retorno vacío)' });
+  await expect(rows(page)).toHaveCount(2);
+  await expect(rows(page).first()).toContainText('sin carga');
+  await expect(page).toHaveURL(/carga=sin/);
+  await carga.selectOption({ label: 'Con carga' });
+  await expect(rows(page)).toHaveCount(3);
+  await expect(page.locator('.trip-rows')).not.toContainText('sin carga');
+  await carga.selectOption({ label: 'Con y sin carga' });
+  await expect(rows(page)).toHaveCount(6);
+});
+
 test('Viajes lista los viajes del período por estado y los filtra', async ({ page }) => {
   await signIn(page, 'dueno@ejemplo.uy');
   await open(page, 'Viajes');

@@ -191,3 +191,14 @@ Decisión del 29/10/2026. La app solo lee, y lo mismo que ya leía: no hay tabla
 - El dueño que maneja (la cuenta de Flota en vivo), con un viaje en curso, lee para el mapa de su viaje lo mismo que Flota en vivo y cada cuánto: quién está de viaje (`trf_driver_tracking_sessions` con `active`) y la presencia (`trf_driver_presence`) cada minuto, y las posiciones (`trf_driver_locations`) cada 5 segundos. Su propio viaje no se dibuja dos veces. Los choferes no leen nada de esto.
 - Tocando un camión de viaje, en el mapa del viaje del dueño o en Flota en vivo, la app lee su recorrido de `trf_driver_location_history` como el detalle de un viaje en curso, con `estimated`, y lo dibuja con la misma regla de tramos (`Gaps.runs`).
 - La velocidad que dice cada camión de viaje que se mueve es la de su última posición (`speed_kmh`), redondeada.
+
+## Viajes con y sin carga: solo el panel (sin migración)
+Decisión del 29/10/2026. El panel solo lee: la app no cambia lo que guarda ni lo que manda.
+
+- «Con carga» y «sin carga» salen de `load_type` de `trf_driver_tracking_sessions` (`empty` es el retorno vacío; cualquier otro valor es con carga). Un viaje cargado a mano en el panel (`trf_panel_trips` con `source = manual`) no dice su carga y no entra en ninguno de los dos filtros, como en Métricas.
+
+## Leer la boleta con la foto: app 0.26.0 y función `leer-boleta` (sin migración)
+Decisión del 29/10/2026. Lo que la app guarda y manda no cambia: los datos leídos solo llenan el formulario de combustible y el chofer los confirma.
+
+- La lectura corre primero en el teléfono (ML Kit, sin red). Si no encuentra litros e importe, o si litros por precio por litro difieren del importe en más de un 5 %, la app manda la foto, reducida a 1800 px, a `POST /functions/v1/leer-boleta` con la sesión del chofer y `{image, media_type}`.
+- La función comprueba que la sesión sea de una cuenta (la llave anónima de la app es pública), limita a 40 lecturas por hora y cuenta, y le pide a Claude (`claude-sonnet-5-5`) los datos con una herramienta de esquema estricto. Devuelve `{liters, total, price, date, station}`, con `null` en lo que no se lee. No guarda la foto ni el resultado. Sin el secreto `ANTHROPIC_API_KEY` contesta 503 y la app se queda con la lectura del teléfono.
