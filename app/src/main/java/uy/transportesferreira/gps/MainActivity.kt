@@ -1406,14 +1406,18 @@ class MainActivity:AppCompatActivity(){
   name=driverName();if(first)sampleData()
   val see=intent.getStringExtra("trf_sample_screen")?:"home"
   setMode(if(see.startsWith("simple"))UiMode.SIMPLE else UiMode.NORMAL)
-  if(see in setOf("trip","tripsheet","tripfinish","simpletrip","simplefinish")&&!active())sampleTrip()
+  if(see in setOf("trip","tripsheet","tripfinish","tripend","simpletrip","simplefinish","simpletripend")&&!active())sampleTrip()
   val t=mobile.history("trips").optJSONObject(0)
   when(see){
    "mode"->askMode();"newtrip"->newTrip();"pick"->{newTrip();pickTruck{newTrip()}};"prepare"->{tripForm=JSONObject().put("destino","Puerto de Montevideo").put("cliente","Cooperativa del Este").put("tipoCarga","Arroz").put("kg","28500");prepare()}
    "fuel"->openFuel(null);"document"->openDocument(t,"tripdetail","arrival");"triphistory"->history("trips");"fuelhistory"->history("fuel");"tripdetail"->t?.let{detail(it)}?:home()
    "documents"->documents();"maintenance"->maintenance();"settings"->settings();"games"->games();"privacy"->privacy()
    "simplehome"->simpleHome();"simpleask"->{startAskAt=SystemClock.elapsedRealtime();simpleHome(true)};"simpletrip"->simpleTrip();"simplefinish"->{simpleTrip();finishAsk=true;simpleDock()}
-   "trip"->trip();"tripsheet"->{trip();stage?.postDelayed({sheet(true)},300)};"tripfinish"->{trip();askFinish()};"receipt"->{home();t?.let{askReceipt(it)}};"ownermenu"->{home();ownerMenu()};"owner"->ownerDashboard();"fleetfull"->{ownerDashboard();fullFleet()};"performance"->performance()
+   "trip"->trip()
+   // The trip ends a few seconds after it opens, the way the finish button ends it (the emulator test of finishing a trip).
+   "tripend"->{trip();handler.postDelayed({try{service(GpsService.FINISH)}catch(_:Exception){}},4000)}
+   "simpletripend"->{simpleTrip();handler.postDelayed({try{service(GpsService.FINISH)}catch(_:Exception){}},4000)}
+   "tripsheet"->{trip();stage?.postDelayed({sheet(true)},300)};"tripfinish"->{trip();askFinish()};"receipt"->{home();t?.let{askReceipt(it)}};"ownermenu"->{home();ownerMenu()};"owner"->ownerDashboard();"fleetfull"->{ownerDashboard();fullFleet()};"performance"->performance()
    else->home()}
   // The screens of a trip change every second and the emulator's reader of screens never finds them still: the script
   // knows the screen is up from this line of the log.
