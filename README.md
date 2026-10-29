@@ -5,7 +5,16 @@ Panel web nuevo (React + TypeScript), en la dirección principal del panel desde
 # Panel web (anterior)
 La carpeta [`web/`](web/README.md) tiene el panel web anterior, que queda en `/anterior/` de la misma dirección un tiempo: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
 
-# Transportes Ferreira GPS — v0.24.0
+# Transportes Ferreira GPS — v0.25.0
+
+## Nuevo en v0.25.0 (el mapa del viaje en toda la pantalla; versionCode 37)
+- **La pantalla del viaje** (decisión del 29/10/2026): el mapa ocupa la pantalla y gira con el camión, que va como una flecha. Arriba, el estado del viaje, el camión y el cartel de 90 km/h; a la derecha, los botones para girar el mapa o dejar el norte arriba, elegir mapa, satélite o tráfico, seguir el camión y ver todo el viaje.
+  - Abajo, los km recorridos, la velocidad en un arco que se pone rojo pasando los 90, el tiempo en viaje y «Pausar viaje».
+  - Lo demás (combustible, remito, finalizar, los datos del viaje, juegos) está en una hoja que sube deslizando hacia arriba o tocando la manija.
+  - El modo sencillo tiene la misma pantalla, con los botones grandes.
+- **El dueño de viaje** ve en su mapa los camiones de viaje y los choferes activos, con la velocidad de los que se mueven. Tocando un camión aparece su recorrido; tocándolo otra vez se va.
+- **Flota en vivo:** el mapa ocupa media pantalla y se puede ver en pantalla completa; los camiones de viaje dicen su velocidad y muestran su recorrido al tocarlos.
+- No cambia lo que la app guarda ni lo que manda: no necesita migración.
 
 ## Nuevo en v0.24.0 (tramos sin señal; versionCode 36)
 - **Cuando el GPS se corta y vuelve** (decisión del 28/10/2026): si pasaron más de 90 segundos sin lecturas y el camión apareció a más de 300 m, el viaje cuenta ese tramo y la línea del mapa sigue.

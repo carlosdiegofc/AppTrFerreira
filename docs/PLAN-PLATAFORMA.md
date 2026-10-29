@@ -161,6 +161,15 @@ Cuando el GPS de un viaje se corta (sin señal, el teléfono sin batería, el si
 6. [x] Publicación: unión del PR #30, panel publicado y .aab firmado el 28/10/2026 en la ejecución 40767761897 de main (artefacto «Google-Play-Transportes-Ferreira-GPS-v0.24.0»).
 7. [ ] El dueño habilita la «Routes API» en Google Cloud y la agrega a las APIs permitidas de la llave de Android, y lo prueba en un viaje: sin la API, los tramos se cuentan en recta más un 20 %.
 
+### Pantalla del viaje con el mapa grande (aprobado el 29/10/2026)
+Al iniciar un viaje, el mapa ocupa toda la pantalla, como un navegador, y el dueño que maneja ve también la flota. Solo cambia la app: lee lo que ya leía Flota en vivo y no manda nada nuevo, así que la base no cambia. Va en la app 0.25.0:
+1. [x] La pantalla del viaje: el mapa ocupa la pantalla y gira con el camión, que es una flecha que apunta adonde va. Arriba, el estado del viaje con el camión y el cartel de 90 km/h; a la derecha, botones redondos para que el mapa gire o quede con el norte arriba, elegir mapa, satélite o tráfico, seguir el camión y ver todo el viaje. Abajo, los km recorridos, la velocidad en un arco que se pone rojo pasando los 90, el tiempo en viaje y «Pausar viaje».
+2. [x] El resto del viaje (combustible, remito, finalizar, destino, carga, camión, hora de salida, batería, juegos) queda en una hoja que sube desde abajo, deslizando o tocando la manija.
+3. [x] El modo sencillo tiene la misma pantalla, con los botones grandes: Combustible, Pausar y FINALIZAR VIAJE.
+4. [x] El dueño que maneja ve en el mapa de su viaje, siempre, los camiones de viaje y los choferes activos, con la velocidad de los que se mueven; tocando un camión aparece su recorrido en violeta, y tocándolo otra vez se va.
+5. [x] Flota en vivo: el mapa ocupa media pantalla, tiene «Ver el mapa en pantalla completa», los camiones de viaje dicen su velocidad y tocando uno aparece su recorrido.
+6. [ ] Capturas para que el dueño las apruebe, y publicación: el .aab de la 0.25.0, que se sube a Google Play cuando lo decidas.
+
 Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - El rol anónimo tiene todos los permisos de tabla en 8 tablas de la app y del panel (`trf_driver_*`, `trf_trip_*`, `trf_mobile_catalog`, `trf_panel_trips`), y también los de la secuencia que numera los puntos GPS. Es lo que Supabase da por defecto y la seguridad por filas lo frena, pero hay que quitarlos: solo `trf_rates` necesita lectura anónima.
 - Conviven dos tipos de administrador: `trf_private.admin_emails` (administración completa, por correo) y `trf_panel_admins` (panel: lee toda la flota y también administra mantenimiento y documentos). Los datos que se completan en el panel (`trf_panel_trips`) los lee solo la segunda lista. Los dos pasan a ser roles por empresa.
@@ -169,6 +178,12 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 29/10/2026: Pantalla del viaje con el mapa grande.
+  - El mapa ocupa la pantalla y gira con el camión; se puede dejar con el norte arriba.
+  - Lo que no es el mapa ni los números del viaje va en una hoja deslizable.
+  - El dueño que maneja ve la flota en el mapa de su viaje siempre, sin tener que prenderla.
+  - El modo sencillo tiene la misma pantalla, con botones grandes.
+  - Flota en vivo con el mapa más grande, pantalla completa y el recorrido de un camión al tocarlo.
 - 28/10/2026: Insignias en los puntos del mapa. Cada punto del GPS en vivo lleva en su círculo lo que es: «$» en los peajes, una balanza en las balanzas, un velocímetro en los radares y una bandera en los puntos propios, también en la lista y en los filtros. Los puntos propios van solo con su nombre, sin «Mi punto ·». Solo el panel: la app no muestra estos puntos.
 - 28/10/2026: Tramos sin señal.
   - El tramo se rellena con el camino por ruta de Google (Routes API), con la misma llave de Android de los mapas. Solo los dos puntos van a Google, sin el chofer ni el viaje; la política de privacidad lo dice.

@@ -184,3 +184,10 @@ Decisión del 28/10/2026. La migración `supabase/migrations/0013_tramos_sin_sen
   - Una pausa deja la línea abierta.
   - Lo estimado va punteado, desde la lectura antes del corte hasta la de después.
   - Un corte de más de 90 segundos sin camino estimado también se une punteado (mientras el camino llega, y en los viajes de antes), salvo uno que la app dejaría sin rellenar.
+
+## Pantalla del viaje con el mapa grande: app 0.25.0 (sin migración)
+Decisión del 29/10/2026. La app solo lee, y lo mismo que ya leía: no hay tablas ni columnas nuevas y lo que manda no cambia.
+
+- El dueño que maneja (la cuenta de Flota en vivo), con un viaje en curso, lee para el mapa de su viaje lo mismo que Flota en vivo y cada cuánto: quién está de viaje (`trf_driver_tracking_sessions` con `active`) y la presencia (`trf_driver_presence`) cada minuto, y las posiciones (`trf_driver_locations`) cada 5 segundos. Su propio viaje no se dibuja dos veces. Los choferes no leen nada de esto.
+- Tocando un camión de viaje, en el mapa del viaje del dueño o en Flota en vivo, la app lee su recorrido de `trf_driver_location_history` como el detalle de un viaje en curso, con `estimated`, y lo dibuja con la misma regla de tramos (`Gaps.runs`).
+- La velocidad que dice cada camión de viaje que se mueve es la de su última posición (`speed_kmh`), redondeada.

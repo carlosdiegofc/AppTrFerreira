@@ -11,10 +11,24 @@ import org.json.JSONArray
 object TripMap {
  /** A map on screen: the view that goes in the page, and what frees it when the page changes. */
  interface Shown{val view:View;fun destroy()}
- /** The map of the trip in progress: new readings are pushed to it as they are recorded. */
- interface Live:Shown{fun push(points:List<DoubleArray>)}
- /** The owner's map of the fleet: new positions every few seconds. */
- interface Fleet:Shown{fun setMarks(marks:JSONArray)}
+ /**
+  * The map of the trip in progress: new readings are pushed to it as they are recorded. It fills the screen (decision of
+  * 29/10/2026): pad says how much of it the bar on top and the panel below cover, so the truck stays in sight. An owner
+  * who drives sees the fleet on it too (setFleet, the marks of the fleet map), and the route of a truck tapped.
+  */
+ interface Live:Shown{
+  fun push(points:List<DoubleArray>)
+  fun pad(top:Int,bottom:Int){}
+  fun setFleet(marks:JSONArray){}
+  fun onTruck(tap:(String)->Unit){}
+  fun showRoute(points:JSONArray?){}
+ }
+ /** The owner's map of the fleet: new positions every few seconds, and the route of a truck tapped. */
+ interface Fleet:Shown{
+  fun setMarks(marks:JSONArray)
+  fun onTruck(tap:(String)->Unit){}
+  fun showRoute(points:JSONArray?){}
+ }
  // Google's map when the build has its key and the phone has Google Play services (decision of 26/10/2026); otherwise
  // the app's own map below, with OpenStreetMap's streets, as before.
  fun live(c:Context,destLat:Double,destLng:Double):Live=if(GoogleMaps.usable(c))GoogleMaps.live(c,destLat,destLng) else webLive(c,destLat,destLng)
@@ -44,6 +58,8 @@ object TripMap {
   fun onReady(){ready=true;queue.forEach{web.evaluateJavascript(it,null)};queue.clear()}
   private fun run(js:String){if(ready)web.evaluateJavascript(js,null) else queue.add(js)}
   override fun push(points:List<DoubleArray>){points.chunked(1500).forEach{run("addPoints("+JSONArray(it.map{p->JSONArray(p.toList())}).toString()+")")}}
+  override fun pad(top:Int,bottom:Int){val d=web.resources.displayMetrics.density;run("setPad(${(top/d).toInt()},${(bottom/d).toInt()})")}
+  override fun setFleet(marks:JSONArray)=run("setFleet(${marks.toString().replace("<","\\u003c")})")
  }
  @SuppressLint("SetJavaScriptEnabled","ClickableViewAccessibility") private fun webLive(c:Context,destLat:Double,destLng:Double):Live{
   val js=c.assets.open("map/leaflet.js").bufferedReader().use{it.readText()};val css=c.assets.open("map/leaflet.css").bufferedReader().use{it.readText()}
@@ -65,6 +81,14 @@ object TripMap {
   function addPoints(a){a.forEach(p=>{if(!line||p[2]!==seg||p[3]-lastT>90000){if(line&&last&&link([last[0],last[1],seg,lastT],p)===2)L.polyline([last,[p[0],p[1]]],{color:'#1c64f2',weight:5,dashArray:'8 8'}).addTo(map);seg=p[2];line=L.polyline([],{color:'#1c64f2',weight:5}).addTo(map)}lastT=p[3];line.addLatLng([p[0],p[1]]);last=[p[0],p[1]];bounds.push(last)});
    if(!last)return;if(!marker)marker=L.circleMarker(last,{radius:8,color:'#fff',weight:3,fillColor:'#1c64f2',fillOpacity:1}).addTo(map);else marker.setLatLng(last);
    if(follow){map.setView(last,first?16:Math.max(map.getZoom(),15),{animate:false});first=false}routeTo()}
+  // The bar on top and the panel below cover part of the map: the page leaves that room.
+  function setPad(t,b){const s=document.body.style;s.boxSizing='border-box';s.paddingTop=t+'px';s.paddingBottom=b+'px';document.querySelector('.ctl').style.bottom=(b+12)+'px';map.invalidateSize()}
+  // The other trucks of the fleet, for an owner who drives: a dot each with its name, moved in place. Labels are text.
+  const fleet={};
+  function setFleet(list){const seen={};list.forEach(m=>{seen[m.key]=1;const p=[m.lat,m.lng];let k=fleet[m.key];
+    if(!k){const tag=document.createElement('span');k=fleet[m.key]={tag:tag,mark:L.circleMarker(p,{radius:m.person?6:8,color:'#fff',weight:2,fillColor:m.color,fillOpacity:1}).addTo(map).bindTooltip(tag,{permanent:true,direction:'right',offset:[8,0]})}}
+    k.tag.textContent=m.label;k.mark.setLatLng(p);k.mark.setStyle({fillColor:m.color})});
+   Object.keys(fleet).forEach(id=>{if(!seen[id]){map.removeLayer(fleet[id].mark);delete fleet[id]}})}
   </script></body></html>"""
   val web=WebView(c).apply{settings.javaScriptEnabled=true;settings.allowFileAccess=false;settings.allowContentAccess=false;settings.mixedContentMode=WebSettings.MIXED_CONTENT_NEVER_ALLOW
    setOnTouchListener{v,e->if(e.action==MotionEvent.ACTION_DOWN||e.action==MotionEvent.ACTION_MOVE)v.parent?.requestDisallowInterceptTouchEvent(true);false}}

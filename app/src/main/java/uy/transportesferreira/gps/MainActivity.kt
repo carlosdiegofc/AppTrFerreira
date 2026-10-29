@@ -21,7 +21,9 @@ import android.os.*
 import android.provider.Settings
 import android.text.Editable
 import android.text.InputType
+import android.text.SpannableString
 import android.text.TextUtils
+import android.text.style.RelativeSizeSpan
 import android.text.TextWatcher
 import android.view.*
 import android.view.animation.AccelerateInterpolator
@@ -53,6 +55,7 @@ import java.time.format.DateTimeFormatter
 import java.util.*
 import kotlin.concurrent.thread
 import kotlin.math.max
+import kotlin.math.min
 /** Flota en vivo (owner screen): positions every 5 s, who is on a trip every minute (decision of 18/10/2026). */
 private const val LIVE_MS=5000L
 private const val FLEET_MS=60000L
@@ -645,29 +648,19 @@ class MainActivity:AppCompatActivity(){
  }
  private fun simpleTrip(){
   val t=store.current()?.takeIf{it.optBoolean("active")}?:return simpleHome()
-  page("simpletrip");brandBar();finishAsk=false
-  val (model,plate)=truckParts(t.optString("vehicle"))
-  val sb=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(16),dp(12),dp(16),dp(12));background=bg(0xFF178A4C.toInt(),22)}
-  sb.addView(iconView(R.drawable.ic_clock,Color.WHITE,30))
-  val bc=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),0,0,0)}
-  val state=tv("Viaje en curso",18f,Color.WHITE,2);bc.addView(state);status=state
-  bc.addView(tv(listOf(model,plate).filter{it.isNotBlank()}.joinToString(" · ").ifBlank{"Sin camión asignado"},14f,0xFFE3F5EA.toInt()).apply{maxLines=1;ellipsize=TextUtils.TruncateAt.END})
-  sb.addView(bc,LinearLayout.LayoutParams(0,-2,1f));statusBox=sb;root.addView(sb,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(10)})
-  val clock=tv(elapsedText(t.optString("started_at")),54f,ink,2).apply{gravity=Gravity.CENTER;fontFeatureSettings="tnum";includeFontPadding=false;maxLines=1;setAutoSizeTextTypeUniformWithConfiguration(28,54,1,android.util.TypedValue.COMPLEX_UNIT_SP)}
-  root.addView(clock,LinearLayout.LayoutParams(-1,dp(66)).apply{topMargin=dp(14)});elapsed=clock
-  text(root,"Tiempo de viaje",14.5f,muted,0,4).gravity=Gravity.CENTER
-  val mc=card(top=14);trackOffset=0L
-  val live=TripMap.live(this,Double.NaN,Double.NaN);liveMap=live;activeMap=live;mc.addView(live.view,LinearLayout.LayoutParams(-1,dp(230)))
-  val st=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL};root.addView(st,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12)})
-  speed=bigStat(st,"Velocidad","—","km/h",0);distance=bigStat(st,"Distancia",km(t.optDouble("distance_meters",0.0)),null,1)
-  gps=note("",top=10).apply{gravity=Gravity.CENTER}
-  // During the trip it asks whether the load belongs to the trip or not.
-  button(root,"Cargar combustible",Kind.LINE,R.drawable.ic_fuel){fuelChoice()}
+  finishAsk=false
+  val live=driveFrame(t,"simpletrip"){
+   val row=LinearLayout(this@MainActivity).apply{orientation=LinearLayout.HORIZONTAL};addView(row,LinearLayout.LayoutParams(-1,dp(78)))
+   // During the trip it asks whether the load belongs to the trip or not.
+   bigTile(row,"Combustible",brand,R.drawable.ic_fuel,0){fuelChoice()}
+   val (pi,pl)=bigTile(row,"Pausar",0xFFB7740B.toInt(),R.drawable.ic_pause,1){togglePause()};pauseIcon=pi;pauseLabel=pl
+   dock.setPadding(0,0,0,0);addView(dock,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(10)})
+  }
   // For the wait at a plant with the trip going: they open only with the truck stopped.
-  button(root,"Juegos",Kind.LINE,R.drawable.ic_chess){games()}
+  button(root,"Juegos",Kind.LINE,R.drawable.ic_chess,top=4){games()}
   if(!(getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName))row(card(),R.drawable.ic_battery,"Evitar cortes del GPS","Permitir que la app siga en segundo plano",tint=amber){batteryExemption()}
-  sync=note(store.message(),top=6).apply{gravity=Gravity.CENTER}
-  simpleDock()
+  sync=note(store.message(),top=10).apply{gravity=Gravity.CENTER}
+  simpleDock();fleetOnTrip(live)
   refresh();try{service()}catch(_:Exception){gps?.text="Revisá el permiso de ubicación para continuar"}
  }
  /** Bottom of the trip screen: the finish button, or the confirmation after tapping it, without leaving the screen. */
@@ -683,9 +676,7 @@ class MainActivity:AppCompatActivity(){
     try{service(GpsService.FINISH)}catch(_:Exception){toast("No se pudo finalizar. Reintentá.");simpleDock()}}
    button(q,"Seguir viaje",Kind.LINE,top=10){finishAsk=false;simpleDock()}
   }else{
-   // A trip paused from normal mode would otherwise have no way to continue here.
-   if(store.current()?.optBoolean("paused")==true)button(dock,"Reanudar viaje",Kind.PRIMARY,R.drawable.ic_play,top=0){try{service(GpsService.RESUME)}catch(_:Exception){toast("Revisá el permiso de ubicación")};handler.postDelayed({if(screen=="simpletrip")simpleDock()},700)}
-   bigButton(dock,"FINALIZAR VIAJE",0xFFC4262D.toInt(),R.drawable.ic_stop,false,LinearLayout.LayoutParams(-1,dp(92)).apply{topMargin=dp(if(dock.childCount>0)10 else 0)}){finishAsk=true;simpleDock()}
+   bigButton(dock,"FINALIZAR VIAJE",0xFFC4262D.toInt(),R.drawable.ic_stop,false,LinearLayout.LayoutParams(-1,dp(72))){finishAsk=true;simpleDock()}
   }
  }
 
@@ -833,43 +824,152 @@ class MainActivity:AppCompatActivity(){
  // ---------- Trip in progress ----------
  private fun trip(){
   if(simple()){simpleTrip();return}
-  val t=store.current()?:return home();page("trip")
-  val (model,plate)=truckParts(t.optString("vehicle"))
-  bar("Viaje activo",back={home()},trailing=if(plate.isNotBlank())chip(plate) else null)
-  val sb=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(18),0,dp(18),0);background=bg(0xFF178A4C.toInt(),24)}
-  sb.addView(View(this).apply{background=oval(Color.WHITE)},LinearLayout.LayoutParams(dp(9),dp(9)))
-  status=tv("Viaje en curso",15.5f,Color.WHITE,1).apply{setPadding(dp(10),0,0,0)};sb.addView(status,LinearLayout.LayoutParams(0,-2,1f))
-  elapsed=tv("",15.5f,Color.WHITE,1).apply{fontFeatureSettings="tnum"};sb.addView(elapsed)
-  statusBox=sb;root.addView(sb,LinearLayout.LayoutParams(-1,dp(48)).apply{topMargin=dp(12)})
+  val t=store.current()?:return home()
+  val live=driveFrame(t,"trip"){pausePill(this)}
   val details=store.details().firstOrNull{it.second.optString("trip_id")==t.getString("id")}?.second?.optJSONObject("data")
-  val mc=card();trackOffset=0L
-  val live=TripMap.live(this,details?.optDouble("destination_lat",Double.NaN)?:Double.NaN,details?.optDouble("destination_lng",Double.NaN)?:Double.NaN)
-  liveMap=live;activeMap=live;mc.addView(live.view,LinearLayout.LayoutParams(-1,dp(300)))
-  val sc=card();val sr=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(16),dp(12),dp(16),dp(12))}
-  sr.addView(square(R.drawable.ic_speed,blue,blueSoft))
-  val scol=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),0,dp(8),0)}
-  scol.addView(tv("Velocidad actual",13.5f,muted))
-  val sv=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.BOTTOM}
-  speed=tv("—",30f,ink,2);sv.addView(speed);sv.addView(tv("km/h",14f,muted,1).apply{setPadding(dp(6),0,0,dp(6))})
-  scol.addView(sv);sr.addView(scol,LinearLayout.LayoutParams(0,-2,1f))
-  limit=tv("90",16f,ink,2).apply{gravity=Gravity.CENTER;contentDescription="Máximo para camiones: 90 kilómetros por hora"};sr.addView(limit,LinearLayout.LayoutParams(dp(50),dp(50)));sc.addView(sr)
-  val kg=details?.optString("kg")?.takeIf{it.isNotBlank()&&it!="null"}?.let{"$it kg"}
-  val cargo=if(t.optString("load_type")=="empty")"Retorno vacío" else listOfNotNull(details?.optString("tipoCarga")?.ifBlank{null},kg).joinToString(" · ").ifBlank{"Con carga"}
-  val values=factsGrid(card(),listOf(Fact(R.drawable.ic_flag,"Destino",details?.optString("destino")?.ifBlank{null}?:"Sin destino"),Fact(R.drawable.ic_route,"Recorrido GPS",km(t.optDouble("distance_meters",0.0))),Fact(R.drawable.ic_box,"Carga",cargo),Fact(R.drawable.ic_truck,"Camión",model.ifBlank{"Sin asignar"})))
-  distance=values[1]
-  gps=note("",top=12)
-  val trio=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL};root.addView(trio,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(12)})
+  // The sheet: what the panel does not show.
+  val trio=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL};root.addView(trio,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(4)})
   actionBox(trio,R.drawable.ic_fuel,"Combustible",0){openFuel(store.current())}
   actionBox(trio,R.drawable.ic_receipt,"Remito",1){openDocument(store.current(),"trip","arrival")}
-  val (pi,pl)=actionBox(trio,R.drawable.ic_pause,"Pausar",2){try{service(if(store.current()?.optBoolean("paused")==true)GpsService.RESUME else GpsService.PAUSE)}catch(_:Exception){toast("Revisá el permiso de ubicación")}}
-  pauseIcon=pi;pauseLabel=pl
+  actionBox(trio,R.drawable.ic_flag,"Finalizar",2){askFinish()}
+  val (model,_)=truckParts(t.optString("vehicle"))
+  val kg=details?.optString("kg")?.takeIf{it.isNotBlank()&&it!="null"}?.let{"$it kg"}
+  val cargo=if(t.optString("load_type")=="empty")"Retorno vacío" else listOfNotNull(details?.optString("tipoCarga")?.ifBlank{null},kg).joinToString(" · ").ifBlank{"Con carga"}
+  val start=instant(t.optString("started_at"))?.atZone(ZoneId.systemDefault())?.format(DateTimeFormatter.ofPattern("HH:mm"))?:"—"
+  factsGrid(card(),listOf(Fact(R.drawable.ic_flag,"Destino",details?.optString("destino")?.ifBlank{null}?:"Sin destino"),Fact(R.drawable.ic_box,"Carga",cargo),Fact(R.drawable.ic_truck,"Camión",model.ifBlank{"Sin asignar"}),Fact(R.drawable.ic_clock,"Salida",start)))
+  count=note("",top=12)
   if(!(getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName))row(card(),R.drawable.ic_battery,"Evitar cortes del GPS","Permitir que la app siga en segundo plano",tint=amber){batteryExemption()}
+  if(ownerDriver())row(card(),R.drawable.ic_truck,"Flota en vivo","Todos los camiones, sus viajes y los choferes"){ownerDashboard()}
   row(card(),R.drawable.ic_chess,"Juegos","Para la espera, con el camión parado"){games()}
-  count=note("",top=16);sync=note(store.message(),top=4)
+  sync=note(store.message(),top=12)
   link(root,"Revisar ubicación GPS",top=4){requestStart()}
-  dock.visibility=View.VISIBLE
-  button(dock,"Finalizar viaje",Kind.DANGER,R.drawable.ic_flag,top=0){askFinish()}
+  fleetOnTrip(live)
   refresh();try{service()}catch(_:Exception){gps?.text="Revisá el permiso de ubicación para continuar"}
+ }
+ // ---------- The trip in progress on the whole screen (decision of 29/10/2026) ----------
+ private var gauge:Gauge?=null;private var sheetBox:ScrollView?=null;private var sheetOpen=false;private var sheetMove:ValueAnimator?=null
+ /**
+  * The frame of the trip screens: the map fills it and turns with the truck; on top, the trip's state with its truck and
+  * the speed limit; below, the kilometres, the speed on its arc and the time, then the screen's own buttons (actions),
+  * and a sheet that slides up from there with the rest: it holds root, where the screen adds its cards as before.
+  */
+ private fun driveFrame(t:JSONObject,key:String,actions:LinearLayout.()->Unit):TripMap.Live{
+  page(key,header=false);gauge=null;sheetMove?.cancel()
+  val scroll=root.parent as ScrollView;scroll.removeView(root);shell.removeView(scroll);shell.removeView(dock)
+  val canvas=FrameLayout(this);shell.addView(canvas,1,LinearLayout.LayoutParams(-1,0,1f))
+  val details=store.details().firstOrNull{it.second.optString("trip_id")==t.getString("id")}?.second?.optJSONObject("data")
+  trackOffset=0L
+  val live=TripMap.live(this,details?.optDouble("destination_lat",Double.NaN)?:Double.NaN,details?.optDouble("destination_lng",Double.NaN)?:Double.NaN)
+  liveMap=live;activeMap=live;canvas.addView(live.view,FrameLayout.LayoutParams(-1,-1))
+  // On top: the trip's state and its truck, and under them the speed limit for trucks.
+  val top=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(10),0,dp(10),0)}
+  canvas.addView(top,FrameLayout.LayoutParams(-1,-2,Gravity.TOP))
+  val bar=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(if(key=="trip")4 else 18),0,dp(18),0);background=outline(raised,glassLine,30);elevation=dpf(4f)}
+  if(key=="trip")bar.addView(barButton(R.drawable.ic_back,"Volver"){going=-1;home();going=1})
+  val dot=View(this);bar.addView(dot,LinearLayout.LayoutParams(dp(10),dp(10)).apply{marginStart=dp(if(key=="trip")2 else 0);marginEnd=dp(12)});statusBox=dot
+  val col=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
+  status=tv("Viaje en curso",16.5f,ink,2).apply{maxLines=1};col.addView(status)
+  val (model,plate)=truckParts(t.optString("vehicle"))
+  col.addView(tv(listOf(model,plate).filter{it.isNotBlank()}.joinToString(" · ").ifBlank{"Sin camión asignado"},13.5f,muted).apply{maxLines=1;ellipsize=TextUtils.TruncateAt.END})
+  bar.addView(col,LinearLayout.LayoutParams(0,-2,1f))
+  top.addView(bar,LinearLayout.LayoutParams(-1,dp(62)).apply{topMargin=dp(6)})
+  val sign=SpannableString("90\nkm/h").apply{setSpan(RelativeSizeSpan(.45f),3,7,0)}
+  limit=tv(sign,24f,ink,2).apply{gravity=Gravity.CENTER;includeFontPadding=false;setLineSpacing(0f,.85f);contentDescription="Máximo para camiones: 90 kilómetros por hora";elevation=dpf(3f)}
+  top.addView(limit,LinearLayout.LayoutParams(dp(64),dp(64)).apply{topMargin=dp(10);marginStart=dp(4)})
+  topTarget=top;stage?.let{st->ViewCompat.getRootWindowInsets(st)?.let{fitBars(shell,it)}}
+  // Below: the panel, with a handle that opens the sheet.
+  val r=dpf(28f)
+  val panel=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;background=GradientDrawable().apply{setColor(raised);cornerRadii=floatArrayOf(r,r,r,r,0f,0f,0f,0f);setStroke(dp(1),glassLine)};elevation=dpf(10f);isClickable=true}
+  canvas.addView(panel,FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM))
+  val grip=FrameLayout(this).apply{contentDescription="Más opciones del viaje";isClickable=true;isFocusable=true;setOnClickListener{sheet(!sheetOpen)}}
+  grip.addView(View(this).apply{background=bg(grey,3)},FrameLayout.LayoutParams(dp(44),dp(5),Gravity.CENTER))
+  panel.addView(grip,LinearLayout.LayoutParams(-1,dp(26)))
+  val stats=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(18),0,dp(18),0);isClickable=true}
+  distance=figure(stats,R.drawable.ic_route,"Km recorridos",km(t.optDouble("distance_meters",0.0)),Gravity.START)
+  val dial=FrameLayout(this)
+  gauge=Gauge(this,tone(0x24133396,0x29FFFFFF),blue,red,90.0,moves()).also{dial.addView(it,FrameLayout.LayoutParams(-1,-1))}
+  val inside=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER_HORIZONTAL}
+  speed=tv("—",36f,ink,2).apply{gravity=Gravity.CENTER;fontFeatureSettings="tnum";includeFontPadding=false};inside.addView(speed)
+  inside.addView(tv("km/h",13.5f,muted,1).apply{gravity=Gravity.CENTER})
+  dial.addView(inside,FrameLayout.LayoutParams(-2,-2,Gravity.CENTER))
+  stats.addView(dial,LinearLayout.LayoutParams(dp(128),dp(118)))
+  elapsed=figure(stats,R.drawable.ic_clock,"Tiempo en viaje",elapsedText(t.optString("started_at")),Gravity.END)
+  panel.addView(stats,LinearLayout.LayoutParams(-1,-2))
+  gps=tv("",12.5f,muted).apply{gravity=Gravity.CENTER;maxLines=2;setPadding(dp(16),dp(2),dp(16),dp(4))};panel.addView(gps,LinearLayout.LayoutParams(-1,-2))
+  val act=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),dp(4),dp(14),dp(12))};panel.addView(act,LinearLayout.LayoutParams(-1,-2));act.actions()
+  val box=ScrollView(this).apply{isVerticalScrollBarEnabled=false;overScrollMode=View.OVER_SCROLL_NEVER}
+  root.setPadding(dp(14),0,dp(14),dp(18));box.addView(root);panel.addView(box,LinearLayout.LayoutParams(-1,0));sheetBox=box;sheetOpen=false
+  swipe(grip);swipe(stats)
+  // The map leaves the room the bar and the closed panel cover, so the truck stays in sight.
+  val room=View.OnLayoutChangeListener{_,_,_,_,_,_,_,_,_->live.pad(top.bottom,panel.height-box.height)}
+  top.addOnLayoutChangeListener(room);panel.addOnLayoutChangeListener(room)
+  return live
+ }
+ /** A figure of the panel: its icon, what it is and the value, to one side of the speed. */
+ private fun figure(p:LinearLayout,icon:Int,label:String,value:String,side:Int):TextView{
+  val c=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=side}
+  c.addView(iconView(icon,blue,22))
+  c.addView(tv(label,12.5f,muted).apply{gravity=side;setPadding(0,dp(4),0,0)},LinearLayout.LayoutParams(-1,-2))
+  val v=tv(value,22f,ink,2).apply{gravity=side;fontFeatureSettings="tnum";maxLines=1;setAutoSizeTextTypeUniformWithConfiguration(13,22,1,android.util.TypedValue.COMPLEX_UNIT_SP)}
+  c.addView(v,LinearLayout.LayoutParams(-1,dp(32)))
+  p.addView(c,LinearLayout.LayoutParams(0,-2,1f));return v
+ }
+ /** Opens or closes the sheet of the trip: up to a bit more than half the screen, or what it has if less. */
+ private fun sheet(open:Boolean){
+  val box=sheetBox?:return;sheetOpen=open;sheetMove?.cancel()
+  val screenH=(box.parent?.parent as? View)?.height?:resources.displayMetrics.heightPixels
+  root.measure(View.MeasureSpec.makeMeasureSpec(max(1,box.width),View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED))
+  val to=if(open)min(root.measuredHeight,(screenH*.58f).toInt()) else 0
+  val from=box.layoutParams.height;if(open)box.scrollTo(0,0)
+  if(!moves()){box.layoutParams=box.layoutParams.apply{height=to};return}
+  sheetMove=ValueAnimator.ofInt(from,to).apply{duration=260;interpolator=ease;addUpdateListener{box.layoutParams=box.layoutParams.apply{height=it.animatedValue as Int}}}.also{it.start()}
+ }
+ /** Up opens the sheet, down closes it; a short touch is still a tap. */
+ private fun swipe(v:View){var y0=0f
+  v.setOnTouchListener{_,e->when(e.actionMasked){
+   MotionEvent.ACTION_DOWN->{y0=e.rawY;false}
+   MotionEvent.ACTION_UP->{val dy=e.rawY-y0;if(dy< -dp(24)){sheet(true);true}else if(dy>dp(24)){sheet(false);true}else false}
+   else->false}}
+ }
+ /** The pause of the trip, as the panel's button: a pill with its round icon. */
+ private fun pausePill(p:LinearLayout){
+  val v=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;background=ripple(outline(raised,blue,30));isClickable=true;isFocusable=true;contentDescription="Pausar viaje";setOnClickListener{buzz(this);togglePause()}};sink(v)
+  val circle=FrameLayout(this).apply{background=oval(blue)}
+  val icon=ImageView(this).apply{setImageResource(R.drawable.ic_pause);imageTintList=ColorStateList.valueOf(Color.WHITE)};circle.addView(icon,FrameLayout.LayoutParams(dp(20),dp(20),Gravity.CENTER))
+  v.addView(circle,LinearLayout.LayoutParams(dp(40),dp(40)))
+  val label=tv("Pausar viaje",17f,ink,1).apply{setPadding(dp(14),0,0,0)};v.addView(label)
+  p.addView(v,LinearLayout.LayoutParams(-1,dp(60)));pauseIcon=icon;pauseLabel=label
+ }
+ private fun togglePause(){try{service(if(store.current()?.optBoolean("paused")==true)GpsService.RESUME else GpsService.PAUSE)}catch(_:Exception){toast("Revisá el permiso de ubicación")}}
+ /** A big button of simple mode in a row: its icon over its name. */
+ private fun bigTile(p:LinearLayout,label:String,fill:Int,icon:Int,index:Int,action:()->Unit):Pair<ImageView,TextView>{
+  val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=ripple(bg(fill,24),0x40FFFFFF);glow(this,fill,4f);isClickable=true;isFocusable=true;contentDescription=label;setOnClickListener{buzz(this);action()}};sink(v,.95f)
+  val image=iconView(icon,Color.WHITE,30);val caption=tv(label,17f,Color.WHITE,2).apply{gravity=Gravity.CENTER;maxLines=1;setPadding(0,dp(4),0,0)}
+  v.addView(image);v.addView(caption)
+  p.addView(v,LinearLayout.LayoutParams(0,-1,1f).apply{if(index>0)marginStart=dp(10)});return Pair(image,caption)
+ }
+ /**
+  * An owner who drives sees the fleet on the trip's map (decision of 29/10/2026): the trucks on a trip and the phones of
+  * active drivers, with their speed, read like Flota en vivo; a truck tapped shows its route, tapped again it goes away.
+  */
+ private fun fleetOnTrip(live:TripMap.Live){
+  if(!isOwner())return
+  routeKey=null;live.onTruck{k->truckRoute(k){live.showRoute(it)}}
+  live.setFleet(tripFleet());fleetLoadedAt=0L
+ }
+ /** The fleet on the trip's map: the other trucks on a trip, and the active drivers without one. */
+ private fun tripFleet():JSONArray{val f=mobile.fleet();val own=store.current()?.optString("id");return fleetMarks(fleetItems(f).filter{it.session!=null&&it.session.optString("id")!=own},f)}
+ private var routeKey:String?=null
+ /** The route of a truck on a trip tapped on a map of the fleet; tapped again, it goes away. */
+ private fun truckRoute(key:String,show:(JSONArray?)->Unit){
+  if(key==routeKey){routeKey=null;show(null);return}
+  val id=key.removePrefix("trip:");if(id==key)return
+  val active=mobile.fleet().optJSONArray("active")?:return
+  val s=(0 until active.length()).map{active.getJSONObject(it)}.firstOrNull{it.optString("id")==id}?:return
+  routeKey=key;toast("Buscando el recorrido…")
+  thread{val points=try{mobile.route(JSONObject(s.toString()),true)}catch(_:Exception){null}
+   runOnUiThread{if(routeKey!=key)return@runOnUiThread
+    if(points==null||points.length()==0){routeKey=null;toast(if(points==null)"No se pudo leer el recorrido. Revisá la conexión." else "Ese viaje todavía no tiene recorrido.")} else show(points)}}
  }
  /** A trip that ended without receipts asks once whether fuel was loaded in it (decision of 28/10/2026). */
  private fun askReceipt(t:JSONObject){
@@ -902,7 +1002,9 @@ class MainActivity:AppCompatActivity(){
   ValueAnimator.ofFloat(from.toFloat(),to.toFloat()).apply{duration=500;interpolator=DecelerateInterpolator();addUpdateListener{if(t.tag==to)show((it.animatedValue as Float).toDouble())}}.start()
  }
  private fun refresh(){if(!::store.isInitialized)return;sync?.text=store.message();presence()
-  if(screen=="owner"&&!fleetLoading){val now=System.currentTimeMillis();if(now-fleetLoadedAt>FLEET_MS)loadFleet() else if(!liveLoading&&now-liveLoadedAt>LIVE_MS)loadLive()}
+  // Flota en vivo, and the trip's map of an owner who drives: who is on a trip every minute, the positions every few seconds.
+  val fleetOn=screen=="owner"||((screen=="trip"||screen=="simpletrip")&&isOwner())
+  if(fleetOn&&!fleetLoading){val now=System.currentTimeMillis();if(now-fleetLoadedAt>FLEET_MS)loadFleet() else if(!liveLoading&&now-liveLoadedAt>LIVE_MS)loadLive()}
   if(screen=="games"||screen=="chessnew"||screen=="chess"||screen=="truco")gamesCheck()
   if(screen!="trip"&&screen!="simpletrip")return;val t=store.current()?:return
   if(!t.optBoolean("active")){home();toast("Viaje finalizado. Los datos pendientes se enviarán con conexión.");askReceipt(t);return}
@@ -910,10 +1012,10 @@ class MainActivity:AppCompatActivity(){
   status?.text=if(paused)"Viaje pausado" else "Viaje en curso";statusBox?.background=bg(if(paused)0xFFB7740B.toInt() else 0xFF178A4C.toInt(),if(screen=="trip")24 else 22)
   elapsed?.text=elapsedText(t.optString("started_at"))
   distance?.text=km(t.optDouble("distance_meters",0.0))
-  pauseLabel?.text=if(paused)"Reanudar" else "Pausar";pauseIcon?.setImageResource(if(paused)R.drawable.ic_play else R.drawable.ic_pause);(pauseLabel?.parent as? View)?.contentDescription=pauseLabel?.text
+  pauseLabel?.text=if(screen=="simpletrip")(if(paused)"Reanudar" else "Pausar") else if(paused)"Reanudar viaje" else "Pausar viaje";pauseIcon?.setImageResource(if(paused)R.drawable.ic_play else R.drawable.ic_pause);(pauseLabel?.parent as? View)?.contentDescription=pauseLabel?.text
   val recent=instant(t.optJSONObject("last_point")?.optString("recorded_at"))?.let{System.currentTimeMillis()-it.toEpochMilli()<30000}?:false
   val v=if(paused)0.0 else if(recent)t.optDouble("speed_kmh",0.0) else Double.NaN
-  speed?.let{roll(it,v)}
+  speed?.let{roll(it,v)};gauge?.set(v)
   val over=!v.isNaN()&&v>90;speed?.setTextColor(if(over)red else ink)
   limit?.background=GradientDrawable().apply{shape=GradientDrawable.OVAL;setColor(if(over)red else raised);setStroke(dp(4),red)};limit?.setTextColor(if(over)Color.WHITE else ink)
   val warn=store.warning();gps?.text=if(paused)"El GPS y los kilómetros están pausados" else if(warn.isNotBlank())"⚠ $warn" else if(recent)"GPS actualizado" else "Esperando señal GPS precisa…";gps?.setTextColor(if(warn.isNotBlank()&&!paused)amber else muted)
@@ -1157,6 +1259,19 @@ class MainActivity:AppCompatActivity(){
   r.addView(col,LinearLayout.LayoutParams(0,-2,1f))
   p.addView(r,LinearLayout.LayoutParams(-1,-2))
  }
+ private var fullFleetMap:TripMap.Fleet?=null
+ /** Flota en vivo on the whole screen: the trucks move as on its own map, with their speed, and show their route when tapped. */
+ private fun fullFleet(){
+  val dialog=android.app.Dialog(this,if(dark)android.R.style.Theme_Material_NoActionBar else android.R.style.Theme_Material_Light_NoActionBar)
+  val layout=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(12),dp(12),dp(12),dp(12));setBackgroundColor(surface)}
+  button(layout,"Cerrar mapa",Kind.LINE,R.drawable.ic_close,top=0){dialog.dismiss()}
+  val f=mobile.fleet();val map=TripMap.fleet(this,fleetMarks(fleetItems(f),f),LIVE_MS);fullFleetMap=map
+  routeKey=null;map.onTruck{k->truckRoute(k){map.showRoute(it)}}
+  layout.addView(map.view,LinearLayout.LayoutParams(-1,0,1f).apply{topMargin=dp(12)});dialog.setContentView(layout)
+  dialog.setOnDismissListener{map.destroy();fullFleetMap=null;routeKey=null}
+  dialog.show();dialog.window?.setLayout(-1,-1)
+  ViewCompat.setOnApplyWindowInsetsListener(layout){v,i->val insets=i.getInsets(WindowInsetsCompat.Type.systemBars());v.setPadding(insets.left+dp(12),insets.top+dp(12),insets.right+dp(12),insets.bottom+dp(12));i}
+ }
  private fun fullMap(points:JSONArray){
   val dialog=android.app.Dialog(this,android.R.style.Theme_Material_Light_NoActionBar)
   val layout=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(12),dp(12),dp(12),dp(12));setBackgroundColor(surface)}
@@ -1180,14 +1295,14 @@ class MainActivity:AppCompatActivity(){
   name=driverName();if(first)sampleData()
   val see=intent.getStringExtra("trf_sample_screen")?:"home"
   setMode(if(see.startsWith("simple"))UiMode.SIMPLE else UiMode.NORMAL)
-  if(see in setOf("trip","tripfinish","simpletrip","simplefinish")&&!active())sampleTrip()
+  if(see in setOf("trip","tripsheet","tripfinish","simpletrip","simplefinish")&&!active())sampleTrip()
   val t=mobile.history("trips").optJSONObject(0)
   when(see){
    "mode"->askMode();"newtrip"->newTrip();"pick"->{newTrip();pickTruck{newTrip()}};"prepare"->{tripForm=JSONObject().put("destino","Puerto de Montevideo").put("cliente","Cooperativa del Este").put("tipoCarga","Arroz").put("kg","28500");prepare()}
    "fuel"->openFuel(null);"document"->openDocument(t,"tripdetail","arrival");"triphistory"->history("trips");"fuelhistory"->history("fuel");"tripdetail"->t?.let{detail(it)}?:home()
    "documents"->documents();"maintenance"->maintenance();"settings"->settings();"games"->games();"privacy"->privacy()
    "simplehome"->simpleHome();"simpleask"->{startAskAt=SystemClock.elapsedRealtime();simpleHome(true)};"simpletrip"->simpleTrip();"simplefinish"->{simpleTrip();finishAsk=true;simpleDock()}
-   "trip"->trip();"tripfinish"->{trip();askFinish()};"receipt"->{home();t?.let{askReceipt(it)}};"ownermenu"->{home();ownerMenu()};"owner"->ownerDashboard();"performance"->performance()
+   "trip"->trip();"tripsheet"->{trip();stage?.postDelayed({sheet(true)},300)};"tripfinish"->{trip();askFinish()};"receipt"->{home();t?.let{askReceipt(it)}};"ownermenu"->{home();ownerMenu()};"owner"->ownerDashboard();"fleetfull"->{ownerDashboard();fullFleet()};"performance"->performance()
    else->home()}
   // The screens of a trip change every second and the emulator's reader of screens never finds them still: the script
   // knows the screen is up from this line of the log.
@@ -1696,8 +1811,12 @@ class MainActivity:AppCompatActivity(){
   fleetStats=k;fleetStatsInto(k,items)
   alerts()
   val marks=fleetMarks(items,f);fleetShape=shapeOf(f,items,marks)
-  val mc=card();val map=TripMap.fleet(this,marks,LIVE_MS);activeMap=map;fleetMap=map;mc.addView(map.view,LinearLayout.LayoutParams(-1,dp(260)))
+  // Half the screen for the map (decision of 29/10/2026), a full screen too, and the route of a truck tapped.
+  val mc=card();val map=TripMap.fleet(this,marks,LIVE_MS);activeMap=map;fleetMap=map;mc.addView(map.view,LinearLayout.LayoutParams(-1,max(dp(300),(resources.displayMetrics.heightPixels*.5f).toInt())))
+  routeKey=null;map.onTruck{k->truckRoute(k){map.showRoute(it)}}
   if(marks.length()==0)note(if(fetched==0L)"Buscando posiciones…" else "Todavía no hay posiciones GPS para mostrar.",mc,0).setPadding(dp(16),dp(10),dp(16),dp(12))
+  button(root,"Ver el mapa en pantalla completa",Kind.LINE,R.drawable.ic_expand,top=10){fullFleet()}
+  note("Tocá un camión de viaje para ver su recorrido; tocándolo otra vez se oculta.",top=6)
   section("Camiones")
   if(items.isEmpty())emptyCard(R.drawable.ic_truck,"Sin camiones cargados","Los equipos del catálogo aparecen acá.") else {val c=card();fleetCard=c;items.forEach{fleetRow(c,it)}}
   fleetNote=note(fleetNoteText(f),top=10)
@@ -1722,7 +1841,9 @@ class MainActivity:AppCompatActivity(){
   */
  private fun fleetMarks(items:List<FleetItem>,f:JSONObject):JSONArray{
   val marks=JSONArray()
-  items.filter{FleetStats.validPosition(it.lat,it.lng)}.forEach{marks.put(JSONObject().put("key",it.session?.optString("id")?.let{id->"trip:$id"}?:"truck:${it.model}|${it.plate}").put("lat",it.lat).put("lng",it.lng).put("label",it.plate.ifBlank{it.model}).put("color",hex(stateColor(it.state))))}
+  // A truck on a trip says its speed while it moves (decision of 29/10/2026).
+  items.filter{FleetStats.validPosition(it.lat,it.lng)}.forEach{val speed=if(it.session!=null&&it.state=="moving"&&it.speed.isFinite())" · ${Math.round(it.speed)} km/h" else ""
+   marks.put(JSONObject().put("key",it.session?.optString("id")?.let{id->"trip:$id"}?:"truck:${it.model}|${it.plate}").put("lat",it.lat).put("lng",it.lng).put("label",it.plate.ifBlank{it.model}+speed).put("color",hex(stateColor(it.state))))}
   presenceRows(f).filter{(r,state)->placeOf(r,state)}.forEach{(r,_)->val name=FleetStats.text(r.optString("driver_name"))?:"Chofer"
    marks.put(JSONObject().put("key","driver:${r.optString("driver_id")}").put("lat",r.optDouble("latitude")).put("lng",r.optDouble("longitude")).put("label",name.split(' ').first()).put("color",hex(0xFF1663E8.toInt())).put("person",true))}
   return marks
@@ -1732,7 +1853,7 @@ class MainActivity:AppCompatActivity(){
  private fun loadLive(){
   liveLoading=true
   thread{val ok=try{mobile.live();true}catch(_:Exception){false}
-   runOnUiThread{liveLoading=false;liveLoadedAt=System.currentTimeMillis();if(ok&&screen=="owner"&&!fleetLive())rebuildOwner()}}
+   runOnUiThread{liveLoading=false;liveLoadedAt=System.currentTimeMillis();if(ok){fleetMoved();if(screen=="owner"&&!fleetLive())rebuildOwner()}}}
  }
  /** What decides how the fleet screen is built: trucks or none, positions or none, data or still looking. */
  private fun shapeOf(f:JSONObject,items:List<FleetItem>,marks:JSONArray)="${items.isEmpty()}|${marks.length()==0}|${f.optLong("fetched_at")==0L}"
@@ -1776,7 +1897,13 @@ class MainActivity:AppCompatActivity(){
    if(ok)try{mobile.presence(true)}catch(_:Exception){}
    runOnUiThread{fleetLoading=false;fleetLoadedAt=System.currentTimeMillis();if(!ok&&manual)toast("Sin conexión. Se muestra la última información guardada.")
     // The refresh every minute updates the open screen in place; a manual one, or a change in what it shows, builds it again.
+    if(ok)fleetMoved()
     if(ok&&screen=="owner"&&(manual||!fleetLive()))rebuildOwner()}}
+ }
+ /** New positions to the maps of the fleet that are not Flota en vivo's own: the trip's of an owner who drives, and the full screen. */
+ private fun fleetMoved(){
+  if(screen=="trip"||screen=="simpletrip")liveMap?.setFleet(tripFleet())
+  fullFleetMap?.let{val f=mobile.fleet();it.setMarks(fleetMarks(fleetItems(f),f))}
  }
  private fun rebuildOwner(){val scroll=root.parent as? ScrollView;val y=scroll?.scrollY?:0;ownerDashboard();(root.parent as? ScrollView)?.post{(root.parent as? ScrollView)?.scrollTo(0,y)}}
  private fun stateColor(state:String)=when(state){"moving"->0xFF178A4C.toInt();"idle"->0xFF8F9BAD.toInt();else->0xFFE69A1E.toInt()}
