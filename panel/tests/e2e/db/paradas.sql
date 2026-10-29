@@ -39,12 +39,25 @@ begin
     raise exception 'chofer: cargó una parada en el viaje de otro chofer';
   exception when foreign_key_violation then null;
   end;
-  -- A stop does not change owner or trip.
+  -- A stop does not go to another driver or to a trip that is not hers.
   begin
     update public.trf_trip_stops set trip_id = '10000000-0000-4000-8000-00000000000b' where id = '80000000-0000-4000-8000-000000000001';
     raise exception 'chofer: movió una parada a otro viaje';
+  exception when foreign_key_violation then null;
+  end;
+  begin
+    update public.trf_trip_stops set driver_id = '00000000-0000-4000-8000-000000000012' where id = '80000000-0000-4000-8000-000000000001';
+    raise exception 'chofer: pasó una parada a otro chofer';
   exception when insufficient_privilege then null;
   end;
+  -- The phone sends «insert or update» with every column (PostgREST on_conflict=id with merge-duplicates).
+  insert into public.trf_trip_stops (id, trip_id, driver_id, position, client, place, arrived_at, arrived_lat, arrived_lng, finished_at, finished_by, kg, created_at, updated_at)
+  values ('80000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000011', 2, 'Cooperativa del Este', 'Treinta y Tres',
+          now() - interval '1 hour', -33.23, -54.38, now() - interval '20 minutes', 'movimiento', 9800, now(), now())
+  on conflict (id) do update set id = excluded.id, trip_id = excluded.trip_id, driver_id = excluded.driver_id, position = excluded.position, client = excluded.client,
+    place = excluded.place, arrived_at = excluded.arrived_at, arrived_lat = excluded.arrived_lat, arrived_lng = excluded.arrived_lng, finished_at = excluded.finished_at,
+    finished_by = excluded.finished_by, kg = excluded.kg, created_at = excluded.created_at, updated_at = excluded.updated_at;
+  if (select kg from public.trf_trip_stops where id = '80000000-0000-4000-8000-000000000002') <> 9800 then raise exception 'chofer: el envío repetido no actualizó la parada'; end if;
   -- A stop already visited stays; one not visited yet can be removed.
   delete from public.trf_trip_stops where id = '80000000-0000-4000-8000-000000000001';
   if (select count(*) from public.trf_trip_stops) <> 2 then raise exception 'chofer: borró una parada ya visitada'; end if;

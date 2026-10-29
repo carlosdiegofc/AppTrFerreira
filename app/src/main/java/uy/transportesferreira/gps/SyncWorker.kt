@@ -57,6 +57,14 @@ object Sync {
             // The latest location belongs to the newest local trip only; never replay old locations over it. The trip is
             // read again here, not taken from the list above, which may be older than what live() sent meanwhile.
             try{putLive(api){store.trips().filter{it.optString("driver_id")==uid}.lastOrNull()}}catch(_:Exception){failures++}
+            // The stops of the trips, after the trips they belong to: a stop sent before its trip would be refused.
+            for((file,st) in store.records("stops").filter{it.second.optString("driver_id")==uid&&it.second.optInt("revision")>it.second.optInt("synced_revision")}){
+                try{
+                    if(st.optBoolean("deleted")){api.request("/rest/v1/trf_trip_stops?id=eq.${st.getString("id")}","DELETE");file.delete()}
+                    else{val body=JSONObject(st.toString());listOf("revision","synced_revision","deleted").forEach{body.remove(it)}
+                        api.json("/rest/v1/trf_trip_stops?on_conflict=id",body,"resolution=merge-duplicates");store.markStopSynced(file,st,st.optInt("revision"))}
+                }catch(_:Exception){failures++}
+            }
             for((file,r) in store.details().filter{it.second.optString("driver_id")==uid&&!it.second.optBoolean("synced")}){
                 try{val body=JSONObject(r.toString());body.remove("synced");body.remove("synced_at")
                 api.json("/rest/v1/trf_trip_details?on_conflict=trip_id",body,"resolution=ignore-duplicates");store.markSynced(file,r)}catch(_:Exception){failures++}

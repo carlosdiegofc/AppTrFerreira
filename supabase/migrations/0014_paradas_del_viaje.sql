@@ -52,9 +52,9 @@ create policy panel_admins_read_stops on public.trf_trip_stops as permissive for
 create policy admins_read_stops on public.trf_trip_stops as permissive for select to authenticated using ((select trf_private.is_admin() as is_admin));
 
 revoke all on table public.trf_trip_stops from public, anon, authenticated, service_role;
-grant select, insert, delete on table public.trf_trip_stops to authenticated;
--- Un chofer cambia lo de la parada, no a quién ni a qué viaje pertenece.
-grant update (position, client, place, arrived_at, arrived_lat, arrived_lng, finished_at, finished_by, kg, updated_at) on table public.trf_trip_stops to authenticated;
+-- El envío del teléfono es «insertar o actualizar» (on_conflict=id), que toca todas las columnas. Un chofer no puede
+-- pasar una parada a otro chofer (la política lo rechaza) ni a un viaje que no es suyo (la clave foránea lo rechaza).
+grant select, insert, update, delete on table public.trf_trip_stops to authenticated;
 grant all on table public.trf_trip_stops to service_role;
 
 -- Un remito puede decir de qué parada es. Sin clave foránea a propósito: el remito y la parada se envían por separado,

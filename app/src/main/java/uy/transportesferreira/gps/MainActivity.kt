@@ -136,7 +136,7 @@ class MainActivity:AppCompatActivity(){
  private val handler=Handler(Looper.getMainLooper());private val tick=object:Runnable{override fun run(){refresh();handler.postDelayed(this,1000)}}
  private val appVersion:String get()=packageManager.getPackageInfo(packageName,0).versionName?:""
  private val mobile by lazy{MobileData(this)}
- private var tripForm=JSONObject();private var fuelForm=JSONObject();private var docForm=JSONObject();private var draftDocs=JSONArray()
+ private var tripForm=JSONObject();private var fuelForm=JSONObject();private var docForm=JSONObject();private var draftDocs=JSONArray();private var draftStops=JSONArray()
  private var fuelTrip:JSONObject?=null;private var historyTrip:JSONObject?=null;private var docTrip:JSONObject?=null
  private var photoMode="fuel";private var docReturn="prepare";private var historyLimit=50;private var historyQuery="";private var fuelMonth=true
  private var fleetLoadedAt=0L;private var fleetLoading=false
@@ -412,7 +412,7 @@ class MainActivity:AppCompatActivity(){
   val keep=if(again)(root.parent as? ScrollView)?.scrollY?:0 else 0
   val before=if(stage!=null)shell else null
   screen=key;back.isEnabled=key in innerScreens;fleetStats=null;fleetCard=null;fleetNote=null;peopleCard=null;opaque=key in solidScreens
-  distance=null;speed=null;limit=null;status=null;statusBox=null;elapsed=null;sync=null;gps=null;count=null;pauseLabel=null;pauseIcon=null
+  stopBox=null;stopList=null;stopSig="";distance=null;speed=null;limit=null;status=null;statusBox=null;elapsed=null;sync=null;gps=null;count=null;pauseLabel=null;pauseIcon=null
   // Leaving the board drops the phone's move on its way.
   board=null;chessTop=null;chessBottom=null;chessStatus=null;undoButton=null;if(key!="chess"){chessJob++;thinking=false}
   trucoUi=null;if(key!="truco"){trucoJob++;trucoThinking=false}
@@ -644,20 +644,22 @@ class MainActivity:AppCompatActivity(){
  private fun simpleStart(asked:Boolean=false){
   if(active()){simpleTrip();return}
   if(truck.isBlank()&&!asked){val v=knownTruck();if(v!=null)saveTruck(v) else {pickTruck{simpleStart(true)};return}}
-  tripForm=JSONObject();draftDocs=JSONArray();empty=false;beginTrip()
+  tripForm=JSONObject();draftDocs=JSONArray();draftStops=JSONArray();empty=false;beginTrip()
  }
  private fun simpleTrip(){
   val t=store.current()?.takeIf{it.optBoolean("active")}?:return simpleHome()
   finishAsk=false
   val live=driveFrame(t,"simpletrip"){
+   stopSlot(this,true)
    val row=LinearLayout(this@MainActivity).apply{orientation=LinearLayout.HORIZONTAL};addView(row,LinearLayout.LayoutParams(-1,dp(78)))
    // During the trip it asks whether the load belongs to the trip or not.
    bigTile(row,"Combustible",brand,R.drawable.ic_fuel,0){fuelChoice()}
    val (pi,pl)=bigTile(row,"Pausar",0xFFB7740B.toInt(),R.drawable.ic_pause,1){togglePause()};pauseIcon=pi;pauseLabel=pl
    dock.setPadding(0,0,0,0);addView(dock,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(10)})
   }
+  stopsSection()
   // For the wait at a plant with the trip going: they open only with the truck stopped.
-  button(root,"Juegos",Kind.LINE,R.drawable.ic_chess,top=4){games()}
+  button(root,"Juegos",Kind.LINE,R.drawable.ic_chess,top=12){games()}
   if(!(getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName))row(card(),R.drawable.ic_battery,"Evitar cortes del GPS","Permitir que la app siga en segundo plano",tint=amber){batteryExemption()}
   sync=note(store.message(),top=10).apply{gravity=Gravity.CENTER}
   simpleDock();fleetOnTrip(live)
@@ -699,7 +701,7 @@ class MainActivity:AppCompatActivity(){
   alerts()
   menuList(listOfNotNull(
    if(ownerDriver())Shortcut(R.drawable.ic_menu,0xFF2F4A7D.toInt(),"Menú del dueño","Flota, viajes y rendimiento"){ownerMenu()} else null,
-   Shortcut(R.drawable.ic_play,0xFF178A4C.toInt(),"Iniciar viaje",if(running)"Ya hay un viaje en curso" else null){if(active()){toast("Ya tenés un viaje en curso");trip()}else{tripForm=JSONObject();draftDocs=JSONArray();empty=false;newTrip()}},
+   Shortcut(R.drawable.ic_play,0xFF178A4C.toInt(),"Iniciar viaje",if(running)"Ya hay un viaje en curso" else null){if(active()){toast("Ya tenés un viaje en curso");trip()}else{tripForm=JSONObject();draftDocs=JSONArray();draftStops=JSONArray();empty=false;newTrip()}},
    Shortcut(R.drawable.ic_list,0xFF1663E8.toInt(),"Mis viajes",null){openHistory("trips",false)},
    Shortcut(R.drawable.ic_fuel,0xFFC96A12.toInt(),"Combustible","Cargar una boleta"){fuelChoice()},
    Shortcut(R.drawable.ic_receipt,0xFF7A4FD0.toInt(),"Remitos y fotos",null){if(active())openDocument(store.current(),"trip","arrival") else {toast("Elegí el viaje al que querés agregar el remito");openHistory("trips",false)}},
@@ -778,6 +780,10 @@ class MainActivity:AppCompatActivity(){
   row(c,R.drawable.ic_receipt,"Remitos de salida",if(n==0)"Foto o número" else "$n agregado${if(n==1)"" else "s"} · tocá para sumar otro",if(n==0)faint else ink){openDocument(null,"prepare","departure")}
   if(n>0){val dc=card();for(i in 0 until n){val d=draftDocs.getJSONObject(i);val title="${if(d.optString("kind")=="arrival")"Llegada" else "Salida"} · ${d.optString("number").ifBlank{"Sin número"}}"
    row(dc,R.drawable.ic_receipt,title,if(d.optString("draft_photo").isNotBlank())"Con foto" else "Sin foto",trailing=iconView(R.drawable.ic_close,muted,20)){AlertDialog.Builder(this).setTitle("¿Quitar este remito?").setMessage(title).setNegativeButton("Conservar",null).setPositiveButton("Quitar"){_,_->draftDocs.remove(i);prepare()}.show()}}}
+  val ns=draftStops.length()
+  row(c,R.drawable.ic_pin,"Paradas de descarga",if(ns==0)"Si repartís a varios clientes" else "$ns agregada${if(ns==1)"" else "s"} · tocá para sumar otra",if(ns==0)faint else ink){askStop(null){client,place->draftStops.put(JSONObject().put("client",client).put("place",place));prepare()}}
+  if(ns>0){val sc=card();for(i in 0 until ns){val d=draftStops.getJSONObject(i)
+   row(sc,R.drawable.ic_flag,"${i+1} · ${d.optString("client").ifBlank{"Sin cliente"}}",d.optString("place").ifBlank{null},trailing=iconView(R.drawable.ic_close,muted,20)){AlertDialog.Builder(this).setTitle("¿Quitar esta parada?").setMessage(d.optString("client").ifBlank{"Parada ${i+1}"}).setNegativeButton("No",null).setPositiveButton("Quitar"){_,_->draftStops.remove(i);prepare()}.show()}}}
   note("Todos los datos son opcionales. Podés completarlos durante el viaje o al llegar.",top=14)
   dock.visibility=View.VISIBLE;button(dock,"Iniciar viaje",Kind.GO,R.drawable.ic_play,top=0){begin()}
  }
@@ -810,8 +816,8 @@ class MainActivity:AppCompatActivity(){
  }
  private fun begin(){
   val u=api.session()?.optJSONObject("user")?:return login()
-  try{store.start(u,name,InputRules.vehicle(truck),empty,JSONObject(tripForm.toString()).put("kg",InputRules.optionalNumber(tripForm.optString("kg"))?:"").apply{if(empty){put("tipoCarga","");put("kg","")}},draftDocs)
-   draftDocs=JSONArray();trip();Sync.schedule(this);requestStart()
+  try{store.start(u,name,InputRules.vehicle(truck),empty,JSONObject(tripForm.toString()).put("kg",InputRules.optionalNumber(tripForm.optString("kg"))?:"").apply{if(empty){put("tipoCarga","");put("kg","")}},draftDocs,draftStops)
+   draftDocs=JSONArray();draftStops=JSONArray();trip();Sync.schedule(this);requestStart()
   }catch(_:Exception){toast("No se pudo guardar el viaje en el teléfono. Revisá el espacio disponible.");homeOrTrip()}
  }
  private fun service(action:String?=null){
@@ -826,6 +832,7 @@ class MainActivity:AppCompatActivity(){
   if(simple()){simpleTrip();return}
   val t=store.current()?:return home()
   val live=driveFrame(t,"trip"){
+   stopSlot(this,false)
    // Pausar and Finalizar side by side, both in sight (decision of 29/10/2026).
    val row=LinearLayout(this@MainActivity).apply{orientation=LinearLayout.HORIZONTAL};addView(row,LinearLayout.LayoutParams(-1,dp(60)))
    pausePill(row);finishPill(row)
@@ -836,6 +843,7 @@ class MainActivity:AppCompatActivity(){
   actionBox(trio,R.drawable.ic_fuel,"Combustible",0){openFuel(store.current())}
   actionBox(trio,R.drawable.ic_receipt,"Remito",1){openDocument(store.current(),"trip","arrival")}
   actionBox(trio,R.drawable.ic_flag,"Finalizar",2){askFinish()}
+  stopsSection()
   val (model,_)=truckParts(t.optString("vehicle"))
   val kg=details?.optString("kg")?.takeIf{it.isNotBlank()&&it!="null"}?.let{"$it kg"}
   val cargo=if(t.optString("load_type")=="empty")"Retorno vacío" else listOfNotNull(details?.optString("tipoCarga")?.ifBlank{null},kg).joinToString(" · ").ifBlank{"Con carga"}
@@ -991,6 +999,97 @@ class MainActivity:AppCompatActivity(){
    button(list,"Cargar la boleta",Kind.PRIMARY,R.drawable.ic_fuel,top=0){d.dismiss();openFuel(t)}
    button(list,"No cargué combustible",Kind.LINE,top=10){d.dismiss()}}
  }
+
+ // ---------- Stops of a trip with several unloadings (decision of 29/10/2026) ----------
+ private var stopBox:LinearLayout?=null;private var stopList:LinearLayout?=null;private var stopSig=""
+ /** Where the button of the next stop goes, above the trip's own buttons. big: simple mode's, taller. */
+ private fun stopSlot(p:LinearLayout,big:Boolean){
+  val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;tag=big};p.addView(box,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(10)});stopBox=box
+ }
+ private fun stopsOf():List<JSONObject>{val t=store.current()?:return emptyList();return store.stops(t.getString("id"))}
+ /** What the stops look like now, so the screen is drawn again only when something changed (the minutes of an unloading too). */
+ private fun stopsSignature():String{val now=System.currentTimeMillis();return stopsOf().joinToString("|"){"${it.optString("id")}:${it.optInt("revision")}:${if(Stops.state(it)==Stops.State.UNLOADING)Stops.minutes(it,now) else ""}"}}
+ private fun stopsRefresh(){
+  if(screen!="trip"&&screen!="simpletrip")return
+  val sig=stopsSignature();if(sig==stopSig)return;stopSig=sig
+  renderStopBar();fillStops()
+ }
+ /** The one button that matters now: «Llegué a …» for the next stop, or «Terminé de descargar» while unloading. */
+ private fun renderStopBar(){
+  val box=stopBox?:return;val big=box.tag==true;box.removeAllViews()
+  val stops=stopsOf();if(stops.isEmpty())return
+  val unloading=Stops.unloading(stops);val next=Stops.next(stops)
+  val h=dp(if(big)78 else 56)
+  fun make(text:String,sub:String?,fill:Int,icon:Int,action:()->Unit){
+   val v=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(18),0,dp(18),0);background=ripple(bg(fill,if(big)24 else 30),0x40FFFFFF);glow(this,fill,4f);isClickable=true;isFocusable=true;contentDescription=text;setOnClickListener{buzz(this);action()}};sink(v,.97f)
+   v.addView(iconView(icon,Color.WHITE,if(big)30 else 24))
+   val col=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),0,0,0)}
+   col.addView(tv(text,if(big)19f else 16f,Color.WHITE,2).apply{maxLines=1;ellipsize=TextUtils.TruncateAt.END})
+   sub?.let{col.addView(tv(it,13f,0xFFEAF0FF.toInt()).apply{maxLines=1;ellipsize=TextUtils.TruncateAt.END})}
+   v.addView(col,LinearLayout.LayoutParams(0,-2,1f))
+   box.addView(v,LinearLayout.LayoutParams(-1,h))
+  }
+  when{
+   unloading!=null->make("Terminé de descargar","${Stops.title(unloading)} · ${Stops.minutes(unloading,System.currentTimeMillis())?:0} min",0xFFB7740B.toInt(),R.drawable.ic_check_circle){finishUnloading(unloading)}
+   next!=null->make("Llegué a ${Stops.short(next)}",if(stops.size>1)"Parada ${stops.indexOf(next)+1} de ${stops.size}" else null,brand,R.drawable.ic_pin){arriveAt(next)}
+   else->box.addView(note("Descargaste en todas las paradas. Podés sumar otra o finalizar el viaje.",box,0).apply{gravity=Gravity.CENTER})
+  }
+ }
+ private fun arriveAt(stop:JSONObject){
+  val last=store.current()?.optJSONObject("last_point")
+  val lat=last?.optDouble("latitude")?.takeIf{it.isFinite()};val lng=last?.optDouble("longitude")?.takeIf{it.isFinite()}
+  if(store.arrive(stop.getString("id"),lat,lng)==null){toast("No se pudo marcar la llegada");return}
+  Sync.schedule(this);toast("Llegaste a ${Stops.short(stop)}. La descarga se da por terminada cuando la marcás o cuando el camión arranca.");stopsRefresh()
+ }
+ private fun finishUnloading(stop:JSONObject){
+  if(store.finishStop(stop.getString("id"),"chofer")==null){toast("Esa descarga ya terminó");stopsRefresh();return}
+  Sync.schedule(this);val n=Stops.next(stopsOf());toast(if(n!=null)"Descarga terminada. Sigue ${Stops.short(n)}." else "Descarga terminada.");stopsRefresh()
+ }
+ /** The stops in the sheet: each with its state, a tap to change it, and the way to add another. */
+ private fun stopsSection(){
+  section("Paradas");val c=card();stopList=c;stopSig="";fillStops()
+ }
+ private fun fillStops(){
+  val c=stopList?:return;c.removeAllViews();val now=System.currentTimeMillis();val stops=stopsOf()
+  val clock=DateTimeFormatter.ofPattern("HH:mm")
+  fun at(v:String)=instant(v)?.atZone(ZoneId.systemDefault())?.format(clock)?:"—"
+  for((i,st) in stops.withIndex()){
+   val sub=when(Stops.state(st)){
+    Stops.State.WAITING->"Por llegar"
+    Stops.State.UNLOADING->"Descargando desde las ${at(st.optString("arrived_at"))} · ${Stops.minutes(st,now)?:0} min"
+    Stops.State.DONE->"${at(st.optString("arrived_at"))} a ${at(st.optString("finished_at"))} · ${Stops.minutes(st,now)?:0} min"+(st.optDouble("kg",Double.NaN).takeIf{!it.isNaN()}?.let{" · ${numberText(it)} kg"}?:"")
+   }
+   val color=when(Stops.state(st)){Stops.State.WAITING->muted;Stops.State.UNLOADING->amber;Stops.State.DONE->0xFF178A4C.toInt()}
+   row(c,if(Stops.state(st)==Stops.State.DONE)R.drawable.ic_check_circle else R.drawable.ic_flag,"${i+1} · ${Stops.title(st)}",sub,color){stopOptions(st)}
+  }
+  row(c,R.drawable.ic_plus,"Agregar parada",if(stops.isEmpty())"Para repartir la carga a varios clientes" else "Otro cliente en este mismo viaje"){
+   val t=store.current()?:return@row
+   askStop(null){client,place->store.addStop(t.getString("id"),t.getString("driver_id"),client,place);Sync.schedule(this);stopsRefresh()}
+  }
+ }
+ private fun stopOptions(st:JSONObject){
+  val waiting=Stops.state(st)==Stops.State.WAITING
+  val items=mutableListOf("Kilos descargados");if(waiting){items.add("Cambiar cliente o lugar");items.add("Quitar esta parada")}
+  AlertDialog.Builder(this).setTitle(Stops.title(st)).setItems(items.toTypedArray()){_,i->
+   when(items[i]){
+    "Kilos descargados"->{val d=JSONObject().put("kg",st.optDouble("kg",Double.NaN).takeIf{!it.isNaN()}?.let{numberText(it)}?:"")
+     askNumber("Kilos descargados",d,"kg"){store.setStopKg(st.getString("id"),d.optString("kg").replace(',','.').toDoubleOrNull()?.takeIf{it>=0});Sync.schedule(this);stopsRefresh()}}
+    "Cambiar cliente o lugar"->askStop(st){client,place->store.renameStop(st.getString("id"),client,place);Sync.schedule(this);stopsRefresh()}
+    else->{store.removeStop(st.getString("id"));Sync.schedule(this);stopsRefresh()}
+   }}.setNegativeButton("Cerrar",null).show()
+ }
+ /** Asks for the client and the place of a stop: the client from the list or typed, the place as free text. */
+ private fun askStop(current:JSONObject?,done:(String,String)->Unit){
+  val client=input(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS,"Cliente").apply{setText(current?.optString("client")?:"")}
+  val place=input(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS,"Lugar · opcional").apply{setText(current?.optString("place")?:"")}
+  val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(20),dp(8),dp(20),0)}
+  box.addView(client,LinearLayout.LayoutParams(-1,dp(52)));box.addView(place,LinearLayout.LayoutParams(-1,dp(52)).apply{topMargin=dp(10)})
+  val names=catalogNames("clientes").filter{it.isNotBlank()}
+  val dialog=AlertDialog.Builder(this).setTitle(if(current==null)"Nueva parada" else "Parada").setView(box).setNegativeButton("Cancelar",null)
+   .setPositiveButton("Guardar"){_,_->val c=client.text.toString().trim();val l=place.text.toString().trim();if(c.isBlank()&&l.isBlank())toast("Escribí el cliente o el lugar") else done(c,l)}
+  if(names.isNotEmpty())dialog.setNeutralButton("Elegir cliente"){_,_->pick("Cliente",names,client.text.toString()){i->if(i<names.size){client.setText(names[i])};askStop(JSONObject().put("client",client.text.toString()).put("place",place.text.toString()),done)}}
+  dialog.show()
+ }
  private fun askFinish(){AlertDialog.Builder(this).setTitle("¿Finalizar este viaje?").setMessage("Se guardarán el recorrido, las boletas y los remitos.").setNegativeButton("Seguir viaje",null).setPositiveButton("Finalizar"){_,_->try{service(GpsService.FINISH)}catch(_:Exception){toast("No se pudo finalizar. Reintentá.")}}.show()}
  private fun actionBox(p:LinearLayout,icon:Int,label:String,index:Int,action:()->Unit):Pair<ImageView,TextView>{
   val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=ripple(glassy(20));isClickable=true;isFocusable=true;contentDescription=label;setOnClickListener{action()}};sink(v,.95f)
@@ -1021,7 +1120,7 @@ class MainActivity:AppCompatActivity(){
   if(!t.optBoolean("active")){home();toast("Viaje finalizado. Los datos pendientes se enviarán con conexión.");askReceipt(t);return}
   val paused=t.optBoolean("paused")
   status?.text=if(paused)"Viaje pausado" else "Viaje en curso";statusBox?.background=bg(if(paused)0xFFB7740B.toInt() else 0xFF178A4C.toInt(),if(screen=="trip")24 else 22)
-  elapsed?.text=elapsedText(t.optString("started_at"))
+  elapsed?.text=elapsedText(t.optString("started_at"));stopsRefresh()
   distance?.text=km(t.optDouble("distance_meters",0.0))
   pauseLabel?.text=if(screen=="simpletrip")(if(paused)"Reanudar" else "Pausar") else if(paused)"Reanudar viaje" else "Pausar viaje";pauseIcon?.setImageResource(if(paused)R.drawable.ic_play else R.drawable.ic_pause);(pauseLabel?.parent as? View)?.contentDescription=pauseLabel?.text
   val recent=instant(t.optJSONObject("last_point")?.optString("recorded_at"))?.let{System.currentTimeMillis()-it.toEpochMilli()<30000}?:false
@@ -1085,7 +1184,7 @@ class MainActivity:AppCompatActivity(){
   button(dock,"Guardar remito",top=0){
    if(photoBusy){toast("Esperá a que termine de prepararse la foto");return@button}
    try{val d=JSONObject(docForm.toString());val raw=d.optString("kg");val n=raw.replace(',','.').toDoubleOrNull();if(raw.isNotBlank()&&(n==null||!n.isFinite()||n<0)){toast("Revisá los kilogramos");return@button};d.put("kg",n?:JSONObject.NULL)
-    if(docTrip==null){photo?.let{d.put("draft_photo",it.path)};draftDocs.put(d)}else{store.saveDocument(docTrip!!,d,photo);Sync.schedule(this)}
+    if(docTrip==null){photo?.let{d.put("draft_photo",it.path)};draftDocs.put(d)}else{Stops.unloading(store.stops(docTrip!!.getString("id")))?.takeIf{d.optString("kind")=="arrival"}?.let{d.put("stop_id",it.getString("id"))};store.saveDocument(docTrip!!,d,photo);Sync.schedule(this)}
     photo=null;toast("Remito agregado. Podés agregar otro.");backFromDocument()
    }catch(_:Exception){toast("No se pudo guardar el remito")}
   }
@@ -1387,6 +1486,11 @@ class MainActivity:AppCompatActivity(){
   val now=Instant.now();val t=store.start(Api.sample!!.getJSONObject("user"),name,"Ford Cargo 1722 · ATP 2231",false,JSONObject().put("destino","Puerto de Montevideo").put("cliente","Cooperativa del Este").put("tipoCarga","Arroz").put("kg","28500"))
   store.update(false){it.put("started_at",now.minusSeconds(83*60L).toString()).put("distance_meters",86400.0).put("speed_kmh",78.0).put("last_point",JSONObject().put("recorded_at",now.toString()).put("latitude",-33.62).put("longitude",-55.31))}
   for(i in 0..20)store.appendTrack(t.getString("id"),-33.233-i*0.019,-54.383-i*0.044,0,now.toEpochMilli()-(20-i)*240_000L)
+  // Three unloadings: one done, one in progress and one to come (the screens with stops).
+  val u=Api.sample!!.getJSONObject("user").getString("id")
+  val first=store.addStop(t.getString("id"),u,"Molino San José","San José");val second=store.addStop(t.getString("id"),u,"Cooperativa del Este","Treinta y Tres");store.addStop(t.getString("id"),u,"Agroservicios del Norte","Melo")
+  store.arrive(first.getString("id"),-34.34,-56.71,now.minusSeconds(80*60L));store.finishStop(first.getString("id"),"chofer",now.minusSeconds(52*60L),12500.0)
+  store.arrive(second.getString("id"),-33.23,-54.38,now.minusSeconds(7*60L))
  }
 
  // ---------- Games: for the waits, with the truck stopped (decision of 21/10/2026). Nothing of them leaves the phone ----------
