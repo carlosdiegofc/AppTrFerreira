@@ -9,13 +9,14 @@ import { TripMap } from '../components/TripMap';
 import { CatalogNote, Card, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote } from '../components/ui';
 import { ROUTE_REFRESH_MS } from '../config';
 import { ConflictError, describeWriteError } from '../data/api';
-import { useExpenses, useRoute, useRouteGaps, useSetTripDeleted, useTripDetail } from '../data/hooks';
+import { useExpenses, useNow, useRoute, useRouteGaps, useSetTripDeleted, useTripDetail, useTripStops } from '../data/hooks';
 import { clientKey } from '../lib/clients';
 import { calendarDay, dayInZone, formatDay, formatDayTime, formatDuration } from '../lib/dates';
 import { type Expense, expensesLink, expenseTotals, NO_CHOICES, NO_NAMES, tripTargetName } from '../lib/expenses';
 import { count, money, number } from '../lib/format';
 import { documentLabel, sourceLabel, tripFacts } from '../lib/tripTable';
 import { gapSummary, routeRuns } from '../lib/route';
+import { inOrder, legs as stopLegs, STOP_STATE_LABEL, stopState, stopTitle, unloadMs } from '../lib/stops';
 import { fuelFromReceipt, type LatLng, parseTripKey, routeStats } from '../lib/trips';
 import { clientPath } from './clientText';
 import { amounts } from './fuelText';
@@ -71,6 +72,11 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
   const gaps = useRouteGaps(routeTrip);
   const gapTotals = useMemo(() => gapSummary(gaps.data ?? []), [gaps.data]);
   const openGaps = (gaps.data ?? []).filter((g) => g.method === 'sin_rellenar');
+  // The stops of a trip with several unloadings, and the kilometres of each leg between them.
+  const stopsQuery = useTripStops(routeTrip);
+  const stops = useMemo(() => inOrder(stopsQuery.data ?? []), [stopsQuery.data]);
+  const stopLegsList = useMemo(() => (session && route.data ? stopLegs(route.data, stops, session.started_at, session.ended_at) : []), [session, route.data, stops]);
+  const now = useNow(30_000);
   const dashed = useMemo(() => (route.data ? routeRuns(route.data).some((r) => r.estimated && r.points.length > 1) : false), [route.data]);
   const fuel = useMemo(() => (detail.data?.fuel ?? []).map((f) => fuelFromReceipt(f, catalog.data ?? [])), [detail.data, catalog.data]);
   const documents = detail.data?.documents ?? [];
@@ -247,7 +253,7 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
                   <ErrorNote onRetry={() => void route.refetch()}>{route.data ? 'No se pudo actualizar el recorrido del GPS.' : 'No se pudo leer el recorrido del GPS.'}</ErrorNote>
                 </div>
               )}
-              <TripMap route={route.data ?? null} start={trip.gpsStart} end={trip.gpsEnd} declared={declared} live={live} label="Mapa del recorrido del viaje" />
+              <TripMap route={route.data ?? null} start={trip.gpsStart} end={trip.gpsEnd} declared={declared} live={live} stops={stops} label="Mapa del recorrido del viaje" />
               <p className="map-legend">
                 {trip.source === 'app' && (
                   <span>
@@ -289,6 +295,41 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
         </Card>
       </div>
 
+      {trip.source === 'app' && stops.length > 0 && (
+        <Card title={`Paradas de descarga (${stops.length})`} padded={false}>
+          <ul className="item-list stop-list">
+            {stops.map((st, i) => {
+              const state = stopState(st);
+              const ms = unloadMs(st, now);
+              const leg = stopLegsList.length > 0 ? stopLegsList.find((l) => l.to === stopTitle(st)) : undefined;
+              return (
+                <li key={st.id}>
+                  <span className="item-main">
+                    <strong>
+                      {i + 1} · {stopTitle(st)}
+                    </strong>
+                    <span>
+                      {state === 'waiting'
+                        ? 'Todavía no llegó'
+                        : [
+                            `Llegó ${formatDayTime(Date.parse(st.arrived_at as string))}`,
+                            st.finished_at ? `terminó ${formatDayTime(Date.parse(st.finished_at))}${st.finished_by === 'movimiento' ? ' (el camión arrancó)' : ''}` : null,
+                            ms !== null ? `${formatDuration(ms)} descargando` : null,
+                            st.kg !== null ? `${number(st.kg, 0)} kg` : null,
+                            leg && leg.meters > 0 ? `${number(leg.meters / 1000, 1)} km desde ${leg.from === 'Salida' ? 'la salida' : leg.from}` : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                    </span>
+                  </span>
+                  <Pill tone={state === 'done' ? 'green' : state === 'unloading' ? 'amber' : 'grey'}>{STOP_STATE_LABEL[state]}</Pill>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
+
       {trip.source === 'app' && (
         <div className="grid-2">
           <Card title={`Remitos (${documents.length})`}>
@@ -300,6 +341,7 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
                   <li key={d.id}>
                     <span className="item-main">
                       <strong>{documentLabel(d)}</strong>
+                      {d.stop_id && stops.some((st) => st.id === d.stop_id) && <span>Parada: {stopTitle(stops.find((st) => st.id === d.stop_id) as (typeof stops)[number])}</span>}
                       <span>{[d.cargo_type || null, d.kg === null ? null : `${number(d.kg, 0)} kg`].filter(Boolean).join(' · ') || 'Sin datos de carga'}</span>
                     </span>
                     {d.object_path ? (

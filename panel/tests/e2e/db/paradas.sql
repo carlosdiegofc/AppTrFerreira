@@ -15,13 +15,13 @@ begin
   insert into public.trf_trip_stops (id, trip_id, driver_id, position, client, place)
   values ('80000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000011', 1, 'Molino San José', 'San José')
   on conflict (id) do nothing;
-  if (select count(*) from public.trf_trip_stops) <> 2 then raise exception 'chofer: tendría que ver sus dos paradas una sola vez'; end if;
+  if (select count(*) from public.trf_trip_stops where id::text like '80%') <> 2 then raise exception 'chofer: tendría que ver sus dos paradas una sola vez'; end if;
   -- Arrives, then the unloading ends by hand; the second ends because the truck moved.
   update public.trf_trip_stops set arrived_at = now() - interval '3 hours', arrived_lat = -34.34, arrived_lng = -56.71, updated_at = now() where id = '80000000-0000-4000-8000-000000000001';
   update public.trf_trip_stops set finished_at = now() - interval '2 hours 20 minutes', finished_by = 'chofer', kg = 12500, updated_at = now() where id = '80000000-0000-4000-8000-000000000001';
   update public.trf_trip_stops set arrived_at = now() - interval '1 hour', arrived_lat = -33.23, arrived_lng = -54.38, updated_at = now() where id = '80000000-0000-4000-8000-000000000002';
   update public.trf_trip_stops set finished_at = now() - interval '20 minutes', finished_by = 'movimiento', updated_at = now() where id = '80000000-0000-4000-8000-000000000002';
-  if (select count(*) from public.trf_trip_stops where finished_at is not null) <> 2 then raise exception 'chofer: las dos paradas tendrían que estar terminadas'; end if;
+  if (select count(*) from public.trf_trip_stops where finished_at is not null and id::text like '80%') <> 2 then raise exception 'chofer: las dos paradas tendrían que estar terminadas'; end if;
   -- A receipt can say which stop it is of.
   insert into public.trf_trip_documents (id, trip_id, driver_id, kind, number, stop_id)
   values ('80000000-0000-4000-8000-0000000000d1', '10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000011', 'arrival', '004600', '80000000-0000-4000-8000-000000000001');
@@ -60,11 +60,11 @@ begin
   if (select kg from public.trf_trip_stops where id = '80000000-0000-4000-8000-000000000002') <> 9800 then raise exception 'chofer: el envío repetido no actualizó la parada'; end if;
   -- A stop already visited stays; one not visited yet can be removed.
   delete from public.trf_trip_stops where id = '80000000-0000-4000-8000-000000000001';
-  if (select count(*) from public.trf_trip_stops) <> 2 then raise exception 'chofer: borró una parada ya visitada'; end if;
+  if (select count(*) from public.trf_trip_stops where id::text like '80%') <> 2 then raise exception 'chofer: borró una parada ya visitada'; end if;
   insert into public.trf_trip_stops (id, trip_id, driver_id, position, client)
   values ('80000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000011', 3, 'Agroservicios del Norte');
   delete from public.trf_trip_stops where id = '80000000-0000-4000-8000-000000000003';
-  if (select count(*) from public.trf_trip_stops) <> 2 then raise exception 'chofer: tendría que poder borrar una parada sin visitar'; end if;
+  if (select count(*) from public.trf_trip_stops where id::text like '80%') <> 2 then raise exception 'chofer: tendría que poder borrar una parada sin visitar'; end if;
 end $$;
 reset role;
 
@@ -121,7 +121,7 @@ end $$;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-000000000001","role":"authenticated"}', true) is not null as dueno;
 do $$
 begin
-  if (select count(*) from public.trf_trip_stops) <> 2 then raise exception 'panel: tendría que ver las paradas de Ana'; end if;
+  if (select count(*) from public.trf_trip_stops where id::text like '80%') <> 2 or (select count(*) from public.trf_trip_stops) <> 5 then raise exception 'panel: tendría que ver las paradas de Ana'; end if;
   begin
     insert into public.trf_trip_stops (id, trip_id, driver_id, position, client)
     values (gen_random_uuid(), '10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000011', 5, 'X');

@@ -9,6 +9,7 @@ import { DEFAULT_CENTER, DEFAULT_ZOOM, ROUTE_REFRESH_MS } from '../config';
 import type { RoutePoint } from '../data/api';
 import { type Glide, glideAt, grownTail, type Point, sameLines, startGlide } from '../lib/glide';
 import { routeRuns } from '../lib/route';
+import { stopTitle } from '../lib/stops';
 import type { LatLng } from '../lib/trips';
 import { GAP_STYLE, mapView, ROUTE_STYLE } from './mapView';
 
@@ -22,6 +23,8 @@ interface Props {
   declared: { origin: LatLng | null; destination: LatLng | null };
   /** In progress: the last reading is where the truck is now. */
   live: boolean;
+  /** The stops of a trip with several unloadings: the ones the truck reached are marked where it arrived. */
+  stops?: readonly { id: string; position: number; client: string; place: string; arrived_lat: number | null; arrived_lng: number | null }[];
   label: string;
 }
 
@@ -31,7 +34,7 @@ const calm = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 /** A glide ends a little before the next refresh, so the truck is not still moving when new readings arrive. */
 const GLIDE_MS = ROUTE_REFRESH_MS * 0.9;
 
-export function TripMap({ route, start, end, declared, live, label }: Props) {
+export function TripMap({ route, start, end, declared, live, stops = [], label }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const layer = useRef<L.LayerGroup | null>(null);
@@ -94,6 +97,9 @@ export function TripMap({ route, start, end, declared, live, label }: Props) {
     // Declared places first, so the measured markers stay on top where they coincide.
     if (origin) L.circleMarker(origin, { radius: 7, className: 'fm-declared', weight: 3, dashArray: '3 3' }).bindTooltip('Origen declarado').addTo(g);
     if (destination) L.circleMarker(destination, { radius: 7, className: 'fm-declared', weight: 3, dashArray: '3 3' }).bindTooltip('Destino declarado').addTo(g);
+    stops.forEach((st, i) => {
+      if (st.arrived_lat !== null && st.arrived_lng !== null) L.circleMarker([st.arrived_lat, st.arrived_lng], { radius: 7, className: 'fm-stop', weight: 3 }).bindTooltip(`${i + 1} · ${stopTitle(st)}`).addTo(g);
+    });
     const first = all[0] ?? start;
     const to = live ? (all.at(-1) ?? null) : (end ?? all.at(-1) ?? null);
     if (first) L.circleMarker(first, { radius: 6, className: 'fm-start', weight: 3 }).bindTooltip('Salida (GPS)').addTo(g);
@@ -116,7 +122,7 @@ export function TripMap({ route, start, end, declared, live, label }: Props) {
     framed.current = wanted;
     if (places.length === 1 && places[0]) m.setView(places[0], 11, { animate: false });
     else m.fitBounds(L.latLngBounds(places), { padding: [40, 40], maxZoom: 13, animate: false });
-  }, [route, start, end, origin, destination, live]);
+  }, [route, start, end, origin, destination, live, stops]);
 
   return <div ref={box} className="fleet-map map-trip" role="region" aria-label={label} />;
 }

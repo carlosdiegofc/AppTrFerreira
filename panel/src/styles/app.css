@@ -2317,6 +2317,12 @@ body.map-full-open {
   fill-opacity: 1;
 }
 
+.leaflet-interactive.fm-stop {
+  stroke: var(--surface);
+  fill: var(--amber);
+  fill-opacity: 1;
+}
+
 .leaflet-interactive.fm-now {
   stroke: var(--surface);
   fill: var(--marker-moving);

@@ -299,6 +299,13 @@ export async function fetchRouteGaps(tripId: string): Promise<RouteGapRow[]> {
   return all((from, to) => supabase.from('trf_route_gaps').select('id,from_at,to_at,meters,method').eq('trip_id', tripId).order('from_at', { ascending: true }).order('id').range(from, to), 2_000);
 }
 
+export type StopRow = Tables<'trf_trip_stops'>;
+
+/** The stops of a trip with several unloadings (app 0.27.0), in the order of the trip. */
+export async function fetchTripStops(tripId: string): Promise<StopRow[]> {
+  return all((from, to) => supabase.from('trf_trip_stops').select('*').eq('trip_id', tripId).order('position', { ascending: true }).order('created_at').order('id').range(from, to), 100);
+}
+
 export type DocumentRow = Tables<'trf_trip_documents'>;
 
 export interface TripListData {
