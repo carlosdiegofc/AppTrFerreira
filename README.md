@@ -7,6 +7,11 @@ La carpeta [`web/`](web/README.md) tiene el panel web anterior, que queda en `/a
 
 # Transportes Ferreira GPS — v0.27.1
 
+## Nuevo en v0.27.2 (arreglo: terminar la última descarga cerraba la app; versionCode 42)
+- Al tocar «Terminé de descargar» en la última parada (o cuando el camión arrancaba después de la última), la app se cerraba, y como el viaje seguía abierto volvía a cerrarse cada vez que se abría. Ahora muestra «Descargaste en todas las paradas» y el viaje sigue; las paradas guardadas no se pierden.
+- Si algo de las paradas fallara de nuevo, la pantalla del viaje sigue abierta y el error queda en Mi cuenta («Último error de la app»).
+- La prueba del emulador (`probar_finalizar.py`) termina todas las descargas de un viaje de muestra en modo normal y sencillo, y vuelve a abrir la app sobre ese viaje.
+
 ## Nuevo en v0.27.1 (arreglo: finalizar el viaje cerraba la app; versionCode 41)
 - Al finalizar un viaje, el servicio del GPS podía caerse y cerrar la app entera. Ahora una última lectura incompleta no lo tira, y el mapa del viaje no sigue trabajando después de cerrar la pantalla.
 - Prueba nueva en el emulador de la CI (`probar_finalizar.py`): finaliza un viaje de muestra en modo normal, en modo sencillo y como dueño de viaje, y falla si la app se cierra.

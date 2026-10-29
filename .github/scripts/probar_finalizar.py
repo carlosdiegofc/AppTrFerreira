@@ -7,6 +7,10 @@ FINISH), with the location permission granted so the GPS service runs as on a ph
 mode, a driver in simple mode and the owner on a trip (his map also shows the fleet). It fails if the app closes by itself,
 and then prints the error from the phone's log.
 
+Also the stops of a trip with several unloadings: on 29/10/2026 the app closed on «Terminé de descargar» of the last stop
+and did not open again. The sample trip finishes its unloadings with the same steps as the buttons until every stop is
+done, and then the app is opened again on the same trip. Normal and simple mode.
+
 Usage: probar_finalizar.py <debug apk> <output folder>. Screenshots and the phone's log are left in the folder.
 """
 import subprocess
@@ -16,10 +20,13 @@ from pathlib import Path
 
 PKG = 'com.transportesferreira.app'
 MAIN = PKG + '/uy.transportesferreira.gps.MainActivity'
+# Name, who, screen, and the screen to open again afterwards (the trip still in progress), if any.
 CASES = [
-    ('chofer-normal', 'driver', 'tripend'),
-    ('chofer-sencillo', 'driver', 'simpletripend'),
-    ('dueno-de-viaje', 'owner', 'tripend'),
+    ('chofer-normal', 'driver', 'tripend', None),
+    ('chofer-sencillo', 'driver', 'simpletripend', None),
+    ('dueno-de-viaje', 'owner', 'tripend', None),
+    ('paradas-normal', 'driver', 'tripstops', 'trip'),
+    ('paradas-sencillo', 'driver', 'simpletripstops', 'simpletrip'),
 ]
 
 apk, out = Path(sys.argv[1]), Path(sys.argv[2])
@@ -67,7 +74,7 @@ failed = []
 try:
     print('--- Instalar la versión de prueba', flush=True)
     adb('install', '-r', str(apk), timeout=240)
-    for name, who, see in CASES:
+    for name, who, see, again in CASES:
         print(f'--- {name}', flush=True)
         adb('shell', 'pm', 'clear', PKG)
         for permission in ('ACCESS_FINE_LOCATION', 'ACCESS_COARSE_LOCATION', 'POST_NOTIFICATIONS'):
@@ -95,13 +102,27 @@ try:
             continue
         time.sleep(2)
         shot(f'{name}-1-viaje')
-        # The trip ends 4 seconds after it opens; the screen checks every second and goes back to the start.
+        # The trip ends 4 seconds after it opens (the stops: 3 steps, 2 seconds apart); the screen checks every second.
         time.sleep(12)
         shot(f'{name}-2-despues')
         log = crashes()
         if not running() or PKG in log:
-            failed.append(f'{name}: la app se cerró al finalizar el viaje.\n{log}\n{tail()}')
+            failed.append(f'{name}: la app se cerró.\n{log}\n{tail()}')
             print(f'FALLA {name}', flush=True)
+        elif again:
+            # Closed and opened again: the trip goes on, with every stop done.
+            adb('shell', 'am', 'force-stop', PKG, check=False)
+            time.sleep(4)
+            adb('shell', 'am', 'start', '-n', MAIN, '--es', 'trf_sample', who, '--es', 'trf_sample_screen', again, '--es', 'trf_sample_tag', f'{name}-otra-vez', timeout=60)
+            reopened = ready(f'{name}-otra-vez', 45)
+            time.sleep(5)
+            shot(f'{name}-3-otra-vez')
+            log = crashes()
+            if not reopened or not running() or PKG in log:
+                failed.append(f'{name}: la app no volvió a abrir el viaje.\n{log}\n{tail()}')
+                print(f'FALLA {name}: no vuelve a abrir', flush=True)
+            else:
+                print(f'bien {name}: la app sigue abierta y vuelve a abrir el viaje', flush=True)
         else:
             print(f'bien {name}: la app sigue abierta', flush=True)
         (out / f'{name}-logcat.txt').write_text(adb('logcat', '-d', '-b', 'all', '-v', 'threadtime', check=False, timeout=120).stdout)
@@ -110,4 +131,4 @@ finally:
     adb('shell', 'am', 'force-stop', PKG, check=False)
 if failed:
     raise SystemExit('Finalizar el viaje falló:\n\n' + '\n\n'.join(failed))
-print('Finalizar el viaje: la app siguió abierta en los tres casos.', flush=True)
+print('Finalizar el viaje y las paradas: la app siguió abierta en todos los casos.', flush=True)
