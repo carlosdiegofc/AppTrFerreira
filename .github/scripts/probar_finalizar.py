@@ -74,9 +74,20 @@ try:
             adb('shell', 'pm', 'grant', PKG, f'android.permission.{permission}', check=False)
         adb('logcat', '-c', check=False)
         adb('logcat', '-b', 'crash', '-c', check=False)
-        # Without -W: a launch that hangs must not hang the test, it has to say why.
-        adb('shell', 'am', 'start', '-n', MAIN, '--es', 'trf_sample', who, '--es', 'trf_sample_screen', see, '--es', 'trf_sample_tag', name, timeout=60)
-        if not ready(name):
+        # The previous case's task is still being removed for a moment: started too soon, the system kills the new app
+        # with it («remove task»). It waits, and tries once more if the trip did not open.
+        time.sleep(4)
+        opened = False
+        for attempt in range(2):
+            # Without -W: a launch that hangs must not hang the test, it has to say why.
+            adb('shell', 'am', 'start', '-n', MAIN, '--es', 'trf_sample', who, '--es', 'trf_sample_screen', see, '--es', 'trf_sample_tag', name, timeout=60)
+            if ready(name, 45):
+                opened = True
+                break
+            print(f'{name}: no abrió, se intenta de nuevo', flush=True)
+            adb('shell', 'am', 'force-stop', PKG, check=False)
+            time.sleep(4)
+        if not opened:
             shot(f'{name}-0-no-abrio')
             failed.append(f'{name}: el viaje de muestra no se abrió en 60 segundos.\n{crashes()}\n{tail()}')
             print(f'FALLA {name}: no se abrió', flush=True)
