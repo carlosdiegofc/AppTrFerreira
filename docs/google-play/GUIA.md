@@ -233,6 +233,14 @@ La app de Google Play es una app nueva para Android (nombre de paquete `com.tran
 
 Cada versión nueva lleva un número de versión más alto, y GitHub Actions arma su `.aab` solo. En Play Console: *Prueba interna › Crear versión* › subí el `.aab` nuevo › **Lanzar**. Los teléfonos se actualizan desde Google Play sin hacer nada más.
 
+Versión `0.27.0` (código de versión 40). Un viaje puede llevar **paradas de descarga** para distintos clientes: el chofer marca «Llegué» y «Terminé de descargar», y la descarga también termina sola cuando el camión arranca. No cambian los permisos ni los tipos de datos de Seguridad de los datos (la ubicación de la llegada es la misma ubicación del viaje); la política de privacidad ya nombra las paradas. **Necesita la migración 0014 en producción antes de lanzarla.** Antes de lanzarla, probala en un teléfono con un viaje de dos paradas: «Llegué», esperar, «Terminé de descargar», y en la segunda dejar que el camión arranque. Notas de la versión:
+
+```text
+<es-419>
+• Viajes con varias descargas: agregá las paradas de cada cliente, marcá «Llegué» y «Terminé de descargar», y el viaje sigue con el próximo cliente.
+</es-419>
+```
+
 Versión `0.26.0` (código de versión 39). Al cargar combustible, la app lee la foto de la boleta y llena el formulario. Primero lo hace en el teléfono; si no puede, la foto de esa boleta va a la función de la empresa en Supabase y de ahí a Anthropic (Claude), que la lee y devuelve los datos sin guardarla. Eso cambia la **Seguridad de los datos**: en «Fotos y videos › Fotos» la app ya recopilaba la foto de la boleta; ahora, además, se **procesa por un proveedor que actúa por cuenta de la empresa** (Anthropic), que Play no cuenta como «compartido». Si el formulario lo pregunta, marcalo así. La política de privacidad ya lo dice (actualizada el 29/10/2026). Antes de lanzarla, el dueño tiene que haber cargado el secreto `ANTHROPIC_API_KEY` en Supabase y la función `leer-boleta` tiene que estar desplegada; sin eso la app lee solo con el teléfono. Prueba en un teléfono: **Combustible › Sacar foto** de una boleta de verdad; los litros y el importe tienen que aparecer solos, con el aviso de revisarlos. Notas de la versión:
 
 ```text

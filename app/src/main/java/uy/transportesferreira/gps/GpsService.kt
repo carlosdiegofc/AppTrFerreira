@@ -22,6 +22,8 @@ class GpsService:Service(){
  private var watchSince=System.currentTimeMillis();private var lastRestart=0L
  // When the truck last moved, and whether its stop was already told (Notices.open): a trip that looks left open asks.
  private var movedAt=System.currentTimeMillis();private var toldStop=false
+ // A stop being unloaded ends by itself when the truck moves off (Stops.Mover).
+ private val mover=Stops.Mover()
  private val syncing=AtomicBoolean(false);private val executor=Executors.newSingleThreadExecutor()
  // The live position has its own line out, so it never waits behind the trip, the route or the photos.
  private val sendingLive=AtomicBoolean(false);private val liveExecutor=Executors.newSingleThreadExecutor();private var tripSentAt=0L
@@ -88,6 +90,7 @@ class GpsService:Service(){
   store.appendTrack(t.getString("id"),l.latitude,l.longitude,t.optInt("segment"),l.time)
   val kmh=if(l.hasSpeed())(l.speed*3.6).coerceAtLeast(0.0) else null
   if((kmh?:0.0)>=Notices.MOVING_KMH){movedAt=System.currentTimeMillis();toldStop=false}
+  unloadingCheck(t.getString("id"),kmh,l.time)
   if(route.keep(l.latitude,l.longitude,l.time,t.optInt("segment"),kmh,l.accuracy.toDouble(),if(l.hasBearing())l.bearing.toDouble() else null)){
    if(route.corner)lastReading?.let{store.addPoint(it)}
    store.addPoint(p)
@@ -98,6 +101,16 @@ class GpsService:Service(){
   val now=System.currentTimeMillis();val send=filled!=null||now-tripSentAt>=15000;if(send)tripSentAt=now
   store.update(send){if(!it.has("origin_lat")){it.put("origin_lat",l.latitude).put("origin_lng",l.longitude)};it.put("distance_meters",it.optDouble("distance_meters",0.0)+delta+(filled?:0.0)).put("last_point",p).put("speed_kmh",p.optDouble("speed_kmh",0.0)).put("route_state",route.state())}
   sendLive();if(send)sync()
+ }
+ /** While a stop is being unloaded, the truck moving off ends it, from the moment it started to move. */
+ private fun unloadingCheck(tripId:String,kmh:Double?,time:Long){
+  val stop=Stops.unloading(store.stops(tripId))
+  if(stop==null){mover.reset();return}
+  val since=mover.add(kmh,time)?:return
+  val arrived=try{Instant.parse(stop.getString("arrived_at")).toEpochMilli()}catch(_:Exception){0L}
+  // A truck that was already moving when the driver arrived has not moved off yet: it counts from the arrival.
+  if(since<arrived){mover.reset();return}
+  store.finishStop(stop.getString("id"),"movimiento",Instant.ofEpochMilli(since));mover.reset();sync()
  }
  /**
   * A stretch without signal (Gaps): the reading before this one is in the same stretch of the trip, more than 90 seconds

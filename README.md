@@ -5,7 +5,14 @@ Panel web nuevo (React + TypeScript), en la dirección principal del panel desde
 # Panel web (anterior)
 La carpeta [`web/`](web/README.md) tiene el panel web anterior, que queda en `/anterior/` de la misma dirección un tiempo: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
 
-# Transportes Ferreira GPS — v0.26.0
+# Transportes Ferreira GPS — v0.27.0
+
+## Nuevo en v0.27.0 (viajes con varias descargas; versionCode 40)
+- **Paradas de descarga** (decisión del 29/10/2026): un viaje puede llevar carga para distintos clientes. Las paradas se cargan antes de salir (en «Datos del viaje») o durante el viaje (en la hoja, «Agregar parada»).
+  - En la pantalla del viaje aparece «Llegué a [cliente]»: anota la hora y el lugar y pasa a «Descargando». La descarga termina cuando tocás «Terminé de descargar» o cuando el camión arranca (más de 15 km/h durante 30 segundos); entonces sigue la parada siguiente, en el mismo viaje.
+  - La hoja lista las paradas con su hora y cuánto duró cada descarga; tocando una se cargan los kilos descargados, y las que todavía no se visitaron se pueden cambiar o quitar. El remito que se agrega mientras se descarga queda atado a esa parada.
+  - El modo sencillo lleva lo mismo, con el botón grande.
+- **Necesita la migración 0014 en producción** antes de publicar (tabla `trf_trip_stops` y `stop_id` en los remitos). Un viaje sin paradas es igual que antes.
 
 ## Nuevo en v0.26.0 (leer la boleta con la foto; versionCode 39)
 - **Combustible:** al sacar o elegir la foto de la boleta, la app lee litros, importe, fecha y estación y llena el formulario (decisión del 29/10/2026). Siempre revisás y confirmás antes de guardar; lo que ya escribiste no se pisa.

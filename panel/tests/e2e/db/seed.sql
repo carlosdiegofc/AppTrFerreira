@@ -135,6 +135,15 @@ insert into public.trf_trip_documents (id, trip_id, driver_id, kind, number, car
   ('30000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000011', 'departure', '0001-00012345', 'Soja', 30000,
    '00000000-0000-4000-8000-000000000011/10000000-0000-4000-8000-00000000000a/30000000-0000-4000-8000-000000000001.jpg', (select now from t0) - interval '110 minutes'),
   ('30000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000011', 'arrival', '', '', null, null, (select now from t0) - interval '100 minutes');
+-- Ana's trip carries three unloadings (migration 0014): one done by hand, one in progress and one to come. The
+-- receipt of arrival belongs to the first.
+insert into public.trf_trip_stops (id, trip_id, driver_id, position, client, place, arrived_at, arrived_lat, arrived_lng, finished_at, finished_by, kg) values
+  ('81000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000011', 1, 'Molino San José', 'San José',
+   (select now from t0) - interval '95 minutes', -34.34, -56.71, (select now from t0) - interval '70 minutes', 'chofer', 12500),
+  ('81000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000011', 2, 'Cooperativa del Este', 'Treinta y Tres',
+   (select now from t0) - interval '4 minutes', -34.43, -56.45, null, null, null),
+  ('81000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000011', 3, 'Agroservicios del Norte', 'Melo', null, null, null, null, null, null);
+update public.trf_trip_documents set stop_id = '81000000-0000-4000-8000-000000000001' where id = '30000000-0000-4000-8000-000000000002';
 -- Ana filled the Volvo's tank on her trip, when it had done 120 km (the tanks, below).
 insert into public.trf_driver_fuel_receipts (id, trip_id, driver_id, driver_name, vehicle, recorded_at, receipt_date, object_path, station_name, liters, total, panel_data, updated_at, distance_meters, full_tank) values
   ('40000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000011', 'Ana Pereira', 'Volvo FH 460 · ABC1234', (select now from t0) - interval '90 minutes', (select today from t0),

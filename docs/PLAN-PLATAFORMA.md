@@ -169,13 +169,13 @@ Al iniciar un viaje, el mapa ocupa toda la pantalla, como un navegador, y el due
 4. [x] El dueño que maneja ve en el mapa de su viaje, siempre, los camiones de viaje y los choferes activos, con la velocidad de los que se mueven; tocando un camión aparece su recorrido en violeta, y tocándolo otra vez se va.
 5. [x] Flota en vivo: el mapa ocupa media pantalla, tiene «Ver el mapa en pantalla completa», los camiones de viaje dicen su velocidad y tocando uno aparece su recorrido.
 6. [x] Capturas aprobadas por el dueño el 29/10/2026 (ejecución 40801167048); unión del PR #32 y .aab firmado el mismo día en la ejecución 40805614080 de main (artefacto «Google-Play-Transportes-Ferreira-GPS-v0.25.0»), que se sube a Google Play cuando lo decidas.
-7. [ ] App 0.25.1: «Finalizar» siempre a la vista en el panel de abajo, al lado de «Pausar viaje» (pedido del dueño el 29/10/2026, porque en la hoja costaba encontrarlo). Falta aprobar la captura.
+7. [x] App 0.25.1: «Finalizar» siempre a la vista en el panel de abajo, al lado de «Pausar viaje» (pedido del dueño el 29/10/2026, porque en la hoja costaba encontrarlo). Unión del PR #33 el 29/10/2026.
 
 ### Viajes con y sin carga (aprobado el 29/10/2026)
 Solo el panel: la app ya guarda si un viaje va con carga o es un retorno vacío (`load_type`), y Métricas ya separa los kilómetros cargados de los vacíos. No hay migración.
 1. [x] Viajes: un filtro «Carga» (con y sin carga, con la carga que dice la app), «sin carga» a la vista en el kilometraje de cada viaje, y la lista exportada dice qué filtro tenía. Los viajes cargados a mano en el panel no dicen su carga: no entran en ninguno de los dos filtros.
 2. [x] Un viaje sigue teniendo una sola carga: el que sale cargado y vuelve vacío son dos viajes, como hoy.
-3. [ ] Publicación del panel.
+3. [x] Unión del PR #34 y panel publicado el 29/10/2026.
 
 ### Leer la boleta con la foto (aprobado el 29/10/2026)
 El chofer saca la foto de la boleta y la app llena litros, importe, precio, estación y fecha; el chofer siempre confirma antes de guardar. Va en la app 0.26.0 y una función de Supabase. Lo que se guarda no cambia, así que no hay migración de la base:
@@ -183,7 +183,16 @@ El chofer saca la foto de la boleta y la app llena litros, importe, precio, esta
 2. [x] Si no encuentra litros e importe que coincidan con el precio, la foto va a una función de Supabase (`supabase/functions/leer-boleta`) que la lee con Claude (la llave `ANTHROPIC_API_KEY` la carga el dueño como secreto de Supabase, nunca en el repositorio ni en la app) y devuelve los datos.
 3. [x] Los campos aparecen llenos y se corrigen, sin pisar lo que el chofer ya escribió. Si litros por precio difiere del importe en más de un 5 %, la lectura del teléfono no se da por buena (pasa a la IA) y, si aun así no coincide, la app avisa que revise esos números.
 4. [x] La política de privacidad dice que, solo cuando el teléfono no pudo leerla, la foto de la boleta se manda a Anthropic para leerla.
-5. [ ] Capturas para aprobar, unión, función desplegada con la llave cargada, y .aab de la 0.26.0.
+5. [x] Unión del PR #34 el 29/10/2026 y .aab de la 0.26.0.
+6. [ ] El dueño carga `ANTHROPIC_API_KEY` como secreto en Supabase; después se despliega `leer-boleta` y se prueba con una boleta de verdad desde un teléfono. Sin la función, la app lee solo con el teléfono.
+
+### Viajes con varias descargas (aprobado el 29/10/2026)
+Un viaje puede llevar carga para distintos clientes: en cada lugar el chofer marca que llegó y que terminó de descargar, y el viaje sigue con el próximo cliente. Va en la migración 0014, la app 0.27.0 y el panel. Un viaje sin paradas sigue siendo uno solo.
+1. [x] La base (migración 0014, solo agrega): una tabla `trf_trip_stops` con las paradas de cada viaje (cliente, lugar, orden, llegada con su ubicación, fin de la descarga y cómo terminó, kilos) y una columna opcional `stop_id` en los remitos. Cada chofer carga y maneja las suyas; las cuentas del panel y la administración las ven todas. Una parada ya visitada no se borra. Pruebas en `panel/tests/e2e/db/paradas.sql`.
+2. [x] La app: las paradas se cargan antes de salir o sobre la marcha. En el viaje, «Llegué a [cliente]» anota la hora y el lugar y pasa a «Descargando»; la descarga termina cuando el chofer toca «Terminé de descargar» o cuando el camión pasa de 15 km/h durante 30 segundos; entonces sigue la parada siguiente en el mismo viaje. El modo sencillo lleva los mismos botones, grandes. Un remito se puede atar a su parada.
+3. [x] El panel: el viaje muestra sus paradas con la hora de llegada, el fin y cuánto duró cada descarga, las marca en el mapa y reparte los kilómetros por tramo.
+4. [ ] Respaldo completo de la base (entregado al dueño, fuera del repositorio), migración 0014 en producción antes de publicar la app y el panel, y .aab firmado.
+5. [ ] Segunda parte, a pedir: el importe y los kilos por cliente, para que Cobros y la ganancia cuenten por cliente.
 
 Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - El rol anónimo tiene todos los permisos de tabla en 8 tablas de la app y del panel (`trf_driver_*`, `trf_trip_*`, `trf_mobile_catalog`, `trf_panel_trips`), y también los de la secuencia que numera los puntos GPS. Es lo que Supabase da por defecto y la seguridad por filas lo frena, pero hay que quitarlos: solo `trf_rates` necesita lectura anónima.
@@ -193,6 +202,11 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 29/10/2026: Viajes con varias descargas.
+  - Las paradas se cargan antes de salir o sobre la marcha.
+  - La descarga termina cuando el chofer lo marca o cuando el camión pasa de 15 km/h durante 30 segundos; lo que pasó primero queda anotado.
+  - El modo sencillo también lleva paradas, con botones grandes.
+  - El importe por cliente queda para una segunda parte.
 - 29/10/2026: Viajes con y sin carga: filtro en Viajes, sin cambios en la base; un viaje sale cargado o vacío, no las dos cosas.
 - 29/10/2026: Leer la boleta con la foto: primero el teléfono, si falla Claude desde una función de Supabase; el chofer siempre confirma; el campo se marca si litros por precio difiere del importe en más de un 5 %.
 - 29/10/2026: Pantalla del viaje con el mapa grande.

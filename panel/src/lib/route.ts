@@ -58,7 +58,7 @@ export function lastSaved(shown: readonly { id: number }[]): number | null {
 
 const RAD = Math.PI / 180;
 
-function metersBetween(a: Reading, b: Reading): number {
+export function metersBetween(a: Reading, b: Reading): number {
   const h = Math.sin(((b.latitude - a.latitude) * RAD) / 2) ** 2 + Math.cos(a.latitude * RAD) * Math.cos(b.latitude * RAD) * Math.sin(((b.longitude - a.longitude) * RAD) / 2) ** 2;
   return 6_371_000 * 2 * Math.asin(Math.sqrt(Math.min(1, Math.max(0, h))));
 }

@@ -1180,6 +1180,7 @@ export type Database = {
           kind: string
           number: string
           object_path: string | null
+          stop_id: string | null
           trip_id: string
         }
         Insert: {
@@ -1191,6 +1192,7 @@ export type Database = {
           kind: string
           number?: string
           object_path?: string | null
+          stop_id?: string | null
           trip_id: string
         }
         Update: {
@@ -1202,11 +1204,71 @@ export type Database = {
           kind?: string
           number?: string
           object_path?: string | null
+          stop_id?: string | null
           trip_id?: string
         }
         Relationships: [
           {
             foreignKeyName: "trf_trip_documents_trip_id_driver_id_fkey"
+            columns: ["trip_id", "driver_id"]
+            isOneToOne: false
+            referencedRelation: "trf_driver_tracking_sessions"
+            referencedColumns: ["id", "driver_id"]
+          },
+        ]
+      }
+      trf_trip_stops: {
+        Row: {
+          arrived_at: string | null
+          arrived_lat: number | null
+          arrived_lng: number | null
+          client: string
+          created_at: string
+          driver_id: string
+          finished_at: string | null
+          finished_by: string | null
+          id: string
+          kg: number | null
+          place: string
+          position: number
+          trip_id: string
+          updated_at: string
+        }
+        Insert: {
+          arrived_at?: string | null
+          arrived_lat?: number | null
+          arrived_lng?: number | null
+          client?: string
+          created_at?: string
+          driver_id?: string
+          finished_at?: string | null
+          finished_by?: string | null
+          id: string
+          kg?: number | null
+          place?: string
+          position: number
+          trip_id: string
+          updated_at?: string
+        }
+        Update: {
+          arrived_at?: string | null
+          arrived_lat?: number | null
+          arrived_lng?: number | null
+          client?: string
+          created_at?: string
+          driver_id?: string
+          finished_at?: string | null
+          finished_by?: string | null
+          id?: string
+          kg?: number | null
+          place?: string
+          position?: number
+          trip_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trf_trip_stops_owned_trip"
             columns: ["trip_id", "driver_id"]
             isOneToOne: false
             referencedRelation: "trf_driver_tracking_sessions"

@@ -202,3 +202,12 @@ Decisión del 29/10/2026. Lo que la app guarda y manda no cambia: los datos leí
 
 - La lectura corre primero en el teléfono (ML Kit, sin red). Si no encuentra litros e importe, o si litros por precio por litro difieren del importe en más de un 5 %, la app manda la foto, reducida a 1800 px, a `POST /functions/v1/leer-boleta` con la sesión del chofer y `{image, media_type}`.
 - La función comprueba que la sesión sea de una cuenta (la llave anónima de la app es pública), limita a 40 lecturas por hora y cuenta, y le pide a Claude (`claude-sonnet-5-5`) los datos con una herramienta de esquema estricto. Devuelve `{liters, total, price, date, station}`, con `null` en lo que no se lee. No guarda la foto ni el resultado. Sin el secreto `ANTHROPIC_API_KEY` contesta 503 y la app se queda con la lectura del teléfono.
+
+## Viajes con varias descargas: app 0.27.0 y migración 0014
+Decisión del 29/10/2026. La migración `supabase/migrations/0014_paradas_del_viaje.sql` solo agrega, y tiene que estar en producción antes de publicar la app 0.27.0 y el panel: PostgREST rechaza una columna o una tabla que no conoce.
+
+- **`trf_trip_stops`:** una fila por parada, con el id que le da el teléfono y `on_conflict=id` sin duplicar. Tiene `trip_id` y `driver_id` (el viaje es de ese chofer, por la clave), `position` (el orden, desde 1), `client` y `place`, `arrived_at` con `arrived_lat`/`arrived_lng` (cuándo y dónde llegó), `finished_at` con `finished_by` (`chofer` o `movimiento`) y `kg`. Sin llegada no hay fin ni lugar; el fin no es anterior a la llegada.
+- **Cuándo cambia una parada:** el teléfono la crea al cargarla, la actualiza al llegar y al terminar la descarga, y manda el viaje (`trf_driver_tracking_sessions`) antes que sus paradas. Un chofer cambia lo de la parada, no su viaje ni su dueño. Una parada que ya tiene llegada no se borra.
+- **Cuándo termina sola la descarga:** con una lectura del GPS de más de 15 km/h sostenida 30 segundos desde la llegada, la app pone `finished_at` en el momento en que empezó a moverse y `finished_by = movimiento`. Lo que pasa primero (el botón o el movimiento) es lo que queda.
+- **Remitos:** `trf_trip_documents.stop_id` dice de qué parada es un remito. Sin clave foránea, a propósito: el remito y la parada se envían por separado. Los de siempre quedan sin parada.
+- **Lo que leen:** el panel lee las paradas de cada viaje (cuentas del panel y administración, todas; cada chofer, las suyas) y las ordena por `position`.

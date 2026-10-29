@@ -10,8 +10,8 @@ android {
         minSdk = 26
         targetSdk = 36
         // Google Play accepts each versionCode only once: every bundle uploaded there needs a higher one, even a rebuild of the same versionName.
-        versionCode = 39
-        versionName = "0.26.0"
+        versionCode = 40
+        versionName = "0.27.0"
         // Google's map (decision of 26/10/2026): its key only exists in the CI secrets and goes into the manifest when the
         // app is built. Without it the app keeps its own map, as before.
         manifestPlaceholders["mapsApiKey"] = System.getenv("GOOGLE_MAPS_ANDROID_KEY")?.trim().orEmpty()
@@ -52,6 +52,8 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.9.1")
     implementation("androidx.exifinterface:exifinterface:1.3.7")
     testImplementation("junit:junit:4.13.2")
+    // The JSON of Android is empty in unit tests: the real one, only for them.
+    testImplementation("org.json:json:20240303")
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.gms:play-services-location:21.3.0")

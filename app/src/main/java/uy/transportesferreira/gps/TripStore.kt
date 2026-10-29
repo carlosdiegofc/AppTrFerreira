@@ -15,7 +15,7 @@ class TripStore(private val c:Context) {
     private fun read(file:File):JSONObject?=try{JSONObject(AtomicFile(file).openRead().bufferedReader().use{it.readText()})}catch(_:Exception){null}
     fun current():JSONObject?=synchronized(lock){prefs.getString("current",null)?.let{read(File(dir("trips"),"$it.json"))}}
     fun save(trip:JSONObject)=synchronized(lock){write(File(dir("trips"),"${trip.getString("id")}.json"),trip);Unit}
-    fun start(user:JSONObject,name:String,vehicle:String,empty:Boolean,details:JSONObject=JSONObject(),drafts:org.json.JSONArray=org.json.JSONArray()):JSONObject=synchronized(lock){
+    fun start(user:JSONObject,name:String,vehicle:String,empty:Boolean,details:JSONObject=JSONObject(),drafts:org.json.JSONArray=org.json.JSONArray(),stops:org.json.JSONArray=org.json.JSONArray()):JSONObject=synchronized(lock){
         check(current()?.optBoolean("active")!=true){"Ya hay un viaje activo"}
         warning("")
         dir("track").listFiles()?.sortedByDescending{it.lastModified()}?.drop(5)?.forEach{it.delete()}
@@ -26,6 +26,7 @@ class TripStore(private val c:Context) {
         t.put("pending_documents",drafts)
         save(t)
         write(File(dir("details"),"${t.getString("id")}.json"),JSONObject().put("trip_id",t.getString("id")).put("driver_id",user.getString("id")).put("data",details).put("synced",false))
+        for(i in 0 until stops.length())addStop(t.getString("id"),user.getString("id"),stops.getJSONObject(i).optString("client"),stops.getJSONObject(i).optString("place"))
         check(prefs.edit().putString("current",t.getString("id")).commit());t
     }
     /** Changes the trip in progress. send=false keeps the change on the phone until the next one that is sent. */
@@ -55,9 +56,49 @@ class TripStore(private val c:Context) {
         read(f)?.let{t->t.put("distance_meters",(t.optDouble("distance_meters",0.0)+meters-gap.optDouble("counted",0.0)).coerceAtLeast(0.0)).put("revision",t.optInt("revision")+1);write(f,t)}
         saveGap(gap.put("meters",meters).put("method",method).put("counted",meters).put("resolved",true))
     }
+    /**
+     * The stops of a trip with several unloadings (Stops). Each one is a file that goes up to the panel whenever it
+     * changes (revision against synced_revision, like the trip); one removed before the truck arrived is kept as deleted
+     * until the panel is told, unless the panel never knew it.
+     */
+    fun stops(tripId:String)=synchronized(lock){records("stops").map{it.second}.filter{it.optString("trip_id")==tripId&&!it.optBoolean("deleted")}.sortedWith(compareBy({it.optInt("position")},{it.optString("created_at")}))}
+    fun addStop(tripId:String,driverId:String,client:String,place:String):JSONObject=synchronized(lock){
+        val now=Instant.now().toString()
+        val s=JSONObject().put("id",UUID.randomUUID().toString()).put("trip_id",tripId).put("driver_id",driverId).put("position",(stops(tripId).maxOfOrNull{it.optInt("position")}?:0)+1)
+            .put("client",client.trim().take(200)).put("place",place.trim().take(200)).put("arrived_at",JSONObject.NULL).put("arrived_lat",JSONObject.NULL).put("arrived_lng",JSONObject.NULL)
+            .put("finished_at",JSONObject.NULL).put("finished_by",JSONObject.NULL).put("kg",JSONObject.NULL).put("created_at",now).put("updated_at",now).put("revision",1).put("synced_revision",0)
+        write(File(dir("stops"),"${s.getString("id")}.json"),s);s
+    }
+    private fun changeStop(id:String,change:(JSONObject)->Unit):JSONObject?{
+        val f=File(dir("stops"),"$id.json");val s=read(f)?:return null
+        change(s);s.put("updated_at",Instant.now().toString()).put("revision",s.optInt("revision")+1);write(f,s);return s
+    }
+    /** The truck arrived at the stop: when and where. Only a stop still waiting, and only if no other is being unloaded. */
+    fun arrive(id:String,lat:Double?,lng:Double?,at:Instant=Instant.now()):JSONObject?=synchronized(lock){
+        val s=records("stops").map{it.second}.firstOrNull{it.optString("id")==id}?:return@synchronized null
+        if(Stops.state(s)!=Stops.State.WAITING||Stops.unloading(stops(s.optString("trip_id")))!=null)return@synchronized null
+        changeStop(id){it.put("arrived_at",at.toString()).put("arrived_lat",lat?:JSONObject.NULL).put("arrived_lng",if(lat==null)JSONObject.NULL else lng?:JSONObject.NULL)}
+    }
+    /** The unloading ended, by the driver («chofer») or because the truck moved off («movimiento»). Only one being unloaded. */
+    fun finishStop(id:String,by:String,at:Instant=Instant.now(),kg:Double?=null):JSONObject?=synchronized(lock){
+        val s=records("stops").map{it.second}.firstOrNull{it.optString("id")==id}?:return@synchronized null
+        if(Stops.state(s)!=Stops.State.UNLOADING)return@synchronized null
+        val arrived=try{Instant.parse(s.getString("arrived_at"))}catch(_:Exception){at}
+        changeStop(id){it.put("finished_at",(if(at.isBefore(arrived))arrived else at).toString()).put("finished_by",by);if(kg!=null)it.put("kg",kg)}
+    }
+    fun setStopKg(id:String,kg:Double?)=synchronized(lock){changeStop(id){it.put("kg",kg?:JSONObject.NULL)}}
+    fun renameStop(id:String,client:String,place:String)=synchronized(lock){changeStop(id){it.put("client",client.trim().take(200)).put("place",place.trim().take(200))}}
+    /** A stop the truck has not arrived at can be removed; one already visited stays as it was counted. */
+    fun removeStop(id:String):Boolean=synchronized(lock){
+        val f=File(dir("stops"),"$id.json");val s=read(f)?:return@synchronized false
+        if(Stops.state(s)!=Stops.State.WAITING)return@synchronized false
+        if(s.optInt("synced_revision")==0)f.delete() else write(f,s.put("deleted",true).put("revision",s.optInt("revision")+1))
+        true
+    }
+    fun markStopSynced(file:File,s:JSONObject,revision:Int)=synchronized(lock){val now=read(file)?:return@synchronized;if(now.optInt("revision")==revision)write(file,now.put("synced_revision",revision)) else write(file,now.put("synced_revision",maxOf(now.optInt("synced_revision"),revision)))}
     fun receipts()=synchronized(lock){dir("receipts").listFiles()?.filter{it.extension=="json"}?.mapNotNull{f->read(f)?.let{Pair(f,it)}} ?: emptyList()}
     fun receiptCount(id:String)=receipts().count{it.second.optString("trip_id")==id}
-    fun pendingCount()=trips().sumOf{it.optJSONArray("pending_documents")?.length()?:0}+trips().count{it.optInt("revision")>it.optInt("synced_revision")}+points().size+receipts().count{!it.second.optBoolean("synced")}+documents().count{!it.second.optBoolean("synced")}+details().count{!it.second.optBoolean("synced")}+gaps().size
+    fun pendingCount()=trips().sumOf{it.optJSONArray("pending_documents")?.length()?:0}+trips().count{it.optInt("revision")>it.optInt("synced_revision")}+points().size+receipts().count{!it.second.optBoolean("synced")}+documents().count{!it.second.optBoolean("synced")}+details().count{!it.second.optBoolean("synced")}+gaps().size+records("stops").count{it.second.optInt("revision")>it.second.optInt("synced_revision")}
     fun records(folder:String)=synchronized(lock){dir(folder).listFiles()?.filter{it.extension=="json"}?.mapNotNull{f->read(f)?.let{Pair(f,it)}} ?: emptyList()}
     fun documents()=records("documents")
     fun details()=records("details")
@@ -79,6 +120,7 @@ class TripStore(private val c:Context) {
         val r=JSONObject().put("id",id).put("trip_id",tid).put("driver_id",uid).put("kind",fields.optString("kind","departure"))
             .put("number",fields.optString("number")).put("cargo_type",fields.optString("cargo_type")).put("kg",fields.opt("kg")?:JSONObject.NULL)
             .put("object_path",JSONObject.NULL).put("created_at",Instant.now().toString()).put("synced",false)
+        fields.optString("stop_id").takeIf{it.isNotBlank()&&it!="null"}?.let{r.put("stop_id",it)}
         if(photo!=null){val dest=File(dir("documents"),"$id.jpg");photo.copyTo(dest,overwrite=true);r.put("local_path",dest.absolutePath).put("object_path","$uid/$tid/$id.jpg")}
         write(File(dir("documents"),"$id.json"),r);r
     }

@@ -39,6 +39,7 @@ import {
   fetchPresence,
   fetchRoute,
   fetchRouteGaps,
+  fetchTripStops,
   fetchServices,
   fetchTollPassages,
   fetchTripDetail,
@@ -334,6 +335,16 @@ export function useRouteGaps(trip: RouteTrip | null) {
     queryFn: () => (trip ? fetchRouteGaps(trip.id) : Promise.resolve([])),
     enabled: trip !== null,
     refetchInterval: trip && (!trip.ended_at || settling(trip.ended_at)) ? ROUTE_REFRESH_MS * 6 : false,
+  });
+}
+
+/** The stops of a trip, read again with its route while it is in progress (the driver marks arrivals as they happen). */
+export function useTripStops(trip: RouteTrip | null) {
+  return useQuery({
+    queryKey: ['tripStops', trip?.id ?? null],
+    queryFn: () => (trip ? fetchTripStops(trip.id) : Promise.resolve([])),
+    enabled: trip !== null,
+    refetchInterval: trip && (!trip.ended_at || settling(trip.ended_at)) ? ROUTE_REFRESH_MS * 3 : false,
   });
 }
 
