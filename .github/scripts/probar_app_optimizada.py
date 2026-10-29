@@ -89,19 +89,63 @@ def fail(why: str) -> None:
     raise SystemExit(f'La prueba falló: {why}.')
 
 
+def system_wait(root: ET.Element) -> bool:
+    """A slow emulator shows «isn't responding» for its own parts (System UI, the launcher): «Wait» closes it."""
+    if not any('responding' in (n.get('text') or '') for n in root.iter('node') if n.get('package') != PKG):
+        return False
+    for n in root.iter('node'):
+        if n.get('package') != PKG and (n.get('text') or '').lower() == 'wait':
+            tap(n)
+            return True
+    return False
+
+
+def on_screen(root: ET.Element | None) -> str:
+    """What was on the screen when something did not show up: the window in front and its texts."""
+    window = adb('shell', 'dumpsys', 'window', 'windows', check=False, timeout=30).stdout
+    focus = [l.strip() for l in window.splitlines() if 'mCurrentFocus' in l or 'mFocusedApp' in l]
+    texts = [f"{n.get('package')}: {n.get('text')}" for n in root.iter('node') if n.get('text')] if root is not None else ['(no se pudo leer la pantalla)']
+    return '\n'.join(focus + texts[:30])
+
+
 def wait(what: str, found, seconds: int = 30):
     """Waits until found(screen) gives something and returns it; fails if the app closes or it does not show up."""
     end = time.time() + seconds
+    root = None
     while time.time() < end:
         alive = running()
         root = screen()
         hit = found(root) if root is not None else None
         if hit:
             return hit
+        if root is not None and system_wait(root):
+            continue
         if not alive:
-            fail(f'la app se cerró mientras se esperaba {what}')
+            fail(f'la app se cerró mientras se esperaba {what}\n{on_screen(root)}')
         time.sleep(1)
-    fail(f'no apareció {what}')
+    fail(f'no apareció {what}\n{on_screen(root)}')
+
+
+def tap_until(what: str, target, after, tries: int = 3, seconds: int = 20):
+    """Taps target(screen) until after(screen) shows up: a slow emulator can lose a tap (29/10/2026)."""
+    return act_until(what, lambda: tap(wait(what, target)[0]), after, tries, seconds)
+
+
+def act_until(what: str, act, after, tries: int = 3, seconds: int = 20):
+    """Does act() until after(screen) shows up: a slow emulator can lose a tap, a key or typed text (29/10/2026)."""
+    for attempt in range(tries):
+        act()
+        end = time.time() + seconds
+        while time.time() < end:
+            root = screen()
+            hit = after(root) if root is not None else None
+            if hit:
+                return hit
+            if not running():
+                fail(f'la app se cerró después de tocar {what}\n{on_screen(root)}')
+            time.sleep(1)
+        print(f'{what}: no hizo nada, se repite', flush=True)
+    return wait(f'lo que abre {what}', after, seconds=5)
 
 
 def tap(node: ET.Element) -> None:
@@ -144,16 +188,22 @@ try:
     adb('logcat', '-b', 'all', '-c', check=False)
 
     step('Abrir la app: tiene que aparecer el ingreso')
+    # A slow emulator is still starting its own parts after it says it booted (a key press took 8 seconds instead of
+    # 0.1 in the runs that failed on 29/10/2026): it waits for the home screen first.
+    settle = time.time() + 120
+    while time.time() < settle:
+        root = screen()
+        if root is not None and not system_wait(root) and any('launcher' in n.get('package', '') for n in root.iter('node')):
+            break
+        time.sleep(2)
     adb('shell', 'am', 'start', '-W', '-n', MAIN, timeout=120)
-    wait('la pantalla de ingreso', sign_in_screen, seconds=60)
+    wait('la pantalla de ingreso', sign_in_screen, seconds=120)
     shot('1-ingreso')
 
     step('Política de privacidad: sale de los archivos de la app')
-    tap(wait('el enlace a la política de privacidad', lambda r: nodes(r, text='Política de privacidad'))[0])
-    wait('el texto de la política de privacidad', lambda r: nodes(r, part='Última actualización'))
+    tap_until('el enlace a la política de privacidad', lambda r: nodes(r, text='Política de privacidad'), lambda r: nodes(r, part='Última actualización'))
     shot('2-privacidad')
-    adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
-    wait('el ingreso al volver de la política', sign_in_screen)
+    act_until('volver de la política', lambda: adb('shell', 'input', 'keyevent', 'KEYCODE_BACK'), sign_in_screen)
 
     step('Girar la pantalla: la app se vuelve a armar en el ingreso')
     adb('shell', 'settings', 'put', 'system', 'accelerometer_rotation', '0')
@@ -180,16 +230,18 @@ try:
     for ime in adb('shell', 'ime', 'list', '-s', check=False).stdout.split():
         adb('shell', 'ime', 'disable', ime, check=False)
     fields = wait('los campos de correo y contraseña', sign_in_fields)
-    tap(fields[0])
-    adb('shell', 'input', 'text', 'prueba@example.com')
-    tap(fields[1])
-    adb('shell', 'input', 'text', 'clave-de-prueba')
-    wait('el correo escrito en su campo', lambda r: nodes(r, text='prueba@example.com'))
+    def type_in(field: ET.Element, text: str) -> None:
+        tap(field)
+        adb('shell', 'input', 'text', text)
+    # A late repeat can leave the email twice in its field: the sign-in fails all the same, without connection.
+    act_until('escribir el correo', lambda: type_in(fields[0], 'prueba@example.com'), lambda r: nodes(r, part='prueba@example.com'))
+    # The password shows as dots: it is there once its field no longer shows the hint.
+    act_until('escribir la contraseña', lambda: type_in(fields[1], 'clave-de-prueba'),
+              lambda r: (f := sign_in_fields(r)) and (f[1].get('text') or '') not in ('', 'Contraseña'))
     if 'mInputShown=true' in adb('shell', 'dumpsys', 'input_method', check=False).stdout:
         adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
         time.sleep(1)
-    tap(wait('el botón Ingresar', sign_in_screen)[0])
-    wait('el aviso de que no se pudo ingresar', lambda r: nodes(r, part='No se pudo ingresar'), seconds=90)
+    tap_until('el botón Ingresar', sign_in_screen, lambda r: nodes(r, part='No se pudo ingresar'), seconds=45)
     shot('4-ingreso-sin-conexion')
 
     step('Volver a abrir la app, desde el inicio del teléfono y de cero')
