@@ -191,7 +191,7 @@ Un viaje puede llevar carga para distintos clientes: en cada lugar el chofer mar
 1. [x] La base (migración 0014, solo agrega): una tabla `trf_trip_stops` con las paradas de cada viaje (cliente, lugar, orden, llegada con su ubicación, fin de la descarga y cómo terminó, kilos) y una columna opcional `stop_id` en los remitos. Cada chofer carga y maneja las suyas; las cuentas del panel y la administración las ven todas. Una parada ya visitada no se borra. Pruebas en `panel/tests/e2e/db/paradas.sql`.
 2. [x] La app: las paradas se cargan antes de salir o sobre la marcha. En el viaje, «Llegué a [cliente]» anota la hora y el lugar y pasa a «Descargando»; la descarga termina cuando el chofer toca «Terminé de descargar» o cuando el camión pasa de 15 km/h durante 30 segundos; entonces sigue la parada siguiente en el mismo viaje. El modo sencillo lleva los mismos botones, grandes. Un remito se puede atar a su parada.
 3. [x] El panel: el viaje muestra sus paradas con la hora de llegada, el fin y cuánto duró cada descarga, las marca en el mapa y reparte los kilómetros por tramo.
-4. [ ] Respaldo completo de la base (entregado al dueño, fuera del repositorio), migración 0014 en producción antes de publicar la app y el panel, y .aab firmado.
+4. [x] Respaldo completo de la base el 29/10/2026 a las 13:52 (hora UTC), entregado al dueño y fuera del repositorio; migración 0014 en producción el mismo día a las 13:55, con un viaje en curso, y después los datos siguieron iguales. Unión del PR #35, panel publicado y .aab firmado de la 0.27.0.
 5. [ ] Segunda parte, a pedir: el importe y los kilos por cliente, para que Cobros y la ganancia cuenten por cliente.
 
 Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
