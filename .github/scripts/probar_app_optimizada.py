@@ -126,6 +126,23 @@ def wait(what: str, found, seconds: int = 30):
     fail(f'no apareció {what}\n{on_screen(root)}')
 
 
+def tap_until(what: str, target, after, tries: int = 3, seconds: int = 20):
+    """Taps target(screen) until after(screen) shows up: a slow emulator can lose a tap (29/10/2026)."""
+    for attempt in range(tries):
+        tap(wait(what, target)[0])
+        end = time.time() + seconds
+        while time.time() < end:
+            root = screen()
+            hit = after(root) if root is not None else None
+            if hit:
+                return hit
+            if not running():
+                fail(f'la app se cerró después de tocar {what}\n{on_screen(root)}')
+            time.sleep(1)
+        print(f'{what}: el toque no hizo nada, se toca de nuevo', flush=True)
+    return wait(f'lo que abre {what}', after, seconds=5)
+
+
 def tap(node: ET.Element) -> None:
     x1, y1, x2, y2 = map(int, re.findall(r'\d+', node.get('bounds', '')))
     adb('shell', 'input', 'tap', str((x1 + x2) // 2), str((y1 + y2) // 2))
@@ -179,8 +196,7 @@ try:
     shot('1-ingreso')
 
     step('Política de privacidad: sale de los archivos de la app')
-    tap(wait('el enlace a la política de privacidad', lambda r: nodes(r, text='Política de privacidad'))[0])
-    wait('el texto de la política de privacidad', lambda r: nodes(r, part='Última actualización'))
+    tap_until('el enlace a la política de privacidad', lambda r: nodes(r, text='Política de privacidad'), lambda r: nodes(r, part='Última actualización'))
     shot('2-privacidad')
     adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
     wait('el ingreso al volver de la política', sign_in_screen)
