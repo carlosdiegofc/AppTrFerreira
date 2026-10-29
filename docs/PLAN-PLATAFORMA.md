@@ -169,6 +169,7 @@ Al iniciar un viaje, el mapa ocupa toda la pantalla, como un navegador, y el due
 4. [x] El dueño que maneja ve en el mapa de su viaje, siempre, los camiones de viaje y los choferes activos, con la velocidad de los que se mueven; tocando un camión aparece su recorrido en violeta, y tocándolo otra vez se va.
 5. [x] Flota en vivo: el mapa ocupa media pantalla, tiene «Ver el mapa en pantalla completa», los camiones de viaje dicen su velocidad y tocando uno aparece su recorrido.
 6. [x] Capturas aprobadas por el dueño el 29/10/2026 (ejecución 40801167048); unión del PR #32 y .aab firmado el mismo día en la ejecución 40805614080 de main (artefacto «Google-Play-Transportes-Ferreira-GPS-v0.25.0»), que se sube a Google Play cuando lo decidas.
+7. [ ] App 0.25.1: «Finalizar» siempre a la vista en el panel de abajo, al lado de «Pausar viaje» (pedido del dueño el 29/10/2026, porque en la hoja costaba encontrarlo). Falta aprobar la captura.
 
 Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - El rol anónimo tiene todos los permisos de tabla en 8 tablas de la app y del panel (`trf_driver_*`, `trf_trip_*`, `trf_mobile_catalog`, `trf_panel_trips`), y también los de la secuencia que numera los puntos GPS. Es lo que Supabase da por defecto y la seguridad por filas lo frena, pero hay que quitarlos: solo `trf_rates` necesita lectura anónima.

@@ -825,7 +825,11 @@ class MainActivity:AppCompatActivity(){
  private fun trip(){
   if(simple()){simpleTrip();return}
   val t=store.current()?:return home()
-  val live=driveFrame(t,"trip"){pausePill(this)}
+  val live=driveFrame(t,"trip"){
+   // Pausar and Finalizar side by side, both in sight (decision of 29/10/2026).
+   val row=LinearLayout(this@MainActivity).apply{orientation=LinearLayout.HORIZONTAL};addView(row,LinearLayout.LayoutParams(-1,dp(60)))
+   pausePill(row);finishPill(row)
+  }
   val details=store.details().firstOrNull{it.second.optString("trip_id")==t.getString("id")}?.second?.optJSONObject("data")
   // The sheet: what the panel does not show.
   val trio=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL};root.addView(trio,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(4)})
@@ -935,10 +939,17 @@ class MainActivity:AppCompatActivity(){
  private fun pausePill(p:LinearLayout){
   val v=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;background=ripple(outline(raised,blue,30));isClickable=true;isFocusable=true;contentDescription="Pausar viaje";setOnClickListener{buzz(this);togglePause()}};sink(v)
   val circle=FrameLayout(this).apply{background=oval(blue)}
-  val icon=ImageView(this).apply{setImageResource(R.drawable.ic_pause);imageTintList=ColorStateList.valueOf(Color.WHITE)};circle.addView(icon,FrameLayout.LayoutParams(dp(20),dp(20),Gravity.CENTER))
-  v.addView(circle,LinearLayout.LayoutParams(dp(40),dp(40)))
-  val label=tv("Pausar viaje",17f,ink,1).apply{setPadding(dp(14),0,0,0)};v.addView(label)
-  p.addView(v,LinearLayout.LayoutParams(-1,dp(60)));pauseIcon=icon;pauseLabel=label
+  val icon=ImageView(this).apply{setImageResource(R.drawable.ic_pause);imageTintList=ColorStateList.valueOf(Color.WHITE)};circle.addView(icon,FrameLayout.LayoutParams(dp(18),dp(18),Gravity.CENTER))
+  v.addView(circle,LinearLayout.LayoutParams(dp(36),dp(36)))
+  val label=tv("Pausar viaje",15f,ink,1).apply{setPadding(dp(8),0,0,0);maxLines=1;ellipsize=TextUtils.TruncateAt.END};v.addView(label,LinearLayout.LayoutParams(0,-2,1f))
+  p.addView(v,LinearLayout.LayoutParams(0,-1,1f));pauseIcon=icon;pauseLabel=label
+ }
+ /** The finish button of the trip, next to the pause: a red pill that asks to confirm. */
+ private fun finishPill(p:LinearLayout){
+  val v=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;background=ripple(bg(0xFFC4262D.toInt(),30),0x40FFFFFF);isClickable=true;isFocusable=true;contentDescription="Finalizar viaje";setOnClickListener{buzz(this);askFinish()}};sink(v)
+  v.addView(iconView(R.drawable.ic_flag,Color.WHITE,22))
+  v.addView(tv("Finalizar",15f,Color.WHITE,2).apply{setPadding(dp(8),0,0,0);maxLines=1})
+  p.addView(v,LinearLayout.LayoutParams(0,-1,1f).apply{marginStart=dp(10)})
  }
  private fun togglePause(){try{service(if(store.current()?.optBoolean("paused")==true)GpsService.RESUME else GpsService.PAUSE)}catch(_:Exception){toast("Revisá el permiso de ubicación")}}
  /** A big button of simple mode in a row: its icon over its name. */

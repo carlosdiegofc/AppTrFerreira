@@ -5,7 +5,10 @@ Panel web nuevo (React + TypeScript), en la dirección principal del panel desde
 # Panel web (anterior)
 La carpeta [`web/`](web/README.md) tiene el panel web anterior, que queda en `/anterior/` de la misma dirección un tiempo: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
 
-# Transportes Ferreira GPS — v0.25.0
+# Transportes Ferreira GPS — v0.25.1
+
+## Nuevo en v0.25.1 (Finalizar siempre a la vista; versionCode 38)
+- En la pantalla del viaje, «Finalizar» queda en el panel de abajo, al lado de «Pausar viaje», sin abrir la hoja. Sigue pidiendo confirmar. El botón de la hoja se mantiene.
 
 ## Nuevo en v0.25.0 (el mapa del viaje en toda la pantalla; versionCode 37)
 - **La pantalla del viaje** (decisión del 29/10/2026): el mapa ocupa la pantalla y gira con el camión, que va como una flecha. Arriba, el estado del viaje, el camión y el cartel de 90 km/h; a la derecha, los botones para girar el mapa o dejar el norte arriba, elegir mapa, satélite o tráfico, seguir el camión y ver todo el viaje.
