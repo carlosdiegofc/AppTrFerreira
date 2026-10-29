@@ -10,8 +10,8 @@ android {
         minSdk = 26
         targetSdk = 36
         // Google Play accepts each versionCode only once: every bundle uploaded there needs a higher one, even a rebuild of the same versionName.
-        versionCode = 37
-        versionName = "0.25.0"
+        versionCode = 38
+        versionName = "0.25.1"
         // Google's map (decision of 26/10/2026): its key only exists in the CI secrets and goes into the manifest when the
         // app is built. Without it the app keeps its own map, as before.
         manifestPlaceholders["mapsApiKey"] = System.getenv("GOOGLE_MAPS_ANDROID_KEY")?.trim().orEmpty()
