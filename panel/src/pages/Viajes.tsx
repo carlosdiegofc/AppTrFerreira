@@ -9,7 +9,7 @@ import { ago, dayInZone, formatDay, formatDayTime } from '../lib/dates';
 import { accountNames } from '../lib/drivers';
 import { count, decimal, number } from '../lib/format';
 import { routeText, sourceLabel, truckOf } from '../lib/tripTable';
-import { countByStatus, filterTrips, knownValues, type PeriodKind, periodRange, periodToIso, type StatusFilter, type Trip } from '../lib/trips';
+import { countByStatus, filterTrips, knownValues, type LoadFilter, loadOf, type PeriodKind, periodRange, periodToIso, type StatusFilter, type Trip } from '../lib/trips';
 import { STATUS_TONE } from './states';
 
 // The filters live in the address (?periodo=mes&estado=pendientes…): going back from a trip, reloading or sharing the
@@ -20,6 +20,12 @@ const PERIODS: { value: string; kind: PeriodKind; label: string }[] = [
   { value: 'mes-anterior', kind: 'prev-month', label: 'Mes anterior' },
   { value: '90', kind: '90', label: 'Últimos 90 días' },
   { value: 'fechas', kind: 'custom', label: 'Elegir fechas…' },
+];
+
+const LOADS: { value: string; load: LoadFilter; label: string }[] = [
+  { value: 'todas', load: 'all', label: 'Con y sin carga' },
+  { value: 'con', load: 'loaded', label: 'Con carga' },
+  { value: 'sin', load: 'empty', label: 'Sin carga (retorno vacío)' },
 ];
 
 const TABS: { value: string; status: StatusFilter | 'bin'; label: string }[] = [
@@ -58,7 +64,7 @@ function TripRow({ trip }: { trip: Trip }) {
         </span>
         <span className="tr-km">
           <strong>{km}</strong>
-          <small>{kmKind}</small>
+          <small>{[kmKind, loadOf(trip) === 'empty' ? 'sin carga' : ''].filter(Boolean).join(' · ')}</small>
         </span>
         <span className="tr-status">
           <Pill tone={STATUS_TONE[trip.status.code]}>{trip.status.label}</Pill>
@@ -91,6 +97,7 @@ export function Viajes() {
   useEffect(() => {
     if (!fromHere) setQ(urlQ);
   }, [location.key, fromHere, urlQ]);
+  const load = LOADS.find((l) => l.value === params.get('carga')) ?? LOADS[0]!;
   const vehicle = params.get('camion') ?? '';
   const driver = params.get('chofer') ?? '';
   // A driver's card links here with its name and its app account: the trips of the account under any name, and the ones
@@ -113,8 +120,8 @@ export function Viajes() {
   const inTab = bin ? counts.deleted : counts.all;
   const known = useMemo(() => knownValues(trips), [trips]);
   const shown = useMemo(
-    () => filterTrips(trips, { q, vehicle, driver, card, status: tab.status === 'bin' ? 'all' : tab.status, bin: tab.status === 'bin' }),
-    [trips, q, vehicle, driver, card, tab.status],
+    () => filterTrips(trips, { q, load: load.load, vehicle, driver, card, status: tab.status === 'bin' ? 'all' : tab.status, bin: tab.status === 'bin' }),
+    [trips, q, load.load, vehicle, driver, card, tab.status],
   );
 
   // The router updates the address in the background: changes made before it does (a tab, then the search right after)
@@ -143,7 +150,7 @@ export function Viajes() {
     setExportFailed(false);
     try {
       const { downloadTrips } = await import('../exports/trips');
-      const what = [tab.status === 'all' ? null : tab.label, vehicle ? `Camión ${vehicle}` : null, card ? `Chofer ${card.name}` : driver ? `Chofer ${driver}` : null, q ? `Búsqueda «${q}»` : null].filter(Boolean).join(' · ');
+      const what = [tab.status === 'all' ? null : tab.label, load.load === 'all' ? null : load.label, vehicle ? `Camión ${vehicle}` : null, card ? `Chofer ${card.name}` : driver ? `Chofer ${driver}` : null, q ? `Búsqueda «${q}»` : null].filter(Boolean).join(' · ');
       await downloadTrips(format, shown, {
         title: `Viajes del ${formatDay(range.from)} al ${formatDay(range.to)}`,
         subtitle: what || 'Todos los viajes del período',
@@ -231,6 +238,16 @@ export function Viajes() {
               set({ buscar: e.target.value });
             }}
           />
+        </label>
+        <label className="field">
+          <span>Carga</span>
+          <select value={load.value} onChange={(e) => set({ carga: e.target.value === 'todas' ? null : e.target.value })}>
+            {LOADS.map((l) => (
+              <option key={l.value} value={l.value}>
+                {l.label}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="field">
           <span>Camión</span>

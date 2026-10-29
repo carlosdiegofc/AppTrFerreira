@@ -171,6 +171,20 @@ Al iniciar un viaje, el mapa ocupa toda la pantalla, como un navegador, y el due
 6. [x] Capturas aprobadas por el dueño el 29/10/2026 (ejecución 40801167048); unión del PR #32 y .aab firmado el mismo día en la ejecución 40805614080 de main (artefacto «Google-Play-Transportes-Ferreira-GPS-v0.25.0»), que se sube a Google Play cuando lo decidas.
 7. [ ] App 0.25.1: «Finalizar» siempre a la vista en el panel de abajo, al lado de «Pausar viaje» (pedido del dueño el 29/10/2026, porque en la hoja costaba encontrarlo). Falta aprobar la captura.
 
+### Viajes con y sin carga (aprobado el 29/10/2026)
+Solo el panel: la app ya guarda si un viaje va con carga o es un retorno vacío (`load_type`), y Métricas ya separa los kilómetros cargados de los vacíos. No hay migración.
+1. [x] Viajes: un filtro «Carga» (con y sin carga, con la carga que dice la app), «sin carga» a la vista en el kilometraje de cada viaje, y la lista exportada dice qué filtro tenía. Los viajes cargados a mano en el panel no dicen su carga: no entran en ninguno de los dos filtros.
+2. [x] Un viaje sigue teniendo una sola carga: el que sale cargado y vuelve vacío son dos viajes, como hoy.
+3. [ ] Publicación del panel.
+
+### Leer la boleta con la foto (aprobado el 29/10/2026)
+El chofer saca la foto de la boleta y la app llena litros, importe, precio, estación y fecha; el chofer siempre confirma antes de guardar. Va en la app 0.26.0 y una función de Supabase. Lo que se guarda no cambia, así que no hay migración de la base:
+1. [ ] Primero en el teléfono, con el reconocimiento de texto de Google (ML Kit), sin red y sin que la foto salga del teléfono.
+2. [ ] Si no encuentra litros e importe con claridad, la foto va a una función de Supabase que la lee con Claude (la llave `ANTHROPIC_API_KEY` la carga el dueño como secreto de Supabase, nunca en el repositorio ni en la app) y devuelve los datos.
+3. [ ] Los campos aparecen llenos y se corrigen. Si litros por precio difiere del importe en más de un 5 %, el campo se marca para revisar.
+4. [ ] La política de privacidad dice que, solo cuando el teléfono no pudo leerla, la foto de la boleta se manda a Anthropic para leerla.
+5. [ ] Capturas para aprobar, unión, función desplegada con la llave cargada, y .aab de la 0.26.0.
+
 Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - El rol anónimo tiene todos los permisos de tabla en 8 tablas de la app y del panel (`trf_driver_*`, `trf_trip_*`, `trf_mobile_catalog`, `trf_panel_trips`), y también los de la secuencia que numera los puntos GPS. Es lo que Supabase da por defecto y la seguridad por filas lo frena, pero hay que quitarlos: solo `trf_rates` necesita lectura anónima.
 - Conviven dos tipos de administrador: `trf_private.admin_emails` (administración completa, por correo) y `trf_panel_admins` (panel: lee toda la flota y también administra mantenimiento y documentos). Los datos que se completan en el panel (`trf_panel_trips`) los lee solo la segunda lista. Los dos pasan a ser roles por empresa.
@@ -179,6 +193,8 @@ Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - `trf_profiles`, `trf_requests` y `trf_rates` no las usan la app ni el panel: por su estructura son de un formulario de cotizaciones para clientes (presupuesto por kilómetro, pallet o tramo). Se conservan; falta confirmar quién las usa.
 
 ## Decisiones tomadas
+- 29/10/2026: Viajes con y sin carga: filtro en Viajes, sin cambios en la base; un viaje sale cargado o vacío, no las dos cosas.
+- 29/10/2026: Leer la boleta con la foto: primero el teléfono, si falla Claude desde una función de Supabase; el chofer siempre confirma; el campo se marca si litros por precio difiere del importe en más de un 5 %.
 - 29/10/2026: Pantalla del viaje con el mapa grande.
   - El mapa ocupa la pantalla y gira con el camión; se puede dejar con el norte arriba.
   - Lo que no es el mapa ni los números del viaje va en una hoja deslizable.

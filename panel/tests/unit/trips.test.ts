@@ -121,6 +121,17 @@ describe('the list', () => {
     expect(knownValues(list)).toEqual({ vehicles: ['Ford Cargo 1722 · ITP2187', 'Leyland', 'Mercedes · SAB1234'], drivers: ['Hugo Silva', 'Immer Sampayo'] });
   });
 
+  it('tells trips with cargo from the empty returns of the app, and leaves the ones typed in the panel out of both', () => {
+    const list = mergeTrips({
+      sessions: [session(), session({ id: 's2', load_type: 'empty', started_at: '2025-08-03T00:00:00Z' })],
+      panelRows: [panel({ id: 'm1', source: 'manual', app_trip_id: null, departure_at: '2025-08-01T10:00:00Z', vehicle: 'Leyland' })],
+      details: [],
+    });
+    expect(filterTrips(list, { load: 'loaded' }).map((t) => t.key)).toEqual(['app:' + ID]);
+    expect(filterTrips(list, { load: 'empty' }).map((t) => t.key)).toEqual(['app:s2']);
+    expect(filterTrips(list, { load: 'all' })).toHaveLength(3);
+  });
+
   it('a driver card brings its account\'s trips under any name and the ones typed with its name, nobody else\'s', () => {
     const list = mergeTrips({
       sessions: [
