@@ -183,7 +183,7 @@ class MainActivity:AppCompatActivity(){
  private val take=registerForActivityResult(ActivityResultContracts.TakePicture()){ok->if(ok)camera?.let{preparePhoto(Uri.fromFile(it))}else camera?.delete()}
  private val pick=registerForActivityResult(ActivityResultContracts.GetContent()){uri->if(uri!=null)preparePhoto(uri)}
 
- override fun onCreate(b:Bundle?){super.onCreate(b);store=TripStore(this);api=Api(this)
+ override fun onCreate(b:Bundle?){super.onCreate(b);CrashLog.install(this);store=TripStore(this);api=Api(this)
   WindowCompat.setDecorFitsSystemWindows(window,false);transparentBars()
   tripForm=JSONObject(b?.getString("tripForm")?:"{}");fuelForm=JSONObject(b?.getString("fuelForm")?:"{}");docForm=JSONObject(b?.getString("docForm")?:"{}");draftDocs=JSONArray(b?.getString("draftDocs")?:"[]")
   fuelTrip=b?.getString("fuelTrip")?.let{JSONObject(it)};docTrip=b?.getString("docTrip")?.let{JSONObject(it)};historyTrip=b?.getString("historyTrip")?.let{JSONObject(it)};photoMode=b?.getString("photoMode")?:"fuel";docReturn=b?.getString("docReturn")?:"prepare"
@@ -1865,6 +1865,13 @@ class MainActivity:AppCompatActivity(){
   section("Camiones y papeles")
   val pp=card();row(pp,R.drawable.ic_wrench,"Mantenimiento","Services hechos y pendientes"){maintenance(true)};row(pp,R.drawable.ic_doc,"Documentos","Licencia, carné de salud, SOA y más"){documents(true)}
   button(root,"Renovar acceso",Kind.LINE,R.drawable.ic_lock,top=24){login()}
+  // The last error that closed the app, to send it as it is (CrashLog).
+  CrashLog.last(this)?.let{text->
+   section("Último error de la app");val ec=card(pad=16)
+   note(text.lineSequence().take(3).joinToString("\n").take(300),ec,0)
+   button(ec,"Enviar el error",Kind.LINE,R.drawable.ic_receipt,top=12){startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_SUBJECT,"Error de Transportes Ferreira GPS");putExtra(Intent.EXTRA_TEXT,text)},"Enviar el error"))}
+   link(ec,"Borrar este error",top=8){CrashLog.clear(this);settings()}
+  }
   button(root,"Cerrar sesión",Kind.LINE_DANGER,R.drawable.ic_logout){logout()}
   note("Transportes Ferreira GPS · versión $appVersion",top=18).gravity=Gravity.CENTER
   navBar("more")

@@ -29,7 +29,7 @@ class GpsService:Service(){
  private val sendingLive=AtomicBoolean(false);private val liveExecutor=Executors.newSingleThreadExecutor();private var tripSentAt=0L
  private val timer=object:Runnable{override fun run(){sync();watchdog();handler.postDelayed(this,10000)}}
  override fun onBind(i:Intent?):IBinder?=null
- override fun onCreate(){super.onCreate();store=TripStore(this);fused=LocationServices.getFusedLocationProviderClient(this);(getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(NotificationChannel("gps","Viaje en curso",NotificationManager.IMPORTANCE_LOW));(getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(NotificationChannel("gps-alert","Avisos del GPS",NotificationManager.IMPORTANCE_HIGH))}
+ override fun onCreate(){super.onCreate();CrashLog.install(this);store=TripStore(this);fused=LocationServices.getFusedLocationProviderClient(this);(getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(NotificationChannel("gps","Viaje en curso",NotificationManager.IMPORTANCE_LOW));(getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(NotificationChannel("gps-alert","Avisos del GPS",NotificationManager.IMPORTANCE_HIGH))}
  override fun onStartCommand(i:Intent?,flags:Int,id:Int):Int{
   val t=store.current();if(t==null||!t.optBoolean("active")){stopSelf();return START_NOT_STICKY}
   // Android 12+ can refuse a foreground start from the background after the system killed the service.

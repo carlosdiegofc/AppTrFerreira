@@ -5,7 +5,12 @@ Panel web nuevo (React + TypeScript), en la dirección principal del panel desde
 # Panel web (anterior)
 La carpeta [`web/`](web/README.md) tiene el panel web anterior, que queda en `/anterior/` de la misma dirección un tiempo: viajes de la app que aparecen solos para completarlos, edición y papelera, recorrido real del GPS en el mapa, seguimiento en vivo de la flota, combustible y resumen mensual. Instalación y publicación: [web/README.md](web/README.md).
 
-# Transportes Ferreira GPS — v0.27.0
+# Transportes Ferreira GPS — v0.27.1
+
+## Nuevo en v0.27.1 (arreglo: finalizar el viaje cerraba la app; versionCode 41)
+- Al finalizar un viaje, el servicio del GPS podía caerse y cerrar la app entera. Ahora una última lectura incompleta no lo tira, y el mapa del viaje no sigue trabajando después de cerrar la pantalla.
+- Prueba nueva en el emulador de la CI (`probar_finalizar.py`): finaliza un viaje de muestra en modo normal, en modo sencillo y como dueño de viaje, y falla si la app se cierra.
+- Si la app se cierra por un error, el detalle queda guardado en el teléfono y Mi cuenta muestra «Último error de la app», con «Enviar el error» para mandarlo. No se envía nada solo.
 
 ## Nuevo en v0.27.0 (viajes con varias descargas; versionCode 40)
 - **Paradas de descarga** (decisión del 29/10/2026): un viaje puede llevar carga para distintos clientes. Las paradas se cargan antes de salir (en «Datos del viaje») o durante el viaje (en la hoja, «Agregar parada»).
