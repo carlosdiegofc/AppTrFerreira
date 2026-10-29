@@ -45,15 +45,22 @@ def crashes() -> str:
     return adb('logcat', '-d', '-b', 'crash', check=False).stdout
 
 
-def ready(tag: str, seconds: int = 40) -> None:
+def tail() -> str:
+    """What the phone said lately: the app's errors, a frozen screen (ANR) and what is on the screen."""
+    log = adb('logcat', '-d', '-v', 'threadtime', check=False, timeout=60).stdout.splitlines()
+    wanted = [l for l in log if PKG in l or 'AndroidRuntime' in l or 'ANR' in l or 'TRF-' in l][-60:]
+    window = adb('shell', 'dumpsys', 'window', 'windows', check=False, timeout=30).stdout
+    focus = [l.strip() for l in window.splitlines() if 'mCurrentFocus' in l or 'mFocusedApp' in l]
+    return '\n'.join(focus + wanted)
+
+
+def ready(tag: str, seconds: int = 60) -> bool:
     end = time.time() + seconds
     while time.time() < end:
         if f'lista {tag}.' in adb('logcat', '-d', '-s', 'TRF-muestra:I', check=False, timeout=60).stdout:
-            return
-        if not running():
-            break
+            return True
         time.sleep(1)
-    raise SystemExit(f'No se abrió el viaje de muestra ({tag}).\n{crashes()}')
+    return False
 
 
 failed = []
@@ -67,8 +74,14 @@ try:
             adb('shell', 'pm', 'grant', PKG, f'android.permission.{permission}', check=False)
         adb('logcat', '-c', check=False)
         adb('logcat', '-b', 'crash', '-c', check=False)
-        adb('shell', 'am', 'start', '-W', '-n', MAIN, '--es', 'trf_sample', who, '--es', 'trf_sample_screen', see, '--es', 'trf_sample_tag', name, timeout=120)
-        ready(name)
+        # Without -W: a launch that hangs must not hang the test, it has to say why.
+        adb('shell', 'am', 'start', '-n', MAIN, '--es', 'trf_sample', who, '--es', 'trf_sample_screen', see, '--es', 'trf_sample_tag', name, timeout=60)
+        if not ready(name):
+            shot(f'{name}-0-no-abrio')
+            failed.append(f'{name}: el viaje de muestra no se abrió en 60 segundos.\n{crashes()}\n{tail()}')
+            print(f'FALLA {name}: no se abrió', flush=True)
+            adb('shell', 'am', 'force-stop', PKG, check=False)
+            continue
         time.sleep(2)
         shot(f'{name}-1-viaje')
         # The trip ends 4 seconds after it opens; the screen checks every second and goes back to the start.
@@ -76,11 +89,12 @@ try:
         shot(f'{name}-2-despues')
         log = crashes()
         if not running() or PKG in log:
-            failed.append(f'{name}: la app se cerró al finalizar el viaje.\n{log}')
+            failed.append(f'{name}: la app se cerró al finalizar el viaje.\n{log}\n{tail()}')
             print(f'FALLA {name}', flush=True)
         else:
             print(f'bien {name}: la app sigue abierta', flush=True)
         (out / f'{name}-logcat.txt').write_text(adb('logcat', '-d', '-b', 'all', '-v', 'threadtime', check=False, timeout=120).stdout)
+        adb('shell', 'am', 'force-stop', PKG, check=False)
 finally:
     adb('shell', 'am', 'force-stop', PKG, check=False)
 if failed:
