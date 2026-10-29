@@ -128,8 +128,13 @@ def wait(what: str, found, seconds: int = 30):
 
 def tap_until(what: str, target, after, tries: int = 3, seconds: int = 20):
     """Taps target(screen) until after(screen) shows up: a slow emulator can lose a tap (29/10/2026)."""
+    return act_until(what, lambda: tap(wait(what, target)[0]), after, tries, seconds)
+
+
+def act_until(what: str, act, after, tries: int = 3, seconds: int = 20):
+    """Does act() until after(screen) shows up: a slow emulator can lose a tap, a key or typed text (29/10/2026)."""
     for attempt in range(tries):
-        tap(wait(what, target)[0])
+        act()
         end = time.time() + seconds
         while time.time() < end:
             root = screen()
@@ -139,7 +144,7 @@ def tap_until(what: str, target, after, tries: int = 3, seconds: int = 20):
             if not running():
                 fail(f'la app se cerró después de tocar {what}\n{on_screen(root)}')
             time.sleep(1)
-        print(f'{what}: el toque no hizo nada, se toca de nuevo', flush=True)
+        print(f'{what}: no hizo nada, se repite', flush=True)
     return wait(f'lo que abre {what}', after, seconds=5)
 
 
@@ -198,8 +203,7 @@ try:
     step('Política de privacidad: sale de los archivos de la app')
     tap_until('el enlace a la política de privacidad', lambda r: nodes(r, text='Política de privacidad'), lambda r: nodes(r, part='Última actualización'))
     shot('2-privacidad')
-    adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
-    wait('el ingreso al volver de la política', sign_in_screen)
+    act_until('volver de la política', lambda: adb('shell', 'input', 'keyevent', 'KEYCODE_BACK'), sign_in_screen)
 
     step('Girar la pantalla: la app se vuelve a armar en el ingreso')
     adb('shell', 'settings', 'put', 'system', 'accelerometer_rotation', '0')
@@ -226,16 +230,18 @@ try:
     for ime in adb('shell', 'ime', 'list', '-s', check=False).stdout.split():
         adb('shell', 'ime', 'disable', ime, check=False)
     fields = wait('los campos de correo y contraseña', sign_in_fields)
-    tap(fields[0])
-    adb('shell', 'input', 'text', 'prueba@example.com')
-    tap(fields[1])
-    adb('shell', 'input', 'text', 'clave-de-prueba')
-    wait('el correo escrito en su campo', lambda r: nodes(r, text='prueba@example.com'))
+    def type_in(field: ET.Element, text: str) -> None:
+        tap(field)
+        adb('shell', 'input', 'text', text)
+    # A late repeat can leave the email twice in its field: the sign-in fails all the same, without connection.
+    act_until('escribir el correo', lambda: type_in(fields[0], 'prueba@example.com'), lambda r: nodes(r, part='prueba@example.com'))
+    # The password shows as dots: it is there once its field no longer shows the hint.
+    act_until('escribir la contraseña', lambda: type_in(fields[1], 'clave-de-prueba'),
+              lambda r: (f := sign_in_fields(r)) and (f[1].get('text') or '') not in ('', 'Contraseña'))
     if 'mInputShown=true' in adb('shell', 'dumpsys', 'input_method', check=False).stdout:
         adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
         time.sleep(1)
-    tap(wait('el botón Ingresar', sign_in_screen)[0])
-    wait('el aviso de que no se pudo ingresar', lambda r: nodes(r, part='No se pudo ingresar'), seconds=90)
+    tap_until('el botón Ingresar', sign_in_screen, lambda r: nodes(r, part='No se pudo ingresar'), seconds=45)
     shot('4-ingreso-sin-conexion')
 
     step('Volver a abrir la app, desde el inicio del teléfono y de cero')
