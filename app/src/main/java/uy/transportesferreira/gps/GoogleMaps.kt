@@ -146,7 +146,8 @@ object GoogleMaps {
     base(m);waiting.forEach{it(m)};waiting.clear()}
   }
   fun dp(v:Int)=(v*d).toInt()
-  fun whenReady(work:(GoogleMap)->Unit){val m=map;if(m!=null)work(m) else waiting.add(work)}
+  // A map already closed (its screen left) does no more work: Google's map is gone and touching it would close the app.
+  fun whenReady(work:(GoogleMap)->Unit){if(!alive)return;val m=map;if(m!=null)work(m) else waiting.add(work)}
   private fun choose(sat:Boolean){satellite=sat;prefs.edit().putString("base",if(sat)"satellite" else "map").apply();map?.let{base(it)};mark()}
   private fun base(m:GoogleMap){
    m.mapType=if(satellite)GoogleMap.MAP_TYPE_HYBRID else GoogleMap.MAP_TYPE_NORMAL

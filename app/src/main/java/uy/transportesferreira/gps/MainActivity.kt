@@ -913,7 +913,8 @@ class MainActivity:AppCompatActivity(){
   root.setPadding(dp(14),0,dp(14),dp(18));box.addView(root);panel.addView(box,LinearLayout.LayoutParams(-1,0));sheetBox=box;sheetOpen=false
   swipe(grip);swipe(stats)
   // The map leaves the room the bar and the closed panel cover, so the truck stays in sight.
-  val room=View.OnLayoutChangeListener{_,_,_,_,_,_,_,_,_->live.pad(top.bottom,panel.height-box.height)}
+  // Only while this map is the screen's: a screen that is leaving does not move a map already closed.
+  val room=View.OnLayoutChangeListener{_,_,_,_,_,_,_,_,_->if(liveMap===live)live.pad(top.bottom,panel.height-box.height)}
   top.addOnLayoutChangeListener(room);panel.addOnLayoutChangeListener(room)
   return live
  }
@@ -1488,7 +1489,7 @@ class MainActivity:AppCompatActivity(){
  /** A trip in progress for an hour and a half, going at 78 km/h, with the route so far for the map. */
  private fun sampleTrip(){
   val now=Instant.now();val t=store.start(Api.sample!!.getJSONObject("user"),name,"Ford Cargo 1722 · ATP 2231",false,JSONObject().put("destino","Puerto de Montevideo").put("cliente","Cooperativa del Este").put("tipoCarga","Arroz").put("kg","28500"))
-  store.update(false){it.put("started_at",now.minusSeconds(83*60L).toString()).put("distance_meters",86400.0).put("speed_kmh",78.0).put("last_point",JSONObject().put("recorded_at",now.toString()).put("latitude",-33.62).put("longitude",-55.31))}
+  store.update(false){it.put("started_at",now.minusSeconds(83*60L).toString()).put("distance_meters",86400.0).put("speed_kmh",78.0).put("last_point",JSONObject().put("event_id",UUID.randomUUID().toString()).put("trip_id",it.getString("id")).put("driver_id",it.getString("driver_id")).put("vehicle",it.getString("vehicle")).put("recorded_at",now.toString()).put("latitude",-33.62).put("longitude",-55.31).put("accuracy_m",8.0).put("speed_kmh",78.0).put("heading",JSONObject.NULL).put("segment",0))}
   for(i in 0..20)store.appendTrack(t.getString("id"),-33.233-i*0.019,-54.383-i*0.044,0,now.toEpochMilli()-(20-i)*240_000L)
   // Three unloadings: one done, one in progress and one to come (the screens with stops).
   val u=Api.sample!!.getJSONObject("user").getString("id")

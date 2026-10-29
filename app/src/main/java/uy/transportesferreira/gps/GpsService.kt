@@ -140,7 +140,9 @@ class GpsService:Service(){
   */
  private fun keepLast(){
   val p=store.current()?.optJSONObject("last_point")?:return
-  if(!route.jittery)store.addPoint(p)
+  // A reading without its id cannot go to the route without repeating itself; the end of the trip goes on anyway.
+  if(p.optString("event_id").isBlank())return
+  if(!route.jittery)try{store.addPoint(p)}catch(_:Exception){}
  }
  private fun sync(){if(syncing.compareAndSet(false,true))executor.execute{try{Sync.flush(this)}finally{syncing.set(false)}}}
  /** The latest reading to the live map; a reading that arrives while one is on its way goes with the next one. */
