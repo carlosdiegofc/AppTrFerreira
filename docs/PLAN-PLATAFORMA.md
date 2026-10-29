@@ -193,6 +193,7 @@ Un viaje puede llevar carga para distintos clientes: en cada lugar el chofer mar
 3. [x] El panel: el viaje muestra sus paradas con la hora de llegada, el fin y cuánto duró cada descarga, las marca en el mapa y reparte los kilómetros por tramo.
 4. [x] Respaldo completo de la base el 29/10/2026 a las 13:52 (hora UTC), entregado al dueño y fuera del repositorio; migración 0014 en producción el mismo día a las 13:55, con un viaje en curso, y después los datos siguieron iguales. Unión del PR #35, panel publicado y .aab firmado de la 0.27.0.
 5. [ ] Segunda parte, a pedir: el importe y los kilos por cliente, para que Cobros y la ganancia cuenten por cliente.
+6. [x] App 0.27.1: finalizar el viaje ya no cierra la app (el servicio del GPS no se cae con una última lectura incompleta y el mapa no trabaja una vez cerrado), probado en el emulador para el chofer en modo normal, en modo sencillo y el dueño de viaje. Si la app se cierra por un error, Mi cuenta muestra «Último error de la app» para enviarlo. Pedido del dueño el 29/10/2026; unión del PR #36 el mismo día.
 
 Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - El rol anónimo tiene todos los permisos de tabla en 8 tablas de la app y del panel (`trf_driver_*`, `trf_trip_*`, `trf_mobile_catalog`, `trf_panel_trips`), y también los de la secuencia que numera los puntos GPS. Es lo que Supabase da por defecto y la seguridad por filas lo frena, pero hay que quitarlos: solo `trf_rates` necesita lectura anónima.
