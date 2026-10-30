@@ -21,6 +21,11 @@ test('el recorrido sigue en línea punteada por el camino estimado y el viaje di
   await expect(facts.locator('div', { hasText: 'Puntos del recorrido' }).locator('dd')).toHaveText('12');
   await expect(facts.locator('div', { hasText: 'Sin señal' }).locator('dd')).toHaveText('6,3 km estimados en 1 tramo');
   await expect(page.locator('.route-gap')).toHaveCount(0);
+  // The five minutes without readings were with the truck moving: the office sees the GPS cut too (30/10/2026).
+  const cuts = page.locator('.route-cuts');
+  await expect(cuts).toContainText('El GPS del teléfono no registró con el camión en marcha una vez');
+  await expect(cuts.locator('li')).toHaveCount(1);
+  await expect(cuts.locator('li')).toContainText('km en línea recta');
   await shot(page, 'viaje-sin-senal');
 
   // The live map draws it the same way.

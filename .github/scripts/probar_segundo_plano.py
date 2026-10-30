@@ -6,6 +6,7 @@ The owner reported on 30/10/2026 that the GPS stops when the app goes to the bac
 trip with made-up data (MainActivity.sampleView) and the emulator's GPS moves at 108 km/h (adb emu geo fix). Each phase
 checks that the trip's last reading keeps moving forward: the app in front, in the background, the phone locked, and
 the app's process killed as a phone short of memory or battery does, which Android then starts again by itself.
+It fails if the trip stops reading in any of them.
 
 Usage: probar_segundo_plano.py <debug apk> <output folder>. The phone's log is left in the folder.
 """
@@ -117,4 +118,7 @@ finally:
     print('\n'.join(l for l in log.splitlines() if 'GpsService' in l or 'ForegroundService' in l or ('location' in l.lower() and PKG in l))[-40:], flush=True)
     adb('shell', 'am', 'force-stop', PKG, check=False)
 print('Resultado: ' + ', '.join(f'{k} {"bien" if v else "FALLA"}' for k, v in results.items()), flush=True)
-# For now it only reports: what the app does after the system closes it is what this test is finding out.
+# On 30/10/2026 the four phases went well on the emulator: the cut came from the owner's phone putting the app to sleep.
+# From then on the test keeps it that way.
+if len(results) < 4 or not all(results.values()):
+    raise SystemExit('El GPS del viaje dejó de registrar en alguna de las fases.')

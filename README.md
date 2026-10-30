@@ -7,6 +7,12 @@ La carpeta [`web/`](web/README.md) tiene el panel web anterior, que queda en `/a
 
 # Transportes Ferreira GPS — v0.27.1
 
+## Nuevo en v0.28.0 (cortes del GPS en segundo plano; versionCode 43)
+- **Aviso si el GPS se corta**: si el teléfono duerme la app durante un viaje y el GPS pasa 3 minutos sin registrar, una alarma del sistema avisa con sonido «El GPS del viaje se cortó · tocá para abrir la app» y lo repite cada 10 minutos mientras siga cortado. Al abrir la app, el GPS sigue.
+- **Pasos de batería según la marca**: en el primer viaje, y en Mi cuenta › Revisar GPS, la app muestra qué cambiar en Samsung, Xiaomi, Huawei/Honor, OPPO/Realme/OnePlus, vivo y Motorola para que el teléfono no la duerma, además de la batería «Sin restricciones».
+- Panel: el viaje dice cuándo el GPS no registró con el camión en marcha (más de 2 minutos), con la hora y los km en línea recta.
+- La prueba del emulador (`probar_segundo_plano.py`) mueve el GPS a 108 km/h y falla si el viaje deja de registrar con la app en segundo plano, con el teléfono bloqueado o después de que el sistema cierra la app.
+
 ## Nuevo en v0.27.2 (arreglo: terminar la última descarga cerraba la app; versionCode 42)
 - Al tocar «Terminé de descargar» en la última parada (o cuando el camión arrancaba después de la última), la app se cerraba, y como el viaje seguía abierto volvía a cerrarse cada vez que se abría. Ahora muestra «Descargaste en todas las paradas» y el viaje sigue; las paradas guardadas no se pierden.
 - Si algo de las paradas fallara de nuevo, la pantalla del viaje sigue abierta y el error queda en Mi cuenta («Último error de la app»).
