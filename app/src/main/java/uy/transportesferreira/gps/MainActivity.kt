@@ -1409,7 +1409,7 @@ class MainActivity:AppCompatActivity(){
   name=driverName();if(first)sampleData()
   val see=intent.getStringExtra("trf_sample_screen")?:"home"
   setMode(if(see.startsWith("simple"))UiMode.SIMPLE else UiMode.NORMAL)
-  if(see in setOf("trip","tripsheet","tripfinish","tripend","simpletrip","simplefinish","simpletripend","tripstops","simpletripstops")&&!active())sampleTrip()
+  if(see in setOf("trip","tripsheet","tripfinish","tripend","simpletrip","simplefinish","simpletripend","tripstops","simpletripstops","tripgps")&&!active())sampleTrip()
   val t=mobile.history("trips").optJSONObject(0)
   when(see){
    "mode"->askMode();"newtrip"->newTrip();"pick"->{newTrip();pickTruck{newTrip()}};"prepare"->{tripForm=JSONObject().put("destino","Puerto de Montevideo").put("cliente","Cooperativa del Este").put("tipoCarga","Arroz").put("kg","28500");prepare()}
@@ -1422,6 +1422,8 @@ class MainActivity:AppCompatActivity(){
    "simpletripend"->{simpleTrip();handler.postDelayed({try{service(GpsService.FINISH)}catch(_:Exception){}},4000)}
    // The unloadings go on with the same steps as the buttons until every stop is done (a driver on 29/10/2026: the app
    // closed on «Terminé de descargar» of the last stop and did not open again).
+   // The trip with its GPS service running, as on a phone (the emulator test of the GPS in the background).
+   "tripgps"->{trip();try{service()}catch(_:Exception){}}
    "tripstops","simpletripstops"->{if(see=="tripstops")trip() else simpleTrip();sampleUnloadAll(3)}
    "tripsheet"->{trip();stage?.postDelayed({sheet(true)},300)};"tripfinish"->{trip();askFinish()};"receipt"->{home();t?.let{askReceipt(it)}};"ownermenu"->{home();ownerMenu()};"owner"->ownerDashboard();"fleetfull"->{ownerDashboard();fullFleet()};"performance"->performance()
    else->home()}

@@ -113,6 +113,7 @@ jobs:
             python3 .github/scripts/probar_app_optimizada.py apk-a-probar/app-release.apk prueba-version-optimizada
             python3 .github/scripts/probar_juegos.py apk-de-prueba/app-debug.apk prueba-juegos
             python3 .github/scripts/probar_finalizar.py apk-de-prueba/app-debug.apk prueba-finalizar
+            python3 .github/scripts/probar_segundo_plano.py apk-de-prueba/app-debug.apk prueba-segundo-plano
             python3 .github/scripts/capturas_app.py apk-de-prueba/app-debug.apk capturas-app
       - uses: actions/upload-artifact@v4
         if: always()
@@ -126,6 +127,13 @@ jobs:
         with:
           name: prueba-juegos
           path: prueba-juegos
+          retention-days: 14
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prueba-segundo-plano
+          path: prueba-segundo-plano
           retention-days: 14
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
