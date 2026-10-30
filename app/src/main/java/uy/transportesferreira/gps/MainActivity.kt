@@ -660,7 +660,7 @@ class MainActivity:AppCompatActivity(){
   stopsSection()
   // For the wait at a plant with the trip going: they open only with the truck stopped.
   button(root,"Juegos",Kind.LINE,R.drawable.ic_chess,top=12){games()}
-  if(!(getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName))row(card(),R.drawable.ic_battery,"Evitar cortes del GPS","Permitir que la app siga en segundo plano",tint=amber){batteryExemption()}
+  batteryRow()
   sync=note(store.message(),top=10).apply{gravity=Gravity.CENTER}
   simpleDock();fleetOnTrip(live)
   refresh();try{service()}catch(_:Exception){gps?.text="Revisá el permiso de ubicación para continuar"}
@@ -731,7 +731,7 @@ class MainActivity:AppCompatActivity(){
  private fun locationPermissions()=mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION).apply{if(Build.VERSION.SDK_INT>=33)add(Manifest.permission.POST_NOTIFICATIONS)}
  private fun checkGps(){
   val req=locationPermissions();if(req.any{ContextCompat.checkSelfPermission(this,it)!=PackageManager.PERMISSION_GRANTED}){askLocation(req);return}
-  if(!(getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName))batteryExemption()
+  if(!batteryFree()||BatteryGuide.of(Build.MANUFACTURER)!=null)batteryExemption()
   else toast("GPS listo: ubicación precisa y batería sin restricciones.")
  }
  /** Google Play requires telling drivers how location is used right before the system prompt. */
@@ -808,7 +808,7 @@ class MainActivity:AppCompatActivity(){
  }
  private fun requestStart(){
   val req=locationPermissions()
-  if(req.any{ContextCompat.checkSelfPermission(this,it)!=PackageManager.PERMISSION_GRANTED})askLocation(req) else service()
+  if(req.any{ContextCompat.checkSelfPermission(this,it)!=PackageManager.PERMISSION_GRANTED})askLocation(req) else{service();batteryOnce()}
  }
  private fun beginTrip(){
   val u=api.session()?.optJSONObject("user")?:return login()
@@ -850,7 +850,7 @@ class MainActivity:AppCompatActivity(){
   val start=instant(t.optString("started_at"))?.atZone(ZoneId.systemDefault())?.format(DateTimeFormatter.ofPattern("HH:mm"))?:"—"
   factsGrid(card(),listOf(Fact(R.drawable.ic_flag,"Destino",details?.optString("destino")?.ifBlank{null}?:"Sin destino"),Fact(R.drawable.ic_box,"Carga",cargo),Fact(R.drawable.ic_truck,"Camión",model.ifBlank{"Sin asignar"}),Fact(R.drawable.ic_clock,"Salida",start)))
   count=note("",top=12)
-  if(!(getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName))row(card(),R.drawable.ic_battery,"Evitar cortes del GPS","Permitir que la app siga en segundo plano",tint=amber){batteryExemption()}
+  batteryRow()
   if(ownerDriver())row(card(),R.drawable.ic_truck,"Flota en vivo","Todos los camiones, sus viajes y los choferes"){ownerDashboard()}
   row(card(),R.drawable.ic_chess,"Juegos","Para la espera, con el camión parado"){games()}
   sync=note(store.message(),top=12)
@@ -1099,11 +1099,27 @@ class MainActivity:AppCompatActivity(){
   val image=iconView(icon,blue,24);val caption=tv(label,13.5f,blue,1).apply{gravity=Gravity.CENTER;setPadding(0,dp(6),0,0)};v.addView(image);v.addView(caption)
   p.addView(v,LinearLayout.LayoutParams(0,dp(76),1f).apply{if(index>0)marginStart=dp(10)});return Pair(image,caption)
  }
+ private fun batteryFree()=(getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName)
+ /** «Evitar cortes del GPS»: until the battery is «Sin restricciones», and always on a brand that saves battery on its own. */
+ private fun batteryRow(){
+  val guide=BatteryGuide.of(Build.MANUFACTURER)
+  if(!batteryFree())row(card(),R.drawable.ic_battery,"Evitar cortes del GPS","Permitir que la app siga en segundo plano",tint=amber){batteryExemption()}
+  else if(guide!=null)row(card(),R.drawable.ic_battery,"Evitar cortes del GPS","Los pasos para tu ${guide.brand}"){batteryExemption()}
+ }
+ /** At the first trip on this phone, the steps against the GPS cuts once (decision of 30/10/2026). */
+ private fun batteryOnce(){
+  val key="asked-battery";if(prefs().getBoolean(key,false))return
+  if(batteryFree()&&BatteryGuide.of(Build.MANUFACTURER)==null)return
+  prefs().edit().putBoolean(key,true).apply();batteryExemption()
+ }
  // Opens the system page where the driver lifts battery limits; asking for the exemption directly is restricted on Google Play.
+ // The brands that put apps to sleep on their own (BatteryGuide) get their steps too.
  private fun batteryExemption(){
-  val appPage=Build.VERSION.SDK_INT>=31
+  val appPage=Build.VERSION.SDK_INT>=31;val guide=BatteryGuide.of(Build.MANUFACTURER)
+  val base=when{batteryFree()->"La batería de la app ya está «Sin restricciones»."
+   appPage->"Para que el GPS no se corte durante el viaje, en la pantalla que se abre tocá «Batería» (o «Uso de batería de la app») y elegí «Sin restricciones».";else->"Para que el GPS no se corte durante el viaje, en la lista que se abre elegí «Todas las apps», buscá «Transportes Ferreira GPS» y marcá «No optimizar»."}
   AlertDialog.Builder(this).setTitle("Evitar cortes del GPS")
-   .setMessage(if(appPage)"Para que el GPS no se corte durante el viaje, en la pantalla que se abre tocá «Batería» (o «Uso de batería de la app») y elegí «Sin restricciones»." else "Para que el GPS no se corte durante el viaje, en la lista que se abre elegí «Todas las apps», buscá «Transportes Ferreira GPS» y marcá «No optimizar».")
+   .setMessage(base+(guide?.let{"\n\nEn tu ${it.brand}, además: ${it.steps}"}?:""))
    .setPositiveButton("Abrir ajustes"){_,_->try{startActivity(if(appPage)Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:$packageName")) else Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))}catch(_:Exception){toast("Abrí Ajustes › Apps › Transportes Ferreira GPS › Batería y elegí «Sin restricciones»")}}
    .setNegativeButton("Ahora no",null).show()
  }
@@ -1409,7 +1425,7 @@ class MainActivity:AppCompatActivity(){
   name=driverName();if(first)sampleData()
   val see=intent.getStringExtra("trf_sample_screen")?:"home"
   setMode(if(see.startsWith("simple"))UiMode.SIMPLE else UiMode.NORMAL)
-  if(see in setOf("trip","tripsheet","tripfinish","tripend","simpletrip","simplefinish","simpletripend","tripstops","simpletripstops")&&!active())sampleTrip()
+  if(see in setOf("trip","tripsheet","tripfinish","tripend","simpletrip","simplefinish","simpletripend","tripstops","simpletripstops","tripgps")&&!active())sampleTrip()
   val t=mobile.history("trips").optJSONObject(0)
   when(see){
    "mode"->askMode();"newtrip"->newTrip();"pick"->{newTrip();pickTruck{newTrip()}};"prepare"->{tripForm=JSONObject().put("destino","Puerto de Montevideo").put("cliente","Cooperativa del Este").put("tipoCarga","Arroz").put("kg","28500");prepare()}
@@ -1422,6 +1438,8 @@ class MainActivity:AppCompatActivity(){
    "simpletripend"->{simpleTrip();handler.postDelayed({try{service(GpsService.FINISH)}catch(_:Exception){}},4000)}
    // The unloadings go on with the same steps as the buttons until every stop is done (a driver on 29/10/2026: the app
    // closed on «Terminé de descargar» of the last stop and did not open again).
+   // The trip with its GPS service running, as on a phone (the emulator test of the GPS in the background).
+   "tripgps"->{trip();try{service()}catch(_:Exception){}}
    "tripstops","simpletripstops"->{if(see=="tripstops")trip() else simpleTrip();sampleUnloadAll(3)}
    "tripsheet"->{trip();stage?.postDelayed({sheet(true)},300)};"tripfinish"->{trip();askFinish()};"receipt"->{home();t?.let{askReceipt(it)}};"ownermenu"->{home();ownerMenu()};"owner"->ownerDashboard();"fleetfull"->{ownerDashboard();fullFleet()};"performance"->performance()
    else->home()}

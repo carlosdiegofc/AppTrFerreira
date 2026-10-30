@@ -11,11 +11,11 @@ import { ROUTE_REFRESH_MS } from '../config';
 import { ConflictError, describeWriteError } from '../data/api';
 import { useExpenses, useNow, useRoute, useRouteGaps, useSetTripDeleted, useTripDetail, useTripStops } from '../data/hooks';
 import { clientKey } from '../lib/clients';
-import { calendarDay, dayInZone, formatDay, formatDayTime, formatDuration } from '../lib/dates';
+import { calendarDay, dayInZone, formatDay, formatDayTime, formatDuration, formatTime } from '../lib/dates';
 import { type Expense, expensesLink, expenseTotals, NO_CHOICES, NO_NAMES, tripTargetName } from '../lib/expenses';
 import { count, money, number } from '../lib/format';
 import { documentLabel, sourceLabel, tripFacts } from '../lib/tripTable';
-import { gapSummary, routeRuns } from '../lib/route';
+import { gapSummary, readingCuts, routeRuns } from '../lib/route';
 import { inOrder, legs as stopLegs, STOP_STATE_LABEL, stopState, stopTitle, unloadMs } from '../lib/stops';
 import { fuelFromReceipt, type LatLng, parseTripKey, routeStats } from '../lib/trips';
 import { clientPath } from './clientText';
@@ -72,6 +72,8 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
   const gaps = useRouteGaps(routeTrip);
   const gapTotals = useMemo(() => gapSummary(gaps.data ?? []), [gaps.data]);
   const openGaps = (gaps.data ?? []).filter((g) => g.method === 'sin_rellenar');
+  // The times the phone's GPS stopped with the truck moving (30/10/2026).
+  const cuts = useMemo(() => (route.data ? readingCuts(route.data) : []), [route.data]);
   // The stops of a trip with several unloadings, and the kilometres of each leg between them.
   const stopsQuery = useTripStops(routeTrip);
   const stops = useMemo(() => inOrder(stopsQuery.data ?? []), [stopsQuery.data]);
@@ -290,6 +292,23 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
                     <Icon name="warning" size={18} /> Sin señal desde el {formatDayTime(Date.parse(g.from_at))} durante {formatDuration(Date.parse(g.to_at) - Date.parse(g.from_at))}: ese tramo quedó sin contar, porque pasaron más de 3 horas o el salto fue más largo de lo que anda un camión. Revisá los km del viaje.
                   </p>
                 ))}
+              {trip.source === 'app' && cuts.length > 0 && (
+                <div className="notice notice-warn route-cuts">
+                  <Icon name="warning" size={18} />
+                  <div>
+                    <p>
+                      El GPS del teléfono no registró con el camión en marcha {cuts.length === 1 ? 'una vez' : `${cuts.length} veces`}. Pasa cuando el teléfono duerme la app para ahorrar batería: en la app, Mi cuenta › Revisar GPS tiene los pasos para evitarlo.
+                    </p>
+                    <ul>
+                      {cuts.map((c) => (
+                        <li key={c.from}>
+                          De {formatDayTime(Date.parse(c.from))} a {formatTime(Date.parse(c.to))} ({formatDuration(Date.parse(c.to) - Date.parse(c.from))}), unos {Math.max(1, Math.round(c.meters / 1000))} km en línea recta
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </Card>

@@ -115,6 +115,39 @@ export function routeRuns(points: readonly Reading[]): RouteRun[] {
   return runs;
 }
 
+/** Longer than this without a reading, with the truck moving, the GPS of the phone stopped (30/10/2026). */
+export const CUT_MS = 2 * 60_000;
+/** Faster than this between the two readings around it, the truck was moving: a stop drops no readings it should have. */
+export const CUT_MOVING_KMH = 20;
+
+export interface ReadingCut {
+  from: string;
+  to: string;
+  /** In a straight line between the readings around it: the road was at least this long. */
+  meters: number;
+}
+
+/**
+ * The times the GPS stopped with the truck moving: more than 2 minutes between two readings of the GPS in the same stretch
+ * of the trip, more than 300 m apart, faster than 20 km/h on average. A stop is not one (the app keeps no readings of a
+ * truck standing still), nor a pause. Some phones put the app to sleep in the background (a trip of 30/10/2026 at 110 km/h
+ * had 17 minutes without readings): the office sees when and how far.
+ */
+export function readingCuts(points: readonly Reading[]): ReadingCut[] {
+  const measured = drawable(points).filter((p) => !p.estimated);
+  const cuts: ReadingCut[] = [];
+  for (let i = 1; i < measured.length; i++) {
+    const a = measured[i - 1];
+    const b = measured[i];
+    if (!a || !b || (a.segment ?? 0) !== (b.segment ?? 0)) continue;
+    const ms = Date.parse(b.recorded_at) - Date.parse(a.recorded_at);
+    if (!(ms > CUT_MS)) continue;
+    const meters = metersBetween(a, b);
+    if (meters >= GAP_MIN_METERS && (meters * 3.6) / (ms / 1000) > CUT_MOVING_KMH) cuts.push({ from: a.recorded_at, to: b.recorded_at, meters });
+  }
+  return cuts;
+}
+
 /** What the stretches without signal of a trip add up to: the ones filled and their kilometres, and the ones left open. */
 export function gapSummary(gaps: readonly { meters: number; method: string }[]): { filled: number; meters: number; open: number } {
   const open = gaps.filter((g) => g.method === 'sin_rellenar').length;

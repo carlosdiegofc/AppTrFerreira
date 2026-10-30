@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type ActiveTrip, fleetUnits } from '../../src/lib/fleet';
-import { appendReadings, drawable, gapSummary, lastSaved, measuredCount, type Reading, routeLink, routeRuns, validPosition } from '../../src/lib/route';
+import { appendReadings, drawable, gapSummary, lastSaved, measuredCount, type Reading, readingCuts, routeLink, routeRuns, validPosition } from '../../src/lib/route';
 
 const T0 = Date.parse('2026-10-18T15:00:00Z');
 const at = (seconds: number) => new Date(T0 + seconds * 1000).toISOString();
@@ -98,5 +98,27 @@ describe('stretches without signal of a trip', () => {
   it('adds the kilometres of the ones filled and counts the ones left open', () => {
     expect(gapSummary([{ meters: 6300, method: 'ruta' }, { meters: 1200, method: 'recta' }, { meters: 0, method: 'sin_rellenar' }])).toEqual({ filled: 2, meters: 7500, open: 1 });
     expect(gapSummary([])).toEqual({ filled: 0, meters: 0, open: 0 });
+  });
+});
+
+describe('GPS cuts with the truck moving (30/10/2026)', () => {
+  // 0.01° of longitude here is about 920 m.
+  it('17 minutes without readings at 84 km/h is a cut, with its straight line', () => {
+    const cuts = readingCuts([reading(0, -34.5, -56.3), reading(60, -34.5, -56.29), reading(60 + 17 * 60, -34.5, -56.05)]);
+    expect(cuts).toHaveLength(1);
+    const [cut] = cuts;
+    expect(cut?.from).toBe(at(60));
+    expect(cut?.to).toBe(at(60 + 17 * 60));
+    expect(Math.round((cut?.meters ?? 0) / 1000)).toBe(22);
+  });
+  it('a stop is not a cut: the truck did not go anywhere, or went slowly', () => {
+    expect(readingCuts([reading(0, -34.5, -56.3), reading(3600, -34.5, -56.3001)])).toEqual([]);
+    expect(readingCuts([reading(0, -34.5, -56.3), reading(3600, -34.5, -56.29)])).toEqual([]);
+  });
+  it('a pause, a short wait and the estimated road are not cuts', () => {
+    expect(readingCuts([reading(0, -34.5, -56.3, 0), reading(900, -34.5, -56.1, 1)])).toEqual([]);
+    expect(readingCuts([reading(0, -34.5, -56.3), reading(100, -34.5, -56.27)])).toEqual([]);
+    const road = { ...reading(450, -34.5, -56.2), estimated: true };
+    expect(readingCuts([reading(0, -34.5, -56.3), road, reading(900, -34.5, -56.1)])).toHaveLength(1);
   });
 });
