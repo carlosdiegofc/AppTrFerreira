@@ -7,6 +7,13 @@ La carpeta [`web/`](web/README.md) tiene el panel web anterior, que queda en `/a
 
 # Transportes Ferreira GPS — v0.27.1
 
+## Nuevo en v0.29.0 (viajes automáticos, opcionales; versionCode 44)
+- **Viajes que empiezan solos** (pedido del dueño del 3/11/2026): se activan en Mi cuenta › Viajes automáticos y vienen apagados. Cuando el teléfono va en un vehículo (permiso «Actividad física») o la app está abierta, el GPS mira la velocidad; con 15 km/h o más durante 5 minutos (una parada de hasta 90 segundos no lo corta) empieza un viaje con el último camión, desde donde arrancó.
+  - Con la ubicación «Permitir todo el tiempo» funciona con la app cerrada; sin ese permiso llega un aviso y al abrir la app el viaje empieza solo.
+  - Los primeros 10 minutos el viaje queda solo en el teléfono: «No estoy al volante» (en la notificación, en el viaje o en el inicio) lo descarta sin que llegue al panel y pausa la detección 8 horas.
+- La prueba del emulador suma un viaje automático: 5 minutos a 108 km/h con la app en segundo plano.
+- Google Play: hay que completar la declaración de ubicación en segundo plano (ver `docs/google-play/GUIA.md`).
+
 ## Nuevo en v0.28.0 (cortes del GPS en segundo plano; versionCode 43)
 - **Aviso si el GPS se corta**: si el teléfono duerme la app durante un viaje y el GPS pasa 3 minutos sin registrar, una alarma del sistema avisa con sonido «El GPS del viaje se cortó · tocá para abrir la app» y lo repite cada 10 minutos mientras siga cortado. Al abrir la app, el GPS sigue.
 - **Pasos de batería según la marca**: en el primer viaje, y en Mi cuenta › Revisar GPS, la app muestra qué cambiar en Samsung, Xiaomi, Huawei/Honor, OPPO/Realme/OnePlus, vivo y Motorola para que el teléfono no la duerma, además de la batería «Sin restricciones».

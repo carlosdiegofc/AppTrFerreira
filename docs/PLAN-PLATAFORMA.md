@@ -204,6 +204,13 @@ Con la app en segundo plano o el teléfono bloqueado, el GPS de un viaje dejó d
 4. [x] La prueba del emulador de segundo plano, bloqueo y cierre de la app corre en cada versión.
 5. [ ] Si con la batería ajustada se sigue cortando: el permiso de ubicación «Permitir todo el tiempo», con el formulario de permisos de ubicación de Google Play. Lo decide el dueño.
 
+### Viajes que empiezan solos (aprobado el 3/11/2026)
+Opcional, apagado hasta que el chofer lo activa en Mi cuenta. Decisiones del dueño: el viaje empieza solo, con la app abierta o cerrada, sin confirmar, salvo que el chofer lo niegue; «No estoy al volante» pausa la detección 8 horas; el viaje empieza con el último camión, sin destino.
+1. [x] La regla (Drive, con pruebas): 15 km/h o más durante 5 minutos; una parada de hasta 90 segundos no la corta. El viaje empieza desde donde el camión arrancó, y esos minutos se cuentan como un tramo sin lecturas.
+2. [x] App 0.29.0: el reconocimiento de actividad («Actividad física») avisa cuando el teléfono va en un vehículo, y con la app abierta también se mira la velocidad. Con «Permitir todo el tiempo» funciona con la app cerrada; sin él llega un aviso y al abrir la app el viaje empieza. Los primeros 10 minutos el viaje no se manda; «No estoy al volante» lo descarta del teléfono. Un viaje con boletas o remitos no se descarta.
+3. [x] Política de privacidad y guía de Google Play (declaración de ubicación en segundo plano, con su video). La prueba del emulador suma un viaje automático.
+4. [ ] El dueño completa en Play Console la declaración de ubicación en segundo plano, con el video, y lo prueba en un teléfono manejando.
+
 Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - El rol anónimo tiene todos los permisos de tabla en 8 tablas de la app y del panel (`trf_driver_*`, `trf_trip_*`, `trf_mobile_catalog`, `trf_panel_trips`), y también los de la secuencia que numera los puntos GPS. Es lo que Supabase da por defecto y la seguridad por filas lo frena, pero hay que quitarlos: solo `trf_rates` necesita lectura anónima.
 - Conviven dos tipos de administrador: `trf_private.admin_emails` (administración completa, por correo) y `trf_panel_admins` (panel: lee toda la flota y también administra mantenimiento y documentos). Los datos que se completan en el panel (`trf_panel_trips`) los lee solo la segunda lista. Los dos pasan a ser roles por empresa.
