@@ -1126,7 +1126,12 @@ class MainActivity:AppCompatActivity(){
  private fun graceRow(){
   val t=store.current()?:return
   if(!Drive.inGrace(t.optLong("grace_until"),System.currentTimeMillis()))return
-  row(card(),R.drawable.ic_flag,"Este viaje empezó solo","Si no estás al volante, tocá acá: se descarta y no llega al panel",tint=amber){notDrivingNow()}
+  // One tap on this card threw the trip away without asking (3/11/2026, a test trip lost that way): now it asks first.
+  val at=java.time.Instant.ofEpochMilli(t.optLong("grace_until")).atZone(java.time.ZoneId.systemDefault()).toLocalTime()
+  row(card(),R.drawable.ic_flag,"Este viaje empezó solo","Llega al panel a las %02d:%02d. ¿No estás al volante? Tocá para descartarlo".format(at.hour,at.minute),tint=amber){
+   AlertDialog.Builder(this).setTitle("¿Descartar este viaje?").setMessage("Se borra del teléfono y no llega al panel. Si vas manejando, seguí el viaje.")
+    .setNegativeButton("Seguir viaje",null).setPositiveButton("Descartar"){_,_->notDrivingNow()}.show()
+  }
  }
  /** Home, without a trip and with them on: pause them, or see until when they are paused. */
  private fun autoHomeRow(){

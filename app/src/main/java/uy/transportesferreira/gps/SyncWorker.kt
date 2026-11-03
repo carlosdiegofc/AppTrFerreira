@@ -59,7 +59,9 @@ object Sync {
             }
             // The latest location belongs to the newest local trip only; never replay old locations over it. The trip is
             // read again here, not taken from the list above, which may be older than what live() sent meanwhile.
-            try{putLive(api){store.trips().filter{it.optString("driver_id")==uid&&it.optString("id") !in waiting}.lastOrNull()}}catch(_:Exception){failures++}
+            // While the trip in progress waits its 10 minutes, the live row is left alone: an older trip's last place would
+            // show up there as where the truck is now.
+            if(store.current()?.optString("id").let{it==null||it !in waiting})try{putLive(api){store.trips().filter{it.optString("driver_id")==uid&&it.optString("id") !in waiting}.lastOrNull()}}catch(_:Exception){failures++}
             // The stops of the trips, after the trips they belong to: a stop sent before its trip would be refused.
             for((file,st) in store.records("stops").filter{it.second.optString("driver_id")==uid&&it.second.optString("trip_id") !in waiting&&it.second.optInt("revision")>it.second.optInt("synced_revision")}){
                 try{

@@ -7,6 +7,10 @@ La carpeta [`web/`](web/README.md) tiene el panel web anterior, que queda en `/a
 
 # Transportes Ferreira GPS — v0.27.1
 
+## Nuevo en v0.29.1 (versionCode 45)
+- **Descartar un viaje que empezó solo pide confirmación** (3/11/2026, un viaje de prueba se perdió con un toque): la tarjeta del viaje dice a qué hora llega al panel y, al tocarla, pregunta «¿Descartar este viaje?» con «Seguir viaje» y «Descartar». El botón «No estoy al volante» de la notificación sigue igual.
+- Durante esos 10 minutos la sincronización ya no vuelve a mandar como posición actual el último lugar del viaje anterior.
+
 ## Nuevo en v0.29.0 (viajes automáticos, opcionales; versionCode 44)
 - **Viajes que empiezan solos** (pedido del dueño del 3/11/2026): se activan en Mi cuenta › Viajes automáticos y vienen apagados. Cuando el teléfono va en un vehículo (permiso «Actividad física») o la app está abierta, el GPS mira la velocidad; con 15 km/h o más durante 5 minutos (una parada de hasta 90 segundos no lo corta) empieza un viaje con el último camión, desde el lugar y la hora en que el camión empezó a moverse (más de 3 km/h), con las lecturas del GPS de esos minutos como ruta y kilómetros.
   - Con la ubicación «Permitir todo el tiempo» funciona con la app cerrada; sin ese permiso llega un aviso y al abrir la app el viaje empieza solo.

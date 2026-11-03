@@ -259,6 +259,15 @@ La app de Google Play es una app nueva para Android (nombre de paquete `com.tran
 
 Cada versión nueva lleva un número de versión más alto, y GitHub Actions arma su `.aab` solo. En Play Console: *Prueba interna › Crear versión* › subí el `.aab` nuevo › **Lanzar**. Los teléfonos se actualizan desde Google Play sin hacer nada más.
 
+Versión `0.29.1` (código de versión 45). Descartar un viaje que empezó solo pide confirmación, y en sus 10 minutos ya no se muestra en el mapa en vivo el lugar del viaje anterior. No cambian los permisos (la declaración de la 0.29.0 sirve). Notas de la versión:
+
+```text
+<es-419>
+• Viajes automáticos (opcional, en Mi cuenta): si el camión anda 5 minutos a más de 15 km/h, el viaje empieza solo. «No estoy al volante» lo descarta, y en la app pide confirmación.
+• Aviso si el GPS del viaje se corta, y pasos de batería según la marca del teléfono.
+</es-419>
+```
+
 Versión `0.29.0` (código de versión 44). **Viajes automáticos** (opcionales): con el camión a más de 15 km/h durante 5 minutos el viaje empieza solo. **Cambian los permisos**: agrega «Actividad física» y la ubicación en segundo plano, así que antes de lanzarla completá la declaración de [Ubicación en segundo plano y actividad física](#ubicación-en-segundo-plano-y-actividad-física-desde-la-versión-0290), con su video. La política de privacidad ya lo dice (actualizada el 3/11/2026). Antes de lanzarla, probala en un teléfono: activá los viajes automáticos, salí a manejar más de 5 minutos con la app cerrada y mirá que llegue «Viaje iniciado solo»; después probá «No estoy al volante» en otro arranque. Notas de la versión:
 
 ```text
