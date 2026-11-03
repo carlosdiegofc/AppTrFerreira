@@ -27,7 +27,8 @@ class GpsService:Service(){
  private val syncing=AtomicBoolean(false);private val executor=Executors.newSingleThreadExecutor()
  // The live position has its own line out, so it never waits behind the trip, the route or the photos.
  private val sendingLive=AtomicBoolean(false);private val liveExecutor=Executors.newSingleThreadExecutor();private var tripSentAt=0L
- private val timer=object:Runnable{override fun run(){sync();watchdog();handler.postDelayed(this,10000)}}
+ // Each turn also moves the watch from outside forward (GpsWatch): it goes off only if this service stops.
+ private val timer=object:Runnable{override fun run(){sync();watchdog();watch();handler.postDelayed(this,10000)}}
  override fun onBind(i:Intent?):IBinder?=null
  override fun onCreate(){super.onCreate();CrashLog.install(this);store=TripStore(this);fused=LocationServices.getFusedLocationProviderClient(this);(getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(NotificationChannel("gps","Viaje en curso",NotificationManager.IMPORTANCE_LOW));(getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(NotificationChannel("gps-alert","Avisos del GPS",NotificationManager.IMPORTANCE_HIGH))}
  override fun onStartCommand(i:Intent?,flags:Int,id:Int):Int{
@@ -39,9 +40,9 @@ class GpsService:Service(){
   // the trip's last reading, which may be the corner of a turn).
   if(tripId!=t.getString("id")){distance.reset();route.restore(t.optString("route_state"));lastReading=t.optJSONObject("last_point");tripId=t.getString("id")}
   when(i?.action){
-   PAUSE->{keepLast();store.update{it.put("paused",true).put("speed_kmh",0.0)};stopGps();distance.reset();sendLive();sync()}
+   PAUSE->{GpsWatch.cancel(this);keepLast();store.update{it.put("paused",true).put("speed_kmh",0.0)};stopGps();distance.reset();sendLive();sync()}
    RESUME->{store.update{it.put("paused",false).put("segment",it.optInt("segment")+1)};distance.reset();movedAt=System.currentTimeMillis();toldStop=false;sync()}
-   FINISH->{keepLast();Reminders.tripClosed(this);store.update{it.optJSONObject("last_point")?.let{p->it.put("arrival_lat",p.optDouble("latitude")).put("arrival_lng",p.optDouble("longitude"))};it.put("active",false).put("paused",false).put("ended_at",Instant.now().toString()).put("speed_kmh",0.0)};stopGps();Sync.schedule(this);sync();stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();return START_NOT_STICKY}
+   FINISH->{GpsWatch.cancel(this);keepLast();Reminders.tripClosed(this);store.update{it.optJSONObject("last_point")?.let{p->it.put("arrival_lat",p.optDouble("latitude")).put("arrival_lng",p.optDouble("longitude"))};it.put("active",false).put("paused",false).put("ended_at",Instant.now().toString()).put("speed_kmh",0.0)};stopGps();Sync.schedule(this);sync();stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();return START_NOT_STICKY}
   }
   val paused=store.current()?.optBoolean("paused")?:false;try{notifyTrip(paused)}catch(_:Exception){};if(paused)stopGps() else startGps();handler.removeCallbacks(timer);handler.post(timer);return START_STICKY
  }
@@ -74,6 +75,7 @@ class GpsService:Service(){
    null->{}
   }
  }
+ private fun watch(){val t=store.current();if(t!=null&&t.optBoolean("active")&&!t.optBoolean("paused"))GpsWatch.arm(this) else GpsWatch.cancel(this)}
  private fun alert(text:String){
   val open=PendingIntent.getActivity(this,1,Intent(this,MainActivity::class.java),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
   (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(8,Notification.Builder(this,"gps-alert").setContentTitle("Revisá el GPS del viaje").setContentText(text).setContentIntent(open).setSmallIcon(android.R.drawable.ic_dialog_alert).setAutoCancel(true).build())

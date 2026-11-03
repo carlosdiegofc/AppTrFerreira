@@ -196,6 +196,14 @@ Un viaje puede llevar carga para distintos clientes: en cada lugar el chofer mar
 6. [x] App 0.27.1: finalizar el viaje ya no cierra la app (el servicio del GPS no se cae con una última lectura incompleta y el mapa no trabaja una vez cerrado), probado en el emulador para el chofer en modo normal, en modo sencillo y el dueño de viaje. Si la app se cierra por un error, Mi cuenta muestra «Último error de la app» para enviarlo. Pedido del dueño el 29/10/2026; unión del PR #36 el mismo día.
 7. [x] App 0.27.2: terminar la descarga de la última parada cerraba la app, y no volvía a abrir mientras el viaje siguiera (aviso del dueño el 29/10/2026). Arreglado; un error en las paradas ya no cierra la pantalla del viaje y queda en Mi cuenta. El emulador termina todas las descargas en modo normal y sencillo y vuelve a abrir el viaje.
 
+### GPS que se corta en segundo plano (pedido del dueño el 30/10/2026)
+Con la app en segundo plano o el teléfono bloqueado, el GPS de un viaje dejó de registrar: a 110 km/h, 17 minutos sin lecturas, que volvieron al abrir la app. En el emulador (Android 14) el GPS sigue en segundo plano, bloqueado y después de que el sistema cierra la app: lo corta el ahorro de batería propio de algunas marcas.
+1. [x] Respaldo y cierre de un viaje que quedó abierto desde el 29/10 a las 12:40 (47 segundos, 0 km, del cierre de la app de la 0.27.0), con la hora de su última lectura.
+2. [x] App 0.28.0: una alarma del sistema, que el servicio del GPS corre cada 10 segundos, avisa con sonido si el viaje pasa 3 minutos sin lecturas, y lo repite cada 10 minutos; los pasos de batería de cada marca en el primer viaje y en Mi cuenta › Revisar GPS.
+3. [x] Panel: el viaje muestra cuándo el GPS no registró con el camión en marcha.
+4. [x] La prueba del emulador de segundo plano, bloqueo y cierre de la app corre en cada versión.
+5. [ ] Si con la batería ajustada se sigue cortando: el permiso de ubicación «Permitir todo el tiempo», con el formulario de permisos de ubicación de Google Play. Lo decide el dueño.
+
 Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - El rol anónimo tiene todos los permisos de tabla en 8 tablas de la app y del panel (`trf_driver_*`, `trf_trip_*`, `trf_mobile_catalog`, `trf_panel_trips`), y también los de la secuencia que numera los puntos GPS. Es lo que Supabase da por defecto y la seguridad por filas lo frena, pero hay que quitarlos: solo `trf_rates` necesita lectura anónima.
 - Conviven dos tipos de administrador: `trf_private.admin_emails` (administración completa, por correo) y `trf_panel_admins` (panel: lee toda la flota y también administra mantenimiento y documentos). Los datos que se completan en el panel (`trf_panel_trips`) los lee solo la segunda lista. Los dos pasan a ser roles por empresa.

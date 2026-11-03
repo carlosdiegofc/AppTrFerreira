@@ -2379,6 +2379,20 @@ body.map-full-open {
   margin: 0 16px 14px;
 }
 
+.route-cuts {
+  margin: 0 16px 14px;
+}
+
+.route-cuts p {
+  margin: 0 0 6px;
+}
+
+.route-cuts ul {
+  margin: 0;
+  padding-left: 18px;
+  font-weight: 500;
+}
+
 .map-legend + .route-facts {
   padding-top: 2px;
 }
