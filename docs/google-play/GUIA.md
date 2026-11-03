@@ -172,7 +172,7 @@ Respuestas para la declaración:
 Descripción (en inglés, como lo pide el formulario):
 
 ```text
-Optional feature, off until the driver turns it on in "Mi cuenta > Viajes automáticos", after an in-app disclosure. When the phone's activity recognition says the driver is in a vehicle, the app uses location for a few minutes, also with the app closed, to measure the truck's speed. If the truck moves above 15 km/h for 5 minutes, the app starts recording the company trip automatically with the last truck used, so drivers do not lose the kilometers of trips they forgot to start. A notification is shown while the speed is measured and when the trip starts; within 10 minutes the driver can tap "No estoy al volante" to discard it (nothing is sent) and pause the detection for 8 hours. Without the background permission the app only asks the driver with a notification.
+Optional feature, off until the driver turns it on in "Mi cuenta > Viajes automáticos", after an in-app disclosure. When the phone's activity recognition says the driver is in a vehicle, the app uses location for a few minutes, also with the app closed, to measure the truck's speed. If the truck moves above 15 km/h for 5 minutes, the app starts recording the company trip automatically with the last truck used, so drivers do not lose the kilometers of trips they forgot to start. A notification is shown while the speed is measured and when the trip starts; within 3 minutes the driver can tap "No estoy al volante" to discard the trip (only its latest position was sent, and the trip is not kept) and pause the detection for 8 hours. Without the background permission the app only asks the driver with a notification.
 ```
 
 Video (30 a 60 segundos, YouTube **No listado**): abrir la app › **Mi cuenta** › **Viajes automáticos** › mostrar el aviso › **Activar** › aceptar «Actividad física» › en la pantalla del sistema elegir **Permitir todo el tiempo** › cerrar la app › salir a manejar 5 minutos (o mostrar la notificación «Mirando si el camión arrancó») › mostrar la notificación **Viaje iniciado solo** con **No estoy al volante** › abrir la app con el viaje en curso.
@@ -259,7 +259,7 @@ La app de Google Play es una app nueva para Android (nombre de paquete `com.tran
 
 Cada versión nueva lleva un número de versión más alto, y GitHub Actions arma su `.aab` solo. En Play Console: *Prueba interna › Crear versión* › subí el `.aab` nuevo › **Lanzar**. Los teléfonos se actualizan desde Google Play sin hacer nada más.
 
-Versión `0.29.1` (código de versión 45). Descartar un viaje que empezó solo pide confirmación, y en sus 10 minutos ya no se muestra en el mapa en vivo el lugar del viaje anterior. No cambian los permisos (la declaración de la 0.29.0 sirve). Notas de la versión:
+Versión `0.29.1` (código de versión 45). Descartar un viaje que empezó solo pide confirmación, el margen para descartarlo baja a 3 minutos, y el viaje llega al panel a los 3 minutos con la ruta desde donde el camión arrancó. Si ya completaste la declaración con el texto de la 0.29.0, actualizala con el de arriba. No cambian los permisos (la declaración de la 0.29.0 sirve). Notas de la versión:
 
 ```text
 <es-419>

@@ -122,12 +122,14 @@ class GpsService:Service(){
   detecting=false
   if(store.current()?.optBoolean("active")!=true){stopForeground(STOP_FOREGROUND_REMOVE);stopSelf()}
  }
- /** «No estoy al volante» in the first 10 minutes: the trip goes away from the phone, before it reached the panel. */
+ /** «No estoy al volante» in the first 3 minutes: the trip goes away from the phone, before it reached the panel. */
  private fun discard():Boolean{
   val t=store.current()?:return false
   if(!Drive.inGrace(t.optLong("grace_until"),System.currentTimeMillis()))return false
   stopGps()
   if(!store.discard(t.getString("id")))return false
+  // Its live position went out from the start: the live map is told it is no longer on a trip.
+  liveExecutor.execute{Sync.endLive(this,t)}
   GpsWatch.cancel(this);AutoTrip.cancelNote(this)
   tripId=null;distance.reset();handler.removeCallbacks(timer)
   stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();return true

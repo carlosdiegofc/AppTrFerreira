@@ -34,10 +34,13 @@ object Sync {
     fun live(c:Context):Boolean=try{
         // The trip in progress only (reading every saved trip each time would cost battery); flush() covers the rest.
         val api=Api(c);val uid=api.session()?.getJSONObject("user")?.getString("id");val store=TripStore(c)
-        // A trip that started by itself waits its 10 minutes on the phone (Drive) before the live map shows it.
-        putLive(api){store.current()?.takeIf{uid!=null&&it.optString("driver_id")==uid&&!Drive.inGrace(it.optLong("grace_until"),System.currentTimeMillis())}}
+        // A trip that started by itself sends its latest position from its start (3/11/2026), also in its 3 minutes (Drive);
+        // the panel's map shows it once the trip itself goes up.
+        putLive(api){store.current()?.takeIf{uid!=null&&it.optString("driver_id")==uid}}
         true
     }catch(_:Exception){false}
+    /** A trip thrown away in its 3 minutes: the live map keeps its last place, no longer on a trip. */
+    fun endLive(c:Context,trip:JSONObject){try{putLive(Api(c)){JSONObject(trip.toString()).put("active",false)}}catch(_:Exception){}}
     fun flush(c:Context):Boolean=synchronized(lock){
         val store=TripStore(c);val api=Api(c)
         try{
@@ -59,9 +62,9 @@ object Sync {
             }
             // The latest location belongs to the newest local trip only; never replay old locations over it. The trip is
             // read again here, not taken from the list above, which may be older than what live() sent meanwhile.
-            // While the trip in progress waits its 10 minutes, the live row is left alone: an older trip's last place would
-            // show up there as where the truck is now.
-            if(store.current()?.optString("id").let{it==null||it !in waiting})try{putLive(api){store.trips().filter{it.optString("driver_id")==uid&&it.optString("id") !in waiting}.lastOrNull()}}catch(_:Exception){failures++}
+            // The trip in progress in its 3 minutes is where the truck is now: never an older trip's last place (3/11/2026).
+            try{putLive(api){store.current()?.takeIf{it.optString("driver_id")==uid&&it.optString("id") in waiting}
+                ?:store.trips().filter{it.optString("driver_id")==uid&&it.optString("id") !in waiting}.lastOrNull()}}catch(_:Exception){failures++}
             // The stops of the trips, after the trips they belong to: a stop sent before its trip would be refused.
             for((file,st) in store.records("stops").filter{it.second.optString("driver_id")==uid&&it.second.optString("trip_id") !in waiting&&it.second.optInt("revision")>it.second.optInt("synced_revision")}){
                 try{

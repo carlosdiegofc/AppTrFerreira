@@ -77,10 +77,10 @@ object AutoTrip{
   try{manager(c).notify(NOTE,Notification.Builder(c,"auto").setContentTitle("Parece que vas manejando").setContentText("Tocá para abrir la app: el viaje empieza solo con el último camión.")
    .setContentIntent(openApp(c,true)).addAction(notDrivingButton(c)).setSmallIcon(android.R.drawable.ic_menu_mylocation).setAutoCancel(true).setTimeoutAfter(Drive.GIVE_UP_MS).build())}catch(_:Exception){}
  }
- /** A trip started by itself: for 10 minutes «No estoy al volante» throws it away. */
+ /** A trip started by itself: for 3 minutes «No estoy al volante» throws it away. */
  fun started(c:Context,vehicle:String){
-  try{manager(c).notify(NOTE,Notification.Builder(c,"auto").setContentTitle("Viaje iniciado solo").setContentText("$vehicle · Si no estás al volante, tocá «No estoy al volante» antes de 10 minutos.")
-   .setStyle(Notification.BigTextStyle().bigText("$vehicle. El camión anduvo 5 minutos a más de 15 km/h. Si no estás al volante, tocá «No estoy al volante» antes de 10 minutos: el viaje se descarta y no llega al panel."))
+  try{manager(c).notify(NOTE,Notification.Builder(c,"auto").setContentTitle("Viaje iniciado solo").setContentText("$vehicle · Si no estás al volante, tocá «No estoy al volante» antes de 3 minutos.")
+   .setStyle(Notification.BigTextStyle().bigText("$vehicle. El camión anduvo 5 minutos a más de 15 km/h. Si no estás al volante, tocá «No estoy al volante» antes de 3 minutos: el viaje se descarta y no queda en el panel."))
    .setContentIntent(openApp(c,false)).addAction(notDrivingButton(c)).setSmallIcon(android.R.drawable.ic_menu_mylocation).setAutoCancel(true).setTimeoutAfter(Drive.GRACE_MS).build())}catch(_:Exception){}
  }
  /** The trip ended by itself after more than an hour stopped. */

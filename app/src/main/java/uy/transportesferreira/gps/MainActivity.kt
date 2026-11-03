@@ -1092,7 +1092,7 @@ class MainActivity:AppCompatActivity(){
     }}.setNegativeButton("Cerrar",null).show();return
   }
   AlertDialog.Builder(this).setTitle("Viajes automáticos")
-   .setMessage("Si los activás, cuando el camión anda a más de 15 km/h durante 5 minutos, la app empieza un viaje sola con el último camión que usaste, desde el lugar y la hora en que el camión arrancó (completás destino y carga después). Y si el camión queda más de 1 hora parado, el viaje termina solo, a la hora en que se detuvo (no con el viaje en pausa ni mientras descargás en una parada).\n\nPara darse cuenta, la app usa la actividad física del teléfono (si vas en un vehículo) y la ubicación, también con la app cerrada o el teléfono bloqueado. No envía nada hasta que empieza un viaje.\n\nEn los 10 minutos después de empezar podés tocar «No estoy al volante»: el viaje se descarta y no llega al panel, y la app no busca viajes por 8 horas. Lo apagás cuando quieras desde acá.")
+   .setMessage("Si los activás, cuando el camión anda a más de 15 km/h durante 5 minutos, la app empieza un viaje sola con el último camión que usaste, desde el lugar y la hora en que el camión arrancó (completás destino y carga después). Y si el camión queda más de 1 hora parado, el viaje termina solo, a la hora en que se detuvo (no con el viaje en pausa ni mientras descargás en una parada).\n\nPara darse cuenta, la app usa la actividad física del teléfono (si vas en un vehículo) y la ubicación, también con la app cerrada o el teléfono bloqueado. No envía nada hasta que empieza un viaje.\n\nEn los 3 minutos después de empezar podés tocar «No estoy al volante»: el viaje se descarta y no queda en el panel, y la app no busca viajes por 8 horas. Lo apagás cuando quieras desde acá.")
    .setPositiveButton("Activar"){_,_->autoAsk()}.setNegativeButton("Ahora no",null).show()
  }
  private fun autoAsk(){
@@ -1115,21 +1115,21 @@ class MainActivity:AppCompatActivity(){
   !AutoTrip.backgroundGranted(this)->"Activados con la app abierta; cerrada, con un aviso"
   else->"Activados: a más de 15 km/h durante 5 minutos"
  }
- /** «No estoy al volante»: throws away a trip that started by itself in its 10 minutes, and pauses the detection 8 hours. */
+ /** «No estoy al volante»: throws away a trip that started by itself in its 3 minutes, and pauses the detection 8 hours. */
  private fun notDrivingNow(){
   val t=store.current();val grace=t!=null&&Drive.inGrace(t.optLong("grace_until"),System.currentTimeMillis())
   AutoTrip.notDriving(this)
   toast(if(grace)"Listo: el viaje se descartó y no llega al panel. Por 8 horas no empiezan viajes solos." else "Listo: por 8 horas no empiezan viajes solos.")
   if(grace)handler.postDelayed({homeOrTrip()},800)
  }
- /** On a trip that started by itself, in its first 10 minutes. */
+ /** On a trip that started by itself, in its first 3 minutes. */
  private fun graceRow(){
   val t=store.current()?:return
   if(!Drive.inGrace(t.optLong("grace_until"),System.currentTimeMillis()))return
   // One tap on this card threw the trip away without asking (3/11/2026, a test trip lost that way): now it asks first.
   val at=java.time.Instant.ofEpochMilli(t.optLong("grace_until")).atZone(java.time.ZoneId.systemDefault()).toLocalTime()
-  row(card(),R.drawable.ic_flag,"Este viaje empezó solo","Llega al panel a las %02d:%02d. ¿No estás al volante? Tocá para descartarlo".format(at.hour,at.minute),tint=amber){
-   AlertDialog.Builder(this).setTitle("¿Descartar este viaje?").setMessage("Se borra del teléfono y no llega al panel. Si vas manejando, seguí el viaje.")
+  row(card(),R.drawable.ic_flag,"Este viaje empezó solo","Queda en el panel a las %02d:%02d. ¿No estás al volante? Tocá para descartarlo".format(at.hour,at.minute),tint=amber){
+   AlertDialog.Builder(this).setTitle("¿Descartar este viaje?").setMessage("Se borra del teléfono y no queda en el panel. Si vas manejando, seguí el viaje.")
     .setNegativeButton("Seguir viaje",null).setPositiveButton("Descartar"){_,_->notDrivingNow()}.show()
   }
  }

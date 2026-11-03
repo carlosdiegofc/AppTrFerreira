@@ -6,7 +6,8 @@ import kotlin.math.*
  * the phone goes in a vehicle, or the app is open, the GPS looks for the truck moving at 15 km/h or more for 5 minutes;
  * a stop of up to 90 seconds (a traffic light, a toll) does not break it. Then a trip starts with the last truck, from
  * the place and the time where it started to move (above 3 km/h), with the readings of those minutes as its route.
- * For 10 minutes it stays on the phone, and «No estoy al volante» throws it away without it reaching the panel, and
+ * For 3 minutes (decision of 3/11/2026, it was 10) the trip stays on the phone, only its latest position goes out, and
+ * «No estoy al volante» throws it away without the trip reaching the panel, and
  * leaves the detection off for 8 hours. With the option on, a trip ends by itself after more than an hour stopped
  * (decision of 3/11/2026), at the time and the place where the truck stopped.
  */
@@ -26,13 +27,13 @@ object Drive{
  /** Without a trip after this long, the detection stops until the next time the phone goes in a vehicle. */
  const val GIVE_UP_MS=20*60_000L
  /** A trip that started by itself stays on the phone this long, for «No estoy al volante». */
- const val GRACE_MS=10*60_000L
+ const val GRACE_MS=3*60_000L
  /** «No estoy al volante» leaves the detection off this long. */
  const val PAUSE_MS=8*3_600_000L
 
  /** Is the detection off now because the driver said «No estoy al volante»? */
  fun paused(until:Long,now:Long)=now<until
- /** Is this trip still in its 10 minutes on the phone? (grace_until, a local field of the trip that is never sent) */
+ /** Is this trip still in its 3 minutes on the phone? (grace_until, a local field of the trip that is never sent) */
  fun inGrace(graceUntil:Long,now:Long)=graceUntil>0&&now<graceUntil
  /** Does the trip end by itself now? More than an hour stopped; never while paused or while a stop is being unloaded. */
  fun endsStopped(movedAt:Long,now:Long,paused:Boolean,unloading:Boolean)=!paused&&!unloading&&now-movedAt>STOPPED_END_MS
