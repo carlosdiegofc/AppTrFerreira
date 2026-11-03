@@ -3,12 +3,12 @@ import kotlin.math.*
 
 /**
  * Trips that start by themselves (decision of 3/11/2026, optional, off until the driver turns it on in Mi cuenta). When
- * the phone goes in a vehicle, or the app is open, the GPS looks for the truck moving at 15 km/h or more for 5 minutes;
+ * the phone goes in a vehicle, or the app is open, the GPS looks for the truck moving at 15 km/h or more for 3 minutes;
  * a stop of up to 90 seconds (a traffic light, a toll) does not break it. Then a trip starts with the last truck, from
  * the place and the time where it started to move (above 3 km/h), with the readings of those minutes as its route.
- * For 3 minutes (decision of 3/11/2026, it was 10) the trip stays on the phone, only its latest position goes out, and
- * «No estoy al volante» throws it away without the trip reaching the panel, and
- * leaves the detection off for 8 hours. With the option on, a trip ends by itself after more than an hour stopped
+ * The trip always starts and goes to the panel at once (decision of 3/11/2026: a driver who does not look at the phone
+ * must not lose it; first it was 5 minutes and a 10-minute wait to throw it away). «No estoy al volante» only leaves the
+ * detection off for 8 hours. With the option on, a trip ends by itself after more than an hour stopped
  * (decision of 3/11/2026), at the time and the place where the truck stopped.
  */
 object Drive{
@@ -19,14 +19,14 @@ object Drive{
  const val SLOW_START_MS=5*60_000L
  /** More than this stopped, with the option on, the trip ends by itself. */
  const val STOPPED_END_MS=60*60_000L
- const val NEED_MS=5*60_000L
+ const val NEED_MS=3*60_000L
  /** A stop this long or shorter goes on with the same movement. */
  const val STOP_MS=90_000L
  /** Without a reading for this long the movement starts again. */
  const val LOST_MS=3*60_000L
  /** Without a trip after this long, the detection stops until the next time the phone goes in a vehicle. */
  const val GIVE_UP_MS=20*60_000L
- /** A trip that started by itself stays on the phone this long, for «No estoy al volante». */
+ /** No longer used since 3/11/2026 (a trip that started by itself is never thrown away): kept for trips saved before. */
  const val GRACE_MS=3*60_000L
  /** «No estoy al volante» leaves the detection off this long. */
  const val PAUSE_MS=8*3_600_000L

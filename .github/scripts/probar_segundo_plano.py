@@ -114,8 +114,8 @@ try:
     notes = adb('shell', 'dumpsys', 'notification', '--noredact', check=False).stdout
     print('\n'.join(l.strip() for l in notes.splitlines() if 'android.title=' in l or 'android.text=' in l)[-1500:], flush=True)
     # A trip that starts by itself (AutoTrip, 3/11/2026): on, without a trip and with the app in the background, the GPS
-    # looks at the speed; 5 minutes at 108 km/h start a trip with the last truck, from where the truck started to move.
-    print('--- Viaje automático: 5 minutos a más de 15 km/h, con la app en segundo plano', flush=True)
+    # looks at the speed; 3 minutes at 108 km/h start a trip with the last truck, from where the truck started to move.
+    print('--- Viaje automático: 3 minutos a más de 15 km/h, con la app en segundo plano', flush=True)
     adb('shell', 'am', 'force-stop', PKG, check=False)
     adb('shell', 'pm', 'clear', PKG)
     for permission in ('ACCESS_FINE_LOCATION', 'ACCESS_COARSE_LOCATION', 'POST_NOTIFICATIONS', 'ACCESS_BACKGROUND_LOCATION'):
@@ -134,11 +134,12 @@ try:
         time.sleep(10)
     waited = round(time.time() - looking_since)
     try:
-        # The trip starts where the truck started to move: about 5 minutes before it was found.
-        early = time.time() - datetime.fromisoformat(str(auto.get('started_at')).replace('Z', '+00:00')).timestamp() >= 4 * 60
+        # The trip starts where the truck started to move: about 3 minutes before it was found.
+        early = time.time() - datetime.fromisoformat(str(auto.get('started_at')).replace('Z', '+00:00')).timestamp() >= 2.5 * 60
     except ValueError:
         early = False
-    ok = bool(auto) and auto.get('auto') is True and auto.get('grace_until', 0) > 0 and early and 4 * 60 <= waited + 10 <= 8 * 60
+    # It always starts, with no wait to throw it away (3/11/2026): no grace_until.
+    ok = bool(auto) and auto.get('auto') is True and not auto.get('grace_until') and early and 2 * 60 <= waited + 10 <= 7 * 60
     print(f'{"bien" if ok else "FALLA"} viaje automático: {"empezó a los " + str(waited) + " s, desde " + str(auto.get("started_at")) + " con " + str(auto.get("vehicle")) if auto else "no empezó en 8 minutos"} · proceso {pid() or "no está"}', flush=True)
     results['viaje automático'] = ok
     notes = adb('shell', 'dumpsys', 'notification', '--noredact', check=False).stdout

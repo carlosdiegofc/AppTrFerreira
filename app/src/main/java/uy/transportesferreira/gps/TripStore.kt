@@ -24,7 +24,7 @@ class TripStore(private val c:Context) {
             .put("load_type",if(empty)"empty" else "loaded").put("distance_meters",0.0).put("segment",0).put("revision",1).put("synced_revision",0)
         for(i in 0 until drafts.length())if(!drafts.getJSONObject(i).has("id"))drafts.getJSONObject(i).put("id",UUID.randomUUID().toString())
         t.put("pending_documents",drafts)
-        // What the trip carries from its first save (a trip that started by itself is in its grace from the start: SyncWorker).
+        // What the trip carries from its first save (a trip that started by itself carries its real start and «auto»).
         first(t)
         save(t)
         write(File(dir("details"),"${t.getString("id")}.json"),JSONObject().put("trip_id",t.getString("id")).put("driver_id",user.getString("id")).put("data",details).put("synced",false))

@@ -84,8 +84,8 @@ class GpsService:Service(){
   val user=try{Api(this).session()?.optJSONObject("user")}catch(_:Exception){null};val vehicle=AutoTrip.truck(this)
   stopDetectGps()
   if(user==null||vehicle.isBlank()){AutoTrip.noTruck(this);endDetect();return}
-  // Marked as started by itself and in its grace from its first save, so it never goes to the panel before its readings.
-  val t=try{store.start(user,AutoTrip.name(this),vehicle,false){it.put("started_at",Instant.ofEpochMilli(since).toString()).put("auto",true).put("grace_until",System.currentTimeMillis()+Drive.GRACE_MS)}}catch(_:Exception){endDetect();return}
+  // Marked as started by itself, with its real start, from its first save. It always goes to the panel (3/11/2026).
+  val t=try{store.start(user,AutoTrip.name(this),vehicle,false){it.put("started_at",Instant.ofEpochMilli(since).toString()).put("auto",true)}}catch(_:Exception){endDetect();return}
   // The readings since the truck started to move are the trip's route and kilometres, with the same rules as a trip's
   // (DistanceTracker and RouteSampler): the trip starts at the exact place and time.
   val id=t.getString("id");val tracker=DistanceTracker();val sampler=RouteSampler();var meters=0.0;var last:JSONObject?=null
@@ -109,7 +109,7 @@ class GpsService:Service(){
    .put("latitude",origin[0]).put("longitude",origin[1]).put("accuracy_m",JSONObject.NULL).put("speed_kmh",JSONObject.NULL).put("heading",JSONObject.NULL)
    .put("recorded_at",Instant.ofEpochMilli(since).toString()).put("segment",0).also{store.addPoint(it)}
   store.update(false){it.put("started_at",Instant.ofEpochMilli(since).toString()).put("origin_lat",origin[0]).put("origin_lng",origin[1]).put("last_point",first)
-   .put("distance_meters",meters).put("route_state",sampler.state()).put("auto",true).put("grace_until",System.currentTimeMillis()+Drive.GRACE_MS)}
+   .put("distance_meters",meters).put("route_state",sampler.state()).put("auto",true)}
   movedAt=System.currentTimeMillis()
   detecting=false;handler.removeCallbacks(giveUp)
   AutoTrip.started(this,vehicle)

@@ -13,24 +13,24 @@ class DriveTest {
         }
         return found
     }
-    @Test fun fiveMinutesAtSpeedStartsATripFromWhereItStartedToMove(){
+    @Test fun threeMinutesAtSpeedStartsATripFromWhereItStartedToMove(){
         val d=Drive.Detector()
-        assertNull(feed(d,60.0,0,298))
-        assertEquals(t0,feed(d,60.0,298,310))
+        assertNull(feed(d,60.0,0,178))
+        assertEquals(t0,feed(d,60.0,178,190))
         assertEquals(-34.5,d.origin!![0],0.0)
     }
     @Test fun aTrafficLightDoesNotBreakTheMovement(){
         val d=Drive.Detector()
-        assertNull(feed(d,60.0,0,120))
-        assertNull(feed(d,0.0,120,200))
-        assertEquals(t0,feed(d,60.0,200,320))
+        assertNull(feed(d,60.0,0,90))
+        assertNull(feed(d,0.0,90,170))
+        assertEquals(t0,feed(d,60.0,170,260))
     }
     @Test fun aLongStopStartsAgain(){
         val d=Drive.Detector()
-        assertNull(feed(d,60.0,0,200))
-        assertNull(feed(d,0.0,200,400))
-        assertNull(feed(d,60.0,400,600))
-        assertEquals(t0+400_000L,feed(d,60.0,600,720))
+        assertNull(feed(d,60.0,0,60))
+        assertNull(feed(d,0.0,60,260))
+        assertNull(feed(d,60.0,260,400))
+        assertEquals(t0+260_000L,feed(d,60.0,400,460))
     }
     @Test fun walkingOrCityCrawlIsNotATrip(){
         val d=Drive.Detector()
@@ -42,9 +42,9 @@ class DriveTest {
     }
     @Test fun withoutReadingsForAWhileItStartsAgain(){
         val d=Drive.Detector()
-        assertNull(feed(d,60.0,0,200))
-        assertNull(feed(d,60.0,500,700))
-        assertEquals(t0+500_000L,feed(d,60.0,700,820))
+        assertNull(feed(d,60.0,0,120))
+        assertNull(feed(d,60.0,500,620))
+        assertEquals(t0+500_000L,feed(d,60.0,620,720))
     }
     @Test fun theTripStartsWhereTheTruckStartedToMove(){
         val d=Drive.Detector()

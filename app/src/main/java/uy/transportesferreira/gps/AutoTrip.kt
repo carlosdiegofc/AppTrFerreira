@@ -77,11 +77,11 @@ object AutoTrip{
   try{manager(c).notify(NOTE,Notification.Builder(c,"auto").setContentTitle("Parece que vas manejando").setContentText("Tocá para abrir la app: el viaje empieza solo con el último camión.")
    .setContentIntent(openApp(c,true)).addAction(notDrivingButton(c)).setSmallIcon(android.R.drawable.ic_menu_mylocation).setAutoCancel(true).setTimeoutAfter(Drive.GIVE_UP_MS).build())}catch(_:Exception){}
  }
- /** A trip started by itself: for 3 minutes «No estoy al volante» throws it away. */
+ /** A trip started by itself: it always goes on (3/11/2026); a wrong one is finished like any trip. */
  fun started(c:Context,vehicle:String){
-  try{manager(c).notify(NOTE,Notification.Builder(c,"auto").setContentTitle("Viaje iniciado solo").setContentText("$vehicle · Si no estás al volante, tocá «No estoy al volante» antes de 3 minutos.")
-   .setStyle(Notification.BigTextStyle().bigText("$vehicle. El camión anduvo 5 minutos a más de 15 km/h. Si no estás al volante, tocá «No estoy al volante» antes de 3 minutos: el viaje se descarta y no queda en el panel."))
-   .setContentIntent(openApp(c,false)).addAction(notDrivingButton(c)).setSmallIcon(android.R.drawable.ic_menu_mylocation).setAutoCancel(true).setTimeoutAfter(Drive.GRACE_MS).build())}catch(_:Exception){}
+  try{manager(c).notify(NOTE,Notification.Builder(c,"auto").setContentTitle("Viaje iniciado solo").setContentText("$vehicle · El camión anduvo 3 minutos a más de 15 km/h.")
+   .setStyle(Notification.BigTextStyle().bigText("$vehicle. El camión anduvo 3 minutos a más de 15 km/h: el viaje ya está en el panel, desde donde arrancó. Tocá para completar destino y carga."))
+   .setContentIntent(openApp(c,false)).setSmallIcon(android.R.drawable.ic_menu_mylocation).setAutoCancel(true).build())}catch(_:Exception){}
  }
  /** The trip ended by itself after more than an hour stopped. */
  fun ended(c:Context,vehicle:String){
@@ -95,8 +95,8 @@ object AutoTrip{
  fun cancelNote(c:Context){try{(c.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(NOTE)}catch(_:Exception){}}
  /** «No estoy al volante», from the app or from the notification. */
  fun notDriving(c:Context){
+  // It never throws a trip away (3/11/2026): it only stops looking for new ones.
   pause(c);cancelNote(c)
-  try{c.startService(Intent(c,GpsService::class.java).setAction(GpsService.DISCARD))}catch(_:Exception){}
  }
 }
 
