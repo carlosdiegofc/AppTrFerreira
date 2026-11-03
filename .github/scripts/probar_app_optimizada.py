@@ -128,7 +128,12 @@ def wait(what: str, found, seconds: int = 30):
 
 def tap_until(what: str, target, after, tries: int = 3, seconds: int = 20):
     """Taps target(screen) until after(screen) shows up: a slow emulator can lose a tap (29/10/2026)."""
-    return act_until(what, lambda: tap(wait(what, target)[0]), after, tries, seconds)
+    def act() -> None:
+        # The tap may still be on its way: what it opens counts too, and then nothing is tapped again.
+        hit = wait(what, lambda r: ['done'] if after(r) else target(r))
+        if hit != ['done']:
+            tap(hit[0])
+    return act_until(what, act, after, tries, seconds)
 
 
 def act_until(what: str, act, after, tries: int = 3, seconds: int = 20):
