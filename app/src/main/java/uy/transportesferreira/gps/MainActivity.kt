@@ -655,40 +655,10 @@ class MainActivity:AppCompatActivity(){
   if(truck.isBlank()&&!asked){val v=knownTruck();if(v!=null)saveTruck(v) else {pickTruck{simpleStart(true)};return}}
   tripForm=JSONObject();draftDocs=JSONArray();draftStops=JSONArray();empty=false;beginTrip()
  }
+ /** Simple mode's trip: the same screen as normal mode's, with the big map and every fact (decision of 3/11/2026). */
  private fun simpleTrip(){
-  val t=store.current()?.takeIf{it.optBoolean("active")}?:return simpleHome()
-  finishAsk=false
-  val live=driveFrame(t,"simpletrip"){
-   stopSlot(this,true)
-   val row=LinearLayout(this@MainActivity).apply{orientation=LinearLayout.HORIZONTAL};addView(row,LinearLayout.LayoutParams(-1,dp(78)))
-   // During the trip it asks whether the load belongs to the trip or not.
-   bigTile(row,"Combustible",brand,R.drawable.ic_fuel,0){fuelChoice()}
-   val (pi,pl)=bigTile(row,"Pausar",0xFFB7740B.toInt(),R.drawable.ic_pause,1){togglePause()};pauseIcon=pi;pauseLabel=pl
-   dock.setPadding(0,0,0,0);addView(dock,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(10)})
-  }
-  stopsSection()
-  // For the wait at a plant with the trip going: they open only with the truck stopped.
-  button(root,"Juegos",Kind.LINE,R.drawable.ic_chess,top=12){games()}
-  graceRow();batteryRow()
-  sync=note(store.message(),top=10).apply{gravity=Gravity.CENTER}
-  simpleDock();fleetOnTrip(live)
-  refresh();try{service()}catch(_:Exception){gps?.text="Revisá el permiso de ubicación para continuar"}
- }
- /** Bottom of the trip screen: the finish button, or the confirmation after tapping it, without leaving the screen. */
- private fun simpleDock(){
-  dock.removeAllViews();dock.visibility=View.VISIBLE
-  if(finishAsk){
-   // The question on a card of its own, over the room.
-   val t=store.current();val q=card(dock,pad=16,top=0)
-   text(q,"¿Finalizar el viaje?",20f,ink,2).gravity=Gravity.CENTER
-   text(q,"${elapsedText(t?.optString("started_at")?:"")} · ${km(t?.optDouble("distance_meters",0.0)?:0.0)}. Todo queda guardado.",14.5f,muted,0,4).gravity=Gravity.CENTER
-   bigButton(q,"SÍ, FINALIZAR",0xFFC4262D.toInt(),R.drawable.ic_stop,false,LinearLayout.LayoutParams(-1,dp(76)).apply{topMargin=dp(12)}){
-    finishAsk=false;dock.removeAllViews();text(dock,"Guardando el viaje…",17f,ink,1,18).apply{gravity=Gravity.CENTER;setPadding(0,0,0,dp(18))}
-    try{service(GpsService.FINISH)}catch(_:Exception){toast("No se pudo finalizar. Reintentá.");simpleDock()}}
-   button(q,"Seguir viaje",Kind.LINE,top=10){finishAsk=false;simpleDock()}
-  }else{
-   bigButton(dock,"FINALIZAR VIAJE",0xFFC4262D.toInt(),R.drawable.ic_stop,false,LinearLayout.LayoutParams(-1,dp(72))){finishAsk=true;simpleDock()}
-  }
+  if(store.current()?.optBoolean("active")!=true)return simpleHome()
+  finishAsk=false;tripScreen("simpletrip")
  }
 
  // ---------- Driver home ----------
@@ -840,9 +810,13 @@ class MainActivity:AppCompatActivity(){
  // ---------- Trip in progress ----------
  private fun trip(){
   if(simple()){simpleTrip();return}
+  tripScreen("trip")
+ }
+ /** The trip in progress, in normal mode ("trip") and in simple mode ("simpletrip"), which keeps its bigger stop buttons. */
+ private fun tripScreen(key:String){
   val t=store.current()?:return home()
-  val live=driveFrame(t,"trip"){
-   stopSlot(this,false)
+  val live=driveFrame(t,key){
+   stopSlot(this,key=="simpletrip")
    // Pausar and Finalizar side by side, both in sight (decision of 29/10/2026).
    val row=LinearLayout(this@MainActivity).apply{orientation=LinearLayout.HORIZONTAL};addView(row,LinearLayout.LayoutParams(-1,dp(60)))
    pausePill(row);finishPill(row)
@@ -971,13 +945,6 @@ class MainActivity:AppCompatActivity(){
   p.addView(v,LinearLayout.LayoutParams(0,-1,1f).apply{marginStart=dp(10)})
  }
  private fun togglePause(){try{service(if(store.current()?.optBoolean("paused")==true)GpsService.RESUME else GpsService.PAUSE)}catch(_:Exception){toast("Revisá el permiso de ubicación")}}
- /** A big button of simple mode in a row: its icon over its name. */
- private fun bigTile(p:LinearLayout,label:String,fill:Int,icon:Int,index:Int,action:()->Unit):Pair<ImageView,TextView>{
-  val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=ripple(bg(fill,24),0x40FFFFFF);glow(this,fill,4f);isClickable=true;isFocusable=true;contentDescription=label;setOnClickListener{buzz(this);action()}};sink(v,.95f)
-  val image=iconView(icon,Color.WHITE,30);val caption=tv(label,17f,Color.WHITE,2).apply{gravity=Gravity.CENTER;maxLines=1;setPadding(0,dp(4),0,0)}
-  v.addView(image);v.addView(caption)
-  p.addView(v,LinearLayout.LayoutParams(0,-1,1f).apply{if(index>0)marginStart=dp(10)});return Pair(image,caption)
- }
  /**
   * An owner who drives sees the fleet on the trip's map (decision of 29/10/2026): the trucks on a trip and the phones of
   * active drivers, with their speed, read like Flota en vivo; a truck tapped shows its route, tapped again it goes away.
@@ -1209,7 +1176,7 @@ class MainActivity:AppCompatActivity(){
   status?.text=if(paused)"Viaje pausado" else "Viaje en curso";statusBox?.background=bg(if(paused)0xFFB7740B.toInt() else 0xFF178A4C.toInt(),if(screen=="trip")24 else 22)
   elapsed?.text=elapsedText(t.optString("started_at"));stopsRefresh()
   distance?.text=km(t.optDouble("distance_meters",0.0))
-  pauseLabel?.text=if(screen=="simpletrip")(if(paused)"Reanudar" else "Pausar") else if(paused)"Reanudar viaje" else "Pausar viaje";pauseIcon?.setImageResource(if(paused)R.drawable.ic_play else R.drawable.ic_pause);(pauseLabel?.parent as? View)?.contentDescription=pauseLabel?.text
+  pauseLabel?.text=if(paused)"Reanudar viaje" else "Pausar viaje";pauseIcon?.setImageResource(if(paused)R.drawable.ic_play else R.drawable.ic_pause);(pauseLabel?.parent as? View)?.contentDescription=pauseLabel?.text
   val recent=instant(t.optJSONObject("last_point")?.optString("recorded_at"))?.let{System.currentTimeMillis()-it.toEpochMilli()<30000}?:false
   val v=if(paused)0.0 else if(recent)t.optDouble("speed_kmh",0.0) else Double.NaN
   speed?.let{roll(it,v)};gauge?.set(v)
@@ -1499,7 +1466,7 @@ class MainActivity:AppCompatActivity(){
    "mode"->askMode();"newtrip"->newTrip();"pick"->{newTrip();pickTruck{newTrip()}};"prepare"->{tripForm=JSONObject().put("destino","Puerto de Montevideo").put("cliente","Cooperativa del Este").put("tipoCarga","Arroz").put("kg","28500");prepare()}
    "fuel"->openFuel(null);"document"->openDocument(t,"tripdetail","arrival");"triphistory"->history("trips");"fuelhistory"->history("fuel");"tripdetail"->t?.let{detail(it)}?:home()
    "documents"->documents();"maintenance"->maintenance();"settings"->settings();"games"->games();"privacy"->privacy()
-   "simplehome"->simpleHome();"simpleask"->{startAskAt=SystemClock.elapsedRealtime();simpleHome(true)};"simpletrip"->simpleTrip();"simplefinish"->{simpleTrip();finishAsk=true;simpleDock()}
+   "simplehome"->simpleHome();"simpleask"->{startAskAt=SystemClock.elapsedRealtime();simpleHome(true)};"simpletrip"->simpleTrip();"simplefinish"->{simpleTrip();askFinish()}
    "trip"->trip()
    // The trip ends a few seconds after it opens, the way the finish button ends it (the emulator test of finishing a trip).
    "tripend"->{trip();handler.postDelayed({try{service(GpsService.FINISH)}catch(_:Exception){}},4000)}

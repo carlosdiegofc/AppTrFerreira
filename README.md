@@ -12,6 +12,7 @@ La carpeta [`web/`](web/README.md) tiene el panel web anterior, que queda en `/a
   - Con la ubicación «Permitir todo el tiempo» funciona con la app cerrada; sin ese permiso llega un aviso y al abrir la app el viaje empieza solo.
   - Los primeros 10 minutos el viaje queda solo en el teléfono: «No estoy al volante» (en la notificación, en el viaje o en el inicio) lo descarta sin que llegue al panel y pausa la detección 8 horas.
   - Con la opción activada, el viaje termina solo si el camión queda más de 1 hora parado, a la hora y en el lugar en que se detuvo; no con el viaje en pausa ni mientras se descarga una parada.
+- **Modo sencillo, viaje en curso** (pedido del dueño del 3/11/2026): la misma pantalla que el modo normal, con el mapa grande, «Pausar viaje» y «Finalizar» lado a lado, y en la hoja Combustible, Remito, el destino, la carga, el camión y la hora de salida. Los botones de las paradas siguen más grandes.
 - La prueba del emulador suma un viaje automático: 5 minutos a 108 km/h con la app en segundo plano.
 - Google Play: hay que completar la declaración de ubicación en segundo plano (ver `docs/google-play/GUIA.md`).
 
