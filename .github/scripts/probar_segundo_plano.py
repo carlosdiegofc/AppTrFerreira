@@ -16,6 +16,7 @@ import subprocess
 import sys
 import threading
 import time
+from datetime import datetime
 from pathlib import Path
 
 PKG = 'com.transportesferreira.app'
@@ -127,11 +128,17 @@ try:
     auto = {}
     while time.time() - looking_since < 8 * 60:
         auto = trip()
-        if auto:
+        # The trip is ready once it carries its route: before that it may be on its way to the phone's storage.
+        if auto and auto.get('auto') is True and auto.get('last_point'):
             break
         time.sleep(10)
     waited = round(time.time() - looking_since)
-    ok = bool(auto) and auto.get('auto') is True and auto.get('grace_until', 0) > 0 and 4 * 60 <= waited + 10 <= 8 * 60
+    try:
+        # The trip starts where the truck started to move: about 5 minutes before it was found.
+        early = time.time() - datetime.fromisoformat(str(auto.get('started_at')).replace('Z', '+00:00')).timestamp() >= 4 * 60
+    except ValueError:
+        early = False
+    ok = bool(auto) and auto.get('auto') is True and auto.get('grace_until', 0) > 0 and early and 4 * 60 <= waited + 10 <= 8 * 60
     print(f'{"bien" if ok else "FALLA"} viaje automático: {"empezó a los " + str(waited) + " s, desde " + str(auto.get("started_at")) + " con " + str(auto.get("vehicle")) if auto else "no empezó en 8 minutos"} · proceso {pid() or "no está"}', flush=True)
     results['viaje automático'] = ok
     notes = adb('shell', 'dumpsys', 'notification', '--noredact', check=False).stdout

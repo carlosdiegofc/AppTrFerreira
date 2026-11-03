@@ -15,7 +15,7 @@ class TripStore(private val c:Context) {
     private fun read(file:File):JSONObject?=try{JSONObject(AtomicFile(file).openRead().bufferedReader().use{it.readText()})}catch(_:Exception){null}
     fun current():JSONObject?=synchronized(lock){prefs.getString("current",null)?.let{read(File(dir("trips"),"$it.json"))}}
     fun save(trip:JSONObject)=synchronized(lock){write(File(dir("trips"),"${trip.getString("id")}.json"),trip);Unit}
-    fun start(user:JSONObject,name:String,vehicle:String,empty:Boolean,details:JSONObject=JSONObject(),drafts:org.json.JSONArray=org.json.JSONArray(),stops:org.json.JSONArray=org.json.JSONArray()):JSONObject=synchronized(lock){
+    fun start(user:JSONObject,name:String,vehicle:String,empty:Boolean,details:JSONObject=JSONObject(),drafts:org.json.JSONArray=org.json.JSONArray(),stops:org.json.JSONArray=org.json.JSONArray(),first:(JSONObject)->Unit={}):JSONObject=synchronized(lock){
         check(current()?.optBoolean("active")!=true){"Ya hay un viaje activo"}
         warning("")
         dir("track").listFiles()?.sortedByDescending{it.lastModified()}?.drop(5)?.forEach{it.delete()}
@@ -24,6 +24,8 @@ class TripStore(private val c:Context) {
             .put("load_type",if(empty)"empty" else "loaded").put("distance_meters",0.0).put("segment",0).put("revision",1).put("synced_revision",0)
         for(i in 0 until drafts.length())if(!drafts.getJSONObject(i).has("id"))drafts.getJSONObject(i).put("id",UUID.randomUUID().toString())
         t.put("pending_documents",drafts)
+        // What the trip carries from its first save (a trip that started by itself is in its grace from the start: SyncWorker).
+        first(t)
         save(t)
         write(File(dir("details"),"${t.getString("id")}.json"),JSONObject().put("trip_id",t.getString("id")).put("driver_id",user.getString("id")).put("data",details).put("synced",false))
         for(i in 0 until stops.length())addStop(t.getString("id"),user.getString("id"),stops.getJSONObject(i).optString("client"),stops.getJSONObject(i).optString("place"))
