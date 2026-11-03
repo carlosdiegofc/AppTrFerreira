@@ -6,7 +6,8 @@ The owner reported on 30/10/2026 that the GPS stops when the app goes to the bac
 trip with made-up data (MainActivity.sampleView) and the emulator's GPS moves at 108 km/h (adb emu geo fix). Each phase
 checks that the trip's last reading keeps moving forward: the app in front, in the background, the phone locked, and
 the app's process killed as a phone short of memory or battery does, which Android then starts again by itself.
-It fails if the trip stops reading in any of them.
+It fails if the trip stops reading in any of them. Then, with the trips that start by themselves on and no trip, it
+checks that 5 minutes at 108 km/h with the app in the background start one (AutoTrip, 3/11/2026).
 
 Usage: probar_segundo_plano.py <debug apk> <output folder>. The phone's log is left in the folder.
 """
@@ -111,6 +112,30 @@ try:
     print('\n'.join(l for l in services.splitlines() if 'GpsService' in l or 'isForeground' in l or 'foregroundServiceType' in l)[:3000], flush=True)
     notes = adb('shell', 'dumpsys', 'notification', '--noredact', check=False).stdout
     print('\n'.join(l.strip() for l in notes.splitlines() if 'android.title=' in l or 'android.text=' in l)[-1500:], flush=True)
+    # A trip that starts by itself (AutoTrip, 3/11/2026): on, without a trip and with the app in the background, the GPS
+    # looks at the speed; 5 minutes at 108 km/h start a trip with the last truck, from where the truck started to move.
+    print('--- Viaje automático: 5 minutos a más de 15 km/h, con la app en segundo plano', flush=True)
+    adb('shell', 'am', 'force-stop', PKG, check=False)
+    adb('shell', 'pm', 'clear', PKG)
+    for permission in ('ACCESS_FINE_LOCATION', 'ACCESS_COARSE_LOCATION', 'POST_NOTIFICATIONS', 'ACCESS_BACKGROUND_LOCATION'):
+        adb('shell', 'pm', 'grant', PKG, f'android.permission.{permission}', check=False)
+    time.sleep(4)
+    adb('shell', 'am', 'start', '-n', MAIN, '--es', 'trf_sample', 'driver', '--es', 'trf_sample_screen', 'detect', '--es', 'trf_sample_tag', 'automatico', timeout=60)
+    time.sleep(10)
+    adb('shell', 'input', 'keyevent', 'KEYCODE_HOME')
+    looking_since = time.time()
+    auto = {}
+    while time.time() - looking_since < 8 * 60:
+        auto = trip()
+        if auto:
+            break
+        time.sleep(10)
+    waited = round(time.time() - looking_since)
+    ok = bool(auto) and auto.get('auto') is True and auto.get('grace_until', 0) > 0 and 4 * 60 <= waited + 10 <= 8 * 60
+    print(f'{"bien" if ok else "FALLA"} viaje automático: {"empezó a los " + str(waited) + " s, desde " + str(auto.get("started_at")) + " con " + str(auto.get("vehicle")) if auto else "no empezó en 8 minutos"} · proceso {pid() or "no está"}', flush=True)
+    results['viaje automático'] = ok
+    notes = adb('shell', 'dumpsys', 'notification', '--noredact', check=False).stdout
+    print('\n'.join(l.strip() for l in notes.splitlines() if 'android.title=' in l or 'android.text=' in l)[-1200:], flush=True)
 finally:
     moving.clear()
     log = adb('logcat', '-d', '-v', 'threadtime', check=False, timeout=120).stdout
@@ -120,5 +145,5 @@ finally:
 print('Resultado: ' + ', '.join(f'{k} {"bien" if v else "FALLA"}' for k, v in results.items()), flush=True)
 # On 30/10/2026 the four phases went well on the emulator: the cut came from the owner's phone putting the app to sleep.
 # From then on the test keeps it that way.
-if len(results) < 4 or not all(results.values()):
+if len(results) < 5 or not all(results.values()):
     raise SystemExit('El GPS del viaje dejó de registrar en alguna de las fases.')

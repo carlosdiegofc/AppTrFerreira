@@ -180,6 +180,12 @@ class MainActivity:AppCompatActivity(){
   else AlertDialog.Builder(this).setTitle("Activá la ubicación precisa").setMessage("El cuentakilómetros necesita ubicación precisa. Habilitala en los permisos de la app.").setPositiveButton("Abrir ajustes"){_,_->startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:$packageName")))}.setNegativeButton("Ahora no",null).show()
  }
  private val notifyPermission=registerForActivityResult(ActivityResultContracts.RequestPermission()){if(screen=="settings")settings()}
+ // Trips that start by themselves (AutoTrip): «Actividad física», then the location «Permitir todo el tiempo».
+ private val activityPermission=registerForActivityResult(ActivityResultContracts.RequestPermission()){ok->
+  if(!ok)toast("Sin «Actividad física», la app busca el viaje solo mientras está abierta.")
+  AutoTrip.turnOn(this,name);if(AutoTrip.backgroundGranted(this)){toast("Listo: los viajes empiezan solos.");settings()} else backgroundAsk()}
+ private val backgroundPermission=registerForActivityResult(ActivityResultContracts.RequestPermission()){ok->
+  toast(if(ok)"Listo: los viajes empiezan solos, también con la app cerrada." else "Con la app cerrada te va a llegar un aviso: al tocarlo, el viaje empieza solo.");settings()}
  private val take=registerForActivityResult(ActivityResultContracts.TakePicture()){ok->if(ok)camera?.let{preparePhoto(Uri.fromFile(it))}else camera?.delete()}
  private val pick=registerForActivityResult(ActivityResultContracts.GetContent()){uri->if(uri!=null)preparePhoto(uri)}
 
@@ -206,7 +212,9 @@ class MainActivity:AppCompatActivity(){
  override fun onSaveInstanceState(b:Bundle){super.onSaveInstanceState(b);b.putString("camera",camera?.path);b.putString("photo",photo?.path);b.putString("screen",screen);b.putString("truck",truck);b.putBoolean("empty",empty);b.putString("tripForm",tripForm.toString());b.putString("fuelForm",fuelForm.toString());b.putString("docForm",docForm.toString());b.putString("draftDocs",draftDocs.toString());b.putString("fuelTrip",fuelTrip?.toString());b.putString("docTrip",docTrip?.toString());b.putString("historyTrip",historyTrip?.toString());b.putString("photoMode",photoMode);b.putString("docReturn",docReturn);b.putString("editForm",editForm.toString());b.putString("editId",editId);b.putString("maintTruck",maintTruck);b.putInt("maintFilter",maintFilter)
   b.putBoolean("fleetView",fleetView);b.putInt("tripFilter",tripFilter);b.putString("historyQuery",historyQuery);b.putInt("historyLimit",historyLimit);b.putBoolean("fuelMonth",fuelMonth);b.putString("detailFrom",detailFrom);b.putString("perfMonth",perfMonth.toString());b.putBoolean("perfDrivers",perfDrivers)
   if(screen=="chessnew")b.putString("chessPick","$newVsPhone|${newLevel.name}|$newSide")}
- override fun onStart(){super.onStart();Presence.opened();presenceAt=null;handler.post(tick)}
+ override fun onStart(){super.onStart();Presence.opened();presenceAt=null;handler.post(tick)
+  // With the trips that start by themselves on, the app looks at the speed while it is open (AutoTrip).
+  if(!sampleView()&&api.session()!=null&&AutoTrip.on(this)){AutoTrip.remember(this,name);AutoTrip.register(this);AutoTrip.look(this)}}
  override fun onDestroy(){photoJob++;chessJob++;trucoJob++;sheet?.dismiss();sheet=null;activeMap?.destroy();activeMap=null;liveMap=null;fleetMap=null;super.onDestroy()}
  override fun onStop(){handler.removeCallbacks(tick);Presence.closed();super.onStop()}
  // Screens where back stays inside the app; on the rest the system back gesture leaves it.
@@ -611,6 +619,7 @@ class MainActivity:AppCompatActivity(){
   // The last finished trip confirms that it was saved without the driver doing anything else.
   store.current()?.takeIf{!it.optBoolean("active")&&it.optString("driver_id")==uid()}?.let{t->
    row(card(),R.drawable.ic_check_circle,"Último viaje guardado",listOfNotNull(date(t.optString("started_at")),km(t.optDouble("distance_meters",0.0)),durationText(t.optString("started_at"),t.optString("ended_at"))).joinToString(" · "),tint=green)}
+  if(!ask)autoHomeRow()
   // Fuel can be loaded in simple mode too (decision of 19/10/2026): here, out of a trip.
   button(root,"Cargar combustible",Kind.LINE,R.drawable.ic_fuel){fuelChoice()}
   button(root,"Juegos",Kind.LINE,R.drawable.ic_chess){games()}
@@ -660,7 +669,7 @@ class MainActivity:AppCompatActivity(){
   stopsSection()
   // For the wait at a plant with the trip going: they open only with the truck stopped.
   button(root,"Juegos",Kind.LINE,R.drawable.ic_chess,top=12){games()}
-  batteryRow()
+  graceRow();batteryRow()
   sync=note(store.message(),top=10).apply{gravity=Gravity.CENTER}
   simpleDock();fleetOnTrip(live)
   refresh();try{service()}catch(_:Exception){gps?.text="Revisá el permiso de ubicación para continuar"}
@@ -709,6 +718,7 @@ class MainActivity:AppCompatActivity(){
    Shortcut(R.drawable.ic_wrench,0xFF56647B.toInt(),"Mantenimiento",null){maintenance(true)},
    Shortcut(R.drawable.ic_chess,0xFFBE3A6E.toInt(),"Juegos","Para las esperas, con el camión parado"){games()},
    Shortcut(R.drawable.ic_person,0xFF8590A2.toInt(),"Mi cuenta","Modo de uso, GPS y sesión"){settings()}))
+  autoHomeRow()
   sync=note(store.message(),top=18).apply{gravity=Gravity.CENTER}
   navBar("home")
   refreshPapers()
@@ -850,7 +860,7 @@ class MainActivity:AppCompatActivity(){
   val start=instant(t.optString("started_at"))?.atZone(ZoneId.systemDefault())?.format(DateTimeFormatter.ofPattern("HH:mm"))?:"—"
   factsGrid(card(),listOf(Fact(R.drawable.ic_flag,"Destino",details?.optString("destino")?.ifBlank{null}?:"Sin destino"),Fact(R.drawable.ic_box,"Carga",cargo),Fact(R.drawable.ic_truck,"Camión",model.ifBlank{"Sin asignar"}),Fact(R.drawable.ic_clock,"Salida",start)))
   count=note("",top=12)
-  batteryRow()
+  graceRow();batteryRow()
   if(ownerDriver())row(card(),R.drawable.ic_truck,"Flota en vivo","Todos los camiones, sus viajes y los choferes"){ownerDashboard()}
   row(card(),R.drawable.ic_chess,"Juegos","Para la espera, con el camión parado"){games()}
   sync=note(store.message(),top=12)
@@ -1098,6 +1108,64 @@ class MainActivity:AppCompatActivity(){
   val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=ripple(glassy(20));isClickable=true;isFocusable=true;contentDescription=label;setOnClickListener{action()}};sink(v,.95f)
   val image=iconView(icon,blue,24);val caption=tv(label,13.5f,blue,1).apply{gravity=Gravity.CENTER;setPadding(0,dp(6),0,0)};v.addView(image);v.addView(caption)
   p.addView(v,LinearLayout.LayoutParams(0,dp(76),1f).apply{if(index>0)marginStart=dp(10)});return Pair(image,caption)
+ }
+ // ---------- Trips that start by themselves (Drive, AutoTrip; decision of 3/11/2026) ----------
+ /** Mi cuenta: turn it on with what it does (Google Play asks for this before the location in the background), or change it. */
+ private fun autoTrips(){
+  if(AutoTrip.on(this)){
+   val items=mutableListOf(if(AutoTrip.paused(this))"Reanudar ahora" else "No estoy al volante · pausar 8 horas")
+   if(!AutoTrip.backgroundGranted(this))items.add("Que funcione con la app cerrada")
+   items.add("Apagar los viajes automáticos")
+   AlertDialog.Builder(this).setTitle("Viajes automáticos").setItems(items.toTypedArray()){_,i->
+    when(items[i]){
+     "Reanudar ahora"->{AutoTrip.resume(this);AutoTrip.look(this);toast("Listo: los viajes vuelven a empezar solos.");settings()}
+     "Que funcione con la app cerrada"->backgroundAsk()
+     "Apagar los viajes automáticos"->{AutoTrip.turnOff(this);toast("Listo: los viajes ya no empiezan solos.");settings()}
+     else->{notDrivingNow();settings()}
+    }}.setNegativeButton("Cerrar",null).show();return
+  }
+  AlertDialog.Builder(this).setTitle("Viajes automáticos")
+   .setMessage("Si los activás, cuando el camión anda a más de 15 km/h durante 5 minutos, la app empieza un viaje sola con el último camión que usaste (completás destino y carga después).\n\nPara darse cuenta, la app usa la actividad física del teléfono (si vas en un vehículo) y la ubicación, también con la app cerrada o el teléfono bloqueado. No envía nada hasta que empieza un viaje.\n\nEn los 10 minutos después de empezar podés tocar «No estoy al volante»: el viaje se descarta y no llega al panel, y la app no busca viajes por 8 horas. Lo apagás cuando quieras desde acá.")
+   .setPositiveButton("Activar"){_,_->autoAsk()}.setNegativeButton("Ahora no",null).show()
+ }
+ private fun autoAsk(){
+  if(!AutoTrip.locationGranted(this)){toast("Primero dale permiso de ubicación y después activá los viajes automáticos.");permissions.launch(locationPermissions().toTypedArray());return}
+  if(Build.VERSION.SDK_INT>=29&&!AutoTrip.activityGranted(this)){activityPermission.launch(Manifest.permission.ACTIVITY_RECOGNITION);return}
+  AutoTrip.turnOn(this,name)
+  if(AutoTrip.backgroundGranted(this)){toast("Listo: los viajes empiezan solos.");settings()} else backgroundAsk()
+ }
+ /** «Permitir todo el tiempo»: Android shows it in its own settings page since Android 11. */
+ private fun backgroundAsk(){
+  if(Build.VERSION.SDK_INT<29){settings();return}
+  AlertDialog.Builder(this).setTitle("Con la app cerrada")
+   .setMessage("Para que el viaje empiece solo con la app cerrada o el teléfono bloqueado, en la pantalla que se abre elegí «Permitir todo el tiempo». Si no, te va a llegar un aviso y el viaje empieza al tocarlo.")
+   .setPositiveButton("Continuar"){_,_->try{backgroundPermission.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)}catch(_:Exception){settings()}}
+   .setNegativeButton("Ahora no"){_,_->settings()}.show()
+ }
+ private fun autoSubtitle():String=when{
+  !AutoTrip.on(this)->"Desactivados · Tocá para activarlos"
+  AutoTrip.paused(this)->"En pausa hasta las ${Instant.ofEpochMilli(AutoTrip.pausedUntil(this)).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("HH:mm"))} · Tocá para reanudarlos"
+  !AutoTrip.backgroundGranted(this)->"Activados con la app abierta; cerrada, con un aviso"
+  else->"Activados: a más de 15 km/h durante 5 minutos"
+ }
+ /** «No estoy al volante»: throws away a trip that started by itself in its 10 minutes, and pauses the detection 8 hours. */
+ private fun notDrivingNow(){
+  val t=store.current();val grace=t!=null&&Drive.inGrace(t.optLong("grace_until"),System.currentTimeMillis())
+  AutoTrip.notDriving(this)
+  toast(if(grace)"Listo: el viaje se descartó y no llega al panel. Por 8 horas no empiezan viajes solos." else "Listo: por 8 horas no empiezan viajes solos.")
+  if(grace)handler.postDelayed({homeOrTrip()},800)
+ }
+ /** On a trip that started by itself, in its first 10 minutes. */
+ private fun graceRow(){
+  val t=store.current()?:return
+  if(!Drive.inGrace(t.optLong("grace_until"),System.currentTimeMillis()))return
+  row(card(),R.drawable.ic_flag,"Este viaje empezó solo","Si no estás al volante, tocá acá: se descarta y no llega al panel",tint=amber){notDrivingNow()}
+ }
+ /** Home, without a trip and with them on: pause them, or see until when they are paused. */
+ private fun autoHomeRow(){
+  if(!AutoTrip.on(this)||active())return
+  if(AutoTrip.paused(this))row(card(),R.drawable.ic_clock,"Viajes automáticos en pausa",autoSubtitle()){AutoTrip.resume(this);AutoTrip.look(this);toast("Listo: los viajes vuelven a empezar solos.");homeOrTrip()}
+  else row(card(),R.drawable.ic_clock,"No estoy al volante","Los viajes no empiezan solos por 8 horas"){notDrivingNow();homeOrTrip()}
  }
  private fun batteryFree()=(getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName)
  /** «Evitar cortes del GPS»: until the battery is «Sin restricciones», and always on a brand that saves battery on its own. */
@@ -1440,6 +1508,8 @@ class MainActivity:AppCompatActivity(){
    // closed on «Terminé de descargar» of the last stop and did not open again).
    // The trip with its GPS service running, as on a phone (the emulator test of the GPS in the background).
    "tripgps"->{trip();try{service()}catch(_:Exception){}}
+   // Trips that start by themselves, on, without a trip: the GPS looks at the speed (the emulator test of AutoTrip).
+   "detect"->{saveTruck("Ford Cargo 1722 · ATP 2231");AutoTrip.turnOn(this,name);home();AutoTrip.look(this)}
    "tripstops","simpletripstops"->{if(see=="tripstops")trip() else simpleTrip();sampleUnloadAll(3)}
    "tripsheet"->{trip();stage?.postDelayed({sheet(true)},300)};"tripfinish"->{trip();askFinish()};"receipt"->{home();t?.let{askReceipt(it)}};"ownermenu"->{home();ownerMenu()};"owner"->ownerDashboard();"fleetfull"->{ownerDashboard();fullFleet()};"performance"->performance()
    else->home()}
@@ -1891,6 +1961,7 @@ class MainActivity:AppCompatActivity(){
   if(!panelFirst()){val on=prefs().getBoolean(presenceKey(),false)
    row(gc,R.drawable.ic_pin,"Ubicación con la app abierta",if(on)"Activada: al abrirla y cada 5 minutos, sin viaje · Tocá para desactivarla" else "Desactivada: solo se avisa que estás activo · Tocá para activarla"){
     if(on){prefs().edit().putBoolean(presenceKey(),false).apply();toast("Listo: con la app abierta ya no se envía tu ubicación.");settings()} else presencePositionDialog{settings()}}}
+  if(!panelFirst())row(gc,R.drawable.ic_clock,"Viajes automáticos",autoSubtitle()){autoTrips()}
   row(gc,R.drawable.ic_shield,"Privacidad","Qué datos usa la app y para qué"){privacy()}
   section("Camiones y papeles")
   val pp=card();row(pp,R.drawable.ic_wrench,"Mantenimiento","Services hechos y pendientes"){maintenance(true)};row(pp,R.drawable.ic_doc,"Documentos","Licencia, carné de salud, SOA y más"){documents(true)}

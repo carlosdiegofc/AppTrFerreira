@@ -31,6 +31,22 @@ class TripStore(private val c:Context) {
     }
     /** Changes the trip in progress. send=false keeps the change on the phone until the next one that is sent. */
     fun update(send:Boolean=true,change:(JSONObject)->Unit):JSONObject?=synchronized(lock){val t=current()?:return@synchronized null;change(t);if(send)t.put("revision",t.optInt("revision")+1);save(t);t}
+    /**
+     * A trip that started by itself is thrown away with «No estoy al volante» in its first 10 minutes (Drive), before it
+     * ever went to the panel: the trip, its data, its route and its stretches, only on the phone.
+     */
+    fun discard(id:String):Boolean=synchronized(lock){
+        val f=File(dir("trips"),"$id.json");val t=read(f)?:return@synchronized false
+        if(!Drive.inGrace(t.optLong("grace_until"),System.currentTimeMillis())||t.optInt("synced_revision")>0)return@synchronized false
+        // A receipt or a delivery note already kept with it says the trip is real: it stays, to finish it.
+        if((receipts()+documents()).any{it.second.optString("trip_id")==id})return@synchronized false
+        for(folder in listOf("points","gaps","stops"))records(folder).filter{it.second.optString("trip_id")==id}.forEach{it.first.delete()}
+        File(dir("details"),"$id.json").delete();File(dir("track"),"$id.csv").delete();f.delete()
+        if(prefs.getString("current",null)==id)prefs.edit().remove("current").commit()
+        warning("");true
+    }
+    /** The trips still in their 10 minutes on the phone: nothing of them is sent yet. */
+    fun inGrace(now:Long=System.currentTimeMillis())=trips().filter{Drive.inGrace(it.optLong("grace_until"),now)}.map{it.optString("id")}.toSet()
     fun trips()=synchronized(lock){dir("trips").listFiles()?.filter{it.extension=="json"}?.mapNotNull{read(it)}?.sortedBy{it.optString("started_at")} ?: emptyList()}
     /** Local copy of the route for the live map; GPS points are deleted from the phone once uploaded. */
     fun appendTrack(tripId:String,lat:Double,lng:Double,segment:Int,time:Long)=synchronized(lock){File(dir("track"),"$tripId.csv").appendText(TrackLog.line(lat,lng,segment,time))}
