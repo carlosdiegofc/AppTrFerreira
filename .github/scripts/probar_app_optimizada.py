@@ -203,7 +203,17 @@ try:
     step('Política de privacidad: sale de los archivos de la app')
     tap_until('el enlace a la política de privacidad', lambda r: nodes(r, text='Política de privacidad'), lambda r: nodes(r, part='Última actualización'))
     shot('2-privacidad')
-    act_until('volver de la política', lambda: adb('shell', 'input', 'keyevent', 'KEYCODE_BACK'), sign_in_screen)
+    # The system's back first; on a slow emulator that loses it (3/11/2026), the app's own «Volver» button.
+    tries = iter(range(10))
+
+    def go_back() -> None:
+        root = screen() if next(tries) > 0 else None
+        button = nodes(root, desc='Volver') if root is not None else []
+        if button:
+            tap(button[0])
+        else:
+            adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
+    act_until('volver de la política', go_back, sign_in_screen)
 
     step('Girar la pantalla: la app se vuelve a armar en el ingreso')
     adb('shell', 'settings', 'put', 'system', 'accelerometer_rotation', '0')
