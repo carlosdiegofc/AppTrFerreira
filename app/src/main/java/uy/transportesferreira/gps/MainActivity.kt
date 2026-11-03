@@ -1125,7 +1125,7 @@ class MainActivity:AppCompatActivity(){
     }}.setNegativeButton("Cerrar",null).show();return
   }
   AlertDialog.Builder(this).setTitle("Viajes automáticos")
-   .setMessage("Si los activás, cuando el camión anda a más de 15 km/h durante 5 minutos, la app empieza un viaje sola con el último camión que usaste (completás destino y carga después).\n\nPara darse cuenta, la app usa la actividad física del teléfono (si vas en un vehículo) y la ubicación, también con la app cerrada o el teléfono bloqueado. No envía nada hasta que empieza un viaje.\n\nEn los 10 minutos después de empezar podés tocar «No estoy al volante»: el viaje se descarta y no llega al panel, y la app no busca viajes por 8 horas. Lo apagás cuando quieras desde acá.")
+   .setMessage("Si los activás, cuando el camión anda a más de 15 km/h durante 5 minutos, la app empieza un viaje sola con el último camión que usaste, desde el lugar y la hora en que el camión arrancó (completás destino y carga después). Y si el camión queda más de 1 hora parado, el viaje termina solo, a la hora en que se detuvo (no con el viaje en pausa ni mientras descargás en una parada).\n\nPara darse cuenta, la app usa la actividad física del teléfono (si vas en un vehículo) y la ubicación, también con la app cerrada o el teléfono bloqueado. No envía nada hasta que empieza un viaje.\n\nEn los 10 minutos después de empezar podés tocar «No estoy al volante»: el viaje se descarta y no llega al panel, y la app no busca viajes por 8 horas. Lo apagás cuando quieras desde acá.")
    .setPositiveButton("Activar"){_,_->autoAsk()}.setNegativeButton("Ahora no",null).show()
  }
  private fun autoAsk(){

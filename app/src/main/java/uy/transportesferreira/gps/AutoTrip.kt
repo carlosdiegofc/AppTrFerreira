@@ -83,6 +83,11 @@ object AutoTrip{
    .setStyle(Notification.BigTextStyle().bigText("$vehicle. El camión anduvo 5 minutos a más de 15 km/h. Si no estás al volante, tocá «No estoy al volante» antes de 10 minutos: el viaje se descarta y no llega al panel."))
    .setContentIntent(openApp(c,false)).addAction(notDrivingButton(c)).setSmallIcon(android.R.drawable.ic_menu_mylocation).setAutoCancel(true).setTimeoutAfter(Drive.GRACE_MS).build())}catch(_:Exception){}
  }
+ /** The trip ended by itself after more than an hour stopped. */
+ fun ended(c:Context,vehicle:String){
+  try{manager(c).notify(NOTE,Notification.Builder(c,"auto").setContentTitle("Viaje finalizado solo").setContentText("$vehicle · El camión estuvo más de 1 hora parado: el viaje terminó cuando se detuvo.")
+   .setContentIntent(openApp(c,false)).setSmallIcon(android.R.drawable.ic_menu_mylocation).setAutoCancel(true).build())}catch(_:Exception){}
+ }
  fun noTruck(c:Context){
   try{manager(c).notify(NOTE,Notification.Builder(c,"auto").setContentTitle("No se pudo iniciar el viaje solo").setContentText("Abrí la app y elegí el camión una vez: después los viajes empiezan solos.")
    .setContentIntent(openApp(c,false)).setSmallIcon(android.R.drawable.ic_dialog_alert).setAutoCancel(true).build())}catch(_:Exception){}

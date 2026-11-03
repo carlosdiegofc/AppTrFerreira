@@ -46,6 +46,25 @@ class DriveTest {
         assertNull(feed(d,60.0,500,700))
         assertEquals(t0+500_000L,feed(d,60.0,700,820))
     }
+    @Test fun theTripStartsWhereTheTruckStartedToMove(){
+        val d=Drive.Detector()
+        assertNull(feed(d,0.0,0,60))
+        // Two minutes rolling slowly out of the yard, then on the road.
+        assertNull(feed(d,8.0,60,180,-56.0))
+        assertEquals(t0+60_000L,feed(d,60.0,180,500,-55.998))
+        assertEquals(-56.0+60*0.000325*(8.0/108.0),d.origin!![1],1e-9)
+    }
+    @Test fun aLongCrawlInTrafficIsNotTheStart(){
+        val d=Drive.Detector()
+        assertNull(feed(d,8.0,0,600))
+        assertEquals(t0+600_000L,feed(d,60.0,600,920,-55.99))
+    }
+    @Test fun anHourStoppedEndsTheTripUnlessPausedOrUnloading(){
+        assertFalse(Drive.endsStopped(t0,t0+Drive.STOPPED_END_MS,false,false))
+        assertTrue(Drive.endsStopped(t0,t0+Drive.STOPPED_END_MS+1,false,false))
+        assertFalse(Drive.endsStopped(t0,t0+2*Drive.STOPPED_END_MS,true,false))
+        assertFalse(Drive.endsStopped(t0,t0+2*Drive.STOPPED_END_MS,false,true))
+    }
     @Test fun theGraceAndThePause(){
         assertTrue(Drive.inGrace(t0+Drive.GRACE_MS,t0+60_000))
         assertFalse(Drive.inGrace(t0+Drive.GRACE_MS,t0+Drive.GRACE_MS))

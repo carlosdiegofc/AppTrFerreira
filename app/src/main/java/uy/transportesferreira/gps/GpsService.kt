@@ -51,13 +51,14 @@ class GpsService:Service(){
   when(action){
    PAUSE->{GpsWatch.cancel(this);keepLast();store.update{it.put("paused",true).put("speed_kmh",0.0)};stopGps();distance.reset();sendLive();sync()}
    RESUME->{store.update{it.put("paused",false).put("segment",it.optInt("segment")+1)};distance.reset();movedAt=System.currentTimeMillis();toldStop=false;sync()}
-   FINISH->{GpsWatch.cancel(this);keepLast();Reminders.tripClosed(this);store.update{it.optJSONObject("last_point")?.let{p->it.put("arrival_lat",p.optDouble("latitude")).put("arrival_lng",p.optDouble("longitude"))};it.put("active",false).put("paused",false).put("ended_at",Instant.now().toString()).put("speed_kmh",0.0)};stopGps();Sync.schedule(this);sync();stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();return START_NOT_STICKY}
+   FINISH->{finish(Instant.now());return START_NOT_STICKY}
   }
   val paused=store.current()?.optBoolean("paused")?:false;try{notifyTrip(paused)}catch(_:Exception){};if(paused)stopGps() else startGps();handler.removeCallbacks(timer);handler.post(timer);return START_STICKY
  }
  // ---------- Trips that start by themselves (Drive, decision of 3/11/2026) ----------
  private var detecting=false;private var detectCallback:LocationCallback?=null;private val detector=Drive.Detector()
  private val giveUp=Runnable{if(detecting)endDetect()}
+ private val seenReadings=ArrayDeque<Location>()
  /** Looks at the speed for a while, without a trip: 15 km/h or more for 5 minutes starts one. */
  @Suppress("MissingPermission") private fun detect():Int{
   if(detecting)return START_NOT_STICKY
@@ -65,7 +66,7 @@ class GpsService:Service(){
   val open=PendingIntent.getActivity(this,0,Intent(this,MainActivity::class.java),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
   try{startForeground(7,Notification.Builder(this,"gps").setContentTitle("Viajes automáticos").setContentText("Mirando si el camión arrancó · Tocá para abrir").setContentIntent(open).setSmallIcon(android.R.drawable.ic_menu_mylocation).setOngoing(true).build())}
   catch(_:Exception){AutoTrip.ask(this);stopSelf();return START_NOT_STICKY}
-  detecting=true;detector.reset()
+  detecting=true;detector.reset();seenReadings.clear()
   detectCallback=object:LocationCallback(){override fun onLocationResult(r:LocationResult){r.locations.forEach{seen(it)}}}
   try{fused.requestLocationUpdates(LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY,2000).setMinUpdateIntervalMillis(1000).build(),detectCallback!!,mainLooper).addOnFailureListener{endDetect()}}catch(_:SecurityException){endDetect();return START_NOT_STICKY}
   handler.removeCallbacks(giveUp);handler.postDelayed(giveUp,Drive.GIVE_UP_MS)
@@ -73,6 +74,7 @@ class GpsService:Service(){
  }
  private fun seen(l:Location){
   if(!detecting||!l.hasAccuracy()||l.accuracy>50||System.currentTimeMillis()-l.time !in -2000..30000)return
+  seenReadings.addLast(l);while(seenReadings.isNotEmpty()&&l.time-seenReadings.first().time>Drive.SLOW_START_MS+Drive.NEED_MS+60_000)seenReadings.removeFirst()
   val since=detector.add(l.latitude,l.longitude,if(l.hasSpeed())(l.speed*3.6).coerceAtLeast(0.0) else null,l.time)?:return
   val origin=detector.origin?:doubleArrayOf(l.latitude,l.longitude)
   autoStart(since,origin)
@@ -83,13 +85,31 @@ class GpsService:Service(){
   stopDetectGps()
   if(user==null||vehicle.isBlank()){AutoTrip.noTruck(this);endDetect();return}
   val t=try{store.start(user,AutoTrip.name(this),vehicle,false)}catch(_:Exception){endDetect();return}
-  val first=JSONObject().put("event_id",UUID.randomUUID().toString()).put("trip_id",t.getString("id")).put("driver_id",t.getString("driver_id")).put("vehicle",vehicle)
+  // The readings since the truck started to move are the trip's route and kilometres, with the same rules as a trip's
+  // (DistanceTracker and RouteSampler): the trip starts at the exact place and time.
+  val id=t.getString("id");val tracker=DistanceTracker();val sampler=RouteSampler();var meters=0.0;var last:JSONObject?=null
+  for(l in seenReadings.filter{it.time>=since}){
+   meters+=tracker.add(DistanceTracker.Fix(l.latitude,l.longitude,l.accuracy.toDouble(),l.time),l.time)
+   if(!tracker.accepted)continue
+   val kmh=if(l.hasSpeed())(l.speed*3.6).coerceAtLeast(0.0) else null
+   val p=JSONObject().put("event_id",UUID.randomUUID().toString()).put("trip_id",id).put("driver_id",t.getString("driver_id")).put("vehicle",vehicle)
+    .put("latitude",l.latitude).put("longitude",l.longitude).put("accuracy_m",l.accuracy.toDouble()).put("speed_kmh",kmh?:JSONObject.NULL)
+    .put("heading",if(l.hasBearing())l.bearing.toDouble() else JSONObject.NULL).put("recorded_at",Instant.ofEpochMilli(l.time).toString()).put("segment",0)
+   store.appendTrack(id,l.latitude,l.longitude,0,l.time)
+   // The first reading, where the truck started to move, always goes in.
+   val kept=sampler.keep(l.latitude,l.longitude,l.time,0,kmh,l.accuracy.toDouble(),if(l.hasBearing())l.bearing.toDouble() else null)
+   if(last==null||kept)store.addPoint(p)
+   last=p
+  }
+  seenReadings.clear()
+  // Without the readings (they did not reach the service) the trip still starts where the truck started to move, and
+  // those minutes count as a stretch without readings, filled with the road (Gaps).
+  val first=last?:JSONObject().put("event_id",UUID.randomUUID().toString()).put("trip_id",id).put("driver_id",t.getString("driver_id")).put("vehicle",vehicle)
    .put("latitude",origin[0]).put("longitude",origin[1]).put("accuracy_m",JSONObject.NULL).put("speed_kmh",JSONObject.NULL).put("heading",JSONObject.NULL)
-   .put("recorded_at",Instant.ofEpochMilli(since).toString()).put("segment",0)
-  // The minutes it took to tell the truck was moving count as a stretch without readings, filled with the road (Gaps).
+   .put("recorded_at",Instant.ofEpochMilli(since).toString()).put("segment",0).also{store.addPoint(it)}
   store.update(false){it.put("started_at",Instant.ofEpochMilli(since).toString()).put("origin_lat",origin[0]).put("origin_lng",origin[1]).put("last_point",first)
-   .put("auto",true).put("grace_until",System.currentTimeMillis()+Drive.GRACE_MS)}
-  store.addPoint(first)
+   .put("distance_meters",meters).put("route_state",sampler.state()).put("auto",true).put("grace_until",System.currentTimeMillis()+Drive.GRACE_MS)}
+  movedAt=System.currentTimeMillis()
   detecting=false;handler.removeCallbacks(giveUp)
   AutoTrip.started(this,vehicle)
   onStartCommand(null,0,0)
@@ -113,8 +133,17 @@ class GpsService:Service(){
  }
  private fun notifyTrip(paused:Boolean){val open=PendingIntent.getActivity(this,0,Intent(this,MainActivity::class.java),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT);startForeground(7,Notification.Builder(this,"gps").setContentTitle(if(paused)"Viaje pausado" else "Viaje en curso").setContentText(store.warning().ifBlank{"${store.current()?.optString("vehicle")} · Tocá para abrir"}).setContentIntent(open).setSmallIcon(android.R.drawable.ic_menu_mylocation).setOngoing(true).build())}
  @Suppress("MissingPermission") private fun startGps(){if(callback!=null)return;callback=object:LocationCallback(){override fun onLocationResult(r:LocationResult){r.locations.forEach{record(it)}}};try{fused.requestLocationUpdates(LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY,2000).setMinUpdateIntervalMillis(1000).setWaitForAccurateLocation(false).build(),callback!!,mainLooper).addOnFailureListener{store.message("GPS no disponible · revisá los permisos");stopGps()}}catch(_:SecurityException){store.message("Falta permiso de ubicación precisa");stopGps()}}
+ private fun finish(endedAt:Instant){GpsWatch.cancel(this);keepLast();Reminders.tripClosed(this);store.update{it.optJSONObject("last_point")?.let{p->it.put("arrival_lat",p.optDouble("latitude")).put("arrival_lng",p.optDouble("longitude"))};it.put("active",false).put("paused",false).put("ended_at",endedAt.toString()).put("speed_kmh",0.0)};stopGps();Sync.schedule(this);sync();stopForeground(STOP_FOREGROUND_REMOVE);stopSelf()}
+ /** With the trips that start by themselves on, more than an hour stopped ends the trip, at the time the truck stopped. */
+ private fun stoppedEnd(t:JSONObject):Boolean{
+  if(!AutoTrip.on(this)||!t.optBoolean("active"))return false
+  val now=System.currentTimeMillis()
+  if(!Drive.endsStopped(movedAt,now,t.optBoolean("paused"),Stops.unloading(store.stops(t.getString("id")))!=null))return false
+  val vehicle=t.optString("vehicle");finish(Instant.ofEpochMilli(movedAt));AutoTrip.ended(this,vehicle);return true
+ }
  private fun watchdog(){
   val t=store.current()?:return
+  if(stoppedEnd(t))return
   openCheck(t)
   if(!t.optBoolean("active")||t.optBoolean("paused")){if(store.warning().isNotEmpty()){store.warning("");clearAlert()};return}
   val now=System.currentTimeMillis()
@@ -156,7 +185,8 @@ class GpsService:Service(){
   // GPS jitter (RouteSampler). At a turn the reading before it, where the truck went round the corner, goes in first.
   store.appendTrack(t.getString("id"),l.latitude,l.longitude,t.optInt("segment"),l.time)
   val kmh=if(l.hasSpeed())(l.speed*3.6).coerceAtLeast(0.0) else null
-  if((kmh?:0.0)>=Notices.MOVING_KMH){movedAt=System.currentTimeMillis();toldStop=false}
+  // A reading without speed that moved the odometer counts as moving too: a trip never ends by itself while driving.
+  if((kmh?:0.0)>=Notices.MOVING_KMH||(kmh==null&&delta>0)){movedAt=System.currentTimeMillis();toldStop=false}
   unloadingCheck(t.getString("id"),kmh,l.time)
   if(route.keep(l.latitude,l.longitude,l.time,t.optInt("segment"),kmh,l.accuracy.toDouble(),if(l.hasBearing())l.bearing.toDouble() else null)){
    if(route.corner)lastReading?.let{store.addPoint(it)}

@@ -8,9 +8,10 @@ La carpeta [`web/`](web/README.md) tiene el panel web anterior, que queda en `/a
 # Transportes Ferreira GPS — v0.27.1
 
 ## Nuevo en v0.29.0 (viajes automáticos, opcionales; versionCode 44)
-- **Viajes que empiezan solos** (pedido del dueño del 3/11/2026): se activan en Mi cuenta › Viajes automáticos y vienen apagados. Cuando el teléfono va en un vehículo (permiso «Actividad física») o la app está abierta, el GPS mira la velocidad; con 15 km/h o más durante 5 minutos (una parada de hasta 90 segundos no lo corta) empieza un viaje con el último camión, desde donde arrancó.
+- **Viajes que empiezan solos** (pedido del dueño del 3/11/2026): se activan en Mi cuenta › Viajes automáticos y vienen apagados. Cuando el teléfono va en un vehículo (permiso «Actividad física») o la app está abierta, el GPS mira la velocidad; con 15 km/h o más durante 5 minutos (una parada de hasta 90 segundos no lo corta) empieza un viaje con el último camión, desde el lugar y la hora en que el camión empezó a moverse (más de 3 km/h), con las lecturas del GPS de esos minutos como ruta y kilómetros.
   - Con la ubicación «Permitir todo el tiempo» funciona con la app cerrada; sin ese permiso llega un aviso y al abrir la app el viaje empieza solo.
   - Los primeros 10 minutos el viaje queda solo en el teléfono: «No estoy al volante» (en la notificación, en el viaje o en el inicio) lo descarta sin que llegue al panel y pausa la detección 8 horas.
+  - Con la opción activada, el viaje termina solo si el camión queda más de 1 hora parado, a la hora y en el lugar en que se detuvo; no con el viaje en pausa ni mientras se descarga una parada.
 - La prueba del emulador suma un viaje automático: 5 minutos a 108 km/h con la app en segundo plano.
 - Google Play: hay que completar la declaración de ubicación en segundo plano (ver `docs/google-play/GUIA.md`).
 
