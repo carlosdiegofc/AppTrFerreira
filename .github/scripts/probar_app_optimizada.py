@@ -134,6 +134,12 @@ def tap_until(what: str, target, after, tries: int = 3, seconds: int = 20):
 def act_until(what: str, act, after, tries: int = 3, seconds: int = 20):
     """Does act() until after(screen) shows up: a slow emulator can lose a tap, a key or typed text (29/10/2026)."""
     for attempt in range(tries):
+        if attempt > 0:
+            # A late action may have done its work after the wait: then it is not repeated.
+            root = screen()
+            hit = after(root) if root is not None else None
+            if hit:
+                return hit
         act()
         end = time.time() + seconds
         while time.time() < end:
