@@ -211,7 +211,8 @@ Opcional, apagado hasta que el chofer lo activa en Mi cuenta. Decisiones del due
 3. [x] Con la opción activada, un viaje termina solo con el camión más de 1 hora parado, a la hora en que se detuvo; no con el viaje en pausa ni mientras se descarga una parada (pedido del dueño del 3/11/2026).
 4. [x] Política de privacidad y guía de Google Play (declaración de ubicación en segundo plano, con su video). La prueba del emulador suma un viaje automático.
 5. [x] Modo sencillo: el viaje en curso con la misma pantalla que el modo normal (mapa grande y todos los datos), pedido del dueño del 3/11/2026; los botones de las paradas siguen más grandes.
-6. [ ] El dueño completa en Play Console la declaración de ubicación en segundo plano, con el video, y lo prueba en un teléfono manejando.
+6. [x] Panel, detalle avanzado de cada viaje (pedido del dueño del 3/11/2026): cada vez que el camión estuvo detenido 5 minutos o más (o en pausa), marcado en el mapa; los peajes, balanzas y radares por los que pasó, con su velocidad y el máximo; y al tocar el recorrido, la hora, la velocidad y los km desde la salida en ese punto. Sale de lo que la app ya manda; no cambia la base.
+7. [ ] El dueño completa en Play Console la declaración de ubicación en segundo plano, con el video, y lo prueba en un teléfono manejando.
 
 Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - El rol anónimo tiene todos los permisos de tabla en 8 tablas de la app y del panel (`trf_driver_*`, `trf_trip_*`, `trf_mobile_catalog`, `trf_panel_trips`), y también los de la secuencia que numera los puntos GPS. Es lo que Supabase da por defecto y la seguridad por filas lo frena, pero hay que quitarlos: solo `trf_rates` necesita lectura anónima.

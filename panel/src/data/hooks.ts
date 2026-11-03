@@ -39,6 +39,7 @@ import {
   fetchPresence,
   fetchRoute,
   fetchRouteGaps,
+  fetchTripRoadEvents,
   fetchTripStops,
   fetchServices,
   fetchTollPassages,
@@ -335,6 +336,16 @@ export function useRouteGaps(trip: RouteTrip | null) {
     queryFn: () => (trip ? fetchRouteGaps(trip.id) : Promise.resolve([])),
     enabled: trip !== null,
     refetchInterval: trip && (!trip.ended_at || settling(trip.ended_at)) ? ROUTE_REFRESH_MS * 6 : false,
+  });
+}
+
+/** The tolls, scales and radars the trip went by, read again with its route while it is in progress. */
+export function useTripRoadEvents(trip: RouteTrip | null) {
+  return useQuery({
+    queryKey: ['tripRoadEvents', trip?.id ?? null],
+    queryFn: () => (trip ? fetchTripRoadEvents(trip.id) : Promise.resolve([])),
+    enabled: trip !== null,
+    refetchInterval: trip && !trip.ended_at ? ROUTE_REFRESH_MS * 6 : false,
   });
 }
 

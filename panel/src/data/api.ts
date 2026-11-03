@@ -299,6 +299,22 @@ export async function fetchRouteGaps(tripId: string): Promise<RouteGapRow[]> {
   return all((from, to) => supabase.from('trf_route_gaps').select('id,from_at,to_at,meters,method').eq('trip_id', tripId).order('from_at', { ascending: true }).order('id').range(from, to), 2_000);
 }
 
+export interface TripRoadEventRow {
+  id: string;
+  kind: string;
+  point_name: string;
+  happened_at: string;
+  speed_kmh: number | null;
+  speed_limit: number | null;
+  amount: number | null;
+}
+
+/** The tolls, scales, radars and own points the trip went by (control de ruta, 0005), in order. */
+export async function fetchTripRoadEvents(tripId: string): Promise<TripRoadEventRow[]> {
+  const rows = await all((from, to) => supabase.from('trf_road_events').select('id,kind,point_name,happened_at,speed_kmh,speed_limit,amount').eq('trip_id', tripId).order('happened_at', { ascending: true }).order('id').range(from, to), 2_000);
+  return (rows as unknown as TripRoadEventRow[]).map((r) => ({ ...r, speed_limit: r.speed_limit === null ? null : Number(r.speed_limit), amount: r.amount === null ? null : Number(r.amount) }));
+}
+
 export type StopRow = Tables<'trf_trip_stops'>;
 
 /** The stops of a trip with several unloadings (app 0.27.0), in the order of the trip. */

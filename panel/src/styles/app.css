@@ -2323,6 +2323,12 @@ body.map-full-open {
   fill-opacity: 1;
 }
 
+.leaflet-interactive.fm-halt {
+  stroke: var(--surface);
+  fill: var(--muted);
+  fill-opacity: 0.9;
+}
+
 .leaflet-interactive.fm-now {
   stroke: var(--surface);
   fill: var(--marker-moving);
@@ -4801,4 +4807,16 @@ button.ex-open:hover {
     gap: 8px;
     padding: 0 12px 10px 60px;
   }
+}
+
+/* The advanced detail of a trip (3/11/2026): closed until the office opens it. */
+.trip-advanced summary {
+  cursor: pointer;
+  font-weight: 650;
+  padding: 2px 0 10px;
+}
+
+.trip-advanced h3 {
+  margin: 14px 0 6px;
+  font-size: 15px;
 }
