@@ -71,17 +71,17 @@ object AutoTrip{
   nm.createNotificationChannel(NotificationChannel("auto","Viajes automáticos",NotificationManager.IMPORTANCE_HIGH));return nm
  }
  private fun openApp(c:Context,extra:Boolean)=PendingIntent.getActivity(c,3,Intent(c,MainActivity::class.java).apply{if(extra)putExtra(OPEN_EXTRA,true)},PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
- private fun notDriving(c:Context)=Notification.Action.Builder(null,"No estoy al volante",PendingIntent.getBroadcast(c,4,Intent(c,AutoTripReceiver::class.java).setAction(NOT_DRIVING),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)).build()
+ private fun notDrivingButton(c:Context)=Notification.Action.Builder(null,"No estoy al volante",PendingIntent.getBroadcast(c,4,Intent(c,AutoTripReceiver::class.java).setAction(NOT_DRIVING),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)).build()
  /** Without «Permitir todo el tiempo» the GPS cannot start from the background: opening the app is enough. */
  fun ask(c:Context){
   try{manager(c).notify(NOTE,Notification.Builder(c,"auto").setContentTitle("Parece que vas manejando").setContentText("Tocá para abrir la app: el viaje empieza solo con el último camión.")
-   .setContentIntent(openApp(c,true)).addAction(notDriving(c)).setSmallIcon(android.R.drawable.ic_menu_mylocation).setAutoCancel(true).setTimeoutAfter(Drive.GIVE_UP_MS).build())}catch(_:Exception){}
+   .setContentIntent(openApp(c,true)).addAction(notDrivingButton(c)).setSmallIcon(android.R.drawable.ic_menu_mylocation).setAutoCancel(true).setTimeoutAfter(Drive.GIVE_UP_MS).build())}catch(_:Exception){}
  }
  /** A trip started by itself: for 10 minutes «No estoy al volante» throws it away. */
  fun started(c:Context,vehicle:String){
   try{manager(c).notify(NOTE,Notification.Builder(c,"auto").setContentTitle("Viaje iniciado solo").setContentText("$vehicle · Si no estás al volante, tocá «No estoy al volante» antes de 10 minutos.")
    .setStyle(Notification.BigTextStyle().bigText("$vehicle. El camión anduvo 5 minutos a más de 15 km/h. Si no estás al volante, tocá «No estoy al volante» antes de 10 minutos: el viaje se descarta y no llega al panel."))
-   .setContentIntent(openApp(c,false)).addAction(notDriving(c)).setSmallIcon(android.R.drawable.ic_menu_mylocation).setAutoCancel(true).setTimeoutAfter(Drive.GRACE_MS).build())}catch(_:Exception){}
+   .setContentIntent(openApp(c,false)).addAction(notDrivingButton(c)).setSmallIcon(android.R.drawable.ic_menu_mylocation).setAutoCancel(true).setTimeoutAfter(Drive.GRACE_MS).build())}catch(_:Exception){}
  }
  fun noTruck(c:Context){
   try{manager(c).notify(NOTE,Notification.Builder(c,"auto").setContentTitle("No se pudo iniciar el viaje solo").setContentText("Abrí la app y elegí el camión una vez: después los viajes empiezan solos.")
