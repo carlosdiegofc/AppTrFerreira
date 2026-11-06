@@ -214,7 +214,9 @@ class MainActivity:AppCompatActivity(){
   if(screen=="chessnew")b.putString("chessPick","$newVsPhone|${newLevel.name}|$newSide")}
  override fun onStart(){super.onStart();Presence.opened();presenceAt=null;handler.post(tick)
   // With the trips that start by themselves on, the app looks at the speed while it is open (AutoTrip).
-  if(!sampleView()&&api.session()!=null&&AutoTrip.on(this)){AutoTrip.remember(this,name);AutoTrip.register(this);AutoTrip.look(this)}}
+  if(!sampleView()&&api.session()!=null&&AutoTrip.on(this)){AutoTrip.remember(this,name);AutoTrip.register(this);AutoTrip.look(this)}
+  // A ghost mode set from the panel shows up on opening (Modes).
+  if(!sampleView()&&api.session()!=null)Modes.pull(this){runOnUiThread{if(!isDestroyed)homeOrTrip()}}}
  override fun onDestroy(){photoJob++;chessJob++;trucoJob++;sheet?.dismiss();sheet=null;activeMap?.destroy();activeMap=null;liveMap=null;fleetMap=null;super.onDestroy()}
  override fun onStop(){handler.removeCallbacks(tick);Presence.closed();super.onStop()}
  // Screens where back stays inside the app; on the rest the system back gesture leaves it.
@@ -544,7 +546,7 @@ class MainActivity:AppCompatActivity(){
  }
  private fun driverName():String{val u=api.session()?.optJSONObject("user")?:return "Chofer";val m=u.optJSONObject("user_metadata");val known=mapOf("immer@trferreira.com" to "Immer Sampayo","luis@trferreira.com" to "Luis Ferreira","hugo@trferreira.com" to "Hugo Silva","transportesferreirauy@gmail.com" to "Transportes Ferreira");return m?.optString("full_name")?.takeIf{it.isNotBlank()}?:m?.optString("name")?.takeIf{it.isNotBlank()}?:known[u.optString("email").lowercase()]?:u.optString("email").substringBefore("@").replaceFirstChar{it.uppercase()}}
  // Without an account (the emulator test of the games) every way out goes to the sign-in.
- private fun homeOrTrip(){if(api.session()==null){login();return};when(UiMode.start(panelFirst(),mode(),active())){"owner"->ownerDashboard();"mode"->askMode();"simpletrip"->simpleTrip();"simplehome"->simpleHome();"trip"->trip();else->home()}}
+ private fun homeOrTrip(){if(api.session()==null){login();return};if(Modes.ghost(this)&&!active()){ghostScreen();return};when(UiMode.start(panelFirst(),mode(),active())){"owner"->ownerDashboard();"mode"->askMode();"simpletrip"->simpleTrip();"simplehome"->simpleHome();"trip"->trip();else->home()}}
 
  // ---------- Mode of use: asked after signing in, kept per driver ----------
  private fun askMode(){modePick=mode()?:UiMode.SIMPLE;modeChoice()}
@@ -1082,24 +1084,24 @@ class MainActivity:AppCompatActivity(){
   if(AutoTrip.on(this)){
    val items=mutableListOf(if(AutoTrip.paused(this))"Reanudar ahora" else "No estoy al volante · pausar 8 horas")
    if(!AutoTrip.backgroundGranted(this))items.add("Que funcione con la app cerrada")
-   items.add("Apagar los viajes automáticos")
-   AlertDialog.Builder(this).setTitle("Viajes automáticos").setItems(items.toTypedArray()){_,i->
+   items.add("Apagar el modo zafra")
+   AlertDialog.Builder(this).setTitle("Modo zafra").setItems(items.toTypedArray()){_,i->
     when(items[i]){
      "Reanudar ahora"->{AutoTrip.resume(this);AutoTrip.look(this);toast("Listo: los viajes vuelven a empezar solos.");settings()}
      "Que funcione con la app cerrada"->backgroundAsk()
-     "Apagar los viajes automáticos"->{AutoTrip.turnOff(this);toast("Listo: los viajes ya no empiezan solos.");settings()}
+     "Apagar el modo zafra"->{Modes.setZafra(this,false,name);toast("Listo: modo zafra apagado. Los viajes ya no empiezan solos.");homeOrTrip()}
      else->{notDrivingNow();settings()}
     }}.setNegativeButton("Cerrar",null).show();return
   }
-  AlertDialog.Builder(this).setTitle("Viajes automáticos")
-   .setMessage("Si los activás, cuando el camión anda a más de 15 km/h durante 3 minutos, la app empieza un viaje sola con el último camión que usaste, desde el lugar y la hora en que el camión arrancó (completás destino y carga después). Y si el camión queda más de 1 hora parado, el viaje termina solo, a la hora en que se detuvo (no con el viaje en pausa ni mientras descargás en una parada).\n\nPara darse cuenta, la app usa la actividad física del teléfono (si vas en un vehículo) y la ubicación, también con la app cerrada o el teléfono bloqueado. No envía nada hasta que empieza un viaje.\n\nEl viaje empieza siempre, aunque no mires el teléfono. Si no estás al volante, tocá «No estoy al volante» en el inicio: la app no busca viajes por 8 horas. Lo apagás cuando quieras desde acá.")
-   .setPositiveButton("Activar"){_,_->autoAsk()}.setNegativeButton("Ahora no",null).show()
+  AlertDialog.Builder(this).setTitle("Modo zafra")
+   .setMessage("Para la zafra, cuando pasás muchas horas en el camión. Si lo prendés, cuando el camión anda a más de 15 km/h durante 3 minutos, la app empieza un viaje sola con el último camión que usaste, desde el lugar y la hora en que el camión arrancó (completás destino y carga después). Y si el camión queda más de 1 hora parado, el viaje termina solo, a la hora en que se detuvo (no con el viaje en pausa ni mientras descargás en una parada).\n\nPara darse cuenta, la app usa la actividad física del teléfono (si vas en un vehículo) y la ubicación, también con la app cerrada o el teléfono bloqueado. No envía nada hasta que empieza un viaje.\n\nEl viaje empieza siempre, aunque no mires el teléfono. Si no estás al volante, tocá «No estoy al volante» en el inicio: la app no busca viajes por 8 horas. Lo apagás cuando quieras desde acá.")
+   .setPositiveButton("Prender"){_,_->autoAsk()}.setNegativeButton("Ahora no",null).show()
  }
  private fun autoAsk(){
-  if(!AutoTrip.locationGranted(this)){toast("Primero dale permiso de ubicación y después activá los viajes automáticos.");permissions.launch(locationPermissions().toTypedArray());return}
+  if(!AutoTrip.locationGranted(this)){toast("Primero dale permiso de ubicación y después prendé el modo zafra.");permissions.launch(locationPermissions().toTypedArray());return}
   if(Build.VERSION.SDK_INT>=29&&!AutoTrip.activityGranted(this)){activityPermission.launch(Manifest.permission.ACTIVITY_RECOGNITION);return}
-  AutoTrip.turnOn(this,name)
-  if(AutoTrip.backgroundGranted(this)){toast("Listo: los viajes empiezan solos.");settings()} else backgroundAsk()
+  Modes.setZafra(this,true,name)
+  if(AutoTrip.backgroundGranted(this)){toast("Listo: modo zafra prendido. Los viajes empiezan solos.");homeOrTrip()} else backgroundAsk()
  }
  /** «Permitir todo el tiempo»: Android shows it in its own settings page since Android 11. */
  private fun backgroundAsk(){
@@ -1110,13 +1112,32 @@ class MainActivity:AppCompatActivity(){
    .setNegativeButton("Ahora no"){_,_->settings()}.show()
  }
  private fun autoSubtitle():String=when{
-  !AutoTrip.on(this)->"Desactivados · Tocá para activarlos"
+  !AutoTrip.on(this)->"Apagado · Tocá para prenderlo"
   AutoTrip.paused(this)->"En pausa hasta las ${Instant.ofEpochMilli(AutoTrip.pausedUntil(this)).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("HH:mm"))} · Tocá para reanudarlos"
-  !AutoTrip.backgroundGranted(this)->"Activados con la app abierta; cerrada, con un aviso"
-  else->"Activados: a más de 15 km/h durante 3 minutos"
+  !AutoTrip.backgroundGranted(this)->"Prendido con la app abierta; cerrada, con un aviso"
+  else->"Prendido: los viajes empiezan solos a más de 15 km/h durante 3 minutos"
  }
  /** «No estoy al volante»: pauses the detection 8 hours. A trip already started always goes on (3/11/2026). */
  private fun notDrivingNow(){AutoTrip.notDriving(this);toast("Listo: por 8 horas no empiezan viajes solos.")}
+ // ---------- Modo fantasma (6/11/2026): the app does nothing until the date, or until it is turned off ----------
+ private fun ghostUntilText():String{val u=Modes.ghostUntil(this);if(u==Modes.FOREVER)return "hasta que lo apagues"
+  val d=java.time.Instant.ofEpochMilli(u).atZone(java.time.ZoneId.systemDefault());return "hasta el %02d/%02d a las %02d:%02d".format(d.dayOfMonth,d.monthValue,d.hour,d.minute)}
+ private fun ghostScreen(){
+  page("ghost");bar("Modo fantasma")
+  val c=card(pad=18)
+  text(c,"La app está apagada",20f,ink,2)
+  text(c,"Modo fantasma ${ghostUntilText()}. No se inician viajes, no se usa el GPS y no se manda tu ubicación. Lo que estaba pendiente de enviar se sigue enviando.",14.5f,muted,0,8)
+  if(Modes.ghostBy(this)=="panel")note("Lo puso la administración: se apaga desde el panel.")
+  else button(root,"Salir del modo fantasma"){Modes.setGhost(this,0L);toast("Listo: la app vuelve a funcionar.");homeOrTrip()}
+ }
+ /** Asks for how long, and turns the ghost mode on (never during a trip). */
+ private fun askGhost(){
+  if(active()){toast("Terminá el viaje antes de poner el modo fantasma.");return}
+  val days=listOf(1L,3L,7L)
+  AlertDialog.Builder(this).setTitle("Modo fantasma").setItems(arrayOf("1 día","3 días","7 días","Hasta que lo apague")){_,i->
+   Modes.setGhost(this,if(i<3)System.currentTimeMillis()+days[i]*86_400_000L else Modes.FOREVER);homeOrTrip()
+  }.setNegativeButton("Cancelar",null).show()
+ }
  /** Home, without a trip and with them on: pause them, or see until when they are paused. */
  /** Trips that started by themselves and ended without an answer: «¿Fue un viaje de la empresa?» (6/11/2026). */
  private fun answerRows(){
@@ -1133,7 +1154,7 @@ class MainActivity:AppCompatActivity(){
  }
  private fun autoHomeRow(){
   if(!AutoTrip.on(this)||active())return
-  if(AutoTrip.paused(this))row(card(),R.drawable.ic_clock,"Viajes automáticos en pausa",autoSubtitle()){AutoTrip.resume(this);AutoTrip.look(this);toast("Listo: los viajes vuelven a empezar solos.");homeOrTrip()}
+  if(AutoTrip.paused(this))row(card(),R.drawable.ic_clock,"Modo zafra en pausa",autoSubtitle()){AutoTrip.resume(this);AutoTrip.look(this);toast("Listo: los viajes vuelven a empezar solos.");homeOrTrip()}
   else row(card(),R.drawable.ic_clock,"No estoy al volante","Los viajes no empiezan solos por 8 horas"){notDrivingNow();homeOrTrip()}
  }
  private fun batteryFree()=(getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName)
@@ -1930,7 +1951,8 @@ class MainActivity:AppCompatActivity(){
   if(!panelFirst()){val on=prefs().getBoolean(presenceKey(),false)
    row(gc,R.drawable.ic_pin,"Ubicación con la app abierta",if(on)"Activada: al abrirla y cada 5 minutos, sin viaje · Tocá para desactivarla" else "Desactivada: solo se avisa que estás activo · Tocá para activarla"){
     if(on){prefs().edit().putBoolean(presenceKey(),false).apply();toast("Listo: con la app abierta ya no se envía tu ubicación.");settings()} else presencePositionDialog{settings()}}}
-  if(!panelFirst())row(gc,R.drawable.ic_clock,"Viajes automáticos",autoSubtitle()){autoTrips()}
+  if(!panelFirst())row(gc,R.drawable.ic_clock,"Modo zafra",autoSubtitle()){autoTrips()}
+  if(!panelFirst())row(gc,R.drawable.ic_clock,"Modo fantasma","La app no hace nada por unos días"){askGhost()}
   row(gc,R.drawable.ic_shield,"Privacidad","Qué datos usa la app y para qué"){privacy()}
   section("Camiones y papeles")
   val pp=card();row(pp,R.drawable.ic_wrench,"Mantenimiento","Services hechos y pendientes"){maintenance(true)};row(pp,R.drawable.ic_doc,"Documentos","Licencia, carné de salud, SOA y más"){documents(true)}

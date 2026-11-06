@@ -42,7 +42,7 @@ object AutoTrip{
  fun backgroundGranted(c:Context)=Build.VERSION.SDK_INT<29||granted(c,Manifest.permission.ACCESS_BACKGROUND_LOCATION)
  fun activityGranted(c:Context)=Build.VERSION.SDK_INT<29||granted(c,Manifest.permission.ACTIVITY_RECOGNITION)
  /** On, not paused and with the location: the GPS may look for a trip. */
- fun ready(c:Context)=on(c)&&!paused(c)&&locationGranted(c)
+ fun ready(c:Context)=on(c)&&!paused(c)&&locationGranted(c)&&!Modes.ghost(c)
  fun turnOn(c:Context,driver:String){prefs(c).edit().putBoolean("on",true).putString("name",driver).putLong("until",0L).apply();register(c)}
  fun turnOff(c:Context){prefs(c).edit().putBoolean("on",false).apply();unregister(c);stopLooking(c)}
  /** The name of the driver for the trips that start by themselves, kept fresh each time the app opens. */
@@ -67,7 +67,7 @@ object AutoTrip{
   if(!ready(c)||TripStore(c).current()?.optBoolean("active")==true)return
   try{ContextCompat.startForegroundService(c,Intent(c,GpsService::class.java).setAction(GpsService.DETECT))}catch(_:Exception){ask(c)}
  }
- private fun stopLooking(c:Context){try{c.startService(Intent(c,GpsService::class.java).setAction(GpsService.DETECT_STOP))}catch(_:Exception){}}
+ fun stopLooking(c:Context){try{c.startService(Intent(c,GpsService::class.java).setAction(GpsService.DETECT_STOP))}catch(_:Exception){}}
  private fun manager(c:Context):NotificationManager{
   val nm=c.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
   nm.createNotificationChannel(NotificationChannel("auto","Viajes automáticos",NotificationManager.IMPORTANCE_HIGH));return nm
