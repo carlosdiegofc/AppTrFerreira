@@ -30,6 +30,11 @@ export interface Trip {
   panelId: string | null;
   deleted: boolean;
   deletedAt: string | null;
+  /**
+   * A trip that started by itself (migration 0015): pendiente until the driver or the office answers; con_carga, vacio,
+   * or descartado (not the company's: it counts as deleted, and can be answered again). Null for every other trip.
+   */
+  confirmation: string | null;
   active: boolean;
   paused: boolean;
   driverId: string | null;
@@ -84,7 +89,8 @@ export function missingFields(trip: Pick<Trip, 'vehicle' | 'originName' | 'desti
 
 export function tripStatus(trip: Omit<Trip, 'status'>): TripStatus {
   const missing = missingFields(trip);
-  if (trip.deleted) return { code: 'deleted', label: 'Eliminado', missing };
+  if (trip.deleted) return { code: 'deleted', label: trip.confirmation === 'descartado' ? 'No es de la empresa' : 'Eliminado', missing };
+  if (!trip.active && trip.confirmation === 'pendiente') return { code: 'pending', label: 'Sin confirmar', missing };
   if (trip.active) return { code: 'running', label: trip.paused ? 'En curso · pausado' : 'En curso', missing };
   if (missing.length > 0) return { code: 'pending', label: 'Pendiente de completar', missing };
   return { code: 'complete', label: 'Completo', missing };
@@ -102,8 +108,9 @@ export function tripFromSession(session: SessionRow, panel: PanelTripRow | null 
     source: 'app',
     appTripId: session.id,
     panelId: panel?.id ?? null,
-    deleted: Boolean(panel?.deleted_at),
-    deletedAt: panel?.deleted_at ?? null,
+    deleted: Boolean(panel?.deleted_at) || session.confirmation === 'descartado',
+    deletedAt: panel?.deleted_at ?? (session.confirmation === 'descartado' ? (session.confirmed_at ?? null) : null),
+    confirmation: session.confirmation ?? null,
     active: session.active === true,
     paused: session.paused === true,
     driverId: session.driver_id ?? null,
@@ -140,6 +147,7 @@ export function tripFromPanel(p: PanelTripRow, catalog: readonly CatalogTruck[] 
     panelId: p.id,
     deleted: Boolean(p.deleted_at),
     deletedAt: p.deleted_at ?? null,
+    confirmation: null,
     active: false,
     paused: false,
     driverId: p.driver_id ?? null,

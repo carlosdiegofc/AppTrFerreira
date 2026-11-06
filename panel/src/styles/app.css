@@ -4820,3 +4820,11 @@ button.ex-open:hover {
   margin: 14px 0 6px;
   font-size: 15px;
 }
+
+/* «¿Fue un viaje de la empresa?» on a trip that started by itself (6/11/2026). */
+.confirm-answers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
