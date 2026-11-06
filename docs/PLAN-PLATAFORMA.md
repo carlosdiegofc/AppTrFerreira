@@ -215,6 +215,15 @@ Opcional, apagado hasta que el chofer lo activa en Mi cuenta. Decisiones del due
 7. [ ] El dueño completa en Play Console la declaración de ubicación en segundo plano, con el video, y lo prueba en un teléfono manejando.
 8. [ ] «Eliminar viaje», para borrar un viaje equivocado (pedido del dueño del 3/11/2026). Falta presentarlo y aprobarlo: quién puede, desde dónde, y con respaldo, porque cambia permisos de la base.
 
+### Inicio nuevo, modo fantasma, modo zafra y confirmación de viajes (aprobado el 6/11/2026)
+Pedido del dueño: los viajes automáticos generaban viajes falsos (el camión que se mueve en el patio, el chofer en su auto).
+1. [x] Base, migración 0015 (solo agrega; probada en una base de prueba y aplicada en producción el 6/11/2026): en los viajes `auto`, `confirmation` (pendiente, con_carga, vacio, descartado), quién y cuándo; la función `trf_confirm_trip` (el chofer contesta una vez sus viajes, una cuenta del panel contesta y corrige cualquiera); la tabla `trf_driver_modes` con el modo fantasma y la zafra de cada chofer.
+2. [ ] App: los viajes automáticos solo con el modo zafra prendido; al empezar, aviso con el nombre del chofer y «No estoy al volante · Cancelar» (queda descartado, no se borra); al terminar, «¿Fue un viaje de la empresa?» con Con carga, Vacío (retorno) y No es de la empresa.
+3. [ ] App: modo fantasma (1, 3 o 7 días o hasta apagarlo; también puesto desde el panel): la app no inicia viajes, no usa el GPS ni manda posición, presencia, combustible ni remitos.
+4. [ ] App: inicio nuevo con el botón redondo «Inicio de viaje» azul (rojo con un viaje en curso), cuatro botones a los costados (chofer: Modo fantasma, Combustible, Modo zafra, Mis viajes; dueño: Modo zafra, Combustible, Mapa en tiempo real, Resumen de la flota), menú desplegable arriba a la izquierda y logo al centro.
+5. [ ] App: «¡Buen día, nombre!» a las 8:00, salvo en modo fantasma; se apaga en Mi cuenta.
+6. [ ] Panel: viajes sin confirmar con los tres botones; los descartados no suman y se ven con «Ver descartados»; modo fantasma y zafra de cada chofer, y el fantasma se pone desde ahí.
+
 Hallazgos de la revisión de la base (18/10), para resolver en la etapa 1:
 - El rol anónimo tiene todos los permisos de tabla en 8 tablas de la app y del panel (`trf_driver_*`, `trf_trip_*`, `trf_mobile_catalog`, `trf_panel_trips`), y también los de la secuencia que numera los puntos GPS. Es lo que Supabase da por defecto y la seguridad por filas lo frena, pero hay que quitarlos: solo `trf_rates` necesita lectura anónima.
 - Conviven dos tipos de administrador: `trf_private.admin_emails` (administración completa, por correo) y `trf_panel_admins` (panel: lee toda la flota y también administra mantenimiento y documentos). Los datos que se completan en el panel (`trf_panel_trips`) los lee solo la segunda lista. Los dos pasan a ser roles por empresa.
