@@ -25,6 +25,8 @@ import com.google.android.gms.location.DetectedActivity
 object AutoTrip{
  const val NOT_DRIVING="trf.NOT_DRIVING"
  const val TRANSITION="trf.TRANSITION"
+ /** «No estoy al volante · Cancelar» on a trip that just started by itself, and the answer at its end (6/11/2026). */
+ const val CANCEL="trf.CANCEL";const val ANSWER="trf.ANSWER"
  /** The extra of the notification that opens the app to look for the trip (without «Permitir todo el tiempo»). */
  const val OPEN_EXTRA="trf_auto"
  private const val NOTE=9
@@ -79,14 +81,33 @@ object AutoTrip{
  }
  /** A trip started by itself: it always goes on (3/11/2026); a wrong one is finished like any trip. */
  fun started(c:Context,vehicle:String){
-  try{manager(c).notify(NOTE,Notification.Builder(c,"auto").setContentTitle("Viaje iniciado solo").setContentText("$vehicle · El camión anduvo 3 minutos a más de 15 km/h.")
-   .setStyle(Notification.BigTextStyle().bigText("$vehicle. El camión anduvo 3 minutos a más de 15 km/h: el viaje ya está en el panel, desde donde arrancó. Tocá para completar destino y carga."))
-   .setContentIntent(openApp(c,false)).setSmallIcon(android.R.drawable.ic_menu_mylocation).setAutoCancel(true).build())}catch(_:Exception){}
+  val trip=TripStore(c).current()?.optString("id")?:""
+  val cancel=Notification.Action.Builder(null,"No estoy al volante · Cancelar",PendingIntent.getBroadcast(c,10,Intent(c,AutoTripReceiver::class.java).setAction(CANCEL).putExtra("trip",trip),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)).build()
+  try{manager(c).notify(NOTE,Notification.Builder(c,"auto").setContentTitle("${name(c)}, estás iniciando un viaje nuevo automático").setContentText(vehicle)
+   .setStyle(Notification.BigTextStyle().bigText("$vehicle. El camión anduvo 3 minutos a más de 15 km/h y el viaje empezó desde donde arrancó. Si no estás al volante, tocá «Cancelar»."))
+   .setContentIntent(openApp(c,false)).addAction(cancel).setSmallIcon(android.R.drawable.ic_menu_mylocation).setAutoCancel(true).build())}catch(_:Exception){}
  }
  /** The trip ended by itself after more than an hour stopped. */
  fun ended(c:Context,vehicle:String){
-  try{manager(c).notify(NOTE,Notification.Builder(c,"auto").setContentTitle("Viaje finalizado solo").setContentText("$vehicle · El camión estuvo más de 1 hora parado: el viaje terminó cuando se detuvo.")
-   .setContentIntent(openApp(c,false)).setSmallIcon(android.R.drawable.ic_menu_mylocation).setAutoCancel(true).build())}catch(_:Exception){}
+  TripStore(c).trips().lastOrNull{it.optBoolean("auto")&&!it.optBoolean("active")}?.let{confirm(c,it,"El camión estuvo más de 1 hora parado: el viaje terminó cuando se detuvo.")}
+ }
+ /** «¿Fue un viaje de la empresa?» at the end of a trip that started by itself: three answers, the first one counts. */
+ fun confirm(c:Context,trip:org.json.JSONObject,why:String="El viaje terminó."){
+  if(trip.optString("answer").isNotBlank())return
+  val id=trip.optString("id");val vehicle=trip.optString("vehicle")
+  fun answer(code:Int,label:String,value:String)=Notification.Action.Builder(null,label,PendingIntent.getBroadcast(c,code,Intent(c,AutoTripReceiver::class.java).setAction(ANSWER).putExtra("trip",id).putExtra("answer",value),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)).build()
+  try{manager(c).notify(NOTE,Notification.Builder(c,"auto").setContentTitle("${name(c)}, ¿fue un viaje de la empresa?").setContentText("$vehicle · $why")
+   .setStyle(Notification.BigTextStyle().bigText("$vehicle. $why Contestá con un toque: con carga, vacío (retorno) o no es de la empresa."))
+   .setContentIntent(openApp(c,false)).addAction(answer(11,"Con carga","con_carga")).addAction(answer(12,"Vacío (retorno)","vacio")).addAction(answer(13,"No es de la empresa","descartado"))
+   .setSmallIcon(android.R.drawable.ic_menu_help).setAutoCancel(true).build())}catch(_:Exception){}
+ }
+ /** The driver's answer, from the notification or the app; «descartado» on the trip in progress also ends it. */
+ fun answer(c:Context,trip:String,answer:String){
+  val store=TripStore(c);if(trip.isBlank())return
+  store.answer(trip,answer);cancelNote(c)
+  if(answer=="descartado"&&store.current()?.let{it.optString("id")==trip&&it.optBoolean("active")}==true)
+   try{c.startService(Intent(c,GpsService::class.java).setAction(GpsService.FINISH))}catch(_:Exception){}
+  Sync.schedule(c)
  }
  fun noTruck(c:Context){
   try{manager(c).notify(NOTE,Notification.Builder(c,"auto").setContentTitle("No se pudo iniciar el viaje solo").setContentText("Abrí la app y elegí el camión una vez: después los viajes empiezan solos.")
@@ -106,6 +127,9 @@ class AutoTripReceiver:BroadcastReceiver(){
   when(i?.action){
    Intent.ACTION_BOOT_COMPLETED,Intent.ACTION_MY_PACKAGE_REPLACED->AutoTrip.register(c)
    AutoTrip.NOT_DRIVING->AutoTrip.notDriving(c)
+   // Cancelled at its start: not the company's, and no trips start by themselves for 8 hours.
+   AutoTrip.CANCEL->{AutoTrip.answer(c,i.getStringExtra("trip")?:"","descartado");AutoTrip.pause(c)}
+   AutoTrip.ANSWER->AutoTrip.answer(c,i.getStringExtra("trip")?:"",i.getStringExtra("answer")?:return)
    AutoTrip.TRANSITION->{
     if(!ActivityTransitionResult.hasResult(i))return
     val events=ActivityTransitionResult.extractResult(i)?.transitionEvents?:return

@@ -152,6 +152,19 @@ class TripStore(private val c:Context) {
             drafts.remove(0);t.put("pending_documents",drafts);save(t)
         }
     }
+    /**
+     * The answer to «¿Fue un viaje de la empresa?» of a trip that started by itself (6/11/2026): con_carga, vacio or
+     * descartado. Kept with the trip until Sync sends it (trf_confirm_trip, after the trip); the first answer counts.
+     */
+    fun answer(id:String,answer:String):Boolean=synchronized(lock){
+        val f=File(dir("trips"),"$id.json");val t=read(f)?:return@synchronized false
+        if(t.optString("answer").isNotBlank())return@synchronized false
+        if(answer=="vacio")t.put("load_type","empty") else if(answer=="con_carga")t.put("load_type","loaded")
+        t.put("answer",answer).put("answer_sent",false);write(f,t);true
+    }
+    /** Trips that started by themselves, already finished, still waiting for the driver's answer. */
+    fun unanswered()=trips().filter{it.optBoolean("auto")&&!it.optBoolean("active")&&it.optString("answer").isBlank()}
+    fun markAnswerSent(id:String)=synchronized(lock){val f=File(dir("trips"),"$id.json");val t=read(f)?:return@synchronized;t.put("answer_sent",true);write(f,t)}
     fun markTripSynced(id:String,revision:Int)=synchronized(lock){val f=File(dir("trips"),"$id.json");val t=read(f)?:return@synchronized;t.put("synced_revision",revision).put("synced_at",System.currentTimeMillis());write(f,t)}
     fun markReceiptSynced(file:File,r:JSONObject)=synchronized(lock){r.put("synced",true);write(file,r)}
     fun message(value:String){prefs.edit().putString("sync_message",value).apply()}

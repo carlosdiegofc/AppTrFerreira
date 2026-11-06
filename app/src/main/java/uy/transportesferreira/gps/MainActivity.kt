@@ -619,7 +619,7 @@ class MainActivity:AppCompatActivity(){
   // The last finished trip confirms that it was saved without the driver doing anything else.
   store.current()?.takeIf{!it.optBoolean("active")&&it.optString("driver_id")==uid()}?.let{t->
    row(card(),R.drawable.ic_check_circle,"Último viaje guardado",listOfNotNull(date(t.optString("started_at")),km(t.optDouble("distance_meters",0.0)),durationText(t.optString("started_at"),t.optString("ended_at"))).joinToString(" · "),tint=green)}
-  if(!ask)autoHomeRow()
+  if(!ask){answerRows();autoHomeRow()}
   // Fuel can be loaded in simple mode too (decision of 19/10/2026): here, out of a trip.
   button(root,"Cargar combustible",Kind.LINE,R.drawable.ic_fuel){fuelChoice()}
   button(root,"Juegos",Kind.LINE,R.drawable.ic_chess){games()}
@@ -688,7 +688,7 @@ class MainActivity:AppCompatActivity(){
    Shortcut(R.drawable.ic_wrench,0xFF56647B.toInt(),"Mantenimiento",null){maintenance(true)},
    Shortcut(R.drawable.ic_chess,0xFFBE3A6E.toInt(),"Juegos","Para las esperas, con el camión parado"){games()},
    Shortcut(R.drawable.ic_person,0xFF8590A2.toInt(),"Mi cuenta","Modo de uso, GPS y sesión"){settings()}))
-  autoHomeRow()
+  answerRows();autoHomeRow()
   sync=note(store.message(),top=18).apply{gravity=Gravity.CENTER}
   navBar("home")
   refreshPapers()
@@ -1118,6 +1118,19 @@ class MainActivity:AppCompatActivity(){
  /** «No estoy al volante»: pauses the detection 8 hours. A trip already started always goes on (3/11/2026). */
  private fun notDrivingNow(){AutoTrip.notDriving(this);toast("Listo: por 8 horas no empiezan viajes solos.")}
  /** Home, without a trip and with them on: pause them, or see until when they are paused. */
+ /** Trips that started by themselves and ended without an answer: «¿Fue un viaje de la empresa?» (6/11/2026). */
+ private fun answerRows(){
+  for(t in store.unanswered().takeLast(3)){
+   val day=try{java.time.Instant.parse(t.getString("started_at")).atZone(java.time.ZoneId.systemDefault())}catch(_:Exception){null}
+   val when_=day?.let{"%02d/%02d %02d:%02d".format(it.dayOfMonth,it.monthValue,it.hour,it.minute)}?:""
+   row(card(),R.drawable.ic_flag,"¿Fue un viaje de la empresa?","${t.optString("vehicle")} · $when_ · tocá para contestar",tint=amber){
+    val answers=listOf("con_carga","vacio","descartado")
+    AlertDialog.Builder(this).setTitle("¿Fue un viaje de la empresa?").setItems(arrayOf("Con carga","Vacío (retorno)","No es de la empresa")){_,i->
+     AutoTrip.answer(this,t.getString("id"),answers[i]);toast(if(i==2)"Listo: el viaje queda descartado. Desde el panel se puede recuperar." else "Listo: viaje confirmado.");homeOrTrip()
+    }.setNegativeButton("Después",null).show()
+   }
+  }
+ }
  private fun autoHomeRow(){
   if(!AutoTrip.on(this)||active())return
   if(AutoTrip.paused(this))row(card(),R.drawable.ic_clock,"Viajes automáticos en pausa",autoSubtitle()){AutoTrip.resume(this);AutoTrip.look(this);toast("Listo: los viajes vuelven a empezar solos.");homeOrTrip()}

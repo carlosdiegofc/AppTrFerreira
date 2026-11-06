@@ -55,11 +55,16 @@ object Sync {
             for(t in trips){
               try{
                 if(t.optInt("revision")<=t.optInt("synced_revision"))continue
-                val body=JSONObject(t.toString());listOf("segment","revision","synced_revision","last_point","speed_kmh","synced_at","pending_documents","route_state","auto","grace_until").forEach{body.remove(it)}
+                val body=JSONObject(t.toString());listOf("segment","revision","synced_revision","last_point","speed_kmh","synced_at","pending_documents","route_state","grace_until","answer","answer_sent").forEach{body.remove(it)}
                 api.json("/rest/v1/trf_driver_tracking_sessions?on_conflict=id",body,"resolution=merge-duplicates")
                 store.markTripSynced(t.getString("id"),t.optInt("revision"))
               }catch(_:Exception){failures++}
             }
+            // The answers to «¿Fue un viaje de la empresa?», after their trips (migration 0015). The base keeps the first one.
+            for(t in store.trips().filter{it.optString("driver_id")==uid&&it.optString("answer").isNotBlank()&&!it.optBoolean("answer_sent")&&it.optInt("synced_revision")>0})try{
+                api.json("/rest/v1/rpc/trf_confirm_trip",JSONObject().put("p_trip",t.getString("id")).put("p_answer",t.getString("answer")))
+                store.markAnswerSent(t.getString("id"))
+            }catch(_:Exception){failures++}
             // The latest location belongs to the newest local trip only; never replay old locations over it. The trip is
             // read again here, not taken from the list above, which may be older than what live() sent meanwhile.
             // The trip in progress in its 3 minutes is where the truck is now: never an older trip's last place (3/11/2026).
