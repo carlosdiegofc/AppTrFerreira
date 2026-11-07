@@ -146,7 +146,7 @@ async function deletedAppTrips(fromIso: string, toIso: string): Promise<Set<stri
 export async function fetchTrips(fromIso: string, toIso: string): Promise<TripRow[]> {
   const [trips, deleted] = await Promise.all([
     all((from, to) =>
-      supabase.from('trf_driver_tracking_sessions').select('id,driver_name,vehicle,started_at,ended_at,active,paused,load_type,distance_meters').gte('started_at', fromIso).lt('started_at', toIso).order('started_at', { ascending: false }).order('id').range(from, to),
+      supabase.from('trf_driver_tracking_sessions').select('id,driver_name,vehicle,started_at,ended_at,active,paused,load_type,distance_meters').or('confirmation.is.null,confirmation.neq.descartado').gte('started_at', fromIso).lt('started_at', toIso).order('started_at', { ascending: false }).order('id').range(from, to),
     ),
     deletedAppTrips(fromIso, toIso),
   ]);
@@ -167,7 +167,7 @@ export async function fetchServices(): Promise<MaintenanceRow[]> {
  */
 export async function fetchKmTrips(sinceIso: string): Promise<KmTrip[]> {
   const [trips, panel] = await Promise.all([
-    all((from, to) => supabase.from('trf_driver_tracking_sessions').select('id,vehicle,started_at,distance_meters').gte('started_at', sinceIso).order('started_at').order('id').range(from, to), 50_000, true),
+    all((from, to) => supabase.from('trf_driver_tracking_sessions').select('id,vehicle,started_at,distance_meters').or('confirmation.is.null,confirmation.neq.descartado').gte('started_at', sinceIso).order('started_at').order('id').range(from, to), 50_000, true),
     all((from, to) => supabase.from('trf_panel_trips').select('app_trip_id,vehicle,deleted_at').eq('source', 'app').gte('departure_at', sinceIso).order('id').range(from, to), 50_000, true),
   ]);
   return kmTripsAsCorrected(trips, panel);
@@ -299,6 +299,22 @@ export async function fetchRouteGaps(tripId: string): Promise<RouteGapRow[]> {
   return all((from, to) => supabase.from('trf_route_gaps').select('id,from_at,to_at,meters,method').eq('trip_id', tripId).order('from_at', { ascending: true }).order('id').range(from, to), 2_000);
 }
 
+export interface TripRoadEventRow {
+  id: string;
+  kind: string;
+  point_name: string;
+  happened_at: string;
+  speed_kmh: number | null;
+  speed_limit: number | null;
+  amount: number | null;
+}
+
+/** The tolls, scales, radars and own points the trip went by (control de ruta, 0005), in order. */
+export async function fetchTripRoadEvents(tripId: string): Promise<TripRoadEventRow[]> {
+  const rows = await all((from, to) => supabase.from('trf_road_events').select('id,kind,point_name,happened_at,speed_kmh,speed_limit,amount').eq('trip_id', tripId).order('happened_at', { ascending: true }).order('id').range(from, to), 2_000);
+  return (rows as unknown as TripRoadEventRow[]).map((r) => ({ ...r, speed_limit: r.speed_limit === null ? null : Number(r.speed_limit), amount: r.amount === null ? null : Number(r.amount) }));
+}
+
 export type StopRow = Tables<'trf_trip_stops'>;
 
 /** The stops of a trip with several unloadings (app 0.27.0), in the order of the trip. */
@@ -349,7 +365,7 @@ export async function fetchTripList(fromIso: string, toIso: string): Promise<Tri
  */
 export async function fetchBilledTrips(fromIso: string, toIso: string): Promise<BilledTrip[]> {
   const [sessions, manual] = await Promise.all([
-    all((from, to) => supabase.from('trf_driver_tracking_sessions').select('id,started_at,load_type').gte('started_at', fromIso).lt('started_at', toIso).order('started_at').order('id').range(from, to), 50_000, true),
+    all((from, to) => supabase.from('trf_driver_tracking_sessions').select('id,started_at,load_type').or('confirmation.is.null,confirmation.neq.descartado').gte('started_at', fromIso).lt('started_at', toIso).order('started_at').order('id').range(from, to), 50_000, true),
     all((from, to) => supabase.from('trf_panel_trips').select('departure_at,amount,currency,deleted_at').eq('source', 'manual').gte('departure_at', fromIso).lt('departure_at', toIso).order('departure_at').order('id').range(from, to), 50_000, true),
   ]);
   const parts = await Promise.all(chunks([...new Set(sessions.map((s) => s.id))], 100).map(async (ids) => rows(await supabase.from('trf_panel_trips').select('app_trip_id,amount,currency,deleted_at').eq('source', 'app').in('app_trip_id', ids))));
@@ -825,4 +841,29 @@ export async function uploadExpenseFile(path: string, file: Blob, type: FileType
   const e = result.error as { message: string; statusCode?: string; status?: number };
   if (e.statusCode === '409' || e.status === 409 || /already exists|duplicate/i.test(e.message)) return;
   throw new DataError(e.message, e.statusCode ?? (e.status === undefined ? undefined : String(e.status)));
+}
+
+/**
+ * Answers «¿Fue un viaje de la empresa?» for a trip that started by itself (migration 0015): con_carga, vacio or
+ * descartado. The office can answer any trip and correct an answer; returns what the trip keeps.
+ */
+export async function confirmTrip(tripId: string, answer: 'con_carga' | 'vacio' | 'descartado'): Promise<string> {
+  const { data, error } = await supabase.rpc('trf_confirm_trip', { p_trip: tripId, p_answer: answer });
+  if (error) throw error;
+  return data;
+}
+
+export type DriverModesRow = Tables<'trf_driver_modes'>;
+
+/** The ghost mode and the zafra of one driver (migration 0015); null when the phone never sent them. */
+export async function fetchDriverModes(driverId: string): Promise<DriverModesRow | null> {
+  return rows(await supabase.from('trf_driver_modes').select('*').eq('driver_id', driverId).limit(1))[0] ?? null;
+}
+
+/** Puts a driver in ghost mode from the panel until that time ('infinity' = until turned off), or turns it off (null). */
+export async function setDriverGhost(driverId: string, driverName: string, until: string | null): Promise<void> {
+  const { error } = await supabase
+    .from('trf_driver_modes')
+    .upsert({ driver_id: driverId, driver_name: driverName, ghost_until: until, ghost_by: until === null ? null : 'panel', updated_at: new Date().toISOString() }, { onConflict: 'driver_id' });
+  if (error) throw error;
 }

@@ -34,9 +34,13 @@ object Sync {
     fun live(c:Context):Boolean=try{
         // The trip in progress only (reading every saved trip each time would cost battery); flush() covers the rest.
         val api=Api(c);val uid=api.session()?.getJSONObject("user")?.getString("id");val store=TripStore(c)
+        // A trip that started by itself sends its latest position from its start (3/11/2026), also in its 3 minutes (Drive);
+        // the panel's map shows it once the trip itself goes up.
         putLive(api){store.current()?.takeIf{uid!=null&&it.optString("driver_id")==uid}}
         true
     }catch(_:Exception){false}
+    /** A trip thrown away in its 3 minutes: the live map keeps its last place, no longer on a trip. */
+    fun endLive(c:Context,trip:JSONObject){try{putLive(Api(c)){JSONObject(trip.toString()).put("active",false)}}catch(_:Exception){}}
     fun flush(c:Context):Boolean=synchronized(lock){
         val store=TripStore(c);val api=Api(c)
         try{
@@ -44,34 +48,43 @@ object Sync {
             for(t in store.trips().filter{it.optString("driver_id")==uid})try{store.recoverDraftDocuments(t.getString("id"))}catch(_:Exception){}
             // Stretches without signal waiting for the road get it now, before the trip and the route go up with their meters and readings.
             for((_,g) in store.gaps().filter{it.second.optString("driver_id")==uid&&!it.second.optBoolean("resolved")})try{settle(c,store,g)}catch(_:Exception){}
-            val trips=store.trips().filter{it.optString("driver_id")==uid}
+            // A trip that started by itself stays on the phone for its first 10 minutes, with everything of it (Drive).
+            val waiting=store.inGrace()
+            val trips=store.trips().filter{it.optString("driver_id")==uid&&it.optString("id") !in waiting}
             var failures=0
             for(t in trips){
               try{
                 if(t.optInt("revision")<=t.optInt("synced_revision"))continue
-                val body=JSONObject(t.toString());listOf("segment","revision","synced_revision","last_point","speed_kmh","synced_at","pending_documents","route_state").forEach{body.remove(it)}
+                val body=JSONObject(t.toString());listOf("segment","revision","synced_revision","last_point","speed_kmh","synced_at","pending_documents","route_state","grace_until","answer","answer_sent").forEach{body.remove(it)}
                 api.json("/rest/v1/trf_driver_tracking_sessions?on_conflict=id",body,"resolution=merge-duplicates")
                 store.markTripSynced(t.getString("id"),t.optInt("revision"))
               }catch(_:Exception){failures++}
             }
+            // The answers to «¿Fue un viaje de la empresa?», after their trips (migration 0015). The base keeps the first one.
+            for(t in store.trips().filter{it.optString("driver_id")==uid&&it.optString("answer").isNotBlank()&&!it.optBoolean("answer_sent")&&it.optInt("synced_revision")>0})try{
+                api.json("/rest/v1/rpc/trf_confirm_trip",JSONObject().put("p_trip",t.getString("id")).put("p_answer",t.getString("answer")))
+                store.markAnswerSent(t.getString("id"))
+            }catch(_:Exception){failures++}
             // The latest location belongs to the newest local trip only; never replay old locations over it. The trip is
             // read again here, not taken from the list above, which may be older than what live() sent meanwhile.
-            try{putLive(api){store.trips().filter{it.optString("driver_id")==uid}.lastOrNull()}}catch(_:Exception){failures++}
+            // The trip in progress in its 3 minutes is where the truck is now: never an older trip's last place (3/11/2026).
+            try{putLive(api){store.current()?.takeIf{it.optString("driver_id")==uid&&it.optString("id") in waiting}
+                ?:store.trips().filter{it.optString("driver_id")==uid&&it.optString("id") !in waiting}.lastOrNull()}}catch(_:Exception){failures++}
             // The stops of the trips, after the trips they belong to: a stop sent before its trip would be refused.
-            for((file,st) in store.records("stops").filter{it.second.optString("driver_id")==uid&&it.second.optInt("revision")>it.second.optInt("synced_revision")}){
+            for((file,st) in store.records("stops").filter{it.second.optString("driver_id")==uid&&it.second.optString("trip_id") !in waiting&&it.second.optInt("revision")>it.second.optInt("synced_revision")}){
                 try{
                     if(st.optBoolean("deleted")){api.request("/rest/v1/trf_trip_stops?id=eq.${st.getString("id")}","DELETE");file.delete()}
                     else{val body=JSONObject(st.toString());listOf("revision","synced_revision","deleted").forEach{body.remove(it)}
                         api.json("/rest/v1/trf_trip_stops?on_conflict=id",body,"resolution=merge-duplicates");store.markStopSynced(file,st,st.optInt("revision"))}
                 }catch(_:Exception){failures++}
             }
-            for((file,r) in store.details().filter{it.second.optString("driver_id")==uid&&!it.second.optBoolean("synced")}){
+            for((file,r) in store.details().filter{it.second.optString("driver_id")==uid&&it.second.optString("trip_id") !in waiting&&!it.second.optBoolean("synced")}){
                 try{val body=JSONObject(r.toString());body.remove("synced");body.remove("synced_at")
                 api.json("/rest/v1/trf_trip_details?on_conflict=trip_id",body,"resolution=ignore-duplicates");store.markSynced(file,r)}catch(_:Exception){failures++}
             }
             // The route goes in one request per sync; if that fails, one by one, so a single bad reading does not hold the rest.
             // The estimated readings of a stretch go apart: a request sends the same fields in every reading.
-            val points=store.points().filter{it.second.optString("driver_id")==uid}.take(250)
+            val points=store.points().filter{it.second.optString("driver_id")==uid&&it.second.optString("trip_id") !in waiting}.take(250)
             for(group in points.partition{!it.second.optBoolean("estimated")}.toList().filter{it.isNotEmpty()})try{
                 api.request("/rest/v1/trf_driver_location_history?on_conflict=event_id","POST",JSONArray(group.map{it.second}).toString().toByteArray(),"resolution=ignore-duplicates")
                 group.forEach{it.first.delete()}
@@ -82,12 +95,12 @@ object Sync {
                 }
             }
             // A settled stretch goes up after its trip, which it belongs to, and is not kept on the phone.
-            for((file,g) in store.gaps().filter{it.second.optString("driver_id")==uid&&it.second.optBoolean("resolved")})try{
+            for((file,g) in store.gaps().filter{it.second.optString("driver_id")==uid&&it.second.optString("trip_id") !in waiting&&it.second.optBoolean("resolved")})try{
                 val body=JSONObject(g.toString());listOf("counted","resolved","found_at","asked_at").forEach{body.remove(it)}
                 api.json("/rest/v1/trf_route_gaps?on_conflict=id",body,"resolution=ignore-duplicates");file.delete()
             }catch(_:Exception){failures++}
             fun upload(records:List<Pair<File,JSONObject>>,table:String,bucket:String){
-                for((file,r) in records.filter{it.second.optString("driver_id")==uid&&!it.second.optBoolean("synced")}){
+                for((file,r) in records.filter{it.second.optString("driver_id")==uid&&it.second.optString("trip_id") !in waiting&&!it.second.optBoolean("synced")}){
                     try{if(!r.isNull("object_path")){
                         val photo=File(r.getString("local_path"))
                         try{api.request("/storage/v1/object/$bucket/${r.getString("object_path")}","POST",photo.readBytes(),contentType="image/jpeg")}

@@ -252,9 +252,23 @@ try:
     adb('shell', 'settings', 'put', 'system', 'user_rotation', '0')
 
     step('Abrir los juegos: sin viaje se pueden usar')
+    # No window had the focus when it failed (7/11/2026): the screen had gone off after the long test before. Wake it up.
+    adb('shell', 'input', 'keyevent', 'KEYCODE_WAKEUP', check=False)
+    adb('shell', 'wm', 'dismiss-keyguard', check=False)
+    games_list = lambda r: nodes(r, text='Ajedrez') and nodes(r, text='Contra el teléfono o entre dos') and nodes(r, text='Truco') and nodes(r, text='Contra el teléfono, con flor y a 30')
     adb('shell', 'am', 'start', '-W', '-n', MAIN, '--ez', 'trf_test_games', 'true', timeout=120)
-    wait('la lista de juegos con el ajedrez y el truco', lambda r: nodes(r, text='Ajedrez') and nodes(r, text='Contra el teléfono o entre dos')
-         and nodes(r, text='Truco') and nodes(r, text='Contra el teléfono, con flor y a 30'), seconds=60)
+    # A slow emulator (7/11/2026, after a long optimized-build test) can drop the first start: once more, from zero, and
+    # if it still does not show, what was on the screen.
+    if poll('la lista de juegos', games_list, 60) is None:
+        shot('juegos-0-sin-lista')
+        adb('shell', 'am', 'force-stop', PKG, check=False)
+        adb('shell', 'am', 'start', '-W', '-n', MAIN, '--ez', 'trf_test_games', 'true', timeout=120)
+        if poll('la lista de juegos', games_list, 90) is None:
+            window = adb('shell', 'dumpsys', 'window', 'windows', check=False).stdout
+            print('\n'.join(l.strip() for l in window.splitlines() if 'mCurrentFocus' in l or 'mFocusedApp' in l), flush=True)
+            print(adb('shell', 'dumpsys', 'power', check=False).stdout.count('mWakefulness=Awake'), 'despierto', flush=True)
+            print(adb('logcat', '-d', '-b', 'crash', check=False).stdout[-3000:], flush=True)
+            fail('no apareció la lista de juegos con el ajedrez y el truco (ver juegos-0-sin-lista.png)')
     root = screen()
     if root is not None and nodes(root, text='Primero, el camión parado'):
         fail('sin viaje, la lista de juegos dice que el camión tiene que estar parado')

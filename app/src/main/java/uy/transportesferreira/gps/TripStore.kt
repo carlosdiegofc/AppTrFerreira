@@ -15,7 +15,7 @@ class TripStore(private val c:Context) {
     private fun read(file:File):JSONObject?=try{JSONObject(AtomicFile(file).openRead().bufferedReader().use{it.readText()})}catch(_:Exception){null}
     fun current():JSONObject?=synchronized(lock){prefs.getString("current",null)?.let{read(File(dir("trips"),"$it.json"))}}
     fun save(trip:JSONObject)=synchronized(lock){write(File(dir("trips"),"${trip.getString("id")}.json"),trip);Unit}
-    fun start(user:JSONObject,name:String,vehicle:String,empty:Boolean,details:JSONObject=JSONObject(),drafts:org.json.JSONArray=org.json.JSONArray(),stops:org.json.JSONArray=org.json.JSONArray()):JSONObject=synchronized(lock){
+    fun start(user:JSONObject,name:String,vehicle:String,empty:Boolean,details:JSONObject=JSONObject(),drafts:org.json.JSONArray=org.json.JSONArray(),stops:org.json.JSONArray=org.json.JSONArray(),first:(JSONObject)->Unit={}):JSONObject=synchronized(lock){
         check(current()?.optBoolean("active")!=true){"Ya hay un viaje activo"}
         warning("")
         dir("track").listFiles()?.sortedByDescending{it.lastModified()}?.drop(5)?.forEach{it.delete()}
@@ -24,6 +24,8 @@ class TripStore(private val c:Context) {
             .put("load_type",if(empty)"empty" else "loaded").put("distance_meters",0.0).put("segment",0).put("revision",1).put("synced_revision",0)
         for(i in 0 until drafts.length())if(!drafts.getJSONObject(i).has("id"))drafts.getJSONObject(i).put("id",UUID.randomUUID().toString())
         t.put("pending_documents",drafts)
+        // What the trip carries from its first save (a trip that started by itself carries its real start and «auto»).
+        first(t)
         save(t)
         write(File(dir("details"),"${t.getString("id")}.json"),JSONObject().put("trip_id",t.getString("id")).put("driver_id",user.getString("id")).put("data",details).put("synced",false))
         for(i in 0 until stops.length())addStop(t.getString("id"),user.getString("id"),stops.getJSONObject(i).optString("client"),stops.getJSONObject(i).optString("place"))
@@ -31,6 +33,22 @@ class TripStore(private val c:Context) {
     }
     /** Changes the trip in progress. send=false keeps the change on the phone until the next one that is sent. */
     fun update(send:Boolean=true,change:(JSONObject)->Unit):JSONObject?=synchronized(lock){val t=current()?:return@synchronized null;change(t);if(send)t.put("revision",t.optInt("revision")+1);save(t);t}
+    /**
+     * A trip that started by itself is thrown away with «No estoy al volante» in its first 3 minutes (Drive), before it
+     * ever went to the panel: the trip, its data, its route and its stretches, only on the phone.
+     */
+    fun discard(id:String):Boolean=synchronized(lock){
+        val f=File(dir("trips"),"$id.json");val t=read(f)?:return@synchronized false
+        if(!Drive.inGrace(t.optLong("grace_until"),System.currentTimeMillis())||t.optInt("synced_revision")>0)return@synchronized false
+        // A receipt or a delivery note already kept with it says the trip is real: it stays, to finish it.
+        if((receipts()+documents()).any{it.second.optString("trip_id")==id})return@synchronized false
+        for(folder in listOf("points","gaps","stops"))records(folder).filter{it.second.optString("trip_id")==id}.forEach{it.first.delete()}
+        File(dir("details"),"$id.json").delete();File(dir("track"),"$id.csv").delete();f.delete()
+        if(prefs.getString("current",null)==id)prefs.edit().remove("current").commit()
+        warning("");true
+    }
+    /** The trips still in their 3 minutes on the phone: only their live position is sent. */
+    fun inGrace(now:Long=System.currentTimeMillis())=trips().filter{Drive.inGrace(it.optLong("grace_until"),now)}.map{it.optString("id")}.toSet()
     fun trips()=synchronized(lock){dir("trips").listFiles()?.filter{it.extension=="json"}?.mapNotNull{read(it)}?.sortedBy{it.optString("started_at")} ?: emptyList()}
     /** Local copy of the route for the live map; GPS points are deleted from the phone once uploaded. */
     fun appendTrack(tripId:String,lat:Double,lng:Double,segment:Int,time:Long)=synchronized(lock){File(dir("track"),"$tripId.csv").appendText(TrackLog.line(lat,lng,segment,time))}
@@ -134,6 +152,19 @@ class TripStore(private val c:Context) {
             drafts.remove(0);t.put("pending_documents",drafts);save(t)
         }
     }
+    /**
+     * The answer to «¿Fue un viaje de la empresa?» of a trip that started by itself (6/11/2026): con_carga, vacio or
+     * descartado. Kept with the trip until Sync sends it (trf_confirm_trip, after the trip); the first answer counts.
+     */
+    fun answer(id:String,answer:String):Boolean=synchronized(lock){
+        val f=File(dir("trips"),"$id.json");val t=read(f)?:return@synchronized false
+        if(t.optString("answer").isNotBlank())return@synchronized false
+        if(answer=="vacio")t.put("load_type","empty") else if(answer=="con_carga")t.put("load_type","loaded")
+        t.put("answer",answer).put("answer_sent",false);write(f,t);true
+    }
+    /** Trips that started by themselves, already finished, still waiting for the driver's answer. */
+    fun unanswered()=trips().filter{it.optBoolean("auto")&&!it.optBoolean("active")&&it.optString("answer").isBlank()}
+    fun markAnswerSent(id:String)=synchronized(lock){val f=File(dir("trips"),"$id.json");val t=read(f)?:return@synchronized;t.put("answer_sent",true);write(f,t)}
     fun markTripSynced(id:String,revision:Int)=synchronized(lock){val f=File(dir("trips"),"$id.json");val t=read(f)?:return@synchronized;t.put("synced_revision",revision).put("synced_at",System.currentTimeMillis());write(f,t)}
     fun markReceiptSynced(file:File,r:JSONObject)=synchronized(lock){r.put("synced",true);write(file,r)}
     fun message(value:String){prefs.edit().putString("sync_message",value).apply()}

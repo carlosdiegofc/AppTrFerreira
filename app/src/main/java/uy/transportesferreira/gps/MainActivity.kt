@@ -180,6 +180,12 @@ class MainActivity:AppCompatActivity(){
   else AlertDialog.Builder(this).setTitle("Activá la ubicación precisa").setMessage("El cuentakilómetros necesita ubicación precisa. Habilitala en los permisos de la app.").setPositiveButton("Abrir ajustes"){_,_->startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:$packageName")))}.setNegativeButton("Ahora no",null).show()
  }
  private val notifyPermission=registerForActivityResult(ActivityResultContracts.RequestPermission()){if(screen=="settings")settings()}
+ // Trips that start by themselves (AutoTrip): «Actividad física», then the location «Permitir todo el tiempo».
+ private val activityPermission=registerForActivityResult(ActivityResultContracts.RequestPermission()){ok->
+  if(!ok)toast("Sin «Actividad física», la app busca el viaje solo mientras está abierta.")
+  AutoTrip.turnOn(this,name);if(AutoTrip.backgroundGranted(this)){toast("Listo: los viajes empiezan solos.");settings()} else backgroundAsk()}
+ private val backgroundPermission=registerForActivityResult(ActivityResultContracts.RequestPermission()){ok->
+  toast(if(ok)"Listo: los viajes empiezan solos, también con la app cerrada." else "Con la app cerrada te va a llegar un aviso: al tocarlo, el viaje empieza solo.");settings()}
  private val take=registerForActivityResult(ActivityResultContracts.TakePicture()){ok->if(ok)camera?.let{preparePhoto(Uri.fromFile(it))}else camera?.delete()}
  private val pick=registerForActivityResult(ActivityResultContracts.GetContent()){uri->if(uri!=null)preparePhoto(uri)}
 
@@ -206,7 +212,11 @@ class MainActivity:AppCompatActivity(){
  override fun onSaveInstanceState(b:Bundle){super.onSaveInstanceState(b);b.putString("camera",camera?.path);b.putString("photo",photo?.path);b.putString("screen",screen);b.putString("truck",truck);b.putBoolean("empty",empty);b.putString("tripForm",tripForm.toString());b.putString("fuelForm",fuelForm.toString());b.putString("docForm",docForm.toString());b.putString("draftDocs",draftDocs.toString());b.putString("fuelTrip",fuelTrip?.toString());b.putString("docTrip",docTrip?.toString());b.putString("historyTrip",historyTrip?.toString());b.putString("photoMode",photoMode);b.putString("docReturn",docReturn);b.putString("editForm",editForm.toString());b.putString("editId",editId);b.putString("maintTruck",maintTruck);b.putInt("maintFilter",maintFilter)
   b.putBoolean("fleetView",fleetView);b.putInt("tripFilter",tripFilter);b.putString("historyQuery",historyQuery);b.putInt("historyLimit",historyLimit);b.putBoolean("fuelMonth",fuelMonth);b.putString("detailFrom",detailFrom);b.putString("perfMonth",perfMonth.toString());b.putBoolean("perfDrivers",perfDrivers)
   if(screen=="chessnew")b.putString("chessPick","$newVsPhone|${newLevel.name}|$newSide")}
- override fun onStart(){super.onStart();Presence.opened();presenceAt=null;handler.post(tick)}
+ override fun onStart(){super.onStart();Presence.opened();presenceAt=null;handler.post(tick)
+  // With the trips that start by themselves on, the app looks at the speed while it is open (AutoTrip).
+  if(!sampleView()&&api.session()!=null&&AutoTrip.on(this)){AutoTrip.remember(this,name);AutoTrip.register(this);AutoTrip.look(this)}
+  // A ghost mode set from the panel shows up on opening (Modes).
+  if(!sampleView()&&api.session()!=null)Modes.pull(this){runOnUiThread{if(!isDestroyed)homeOrTrip()}}}
  override fun onDestroy(){photoJob++;chessJob++;trucoJob++;sheet?.dismiss();sheet=null;activeMap?.destroy();activeMap=null;liveMap=null;fleetMap=null;super.onDestroy()}
  override fun onStop(){handler.removeCallbacks(tick);Presence.closed();super.onStop()}
  // Screens where back stays inside the app; on the rest the system back gesture leaves it.
@@ -536,7 +546,7 @@ class MainActivity:AppCompatActivity(){
  }
  private fun driverName():String{val u=api.session()?.optJSONObject("user")?:return "Chofer";val m=u.optJSONObject("user_metadata");val known=mapOf("immer@trferreira.com" to "Immer Sampayo","luis@trferreira.com" to "Luis Ferreira","hugo@trferreira.com" to "Hugo Silva","transportesferreirauy@gmail.com" to "Transportes Ferreira");return m?.optString("full_name")?.takeIf{it.isNotBlank()}?:m?.optString("name")?.takeIf{it.isNotBlank()}?:known[u.optString("email").lowercase()]?:u.optString("email").substringBefore("@").replaceFirstChar{it.uppercase()}}
  // Without an account (the emulator test of the games) every way out goes to the sign-in.
- private fun homeOrTrip(){if(api.session()==null){login();return};when(UiMode.start(panelFirst(),mode(),active())){"owner"->ownerDashboard();"mode"->askMode();"simpletrip"->simpleTrip();"simplehome"->simpleHome();"trip"->trip();else->home()}}
+ private fun homeOrTrip(){if(api.session()==null){login();return};if(Modes.ghost(this)&&!active()){ghostScreen();return};when(UiMode.start(panelFirst(),mode(),active())){"owner"->ownerDashboard();"mode"->askMode();"simpletrip"->simpleTrip();"simplehome"->simpleHome();"trip"->trip();else->home()}}
 
  // ---------- Mode of use: asked after signing in, kept per driver ----------
  private fun askMode(){modePick=mode()?:UiMode.SIMPLE;modeChoice()}
@@ -611,6 +621,7 @@ class MainActivity:AppCompatActivity(){
   // The last finished trip confirms that it was saved without the driver doing anything else.
   store.current()?.takeIf{!it.optBoolean("active")&&it.optString("driver_id")==uid()}?.let{t->
    row(card(),R.drawable.ic_check_circle,"Último viaje guardado",listOfNotNull(date(t.optString("started_at")),km(t.optDouble("distance_meters",0.0)),durationText(t.optString("started_at"),t.optString("ended_at"))).joinToString(" · "),tint=green)}
+  if(!ask){answerRows();autoHomeRow()}
   // Fuel can be loaded in simple mode too (decision of 19/10/2026): here, out of a trip.
   button(root,"Cargar combustible",Kind.LINE,R.drawable.ic_fuel){fuelChoice()}
   button(root,"Juegos",Kind.LINE,R.drawable.ic_chess){games()}
@@ -646,40 +657,10 @@ class MainActivity:AppCompatActivity(){
   if(truck.isBlank()&&!asked){val v=knownTruck();if(v!=null)saveTruck(v) else {pickTruck{simpleStart(true)};return}}
   tripForm=JSONObject();draftDocs=JSONArray();draftStops=JSONArray();empty=false;beginTrip()
  }
+ /** Simple mode's trip: the same screen as normal mode's, with the big map and every fact (decision of 3/11/2026). */
  private fun simpleTrip(){
-  val t=store.current()?.takeIf{it.optBoolean("active")}?:return simpleHome()
-  finishAsk=false
-  val live=driveFrame(t,"simpletrip"){
-   stopSlot(this,true)
-   val row=LinearLayout(this@MainActivity).apply{orientation=LinearLayout.HORIZONTAL};addView(row,LinearLayout.LayoutParams(-1,dp(78)))
-   // During the trip it asks whether the load belongs to the trip or not.
-   bigTile(row,"Combustible",brand,R.drawable.ic_fuel,0){fuelChoice()}
-   val (pi,pl)=bigTile(row,"Pausar",0xFFB7740B.toInt(),R.drawable.ic_pause,1){togglePause()};pauseIcon=pi;pauseLabel=pl
-   dock.setPadding(0,0,0,0);addView(dock,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(10)})
-  }
-  stopsSection()
-  // For the wait at a plant with the trip going: they open only with the truck stopped.
-  button(root,"Juegos",Kind.LINE,R.drawable.ic_chess,top=12){games()}
-  batteryRow()
-  sync=note(store.message(),top=10).apply{gravity=Gravity.CENTER}
-  simpleDock();fleetOnTrip(live)
-  refresh();try{service()}catch(_:Exception){gps?.text="Revisá el permiso de ubicación para continuar"}
- }
- /** Bottom of the trip screen: the finish button, or the confirmation after tapping it, without leaving the screen. */
- private fun simpleDock(){
-  dock.removeAllViews();dock.visibility=View.VISIBLE
-  if(finishAsk){
-   // The question on a card of its own, over the room.
-   val t=store.current();val q=card(dock,pad=16,top=0)
-   text(q,"¿Finalizar el viaje?",20f,ink,2).gravity=Gravity.CENTER
-   text(q,"${elapsedText(t?.optString("started_at")?:"")} · ${km(t?.optDouble("distance_meters",0.0)?:0.0)}. Todo queda guardado.",14.5f,muted,0,4).gravity=Gravity.CENTER
-   bigButton(q,"SÍ, FINALIZAR",0xFFC4262D.toInt(),R.drawable.ic_stop,false,LinearLayout.LayoutParams(-1,dp(76)).apply{topMargin=dp(12)}){
-    finishAsk=false;dock.removeAllViews();text(dock,"Guardando el viaje…",17f,ink,1,18).apply{gravity=Gravity.CENTER;setPadding(0,0,0,dp(18))}
-    try{service(GpsService.FINISH)}catch(_:Exception){toast("No se pudo finalizar. Reintentá.");simpleDock()}}
-   button(q,"Seguir viaje",Kind.LINE,top=10){finishAsk=false;simpleDock()}
-  }else{
-   bigButton(dock,"FINALIZAR VIAJE",0xFFC4262D.toInt(),R.drawable.ic_stop,false,LinearLayout.LayoutParams(-1,dp(72))){finishAsk=true;simpleDock()}
-  }
+  if(store.current()?.optBoolean("active")!=true)return simpleHome()
+  finishAsk=false;tripScreen("simpletrip")
  }
 
  // ---------- Driver home ----------
@@ -709,6 +690,7 @@ class MainActivity:AppCompatActivity(){
    Shortcut(R.drawable.ic_wrench,0xFF56647B.toInt(),"Mantenimiento",null){maintenance(true)},
    Shortcut(R.drawable.ic_chess,0xFFBE3A6E.toInt(),"Juegos","Para las esperas, con el camión parado"){games()},
    Shortcut(R.drawable.ic_person,0xFF8590A2.toInt(),"Mi cuenta","Modo de uso, GPS y sesión"){settings()}))
+  answerRows();autoHomeRow()
   sync=note(store.message(),top=18).apply{gravity=Gravity.CENTER}
   navBar("home")
   refreshPapers()
@@ -830,9 +812,13 @@ class MainActivity:AppCompatActivity(){
  // ---------- Trip in progress ----------
  private fun trip(){
   if(simple()){simpleTrip();return}
+  tripScreen("trip")
+ }
+ /** The trip in progress, in normal mode ("trip") and in simple mode ("simpletrip"), which keeps its bigger stop buttons. */
+ private fun tripScreen(key:String){
   val t=store.current()?:return home()
-  val live=driveFrame(t,"trip"){
-   stopSlot(this,false)
+  val live=driveFrame(t,key){
+   stopSlot(this,key=="simpletrip")
    // Pausar and Finalizar side by side, both in sight (decision of 29/10/2026).
    val row=LinearLayout(this@MainActivity).apply{orientation=LinearLayout.HORIZONTAL};addView(row,LinearLayout.LayoutParams(-1,dp(60)))
    pausePill(row);finishPill(row)
@@ -961,13 +947,6 @@ class MainActivity:AppCompatActivity(){
   p.addView(v,LinearLayout.LayoutParams(0,-1,1f).apply{marginStart=dp(10)})
  }
  private fun togglePause(){try{service(if(store.current()?.optBoolean("paused")==true)GpsService.RESUME else GpsService.PAUSE)}catch(_:Exception){toast("Revisá el permiso de ubicación")}}
- /** A big button of simple mode in a row: its icon over its name. */
- private fun bigTile(p:LinearLayout,label:String,fill:Int,icon:Int,index:Int,action:()->Unit):Pair<ImageView,TextView>{
-  val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=ripple(bg(fill,24),0x40FFFFFF);glow(this,fill,4f);isClickable=true;isFocusable=true;contentDescription=label;setOnClickListener{buzz(this);action()}};sink(v,.95f)
-  val image=iconView(icon,Color.WHITE,30);val caption=tv(label,17f,Color.WHITE,2).apply{gravity=Gravity.CENTER;maxLines=1;setPadding(0,dp(4),0,0)}
-  v.addView(image);v.addView(caption)
-  p.addView(v,LinearLayout.LayoutParams(0,-1,1f).apply{if(index>0)marginStart=dp(10)});return Pair(image,caption)
- }
  /**
   * An owner who drives sees the fleet on the trip's map (decision of 29/10/2026): the trucks on a trip and the phones of
   * active drivers, with their speed, read like Flota en vivo; a truck tapped shows its route, tapped again it goes away.
@@ -1099,6 +1078,85 @@ class MainActivity:AppCompatActivity(){
   val image=iconView(icon,blue,24);val caption=tv(label,13.5f,blue,1).apply{gravity=Gravity.CENTER;setPadding(0,dp(6),0,0)};v.addView(image);v.addView(caption)
   p.addView(v,LinearLayout.LayoutParams(0,dp(76),1f).apply{if(index>0)marginStart=dp(10)});return Pair(image,caption)
  }
+ // ---------- Trips that start by themselves (Drive, AutoTrip; decision of 3/11/2026) ----------
+ /** Mi cuenta: turn it on with what it does (Google Play asks for this before the location in the background), or change it. */
+ private fun autoTrips(){
+  if(AutoTrip.on(this)){
+   val items=mutableListOf(if(AutoTrip.paused(this))"Reanudar ahora" else "No estoy al volante · pausar 8 horas")
+   if(!AutoTrip.backgroundGranted(this))items.add("Que funcione con la app cerrada")
+   items.add("Apagar el modo zafra")
+   AlertDialog.Builder(this).setTitle("Modo zafra").setItems(items.toTypedArray()){_,i->
+    when(items[i]){
+     "Reanudar ahora"->{AutoTrip.resume(this);AutoTrip.look(this);toast("Listo: los viajes vuelven a empezar solos.");settings()}
+     "Que funcione con la app cerrada"->backgroundAsk()
+     "Apagar el modo zafra"->{Modes.setZafra(this,false,name);toast("Listo: modo zafra apagado. Los viajes ya no empiezan solos.");homeOrTrip()}
+     else->{notDrivingNow();settings()}
+    }}.setNegativeButton("Cerrar",null).show();return
+  }
+  AlertDialog.Builder(this).setTitle("Modo zafra")
+   .setMessage("Para la zafra, cuando pasás muchas horas en el camión. Si lo prendés, cuando el camión anda a más de 15 km/h durante 3 minutos, la app empieza un viaje sola con el último camión que usaste, desde el lugar y la hora en que el camión arrancó (completás destino y carga después). Y si el camión queda más de 1 hora parado, el viaje termina solo, a la hora en que se detuvo (no con el viaje en pausa ni mientras descargás en una parada).\n\nPara darse cuenta, la app usa la actividad física del teléfono (si vas en un vehículo) y la ubicación, también con la app cerrada o el teléfono bloqueado. No envía nada hasta que empieza un viaje.\n\nEl viaje empieza siempre, aunque no mires el teléfono. Si no estás al volante, tocá «No estoy al volante» en el inicio: la app no busca viajes por 8 horas. Lo apagás cuando quieras desde acá.")
+   .setPositiveButton("Prender"){_,_->autoAsk()}.setNegativeButton("Ahora no",null).show()
+ }
+ private fun autoAsk(){
+  if(!AutoTrip.locationGranted(this)){toast("Primero dale permiso de ubicación y después prendé el modo zafra.");permissions.launch(locationPermissions().toTypedArray());return}
+  if(Build.VERSION.SDK_INT>=29&&!AutoTrip.activityGranted(this)){activityPermission.launch(Manifest.permission.ACTIVITY_RECOGNITION);return}
+  Modes.setZafra(this,true,name)
+  if(AutoTrip.backgroundGranted(this)){toast("Listo: modo zafra prendido. Los viajes empiezan solos.");homeOrTrip()} else backgroundAsk()
+ }
+ /** «Permitir todo el tiempo»: Android shows it in its own settings page since Android 11. */
+ private fun backgroundAsk(){
+  if(Build.VERSION.SDK_INT<29){settings();return}
+  AlertDialog.Builder(this).setTitle("Con la app cerrada")
+   .setMessage("Para que el viaje empiece solo con la app cerrada o el teléfono bloqueado, en la pantalla que se abre elegí «Permitir todo el tiempo». Si no, te va a llegar un aviso y el viaje empieza al tocarlo.")
+   .setPositiveButton("Continuar"){_,_->try{backgroundPermission.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)}catch(_:Exception){settings()}}
+   .setNegativeButton("Ahora no"){_,_->settings()}.show()
+ }
+ private fun autoSubtitle():String=when{
+  !AutoTrip.on(this)->"Apagado · Tocá para prenderlo"
+  AutoTrip.paused(this)->"En pausa hasta las ${Instant.ofEpochMilli(AutoTrip.pausedUntil(this)).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("HH:mm"))} · Tocá para reanudarlos"
+  !AutoTrip.backgroundGranted(this)->"Prendido con la app abierta; cerrada, con un aviso"
+  else->"Prendido: los viajes empiezan solos a más de 15 km/h durante 3 minutos"
+ }
+ /** «No estoy al volante»: pauses the detection 8 hours. A trip already started always goes on (3/11/2026). */
+ private fun notDrivingNow(){AutoTrip.notDriving(this);toast("Listo: por 8 horas no empiezan viajes solos.")}
+ // ---------- Modo fantasma (6/11/2026): the app does nothing until the date, or until it is turned off ----------
+ private fun ghostUntilText():String{val u=Modes.ghostUntil(this);if(u==Modes.FOREVER)return "hasta que lo apagues"
+  val d=java.time.Instant.ofEpochMilli(u).atZone(java.time.ZoneId.systemDefault());return "hasta el %02d/%02d a las %02d:%02d".format(d.dayOfMonth,d.monthValue,d.hour,d.minute)}
+ private fun ghostScreen(){
+  page("ghost");bar("Modo fantasma")
+  val c=card(pad=18)
+  text(c,"La app está apagada",20f,ink,2)
+  text(c,"Modo fantasma ${ghostUntilText()}. No se inician viajes, no se usa el GPS y no se manda tu ubicación. Lo que estaba pendiente de enviar se sigue enviando.",14.5f,muted,0,8)
+  if(Modes.ghostBy(this)=="panel")note("Lo puso la administración: se apaga desde el panel.")
+  else button(root,"Salir del modo fantasma"){Modes.setGhost(this,0L);toast("Listo: la app vuelve a funcionar.");homeOrTrip()}
+ }
+ /** Asks for how long, and turns the ghost mode on (never during a trip). */
+ private fun askGhost(){
+  if(active()){toast("Terminá el viaje antes de poner el modo fantasma.");return}
+  val days=listOf(1L,3L,7L)
+  AlertDialog.Builder(this).setTitle("Modo fantasma").setItems(arrayOf("1 día","3 días","7 días","Hasta que lo apague")){_,i->
+   Modes.setGhost(this,if(i<3)System.currentTimeMillis()+days[i]*86_400_000L else Modes.FOREVER);homeOrTrip()
+  }.setNegativeButton("Cancelar",null).show()
+ }
+ /** Home, without a trip and with them on: pause them, or see until when they are paused. */
+ /** Trips that started by themselves and ended without an answer: «¿Fue un viaje de la empresa?» (6/11/2026). */
+ private fun answerRows(){
+  for(t in store.unanswered().takeLast(3)){
+   val day=try{java.time.Instant.parse(t.getString("started_at")).atZone(java.time.ZoneId.systemDefault())}catch(_:Exception){null}
+   val when_=day?.let{"%02d/%02d %02d:%02d".format(it.dayOfMonth,it.monthValue,it.hour,it.minute)}?:""
+   row(card(),R.drawable.ic_flag,"¿Fue un viaje de la empresa?","${t.optString("vehicle")} · $when_ · tocá para contestar",tint=amber){
+    val answers=listOf("con_carga","vacio","descartado")
+    AlertDialog.Builder(this).setTitle("¿Fue un viaje de la empresa?").setItems(arrayOf("Con carga","Vacío (retorno)","No es de la empresa")){_,i->
+     AutoTrip.answer(this,t.getString("id"),answers[i]);toast(if(i==2)"Listo: el viaje queda descartado. Desde el panel se puede recuperar." else "Listo: viaje confirmado.");homeOrTrip()
+    }.setNegativeButton("Después",null).show()
+   }
+  }
+ }
+ private fun autoHomeRow(){
+  if(!AutoTrip.on(this)||active())return
+  if(AutoTrip.paused(this))row(card(),R.drawable.ic_clock,"Modo zafra en pausa",autoSubtitle()){AutoTrip.resume(this);AutoTrip.look(this);toast("Listo: los viajes vuelven a empezar solos.");homeOrTrip()}
+  else row(card(),R.drawable.ic_clock,"No estoy al volante","Los viajes no empiezan solos por 8 horas"){notDrivingNow();homeOrTrip()}
+ }
  private fun batteryFree()=(getSystemService(POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName)
  /** «Evitar cortes del GPS»: until the battery is «Sin restricciones», and always on a brand that saves battery on its own. */
  private fun batteryRow(){
@@ -1141,7 +1199,7 @@ class MainActivity:AppCompatActivity(){
   status?.text=if(paused)"Viaje pausado" else "Viaje en curso";statusBox?.background=bg(if(paused)0xFFB7740B.toInt() else 0xFF178A4C.toInt(),if(screen=="trip")24 else 22)
   elapsed?.text=elapsedText(t.optString("started_at"));stopsRefresh()
   distance?.text=km(t.optDouble("distance_meters",0.0))
-  pauseLabel?.text=if(screen=="simpletrip")(if(paused)"Reanudar" else "Pausar") else if(paused)"Reanudar viaje" else "Pausar viaje";pauseIcon?.setImageResource(if(paused)R.drawable.ic_play else R.drawable.ic_pause);(pauseLabel?.parent as? View)?.contentDescription=pauseLabel?.text
+  pauseLabel?.text=if(paused)"Reanudar viaje" else "Pausar viaje";pauseIcon?.setImageResource(if(paused)R.drawable.ic_play else R.drawable.ic_pause);(pauseLabel?.parent as? View)?.contentDescription=pauseLabel?.text
   val recent=instant(t.optJSONObject("last_point")?.optString("recorded_at"))?.let{System.currentTimeMillis()-it.toEpochMilli()<30000}?:false
   val v=if(paused)0.0 else if(recent)t.optDouble("speed_kmh",0.0) else Double.NaN
   speed?.let{roll(it,v)};gauge?.set(v)
@@ -1431,7 +1489,7 @@ class MainActivity:AppCompatActivity(){
    "mode"->askMode();"newtrip"->newTrip();"pick"->{newTrip();pickTruck{newTrip()}};"prepare"->{tripForm=JSONObject().put("destino","Puerto de Montevideo").put("cliente","Cooperativa del Este").put("tipoCarga","Arroz").put("kg","28500");prepare()}
    "fuel"->openFuel(null);"document"->openDocument(t,"tripdetail","arrival");"triphistory"->history("trips");"fuelhistory"->history("fuel");"tripdetail"->t?.let{detail(it)}?:home()
    "documents"->documents();"maintenance"->maintenance();"settings"->settings();"games"->games();"privacy"->privacy()
-   "simplehome"->simpleHome();"simpleask"->{startAskAt=SystemClock.elapsedRealtime();simpleHome(true)};"simpletrip"->simpleTrip();"simplefinish"->{simpleTrip();finishAsk=true;simpleDock()}
+   "simplehome"->simpleHome();"simpleask"->{startAskAt=SystemClock.elapsedRealtime();simpleHome(true)};"simpletrip"->simpleTrip();"simplefinish"->{simpleTrip();askFinish()}
    "trip"->trip()
    // The trip ends a few seconds after it opens, the way the finish button ends it (the emulator test of finishing a trip).
    "tripend"->{trip();handler.postDelayed({try{service(GpsService.FINISH)}catch(_:Exception){}},4000)}
@@ -1440,6 +1498,8 @@ class MainActivity:AppCompatActivity(){
    // closed on «Terminé de descargar» of the last stop and did not open again).
    // The trip with its GPS service running, as on a phone (the emulator test of the GPS in the background).
    "tripgps"->{trip();try{service()}catch(_:Exception){}}
+   // Trips that start by themselves, on, without a trip: the GPS looks at the speed (the emulator test of AutoTrip).
+   "detect"->{saveTruck("Ford Cargo 1722 · ATP 2231");AutoTrip.turnOn(this,name);home();AutoTrip.look(this)}
    "tripstops","simpletripstops"->{if(see=="tripstops")trip() else simpleTrip();sampleUnloadAll(3)}
    "tripsheet"->{trip();stage?.postDelayed({sheet(true)},300)};"tripfinish"->{trip();askFinish()};"receipt"->{home();t?.let{askReceipt(it)}};"ownermenu"->{home();ownerMenu()};"owner"->ownerDashboard();"fleetfull"->{ownerDashboard();fullFleet()};"performance"->performance()
    else->home()}
@@ -1891,6 +1951,8 @@ class MainActivity:AppCompatActivity(){
   if(!panelFirst()){val on=prefs().getBoolean(presenceKey(),false)
    row(gc,R.drawable.ic_pin,"Ubicación con la app abierta",if(on)"Activada: al abrirla y cada 5 minutos, sin viaje · Tocá para desactivarla" else "Desactivada: solo se avisa que estás activo · Tocá para activarla"){
     if(on){prefs().edit().putBoolean(presenceKey(),false).apply();toast("Listo: con la app abierta ya no se envía tu ubicación.");settings()} else presencePositionDialog{settings()}}}
+  if(!panelFirst())row(gc,R.drawable.ic_clock,"Modo zafra",autoSubtitle()){autoTrips()}
+  if(!panelFirst())row(gc,R.drawable.ic_clock,"Modo fantasma","La app no hace nada por unos días"){askGhost()}
   row(gc,R.drawable.ic_shield,"Privacidad","Qué datos usa la app y para qué"){privacy()}
   section("Camiones y papeles")
   val pp=card();row(pp,R.drawable.ic_wrench,"Mantenimiento","Services hechos y pendientes"){maintenance(true)};row(pp,R.drawable.ic_doc,"Documentos","Licencia, carné de salud, SOA y más"){documents(true)}

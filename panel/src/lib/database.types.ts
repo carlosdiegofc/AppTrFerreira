@@ -365,6 +365,36 @@ export type Database = {
           },
         ]
       }
+      trf_driver_modes: {
+        Row: {
+          driver_id: string
+          driver_name: string
+          ghost_by: string | null
+          ghost_until: string | null
+          updated_at: string
+          zafra: boolean
+          zafra_since: string | null
+        }
+        Insert: {
+          driver_id: string
+          driver_name?: string
+          ghost_by?: string | null
+          ghost_until?: string | null
+          updated_at?: string
+          zafra?: boolean
+          zafra_since?: string | null
+        }
+        Update: {
+          driver_id?: string
+          driver_name?: string
+          ghost_by?: string | null
+          ghost_until?: string | null
+          updated_at?: string
+          zafra?: boolean
+          zafra_since?: string | null
+        }
+        Relationships: []
+      }
       trf_driver_presence: {
         Row: {
           accuracy_m: number | null
@@ -455,6 +485,11 @@ export type Database = {
         Row: {
           active: boolean
           arrival_lat: number | null
+          auto: boolean
+          confirmation: string | null
+          confirmed_at: string | null
+          confirmed_by: string | null
+          confirmed_role: string | null
           arrival_lng: number | null
           distance_meters: number
           driver_id: string
@@ -471,6 +506,11 @@ export type Database = {
         Insert: {
           active?: boolean
           arrival_lat?: number | null
+          auto?: boolean
+          confirmation?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          confirmed_role?: string | null
           arrival_lng?: number | null
           distance_meters?: number
           driver_id: string
@@ -487,6 +527,11 @@ export type Database = {
         Update: {
           active?: boolean
           arrival_lat?: number | null
+          auto?: boolean
+          confirmation?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          confirmed_role?: string | null
           arrival_lng?: number | null
           distance_meters?: number
           driver_id?: string
@@ -1358,6 +1403,7 @@ export type Database = {
         }
       }
       trf_is_admin: { Args: never; Returns: boolean }
+      trf_confirm_trip: { Args: { p_answer: string; p_trip: string }; Returns: string }
       trf_is_panel_admin: { Args: never; Returns: boolean }
       trf_stop_my_tracking: { Args: never; Returns: undefined }
     }

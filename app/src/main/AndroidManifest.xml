@@ -5,6 +5,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Trips that start by themselves (decision of 3/11/2026), only if the driver turns them on: Android says when the phone
+         goes in a vehicle, and with the location «Permitir todo el tiempo» the GPS can look at the speed with the app closed. -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <application android:allowBackup="false" android:usesCleartextTraffic="false" android:theme="@style/Theme.TRF" android:icon="@mipmap/ic_launcher" android:label="Transportes Ferreira GPS">
         <activity android:name=".MainActivity" android:exported="true" android:windowSoftInputMode="adjustResize">
             <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
@@ -13,6 +18,13 @@
         <service android:name=".GpsService" android:foregroundServiceType="location" android:exported="false"/>
         <!-- The watch on the GPS of the trip from outside its service (GpsWatch, 30/10/2026): only the app's own alarm reaches it. -->
         <receiver android:name=".GpsWatch" android:exported="false"/>
+        <!-- The vehicle, «No estoy al volante», and the phone or the app starting again (AutoTrip). -->
+        <receiver android:name=".AutoTripReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+            </intent-filter>
+        </receiver>
         <!-- Google's map (decision of 26/10/2026): the key comes from the GOOGLE_MAPS_ANDROID_KEY secret when the app is built, never from the repository. Without it the app keeps its own map. -->
         <meta-data android:name="com.google.android.geo.API_KEY" android:value="${mapsApiKey}"/>
         <uses-library android:name="org.apache.http.legacy" android:required="false"/>

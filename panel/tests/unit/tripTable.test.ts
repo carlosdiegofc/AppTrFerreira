@@ -5,6 +5,7 @@ import { kmText, PRINT_HEADERS, printRow, routeText, SHEET_COLUMNS, totalsText, 
 import { type PanelTripRow, type SessionRow, tripFromPanel, tripFromSession } from '../../src/lib/trips';
 
 const session = (over: Partial<SessionRow> = {}): SessionRow => ({
+  auto: false, confirmation: null, confirmed_at: null, confirmed_by: null, confirmed_role: null,
   id: 'aaaaaaaa-0000-4000-8000-000000000001', driver_id: 'd1', driver_name: 'Ana Pereira', vehicle: 'Volvo FH 460 · ABC1234',
   started_at: '2026-10-15T12:05:00Z', ended_at: '2026-10-15T16:40:00Z', active: false, paused: false, load_type: 'loaded',
   distance_meters: 152_340, origin_lat: null, origin_lng: null, arrival_lat: null, arrival_lng: null, ...over,

@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { DriverFormDialog, PaymentFormDialog, SalaryFormDialog } from '../components/DriverDialogs';
+import { DriverModesCard } from '../components/DriverModesCard';
 import { Icon } from '../components/Icon';
 import { Card, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote } from '../components/ui';
 import { useDocuments, useDrivers, useFleetData, useFuel, useNow, usePaperDrivers, usePresence, useTripList } from '../data/hooks';
@@ -249,6 +250,7 @@ function DriverPage({ driver, today, now }: { driver: Driver; today: string; now
       )}
 
       <div className="driver-grid">
+        {driver.userId && <DriverModesCard userId={driver.userId} name={driver.name} />}
         <Card title="Datos">
           <dl className="facts facts-tight">
             <div>

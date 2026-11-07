@@ -8,12 +8,14 @@ import { TripFormDialog } from '../components/TripFormDialog';
 import { TripMap } from '../components/TripMap';
 import { CatalogNote, Card, Empty, ErrorNote, PageHead, Pill, RefreshButton, Skeleton, StaleNote } from '../components/ui';
 import { ROUTE_REFRESH_MS } from '../config';
-import { ConflictError, describeWriteError } from '../data/api';
-import { useExpenses, useNow, useRoute, useRouteGaps, useSetTripDeleted, useTripDetail, useTripStops } from '../data/hooks';
+import { ConflictError, confirmTrip, describeWriteError } from '../data/api';
+import { useExpenses, useNow, useRoute, useRouteGaps, useSetTripDeleted, useTripDetail, useTripRoadEvents, useTripStops } from '../data/hooks';
 import { clientKey } from '../lib/clients';
 import { calendarDay, dayInZone, formatDay, formatDayTime, formatDuration, formatTime } from '../lib/dates';
 import { type Expense, expensesLink, expenseTotals, NO_CHOICES, NO_NAMES, tripTargetName } from '../lib/expenses';
-import { count, money, number } from '../lib/format';
+import { count, kmh, money, number } from '../lib/format';
+import { externalMaps, POINT_LABEL, type PointKind } from '../lib/road';
+import { halts as haltsOf } from '../lib/tripDetail';
 import { documentLabel, sourceLabel, tripFacts } from '../lib/tripTable';
 import { gapSummary, readingCuts, routeRuns } from '../lib/route';
 import { inOrder, legs as stopLegs, STOP_STATE_LABEL, stopState, stopTitle, unloadMs } from '../lib/stops';
@@ -74,6 +76,9 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
   const openGaps = (gaps.data ?? []).filter((g) => g.method === 'sin_rellenar');
   // The times the phone's GPS stopped with the truck moving (30/10/2026).
   const cuts = useMemo(() => (route.data ? readingCuts(route.data) : []), [route.data]);
+  // The advanced detail (3/11/2026): every time the truck stood still, and the tolls, scales and radars it went by.
+  const halts = useMemo(() => (route.data ? haltsOf(route.data) : []), [route.data]);
+  const roadEvents = useTripRoadEvents(routeTrip);
   // The stops of a trip with several unloadings, and the kilometres of each leg between them.
   const stopsQuery = useTripStops(routeTrip);
   const stops = useMemo(() => inOrder(stopsQuery.data ?? []), [stopsQuery.data]);
@@ -255,7 +260,7 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
                   <ErrorNote onRetry={() => void route.refetch()}>{route.data ? 'No se pudo actualizar el recorrido del GPS.' : 'No se pudo leer el recorrido del GPS.'}</ErrorNote>
                 </div>
               )}
-              <TripMap route={route.data ?? null} start={trip.gpsStart} end={trip.gpsEnd} declared={declared} live={live} stops={stops} label="Mapa del recorrido del viaje" />
+              <TripMap route={route.data ?? null} start={trip.gpsStart} end={trip.gpsEnd} declared={declared} live={live} stops={stops} halts={halts} label="Mapa del recorrido del viaje" />
               <p className="map-legend">
                 {trip.source === 'app' && (
                   <span>
@@ -346,6 +351,71 @@ function TripPage({ kind, id }: { kind: 'app' | 'web'; id: string }) {
               );
             })}
           </ul>
+        </Card>
+      )}
+
+      {session?.auto && <ConfirmCard tripId={session.id} answer={session.confirmation} by={session.confirmed_role} onDone={() => void detail.refetch()} />}
+
+      {trip.source === 'app' && (
+        <Card title="Detalle avanzado del viaje">
+          <details className="trip-advanced">
+            <summary>
+              Detenciones ({halts.length}) y peajes, balanzas y radares ({roadEvents.data?.length ?? '…'})
+            </summary>
+            <p className="note">Tocá el recorrido en el mapa para ver la hora, la velocidad y los km desde la salida en ese punto.</p>
+            <h3>Detenciones de 5 minutos o más</h3>
+            {halts.length === 0 ? (
+              <p className="note">{route.data ? 'El camión no estuvo detenido 5 minutos o más en este viaje.' : 'Cargando el recorrido…'}</p>
+            ) : (
+              <ul className="item-list halt-list">
+                {halts.map((h) => {
+                  const maps = externalMaps(h.latitude, h.longitude);
+                  return (
+                    <li key={h.from}>
+                      <span className="item-main">
+                        <strong>
+                          {h.paused ? 'En pausa' : 'Detenido'} de {formatDayTime(Date.parse(h.from))} a {formatTime(Date.parse(h.to))}
+                        </strong>
+                        <span>{formatDuration(h.ms)}</span>
+                      </span>
+                      {maps && (
+                        <a href={maps.google} target="_blank" rel="noreferrer">
+                          Ver el lugar
+                        </a>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <h3>Peajes, balanzas y radares</h3>
+            {roadEvents.error ? (
+              <ErrorNote onRetry={() => void roadEvents.refetch()}>No se pudieron leer los peajes, balanzas y radares del viaje.</ErrorNote>
+            ) : (roadEvents.data?.length ?? 0) === 0 ? (
+              <p className="note">{roadEvents.data ? 'El viaje no pasó por peajes, balanzas ni radares cargados en Control de ruta.' : 'Cargando…'}</p>
+            ) : (
+              <ul className="item-list road-list">
+                {(roadEvents.data ?? []).map((e) => {
+                  const over = e.speed_kmh !== null && e.speed_limit !== null && e.speed_kmh > e.speed_limit;
+                  return (
+                    <li key={e.id}>
+                      <span className="item-main">
+                        <strong>
+                          {POINT_LABEL[e.kind as PointKind] ?? 'Punto'} · {e.point_name}
+                        </strong>
+                        <span>
+                          {[formatDayTime(Date.parse(e.happened_at)), e.speed_kmh !== null ? `${kmh(e.speed_kmh)}${e.speed_limit !== null ? ` (máximo ${number(e.speed_limit, 0)})` : ''}` : null, e.amount !== null ? money(e.amount, 'UYU') : null]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </span>
+                      </span>
+                      {over && <Pill tone="red">Pasó rápido</Pill>}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </details>
         </Card>
       )}
 
@@ -510,4 +580,48 @@ export function Viaje() {
   if (!parsed) return <Missing />;
   // A new key is a new page: nothing of the previous trip stays on screen.
   return <TripPage key={key} kind={parsed.kind} id={parsed.id} />;
+}
+
+const ANSWERS = [
+  { value: 'con_carga', label: 'Con carga' },
+  { value: 'vacio', label: 'Vacío (retorno)' },
+  { value: 'descartado', label: 'No es de la empresa' },
+] as const;
+
+/**
+ * A trip that started by itself (6/11/2026): «¿Fue un viaje de la empresa?». The driver answers on the phone; the office
+ * answers here and can correct any answer. «No es de la empresa» does not delete it: it goes to the trash and stops
+ * counting, and answering again brings it back.
+ */
+function ConfirmCard({ tripId, answer, by, onDone }: { tripId: string; answer: string | null; by: string | null; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const current = ANSWERS.find((a) => a.value === answer);
+  const pick = async (value: (typeof ANSWERS)[number]['value']) => {
+    setBusy(true);
+    setFailed(false);
+    try {
+      await confirmTrip(tripId, value);
+      onDone();
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Card title="¿Fue un viaje de la empresa?">
+      <p className="muted" data-testid="trip-confirmation">
+        {current ? `${current.label} · lo contestó ${by === 'panel' ? 'la administración' : 'el chofer'}.` : 'Este viaje empezó solo y todavía nadie lo confirmó.'}
+      </p>
+      <div className="confirm-answers">
+        {ANSWERS.map((a) => (
+          <button key={a.value} type="button" className={a.value === answer ? 'btn btn-primary' : 'btn'} disabled={busy || a.value === answer} onClick={() => void pick(a.value)}>
+            {a.label}
+          </button>
+        ))}
+      </div>
+      {failed && <ErrorNote onRetry={() => setFailed(false)}>No se pudo guardar la respuesta. Revisá la conexión.</ErrorNote>}
+    </Card>
+  );
 }

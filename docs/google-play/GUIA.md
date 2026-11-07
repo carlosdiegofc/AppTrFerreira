@@ -157,6 +157,32 @@ Google empezó a pedir una justificación a las apps que usan ubicación precisa
 The app records the route and the distance of company trucks during a trip that the driver starts and ends explicitly. Distance is computed from consecutive GPS fixes, so approximate location (about 3 km) cannot measure the kilometers driven or draw the route. Continuous location is collected only while a trip is active and stops when the trip is paused or finished. Outside a trip, only while the app is open and if the driver agrees, the app sends one battery-saving position when it opens and every 5 minutes, so the office knows where available drivers are; it never uses location in the background outside a trip.
 ```
 
+### Ubicación en segundo plano y actividad física (desde la versión 0.29.0)
+
+La 0.29.0 agrega los **viajes automáticos** (opcionales, apagados hasta que el chofer los activa en Mi cuenta). Usan dos permisos nuevos:
+
+- `ACTIVITY_RECOGNITION` («Actividad física»): para saber cuándo el teléfono va en un vehículo. No pide formulario.
+- `ACCESS_BACKGROUND_LOCATION` («Permitir todo el tiempo»): para medir la velocidad y arrancar el viaje con la app cerrada. **Play Console pide la declaración de permisos de ubicación** antes de dejar publicar la versión: **Contenido de la app › Permisos de ubicación** (o aparece al subir el .aab).
+
+Respuestas para la declaración:
+
+- ¿Qué función usa la ubicación en segundo plano? **Viajes automáticos: empezar el registro del viaje cuando el camión empieza a andar.**
+- Tipo de función: la más parecida a **seguimiento de la flota / registro de viajes del conductor** (si no está, **Otra**).
+
+Descripción (en inglés, como lo pide el formulario):
+
+```text
+Optional feature, off until the driver turns it on in "Mi cuenta > Viajes automáticos", after an in-app disclosure. When the phone's activity recognition says the driver is in a vehicle, the app uses location for a few minutes, also with the app closed, to measure the truck's speed. If the truck moves above 15 km/h for 3 minutes, the app starts recording the company trip automatically with the last truck used, so drivers do not lose the kilometers of trips they forgot to start. A notification is shown while the speed is measured and when the trip starts; the driver can tap "No estoy al volante" to pause the detection for 8 hours. Without the background permission the app only asks the driver with a notification.
+```
+
+Video (30 a 60 segundos, YouTube **No listado**): abrir la app › **Mi cuenta** › **Viajes automáticos** › mostrar el aviso › **Activar** › aceptar «Actividad física» › en la pantalla del sistema elegir **Permitir todo el tiempo** › cerrar la app › salir a manejar 5 minutos (o mostrar la notificación «Mirando si el camión arrancó») › mostrar la notificación **Viaje iniciado solo** con **No estoy al volante** › abrir la app con el viaje en curso.
+
+En **Seguridad de los datos** no cambia ningún tipo de dato (la ubicación precisa ya figura). Si Play Console vuelve a pedir la justificación de la ubicación precisa, usá este texto en lugar del de arriba:
+
+```text
+The app records the route and the distance of company trucks during a trip. Distance is computed from consecutive GPS fixes, so approximate location cannot measure the kilometers driven or draw the route. Continuous location is collected while a trip is active and stops when it is paused or finished. Outside a trip, only if the driver turns on "Viajes automáticos", the app uses location for a few minutes when the phone is in a vehicle to tell whether the truck started a trip; nothing is sent unless a trip starts. If the driver agrees, the app also sends one battery-saving position when it opens and every 5 minutes while open.
+```
+
 ## 4. Ficha de Play Store
 
 Menú *Hacer crecer › Presencia en Play Store › Ficha de Play Store principal*.
@@ -232,6 +258,26 @@ La app de Google Play es una app nueva para Android (nombre de paquete `com.tran
 ## 7. Actualizaciones
 
 Cada versión nueva lleva un número de versión más alto, y GitHub Actions arma su `.aab` solo. En Play Console: *Prueba interna › Crear versión* › subí el `.aab` nuevo › **Lanzar**. Los teléfonos se actualizan desde Google Play sin hacer nada más.
+
+Versión `0.29.1` (código de versión 45). Un viaje que empezó solo ya no se puede descartar: va al panel enseguida, y empieza con 3 minutos a más de 15 km/h (antes 5). Si ya completaste la declaración con el texto de la 0.29.0, actualizala con el de arriba. No cambian los permisos (la declaración de la 0.29.0 sirve). Notas de la versión:
+
+```text
+<es-419>
+• Viajes automáticos (opcional, en Mi cuenta): si el camión anda 3 minutos a más de 15 km/h, el viaje empieza solo y va al panel. «No estoy al volante» pausa la detección 8 horas.
+• Aviso si el GPS del viaje se corta, y pasos de batería según la marca del teléfono.
+</es-419>
+```
+
+Versión `0.29.0` (código de versión 44). **Viajes automáticos** (opcionales): con el camión a más de 15 km/h durante 5 minutos el viaje empieza solo. **Cambian los permisos**: agrega «Actividad física» y la ubicación en segundo plano, así que antes de lanzarla completá la declaración de [Ubicación en segundo plano y actividad física](#ubicación-en-segundo-plano-y-actividad-física-desde-la-versión-0290), con su video. La política de privacidad ya lo dice (actualizada el 3/11/2026). Antes de lanzarla, probala en un teléfono: activá los viajes automáticos, salí a manejar más de 5 minutos con la app cerrada y mirá que llegue «Viaje iniciado solo»; después probá «No estoy al volante» en otro arranque. Notas de la versión:
+
+```text
+<es-419>
+• Viajes automáticos (opcional, en Mi cuenta): si el camión anda 5 minutos a más de 15 km/h, el viaje empieza solo. «No estoy al volante» lo descarta.
+• Aviso si el GPS del viaje se corta, y pasos de batería según la marca del teléfono.
+</es-419>
+```
+
+Versión `0.28.0` (código de versión 43). Aviso con sonido si el GPS del viaje se corta 3 minutos, y pasos de batería según la marca. No cambian los permisos.
 
 Versión `0.27.0` (código de versión 40). Un viaje puede llevar **paradas de descarga** para distintos clientes: el chofer marca «Llegué» y «Terminé de descargar», y la descarga también termina sola cuando el camión arranca. No cambian los permisos ni los tipos de datos de Seguridad de los datos (la ubicación de la llegada es la misma ubicación del viaje); la política de privacidad ya nombra las paradas. **Necesita la migración 0014 en producción antes de lanzarla.** Antes de lanzarla, probala en un teléfono con un viaje de dos paradas: «Llegué», esperar, «Terminé de descargar», y en la segunda dejar que el camión arranque. Notas de la versión:
 

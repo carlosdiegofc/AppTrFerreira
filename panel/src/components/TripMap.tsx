@@ -8,8 +8,11 @@ import { useEffect, useRef } from 'react';
 import { DEFAULT_CENTER, DEFAULT_ZOOM, ROUTE_REFRESH_MS } from '../config';
 import type { RoutePoint } from '../data/api';
 import { type Glide, glideAt, grownTail, type Point, sameLines, startGlide } from '../lib/glide';
+import { formatDuration, formatTime } from '../lib/dates';
+import { km, kmh } from '../lib/format';
 import { routeRuns } from '../lib/route';
 import { stopTitle } from '../lib/stops';
+import { type Halt, spotAt } from '../lib/tripDetail';
 import type { LatLng } from '../lib/trips';
 import { GAP_STYLE, mapView, ROUTE_STYLE } from './mapView';
 
@@ -25,6 +28,8 @@ interface Props {
   live: boolean;
   /** The stops of a trip with several unloadings: the ones the truck reached are marked where it arrived. */
   stops?: readonly { id: string; position: number; client: string; place: string; arrived_lat: number | null; arrived_lng: number | null }[];
+  /** The times the truck stood still (the trip's advanced detail): marked where it stopped. */
+  halts?: readonly Halt[];
   label: string;
 }
 
@@ -34,7 +39,7 @@ const calm = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 /** A glide ends a little before the next refresh, so the truck is not still moving when new readings arrive. */
 const GLIDE_MS = ROUTE_REFRESH_MS * 0.9;
 
-export function TripMap({ route, start, end, declared, live, stops = [], label }: Props) {
+export function TripMap({ route, start, end, declared, live, stops = [], halts = [], label }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const layer = useRef<L.LayerGroup | null>(null);
@@ -44,6 +49,9 @@ export function TripMap({ route, start, end, declared, live, stops = [], label }
   const drawn = useRef<Point[][]>([]);
   const active = useRef<{ glide: Glide; kept: Point[] } | null>(null);
   const frame = useRef(0);
+  // The route as it is now, for a tap on the map: the hour, the speed and the kilometres there (3/11/2026).
+  const tapped = useRef<readonly RoutePoint[]>([]);
+  tapped.current = route ?? [];
   const { origin, destination } = declared;
 
   useEffect(() => {
@@ -54,6 +62,13 @@ export function TripMap({ route, start, end, declared, live, stops = [], label }
     const undoView = mapView(m);
     layer.current = L.layerGroup().addTo(m);
     map.current = m;
+    m.on('click', (e: L.LeafletMouseEvent) => {
+      const spot = spotAt(tapped.current, e.latlng.lat, e.latlng.lng);
+      if (!spot) return;
+      const at = formatTime(Date.parse(spot.recorded_at));
+      const speed = spot.estimated ? 'camino estimado, sin señal' : spot.speed_kmh === null ? 'sin velocidad' : kmh(spot.speed_kmh);
+      L.popup({ className: 'route-spot' }).setLatLng([spot.latitude, spot.longitude]).setContent(`<strong>${at}</strong> · ${speed}<br>${km(spot.meters)} desde la salida`).openOn(m);
+    });
     const resize = new ResizeObserver(() => m.invalidateSize());
     resize.observe(box.current);
     return () => {
@@ -100,6 +115,11 @@ export function TripMap({ route, start, end, declared, live, stops = [], label }
     stops.forEach((st, i) => {
       if (st.arrived_lat !== null && st.arrived_lng !== null) L.circleMarker([st.arrived_lat, st.arrived_lng], { radius: 7, className: 'fm-stop', weight: 3 }).bindTooltip(`${i + 1} · ${stopTitle(st)}`).addTo(g);
     });
+    halts.forEach((h) => {
+      L.circleMarker([h.latitude, h.longitude], { radius: 6, className: 'fm-halt', weight: 2 })
+        .bindTooltip(`${h.paused ? 'En pausa' : 'Detenido'} ${formatTime(Date.parse(h.from))} a ${formatTime(Date.parse(h.to))} · ${formatDuration(h.ms)}`)
+        .addTo(g);
+    });
     const first = all[0] ?? start;
     const to = live ? (all.at(-1) ?? null) : (end ?? all.at(-1) ?? null);
     if (first) L.circleMarker(first, { radius: 6, className: 'fm-start', weight: 3 }).bindTooltip('Salida (GPS)').addTo(g);
@@ -122,7 +142,7 @@ export function TripMap({ route, start, end, declared, live, stops = [], label }
     framed.current = wanted;
     if (places.length === 1 && places[0]) m.setView(places[0], 11, { animate: false });
     else m.fitBounds(L.latLngBounds(places), { padding: [40, 40], maxZoom: 13, animate: false });
-  }, [route, start, end, origin, destination, live, stops]);
+  }, [route, start, end, origin, destination, live, stops, halts]);
 
   return <div ref={box} className="fleet-map map-trip" role="region" aria-label={label} />;
 }

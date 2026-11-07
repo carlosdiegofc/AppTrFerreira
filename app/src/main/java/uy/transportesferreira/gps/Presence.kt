@@ -33,6 +33,8 @@ object Presence {
      * done(sent) is called on another thread.
      */
     fun send(c:Context,name:String,vehicle:String?,version:String,place:()->Boolean,done:(Boolean)->Unit){
+        // In ghost mode the app says nothing (Modes, 6/11/2026).
+        if(Modes.ghost(c))return done(false)
         val uid=Api(c).session()?.optJSONObject("user")?.optString("id")?.takeIf{it.isNotBlank()}?:return done(false)
         if(!place()||!granted(c))thread{done(post(c,uid,name,vehicle,version,null))}
         else locate(c){fix->val still=fix?.takeIf{place()&&granted(c)};thread{done(post(c,uid,name,vehicle,version,still))}}

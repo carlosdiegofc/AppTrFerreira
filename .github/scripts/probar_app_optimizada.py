@@ -128,12 +128,23 @@ def wait(what: str, found, seconds: int = 30):
 
 def tap_until(what: str, target, after, tries: int = 3, seconds: int = 20):
     """Taps target(screen) until after(screen) shows up: a slow emulator can lose a tap (29/10/2026)."""
-    return act_until(what, lambda: tap(wait(what, target)[0]), after, tries, seconds)
+    def act() -> None:
+        # The tap may still be on its way: what it opens counts too, and then nothing is tapped again.
+        hit = wait(what, lambda r: ['done'] if after(r) else target(r))
+        if hit != ['done']:
+            tap(hit[0])
+    return act_until(what, act, after, tries, seconds)
 
 
 def act_until(what: str, act, after, tries: int = 3, seconds: int = 20):
     """Does act() until after(screen) shows up: a slow emulator can lose a tap, a key or typed text (29/10/2026)."""
     for attempt in range(tries):
+        if attempt > 0:
+            # A late action may have done its work after the wait: then it is not repeated.
+            root = screen()
+            hit = after(root) if root is not None else None
+            if hit:
+                return hit
         act()
         end = time.time() + seconds
         while time.time() < end:
@@ -203,7 +214,18 @@ try:
     step('Política de privacidad: sale de los archivos de la app')
     tap_until('el enlace a la política de privacidad', lambda r: nodes(r, text='Política de privacidad'), lambda r: nodes(r, part='Última actualización'))
     shot('2-privacidad')
-    act_until('volver de la política', lambda: adb('shell', 'input', 'keyevent', 'KEYCODE_BACK'), sign_in_screen)
+    # The system's back and the app's own «Volver» button, in turns: a slow emulator can lose a key or a tap, and on
+    # 3/11/2026 it lost the key and then three taps in a row.
+    tries = iter(range(20))
+
+    def go_back() -> None:
+        root = screen() if next(tries) % 2 else None
+        button = nodes(root, desc='Volver') if root is not None else []
+        if button:
+            tap(button[0])
+        else:
+            adb('shell', 'input', 'keyevent', 'KEYCODE_BACK')
+    act_until('volver de la política', go_back, sign_in_screen, tries=6)
 
     step('Girar la pantalla: la app se vuelve a armar en el ingreso')
     adb('shell', 'settings', 'put', 'system', 'accelerometer_rotation', '0')

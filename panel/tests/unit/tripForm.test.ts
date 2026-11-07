@@ -5,6 +5,7 @@ import { type PanelTripRow, type SessionRow, tripFromPanel, tripFromSession } fr
 
 // Same cases as the current panel (web/tests/unit/trips.test.mjs), so both panels save a trip alike.
 const session = (over: Partial<SessionRow> = {}): SessionRow => ({
+  auto: false, confirmation: null, confirmed_at: null, confirmed_by: null, confirmed_role: null,
   id: 'aaaaaaaa-0000-4000-8000-000000000001', driver_id: 'd1', driver_name: 'Immer Sampayo', vehicle: 'Ford Cargo 1722 · ITP2187',
   started_at: '2025-07-30T11:00:00+00:00', ended_at: '2025-07-30T13:40:00+00:00', active: false, paused: false, load_type: 'loaded',
   distance_meters: 184200, origin_lat: -32.698, origin_lng: -57.627, arrival_lat: -33.87, arrival_lng: -58.411, ...over,

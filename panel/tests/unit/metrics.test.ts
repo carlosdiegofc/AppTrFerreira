@@ -10,6 +10,7 @@ function trip(over: Partial<Trip> & { day?: string } = {}): Trip {
   n++;
   return {
     key: 'app:' + n,
+    confirmation: null,
     source: 'app',
     appTripId: String(n),
     panelId: null,
